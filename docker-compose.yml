@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: arpia-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-arpia}
+      POSTGRES_USER: ${POSTGRES_USER:-arpia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arpia_secret}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arpia} -d ${POSTGRES_DB:-arpia}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build: ./backend
+    container_name: arpia-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://arpia:arpia_secret@db:5432/arpia}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev_secret_change_me}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

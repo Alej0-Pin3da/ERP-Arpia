@@ -88,6 +88,7 @@ Controla las salidas, calcula márgenes y distribuye utilidades.
 *   **`Ventas`**
     *   `id` (PK), `fecha` (DateTime)
     *   `cliente_id` (FK -> Clientes, Nullable) - *Ventas sin cliente registrado quedan permitidas (ej. ferias), pero con trazabilidad.*
+    *   `canal_venta` (`web`, `whatsapp`, `instagram`, `feria`) - *Origen de la venta; la persona que figura en el registro es el cliente, no un vendedor.*
     *   `descuento_porcentaje` (NUMERIC)
     *   `estado` (`completada`, `anulada`) - *Las anulaciones pasan por el módulo de devoluciones, nunca borran filas.*
     *   `total_venta` (NUMERIC)
@@ -160,4 +161,88 @@ Controla las salidas, calcula márgenes y distribuye utilidades.
 
 ## 5. Cómo ejecutar el proyecto
 
-*(Se completa al finalizar la Fase 1: comandos de `docker-compose up`, migraciones Alembic y seed inicial.)*
+### Requisitos
+* Docker + Docker Compose (para la base de datos PostgreSQL y la API).
+* Python 3.11+ (solo para desarrollo local fuera de Docker).
+
+### Arranque completo con Docker (API + base de datos)
+
+```bash
+# 1. Configurar variables (copiar y ajustar si hace falta)
+cp .env.example .env
+
+# 2. Levantar la base de datos y la API
+docker compose up --build -d
+
+# 3. Aplicar migraciones y sembrar datos iniciales
+docker compose exec api alembic upgrade head
+docker compose exec api python -m app.seeder
+```
+
+La API queda disponible en `http://localhost:8000` (documentación interactiva en `/docs`) y PostgreSQL en `localhost:5432`.
+
+> **Nota Windows/WAMP:** si el puerto 5432 está ocupado por un PostgreSQL local, define `DB_PORT=5433` en `.env` (el contenedor sigue exponiendo su 5432 interno).
+
+### Desarrollo local con venv (sin contenedor de API)
+
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate          # Windows; en Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env            # asegúrate de que DATABASE_URL use localhost:5433 si DB_PORT=5433
+alembic upgrade head
+python -m app.seeder
+uvicorn app.main:app --reload
+```
+
+### Credenciales iniciales (seed)
+
+| Rol | Email | Contraseña |
+| --- | --- | --- |
+| admin | `admin@arpia.com` | `Admin123!` |
+
+> **Seguridad:** cambia `JWT_SECRET_KEY` y las contraseñas del seed antes de cualquier despliegue. Los secretos viven en `.env` (ignorado por git), nunca versionados.
+
+### Tests
+
+```bash
+cd backend
+.venv\Scripts\activate
+pytest
+```
+
+Los tests cubren health, login JWT, roles (401/403/201) y CRUD de insumos contra PostgreSQL real vía Docker. La configuración resuelve `.env` de forma absoluta respecto al backend, por lo que los comandos funcionan desde cualquier directorio.
+
+---
+
+## 6. Anexo: Modelo real desde `ARPIA.xlsx`
+
+Este anexo documenta cómo se almacenan actualmente los datos de ARPIA en el archivo de trabajo `ARPIA.xlsx`, y qué confirma o ajusta sobre el modelo relacional de este documento. Es la fuente de verdad del negocio y guía la implementación.
+
+### Cómo se organiza hoy el archivo
+
+| Hoja | Qué contiene |
+| --- | --- |
+| `VENTAS` | Ventas por fila: producto, talla, precio venta, costo, ganancias, reparto (Reinversión / Margara / Valqui), fecha, canal y cliente. |
+| `INVENTARIO OCT25` | Stock separado en **MATERIAL** (telas/empaques), **HERRAJES** (argolla, varillas, ganchos) y **PRENDAS** (terminadas con talla): `INICIAL / VENTAS / FINAL`. |
+| `Proveedores` | Tipo, nombre, URL, precio unitario, ubicación, contactado. |
+| `DESCUENTOS` | Descuento en $ y %, venta neta, ganancia y reparto por socio. |
+| `GASTOS ARPIA` | Gastos, retiros y distribución por socio. |
+| Hojas de producto (`CORSET`, `BUSTIER`, `Braleth`, etc.) | **Receta BOM real**: por cada insumo (tela, varilla, fijaciones), dimensión (ancho x alto), `cantidad Cms`, `valor metro` y `valor total`. |
+
+### Qué confirma el archivo sobre el modelo
+
+*   **Costo snapshot en ventas:** cada fila de `VENTAS` conserva el costo histórico (ej. `Costo 129388`) junto al precio, tal como modelamos con `Detalle_Ventas.costo_unitario_aplicado`. El margen se calcula contra ese valor, no contra el costo actual.
+*   **Reparto por socios:** el archivo reparte `Ganancias` en **Reinversión 40% / Margarita 30% / Veki 30%**. Coincide con `Socios_Configuracion`.
+*   **Variantes:** tallas (`S`, `M`, `L`, `XS`) y colores/referencias (`vino`, `blanco`) → valida `Variantes_Producto` y `BOM_Insumos.variante_id`.
+*   **Descuentos:** `DESC %` y `DESC $` por operación → valida `Ventas.descuento_porcentaje`.
+*   **Clientes y canales de venta:** la persona que figura en cada venta (ej. `gaby`, `celeste`, `Maira`) es el **cliente**, no un vendedor. Las ventas pueden originarse por **web, WhatsApp, Instagram o feria** → justifica el campo `Ventas.canal_venta`.
+
+### Ajustes que el archivo impone sobre el modelo
+
+1. **Unidades y conversión en el BOM (crítico).** En la realidad, los insumos de tela se cotizan en **metros** (`valor`) y se consumen en la receta en **centímetros** (`cantidad Cms`, ej. 4800 cms). Para que la explosión de inventario y el costo dinámico no se descalibren:
+   - `Insumos.unidad_medida` y `BOM_Insumos.cantidad_requerida` deben estar en la **misma unidad**, o fijar una **unidad maestra + factor de conversión** (se recomienda metros como unidad maestra para textil).
+   - El costo se calcula `cantidad_requerida * unitario` con el unitario en la unidad maestra.
+2. **Materiales vs Herrajes.** El archivo separa `MATERIALES` (telas, empaques, químicos) de `HERRAJES` (argollas, varillas, oches, ganchos) porque se compran y valoran distinto (por metro vs por unidad). Ambos viven en `Insumos` con `unidad_medida` distinta, pero conviene mantener la separación visible en UI/compras.
+3. **Stock por prenda terminada.** `PRENDAS` lleva talla y contador `INICIAL / VENTAS / FINAL`, separado del stock de materia prima. Reafirma la necesidad de inventario de acabado por **producto + variante**, además del inventario de insumos del BOM.

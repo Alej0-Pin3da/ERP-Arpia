@@ -17,3 +17,6 @@ node_modules/
 
 # Docker
 postgres_data/
+
+# Datos de negocio locales (hoja de cálculo de trabajo, no código)
+ARPIA.xlsx
