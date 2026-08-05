@@ -1,5 +1,6 @@
 from app.db.base import Base
 from app.models.clientes import Cliente
+from app.models.refresh_token import RefreshToken
 from app.models.finanzas import MovimientoFinanciero, SociosConfiguracion
 from app.models.insumos import CategoriaInsumo, CompraInsumo, Insumo
 from app.models.productos import (
@@ -17,6 +18,7 @@ __all__ = [
     "Base",
     "Usuario",
     "Cliente",
+    "RefreshToken",
     "Proveedor",
     "CategoriaInsumo",
     "Insumo",
