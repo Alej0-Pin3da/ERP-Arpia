@@ -49,13 +49,13 @@ Chain strategy: stacked-to-main
 
 ## Slice 3: Cost Engine — PR 3 (RED → GREEN)
 
-- [ ] 3.1 Create `backend/app/schemas/costo.py`: CostoLineaRead {tipo, id, nombre, cantidad, costo_unitario, costo_total} + CostoProduccionRead {total, lineas[]}.
-- [ ] 3.2 RED `test_costos.py` service: single 2×5+10=20.0000; waste 10×20%×5=60.0000; multilevel A(B×2)+10=70.0000; variant override; base fallback; non-fabricated→15.0000; no-BOM→15.0000; cycle A→B→A→409; precision no rounding; diamond A→{B,C}→D + cursor-execute counter (D once).
-- [ ] 3.3 GREEN `services/costos.py`: `calcular_costo_produccion(db, pid, vid=None)` + `desglosar_costo_produccion`; core `_calcular` with memo keyed (pid, vid) intra-call + path-stack cycle→409; effective qty×costo_promedio_actual; combo cantidad×child (vid propagates, unknown→NULL base); + fijos per level; read-only, no commits.
-- [ ] 3.4 RED endpoint: GET /productos/{id}/costo — 200 total+lineas (combo carries recursive cost), 404, 409 cycle, consulta 200, no token 401.
-- [ ] 3.5 GREEN `routes/costos.py`: GET /productos/{id}/costo (audited_user) → `desglosar_costo_produccion`.
-- [ ] 3.6 Wire `costos` in router.py (shares /productos prefix, no collision).
-- [ ] 3.7 Close: `pytest backend/tests/test_costos.py -q` green.
+- [x] 3.1 Create `backend/app/schemas/costo.py`: CostoLineaRead {tipo, id, nombre, cantidad, costo_unitario, costo_total} + CostoProduccionRead {total, lineas[]}.
+- [x] 3.2 RED `test_costos.py` service: single 2×5+10=20.0000; waste 10×20%×5=60.0000; multilevel A(B×2)+10=70.0000; variant override; base fallback; non-fabricated→15.0000; no-BOM→15.0000; cycle A→B→A→409; precision no rounding; diamond A→{B,C}→D + cursor-execute counter (D once).
+- [x] 3.3 GREEN `services/costos.py`: `calcular_costo_produccion(db, pid, vid=None)` + `desglosar_costo_produccion`; core `_calcular` with memo keyed (pid, vid) intra-call + path-stack cycle→409; effective qty×costo_promedio_actual; combo cantidad×child (vid propagates, unknown→NULL base); + fijos per level; read-only, no commits.
+- [x] 3.4 RED endpoint: GET /productos/{id}/costo — 200 total+lineas (combo carries recursive cost), 404, 409 cycle, consulta 200, no token 401.
+- [x] 3.5 GREEN `routes/costos.py`: GET /productos/{id}/costo (audited_user) → `desglosar_costo_produccion`.
+- [x] 3.6 Wire `costos` in router.py (shares /productos prefix, no collision).
+- [x] 3.7 Close: `pytest backend/tests/test_costos.py -q` green.
 
 ## Phase 4: Final Verification
 
