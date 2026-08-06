@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     auth,
+    bom,
     categorias_insumos,
     clientes,
     compras_insumos,
@@ -20,5 +21,6 @@ api_router.include_router(insumos.router)
 api_router.include_router(compras_insumos.router)
 api_router.include_router(clientes.router)
 api_router.include_router(productos.router)
+api_router.include_router(bom.router)
 api_router.include_router(tipos_productos.router)
 api_router.include_router(usuarios.router)

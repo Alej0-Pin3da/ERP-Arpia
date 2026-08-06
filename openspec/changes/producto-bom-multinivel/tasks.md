@@ -38,14 +38,14 @@ Chain strategy: stacked-to-main
 
 ## Slice 2: BOM Recipes — PR 2 (RED → GREEN)
 
-- [ ] 2.1 Create `backend/app/schemas/bom.py`: BomInsumo (variante_id optional, cantidad_requerida `gt=0`, porcentaje_desperdicio `ge=0 le=100` default 0) + BomProducto (cantidad `gt=0`) Create/Update/Read.
-- [ ] 2.2 RED `test_bom.py` service-level: import validators from routes/bom.py — NULL+NULL→409, same-variant→409, NULL+variant→ok.
-- [ ] 2.3 RED endpoints insumos: create 201 (waste 0), insumo missing 400, waste 150→422, variant of other product 400, parent missing 404, dup NULL 409, dup variant 409, NULL+variant 201, PUT/DELETE.
-- [ ] 2.4 RED endpoints combos: create 201, dup combo 409, included missing 400, parent missing 404, cantidad 0→422, PUT/DELETE.
-- [ ] 2.5 RED authz: 401/403 + any-role GET 200.
-- [ ] 2.6 GREEN `routes/bom.py`: nested insumos + productos CRUD; product 404; insumo FK 400; variante FK + same-product 400; `validar_linea_insumo_unica` explicit SELECT→409 (IntegrityError fallback); dup combo→409.
-- [ ] 2.7 Wire `bom` in router.py.
-- [ ] 2.8 Close: `pytest backend/tests/test_bom.py -q` green.
+- [x] 2.1 Create `backend/app/schemas/bom.py`: BomInsumo (variante_id optional, cantidad_requerida `gt=0`, porcentaje_desperdicio `ge=0 le=100` default 0) + BomProducto (cantidad `gt=0`) Create/Update/Read.
+- [x] 2.2 RED `test_bom.py` service-level: import validators from routes/bom.py — NULL+NULL→409, same-variant→409, NULL+variant→ok.
+- [x] 2.3 RED endpoints insumos: create 201 (waste 0), insumo missing 400, waste 150→422, variant of other product 400, parent missing 404, dup NULL 409, dup variant 409, NULL+variant 201, PUT/DELETE.
+- [x] 2.4 RED endpoints combos: create 201, dup combo 409, included missing 400, parent missing 404, cantidad 0→422, PUT/DELETE.
+- [x] 2.5 RED authz: 401/403 + any-role GET 200.
+- [x] 2.6 GREEN `routes/bom.py`: nested insumos + productos CRUD; product 404; insumo FK 400; variante FK + same-product 400; `validar_linea_insumo_unica` explicit SELECT→409 (IntegrityError fallback); dup combo→409.
+- [x] 2.7 Wire `bom` in router.py.
+- [x] 2.8 Close: `pytest backend/tests/test_bom.py -q` green.
 
 ## Slice 3: Cost Engine — PR 3 (RED → GREEN)
 
