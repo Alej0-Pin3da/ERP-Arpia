@@ -1,0 +1,55 @@
+# openspec/config.yaml
+schema: spec-driven
+
+# Project context (kept under 10 lines)
+context: |
+  ERP/MRP inventory, production and sales management for ARPIA.
+  Monolithic modular FastAPI + SQLAlchemy 2.0 + Alembic + PostgreSQL (Docker).
+  Backend in backend/ with app package (api/, core/, db/, models/, schemas/).
+  API prefix /api/v1. WAC (weighted average cost) inventory valuation, multilevel BOM.
+  Money and quantities NUMERIC(15,4); timestamps TIMESTAMPTZ.
+  Backend/.venv managed locally; tests run against a real PostgreSQL in Docker.
+  Project roadmap spans Phase 1 (auth/CRUD, done) through Phase 5 (returns, finance, dashboards).
+
+strict_tdd: true
+
+testing:
+  runner: pytest
+  command: pytest backend/tests -q
+  note: >
+    Run from any cwd with the backend venv on PATH:
+    `$env:PATH = "C:\\wamp64\\www\\ERP-Arpia\\backend\\.venv\\Scripts;" + $env:PATH; python -m pytest backend/tests -q`
+    Tests run against a real PostgreSQL via docker (backend/tests/conftest.py).
+    Seed admin: admin@arpia.com / Admin123!.
+  count: 24
+
+rules:
+  proposal:
+    - Address the current roadmap phase explicitly (WAC Phase 2 pending).
+    - Include concurrency strategy for Insumos (SELECT FOR UPDATE) where relevant.
+  specs:
+    - Use Given/When/Then scenarios.
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY).
+    - Respect the README conventions (transactions atomic; WAC snapshot costo_unitario_aplicado).
+  design:
+    - Include sequence/flow diagrams for cost and inventory engine work.
+    - Document architecture decisions with rationale (monolith by design).
+    - Use NUMERIC(15,4); never FLOAT for money.
+  tasks:
+    - Group by phase, use hierarchical numbering.
+    - Keep tasks completable in one session.
+    - Each phase is closed only when its core engine tests pass (README testing rule).
+  apply:
+    guidelines:
+      - Follow existing module layout under backend/app (routes in api/routes).
+      - Keep API prefix /api/v1.
+      - Transactions commit/rollback via db.session; SELECT FOR UPDATE for Insumos reads.
+      - Secrets via .env only; never hardcode.
+    tdd: true
+    test_command: "pytest backend/tests -q"
+  verify:
+    test_command: "pytest backend/tests -q"
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas.

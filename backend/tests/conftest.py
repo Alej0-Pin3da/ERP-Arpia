@@ -41,6 +41,30 @@ def _operador_user():
 
 
 @pytest.fixture(scope="module")
+def _consulta_user():
+    db = SessionLocal()
+    try:
+        existing = (
+            db.query(Usuario).filter(Usuario.email == "consulta@arpia.com").first()
+        )
+        if existing:
+            user = existing
+        else:
+            user = Usuario(
+                nombre="Consulta",
+                email="consulta@arpia.com",
+                password_hash=hash_password("Consulta123!"),
+                rol="consulta",
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        yield user
+    finally:
+        db.close()
+
+
+@pytest.fixture(scope="module")
 def categoria_fixture():
     db = SessionLocal()
     try:
@@ -76,6 +100,16 @@ def operador_token(client, _operador_user):
     resp = client.post(
         "/api/v1/auth/login",
         json={"email": "operador@arpia.com", "password": "Operador123!"},
+    )
+    resp.raise_for_status()
+    return resp.json()["access_token"]
+
+
+@pytest.fixture
+def consulta_token(client, _consulta_user):
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "consulta@arpia.com", "password": "Consulta123!"},
     )
     resp.raise_for_status()
     return resp.json()["access_token"]
