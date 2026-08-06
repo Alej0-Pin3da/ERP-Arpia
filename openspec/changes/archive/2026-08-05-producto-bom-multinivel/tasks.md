@@ -59,5 +59,14 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: Final Verification
 
-- [ ] 4.1 Full suite `pytest backend/tests -q` green; no model/migration/README/.env changes.
-- [ ] 4.2 Verify router ordering/tags match insumos.py convention.
+- [x] 4.1 Full suite `pytest backend/tests -q` green; no model/migration/README/.env changes.
+- [x] 4.2 Verify router ordering/tags match insumos.py convention.
+
+> Archive-time reconciliation (2026-08-05): 4.1/4.2 are verify-owned Phase-4 tasks, not
+> implementation tasks. Both were executed and passed by the verification run itself
+> (see verify-report Completeness: "Verify-phase tasks (4.1-4.2): 2 - both executed and
+> passed by THIS verification"; full suite 122/122, exit 0; router ordering verified by
+> the app-import probe). Checkboxes were left open at apply time because verification
+> owns them; reconciled to `[x]` at archive per orchestrator instruction and
+> verify-report proof, so the archived audit trail shows no stale unchecked tasks.
+> Implementation tasks total: 24/24 (1.1-3.7).
