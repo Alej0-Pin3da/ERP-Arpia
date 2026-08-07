@@ -5,6 +5,7 @@
  * JSON body, no cookie support; rotation REQUIRES persistence). The XSS
  * tradeoff is documented in the design — accepted for this SPA.
  */
+import type { UsuarioRead } from './types'
 
 export const STORAGE_KEYS = {
   access: 'arpia_access',
@@ -43,6 +44,30 @@ export function writeUser(user: unknown): void {
     window.localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user))
   } catch {
     // Non-fatal.
+  }
+}
+
+/**
+ * Read the cached user payload. Returns null when absent or malformed —
+ * the auth store treats /auth/me as authoritative and overwrites this cache.
+ */
+export function readUser(): UsuarioRead | null {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.user)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<UsuarioRead> | null
+    if (
+      parsed &&
+      typeof parsed.id === 'number' &&
+      typeof parsed.nombre === 'string' &&
+      typeof parsed.email === 'string' &&
+      typeof parsed.rol === 'string'
+    ) {
+      return parsed as UsuarioRead
+    }
+    return null
+  } catch {
+    return null
   }
 }
 
