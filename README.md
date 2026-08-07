@@ -144,6 +144,13 @@ Controla las salidas, calcula márgenes y distribuye utilidades.
 3.  **Gestión de Gastos:** CRUD para `Movimientos_Financieros`.
 4.  **Endpoints Analíticos:** Rutas que consolidan datos para el frontend (ventas mensuales, insumos con stock crítico según `stock_minimo`, margen por producto).
 
+### Fase 6: Frontend y Dashboard (Semana 9)
+1.  **Stack frontend:** Aplicación web (Vue o React) que consume la API `/api/v1`.
+2.  **Autenticación:** Login JWT con roles (`admin`, `operador`, `consulta`), sesión y guard de rutas.
+3.  **Dashboard analítico:** Paneles con ventas mensuales, insumos con stock crítico y margen por producto (consume los endpoints de Fase 5).
+4.  **Pantallas operativas:** Gestión de ventas, devoluciones, finanzas (movimientos y socios) e inventario.
+5.  **Despliegue:** Build estático servido desde cPanel / subdominio, apuntando a `api.arpia.com.co`.
+
 ---
 
 ## 4. Notas Clave para el Desarrollo
