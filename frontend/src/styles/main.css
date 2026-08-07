@@ -1,0 +1,11 @@
+/* Global styles — the layout shell (task 1.7) will refine this. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: #f9fafb;
+}
