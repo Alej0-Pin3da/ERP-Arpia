@@ -12,7 +12,7 @@ from app.models.productos import (
 )
 from app.models.proveedores import Proveedor
 from app.models.usuarios import Usuario
-from app.models.ventas import DetalleVenta, Devolucion, Venta
+from app.models.ventas import DetalleVenta, Devolucion, DevolucionItem, Venta
 
 __all__ = [
     "Base",
@@ -31,6 +31,7 @@ __all__ = [
     "Venta",
     "DetalleVenta",
     "Devolucion",
+    "DevolucionItem",
     "SociosConfiguracion",
     "MovimientoFinanciero",
 ]
