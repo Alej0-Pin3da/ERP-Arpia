@@ -1,12 +1,15 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    analiticos,
     auth,
     bom,
     categorias_insumos,
     clientes,
     compras_insumos,
     costos,
+    devoluciones,
+    finanzas,
     insumos,
     productos,
     proveedores,
@@ -28,3 +31,6 @@ api_router.include_router(costos.router)
 api_router.include_router(tipos_productos.router)
 api_router.include_router(usuarios.router)
 api_router.include_router(ventas.router)
+api_router.include_router(devoluciones.router)
+api_router.include_router(finanzas.router)
+api_router.include_router(analiticos.router)
