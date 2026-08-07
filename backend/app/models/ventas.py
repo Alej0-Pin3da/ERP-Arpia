@@ -7,6 +7,7 @@ from sqlalchemy import DateTime, ForeignKey, Numeric, String, CheckConstraint, f
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models.productos import VarianteProducto
 
 
 class Venta(Base):
@@ -16,6 +17,10 @@ class Venta(Base):
             "estado IN ('completada', 'anulada')",
             name="ck_ventas_estado",
         ),
+        CheckConstraint(
+            "canal_venta IN ('web', 'whatsapp', 'instagram', 'feria')",
+            name="ck_ventas_canal_venta",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -24,6 +29,9 @@ class Venta(Base):
     )
     cliente_id: Mapped[int | None] = mapped_column(
         ForeignKey("Clientes.id", ondelete="SET NULL"), nullable=True
+    )
+    canal_venta: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="feria", default="feria"
     )
     descuento_porcentaje: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
@@ -54,6 +62,9 @@ class DetalleVenta(Base):
     producto_id: Mapped[int] = mapped_column(
         ForeignKey("Productos.id", ondelete="RESTRICT"), nullable=False
     )
+    variante_id: Mapped[int | None] = mapped_column(
+        ForeignKey("Variantes_Producto.id", ondelete="SET NULL"), nullable=True
+    )
     cantidad: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
     precio_unitario_aplicado: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False
@@ -64,6 +75,7 @@ class DetalleVenta(Base):
 
     venta: Mapped[Venta] = relationship(back_populates="detalles")
     producto: Mapped[Producto] = relationship(lazy="selectin")
+    variante: Mapped[VarianteProducto | None] = relationship(lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<DetalleVenta id={self.id} venta_id={self.venta_id}>"
