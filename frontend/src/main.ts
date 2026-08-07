@@ -7,6 +7,11 @@ import 'element-plus/dist/index.css'
 import App from './App.vue'
 import './styles/main.css'
 
+// Initialize the API client singleton (baseURL from VITE_API_BASE_URL,
+// Bearer injection + single-flight refresh interceptors). The auth store
+// (PR3) will drive session state through storage.
+import '@/api/client'
+
 const app = createApp(App)
 
 app.use(createPinia())
