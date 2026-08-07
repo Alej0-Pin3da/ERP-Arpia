@@ -3,7 +3,16 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, CheckConstraint, func
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    CheckConstraint,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -38,6 +47,13 @@ class MovimientoFinanciero(Base):
             "tipo IN ('Gasto', 'Inversion', 'Retiro')",
             name="ck_movimientos_tipo",
         ),
+        # One-time settlement guard: a liquidacion_id may be used at most once.
+        Index(
+            "uq_liquidacion",
+            "liquidacion_id",
+            unique=True,
+            postgresql_where=text("liquidacion_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -50,6 +66,10 @@ class MovimientoFinanciero(Base):
     socio_id: Mapped[int | None] = mapped_column(
         ForeignKey("Socios_Configuracion.id", ondelete="SET NULL"), nullable=True
     )
+    estado: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="activo", default="activo"
+    )
+    liquidacion_id: Mapped[str | None] = mapped_column(String(12), nullable=True)
 
     socio: Mapped[SociosConfiguracion | None] = relationship()
 

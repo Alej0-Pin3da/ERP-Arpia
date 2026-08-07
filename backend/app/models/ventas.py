@@ -7,7 +7,7 @@ from sqlalchemy import DateTime, ForeignKey, Numeric, String, CheckConstraint, f
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.productos import VarianteProducto
+from app.models.productos import Producto, VarianteProducto
 
 
 class Venta(Base):
@@ -83,6 +83,12 @@ class DetalleVenta(Base):
 
 class Devolucion(Base):
     __tablename__ = "Devoluciones"
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('parcial', 'total')",
+            name="ck_devoluciones_tipo",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     venta_id: Mapped[int] = mapped_column(
@@ -93,8 +99,48 @@ class Devolucion(Base):
     )
     motivo: Mapped[str | None] = mapped_column(Text, nullable=True)
     monto_reembolsado: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
+    tipo: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="parcial", default="parcial"
+    )
+    usuario_id: Mapped[int | None] = mapped_column(
+        ForeignKey("Usuarios.id", ondelete="SET NULL"), nullable=True
+    )
 
     venta: Mapped[Venta] = relationship()
+    items: Mapped[list[DevolucionItem]] = relationship(
+        back_populates="devolucion", lazy="selectin"
+    )
 
     def __repr__(self) -> str:
-        return f"<Devolucion id={self.id} venta_id={self.venta_id}>"
+        return f"<Devolucion id={self.id} venta_id={self.venta_id} tipo={self.tipo!r}>"
+
+
+class DevolucionItem(Base):
+    __tablename__ = "Items_Devolucion"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    devolucion_id: Mapped[int] = mapped_column(
+        ForeignKey("Devoluciones.id", ondelete="CASCADE"), nullable=False
+    )
+    producto_id: Mapped[int] = mapped_column(
+        ForeignKey("Productos.id", ondelete="RESTRICT"), nullable=False
+    )
+    variante_id: Mapped[int | None] = mapped_column(
+        ForeignKey("Variantes_Producto.id", ondelete="SET NULL"), nullable=True
+    )
+    cantidad: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
+    precio_unitario: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
+    subtotal: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    devolucion: Mapped[Devolucion] = relationship(back_populates="items")
+    producto: Mapped[Producto] = relationship(lazy="selectin")
+    variante: Mapped[VarianteProducto | None] = relationship(lazy="selectin")
+
+    def __repr__(self) -> str:
+        return f"<DevolucionItem id={self.id} devolucion_id={self.devolucion_id}>"
