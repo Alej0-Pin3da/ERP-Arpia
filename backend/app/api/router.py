@@ -12,6 +12,7 @@ from app.api.routes import (
     proveedores,
     tipos_productos,
     usuarios,
+    ventas,
 )
 
 api_router = APIRouter()
@@ -26,3 +27,4 @@ api_router.include_router(bom.router)
 api_router.include_router(costos.router)
 api_router.include_router(tipos_productos.router)
 api_router.include_router(usuarios.router)
+api_router.include_router(ventas.router)
