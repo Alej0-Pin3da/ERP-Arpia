@@ -13,12 +13,14 @@
  *   3. not authenticated -> /login?redirect=<fullPath>
  *   4. role not in `meta.roles` -> /dashboard
  *
- * The layout shell (AppLayout, PR4) re-wraps these routes; view components
- * for modules land in PR4+ (RoutePlaceholder stands in until then).
+ * The layout shell (AppLayout, PR4) wraps every authenticated route as a
+ * child; `/login` stays standalone. View components for modules land in
+ * PR5+ (RoutePlaceholder stands in until then).
  */
 import { createRouter, createWebHistory, type RouteRecordRaw, type Router, type RouterHistory } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import AppLayout from '@/layouts/AppLayout.vue'
 import LoginView from '@/views/LoginView.vue'
 import RoutePlaceholder from '@/views/RoutePlaceholder.vue'
 
@@ -35,16 +37,25 @@ const ALL_ROLES = ['admin', 'operador', 'consulta']
 
 const routes: RouteRecordRaw[] = [
   { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
-  { path: '/', redirect: '/dashboard' },
-  // PR5 replaces the dashboard placeholder with DashboardView.
-  { path: '/dashboard', name: 'dashboard', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
-  { path: '/ventas', name: 'ventas', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
-  { path: '/devoluciones', name: 'devoluciones', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
-  { path: '/finanzas', name: 'finanzas', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
-  { path: '/inventario', name: 'inventario', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
-  { path: '/productos', name: 'productos', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
-  { path: '/maestros', name: 'maestros', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
-  { path: '/usuarios', name: 'usuarios', component: RoutePlaceholder, meta: { roles: ['admin'] } },
+  {
+    // Authenticated shell: every authed route renders inside AppLayout
+    // (header + role-aware sidebar + <router-view>). Child paths are
+    // relative to the parent, so full paths stay /dashboard, /ventas, ...
+    path: '/',
+    component: AppLayout,
+    children: [
+      { path: '', redirect: '/dashboard' },
+      // PR5 replaces the dashboard placeholder with DashboardView.
+      { path: 'dashboard', name: 'dashboard', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
+      { path: 'ventas', name: 'ventas', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
+      { path: 'devoluciones', name: 'devoluciones', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
+      { path: 'finanzas', name: 'finanzas', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
+      { path: 'inventario', name: 'inventario', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
+      { path: 'productos', name: 'productos', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
+      { path: 'maestros', name: 'maestros', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
+      { path: 'usuarios', name: 'usuarios', component: RoutePlaceholder, meta: { roles: ['admin'] } },
+    ],
+  },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
 
