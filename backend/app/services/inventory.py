@@ -127,6 +127,24 @@ def descontar_stock(db: Session, explosiones: dict[int, Decimal]) -> None:
         insumo.stock_actual -= cantidad
 
 
+def reponer_stock(db: Session, explosiones: dict[int, Decimal]) -> None:
+    """Restore an explosion's insumos back into stock (inverse restock).
+
+    Mirrors ``descontar_stock`` with the sign inverted: locks every affected
+    Insumo with SELECT ... FOR UPDATE in id order (deadlock-safe), re-reads the
+    latest committed row via ``populate_existing`` so concurrent restocks of the
+    same insumo never overwrite each other, and adds the quantity. An unknown
+    insumo raises 404. No commit here — the caller owns the transaction.
+    """
+    for insumo_id in sorted(explosiones):
+        insumo = db.get(
+            Insumo, insumo_id, with_for_update=True, populate_existing=True
+        )
+        if insumo is None:
+            raise HTTPException(status_code=404, detail="Insumo not found")
+        insumo.stock_actual += explosiones[insumo_id]
+
+
 def registrar_venta(db: Session, payload: dict) -> Venta:
     """Register a sale and deduct stock in ONE atomic commit.
 

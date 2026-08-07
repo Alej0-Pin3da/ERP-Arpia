@@ -41,6 +41,7 @@ from app.services.inventory import (
     descontar_stock,
     explosion_materiales,
     registrar_venta,
+    reponer_stock,
 )
 
 
@@ -663,6 +664,112 @@ def test_registrar_venta_commit_integrity_error_returns_409(monkeypatch):
         _cleanup_insumo(insumo_id)
         _cleanup_categoria(categoria_id)
         _cleanup_tipo(tipo_id)
+
+
+# ---------------------------------------------------------------------------
+# reponer_stock: inverse restock engine (S2.2)
+# ---------------------------------------------------------------------------
+
+
+def test_reponer_stock_adds_stock():
+    """reponer_stock increments stock_actual by the explosion qty (S2.2)."""
+    categoria_id = _make_categoria()
+    insumo_id = _make_insumo(categoria_id, stock="10")
+    try:
+        db = SessionLocal()
+        try:
+            reponer_stock(db, {insumo_id: Decimal("3")})
+            db.commit()
+        finally:
+            db.close()
+        assert _read_stock(insumo_id) == Decimal("13")
+    finally:
+        _cleanup_insumo(insumo_id)
+        _cleanup_categoria(categoria_id)
+
+
+def test_reponer_stock_multiple_insumos_increments_all():
+    """Two insumos in one call -> BOTH incremented (triangulation, S2.2)."""
+    categoria_id = _make_categoria()
+    x_id = _make_insumo(categoria_id, stock="5")
+    y_id = _make_insumo(categoria_id, stock="2")
+    try:
+        db = SessionLocal()
+        try:
+            reponer_stock(db, {x_id: Decimal("1"), y_id: Decimal("4")})
+            db.commit()
+        finally:
+            db.close()
+        assert _read_stock(x_id) == Decimal("6")
+        assert _read_stock(y_id) == Decimal("6")
+    finally:
+        _cleanup_insumo(x_id)
+        _cleanup_insumo(y_id)
+        _cleanup_categoria(categoria_id)
+
+
+def test_reponer_stock_unknown_insumo_raises_404():
+    """Unknown insumo_id -> 404, mirrors descontar_stock (S2.2)."""
+    db = SessionLocal()
+    try:
+        with pytest.raises(HTTPException) as excinfo:
+            reponer_stock(db, {99999999: Decimal("1")})
+    finally:
+        db.rollback()
+        db.close()
+    assert excinfo.value.status_code == 404
+
+
+def test_reponer_stock_no_internal_commit():
+    """Caller owns the txn: without commit a fresh session still sees the
+    pre-call stock value (S2.2 mirrors descontar_stock's no-commit rule)."""
+    categoria_id = _make_categoria()
+    insumo_id = _make_insumo(categoria_id, stock="10")
+    try:
+        db = SessionLocal()
+        try:
+            reponer_stock(db, {insumo_id: Decimal("3")})
+        finally:
+            db.rollback()
+            db.close()
+        assert _read_stock(insumo_id) == Decimal("10")  # nothing persisted
+    finally:
+        _cleanup_insumo(insumo_id)
+        _cleanup_categoria(categoria_id)
+
+
+def test_reponer_stock_concurrent_restocks_serialize_no_lost_update():
+    """Two parallel restocks of +2 on the same insumo -> final stock 14
+    (10+2+2). Without FOR UPDATE + populate_existing both threads would read
+    the stale 10 and both write 12 (lost update) (S2.2 FOR-UPDATE concurrency)."""
+    categoria_id = _make_categoria()
+    insumo_id = _make_insumo(categoria_id, stock="10")
+    barrier = threading.Barrier(2)
+    errors: list[Exception | None] = [None, None]
+
+    def restock(slot: int):
+        db = SessionLocal()
+        try:
+            barrier.wait(timeout=10)
+            reponer_stock(db, {insumo_id: Decimal("2")})
+            db.commit()
+        except Exception as exc:  # noqa: BLE001
+            errors[slot] = exc
+        finally:
+            db.close()
+
+    t1 = threading.Thread(target=restock, args=(0,))
+    t2 = threading.Thread(target=restock, args=(1,))
+    t1.start()
+    t2.start()
+    t1.join(timeout=30)
+    t2.join(timeout=30)
+
+    assert errors[0] is None, f"Thread 1 failed: {errors[0]}"
+    assert errors[1] is None, f"Thread 2 failed: {errors[1]}"
+    assert _read_stock(insumo_id) == Decimal("14")
+    _cleanup_insumo(insumo_id)
+    _cleanup_categoria(categoria_id)
 
 
 # ---------------------------------------------------------------------------
