@@ -4,7 +4,7 @@
  * formatter must handle Decimal-as-string, and degrade null/undefined/empty.
  */
 import { describe, it, expect } from 'vitest'
-import { formatMoney, parseDecimal, formatDate, formatDateTime } from '@/utils/format'
+import { formatMoney, formatQty, parseDecimal, formatDate, formatDateTime } from '@/utils/format'
 
 describe('formatMoney (Intl.NumberFormat es-CO, 2 decimals)', () => {
   it('formats a Decimal-as-string with es-CO grouping and 2 decimals', () => {
@@ -52,6 +52,28 @@ describe('parseDecimal (safe parse)', () => {
     expect(parseDecimal(null)).toBeNull()
     expect(parseDecimal(undefined)).toBeNull()
     expect(parseDecimal('')).toBeNull()
+  })
+})
+
+describe('formatQty (es-CO quantity, 0-2 decimals, no currency)', () => {
+  it('formats a whole quantity without decimals', () => {
+    expect(formatQty('5')).toBe('5')
+  })
+
+  it('formats a Decimal-as-string with es-CO grouping and up to 2 decimals', () => {
+    expect(formatQty('12345.5')).toBe('12.345,5')
+    expect(formatQty('123456.789')).toBe('123.456,79')
+  })
+
+  it('formats plain numbers', () => {
+    expect(formatQty(12.5)).toBe('12,5')
+  })
+
+  it('renders "0" for null / undefined / empty / non-numeric', () => {
+    expect(formatQty(null)).toBe('0')
+    expect(formatQty(undefined)).toBe('0')
+    expect(formatQty('')).toBe('0')
+    expect(formatQty('abc')).toBe('0')
   })
 })
 

@@ -67,6 +67,28 @@ function moneyWithSign(value: number): string {
   return value < 0 ? `-$${formatted}` : `$${formatted}`
 }
 
+// Quantity formatter: es-CO grouping, 0-2 decimals, NO currency symbol
+// (stocks, counts). Money is formatMoney's job; this keeps the two apart.
+const qtyFormatter = new Intl.NumberFormat('es-CO', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+})
+
+/**
+ * Format a quantity (stock, counts) as es-CO ("1.234,5"). null/undefined/
+ * empty/non-numeric -> "0". Never renders a currency symbol.
+ */
+export function formatQty(value: string | number | null | undefined): string {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? qtyFormatter.format(value) : '0'
+  }
+  if (value === null || value === undefined || value.trim() === '') {
+    return '0'
+  }
+  const parsed = parseDecimal(value)
+  return parsed === null ? '0' : qtyFormatter.format(parsed)
+}
+
 /**
  * Format an ISO date ("2026-08-07" or full datetime) as es-CO dd/mm/yyyy.
  * null/undefined/invalid -> null.

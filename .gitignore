@@ -20,3 +20,5 @@ postgres_data/
 
 # Datos de negocio locales (hoja de cálculo de trabajo, no código)
 ARPIA.xlsx
+# CodeGraph local index (machine-local, regenerable)
+.codegraph/
