@@ -16,3 +16,11 @@ export function isUnauthorized(err: unknown): boolean {
     (err as { response: { status: number } }).response.status === 401
   )
 }
+
+/**
+ * es-CO message for a runtime 403 (spec SHELL-5). The backend detail is
+ * English ("Role 'operador' is not allowed to perform this action"), so the
+ * UI copy is a fixed Spanish role-restriction explanation — this SPA's
+ * convention is Spanish interface text.
+ */
+export const FORBIDDEN_MESSAGE = 'No tienes permisos para realizar esta acción'
