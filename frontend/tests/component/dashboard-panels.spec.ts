@@ -8,7 +8,7 @@
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
-import { nextTick } from 'vue'
+import { nextTick, type Component } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 
 import BajoStockTable from '@/components/dashboard/BajoStockTable.vue'
@@ -16,7 +16,9 @@ import KpiCards from '@/components/dashboard/KpiCards.vue'
 import MargenTable from '@/components/dashboard/MargenTable.vue'
 import VentasMensualesChart from '@/components/dashboard/VentasMensualesChart.vue'
 import type { FilledMonthRow, MargenRow } from '@/utils/dashboard'
-import type { InsumoBajoStockRead } from '@/types/api.d'
+import type { components } from '@/types/api.d'
+
+type InsumoBajoStockRead = components['schemas']['InsumoBajoStockRead']
 
 // jsdom has no canvas — stub vue-echarts with a prop-recording component so
 // tests can inspect the option the chart WOULD receive.
@@ -29,8 +31,8 @@ const { VChartStub } = vi.hoisted(() => ({
 }))
 vi.mock('vue-echarts', () => ({ default: VChartStub }))
 
-async function mountPanel(component: unknown, props: Record<string, unknown>): Promise<VueWrapper> {
-  const wrapper = mount(component as never, { props, global: { plugins: [ElementPlus] } })
+async function mountPanel(component: Component, props: Record<string, unknown>): Promise<VueWrapper> {
+  const wrapper = mount(component, { props, global: { plugins: [ElementPlus] } })
   // el-table paints its body one tick after mount (ResizeObserver layout).
   await nextTick()
   return wrapper

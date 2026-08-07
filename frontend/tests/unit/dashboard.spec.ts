@@ -9,19 +9,19 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import type {
-  InsumoBajoStockRead,
-  MargenProductoRead,
-  ProductoRead,
-  VentasMensualesRead,
-  VarianteProductoRead,
-} from '@/types/api.d'
+import type { components } from '@/types/api.d'
 import {
   buildMargenRows,
   fillMissingMonths,
   lastMonthSummary,
   stockSeverity,
 } from '@/utils/dashboard'
+
+type VentasMensualesRead = components['schemas']['VentasMensualesRead']
+type InsumoBajoStockRead = components['schemas']['InsumoBajoStockRead']
+type MargenProductoRead = components['schemas']['MargenProductoRead']
+type ProductoRead = components['schemas']['ProductoRead']
+type VarianteProductoRead = components['schemas']['VarianteProductoRead']
 
 const ROW = (mes: string, total: string, cantidad = 1): VentasMensualesRead => ({ mes, total, cantidad })
 

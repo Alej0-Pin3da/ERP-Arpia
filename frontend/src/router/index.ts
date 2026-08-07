@@ -22,6 +22,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw, type Router, type 
 import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/layouts/AppLayout.vue'
 import LoginView from '@/views/LoginView.vue'
+import DashboardView from '@/views/DashboardView.vue'
 import RoutePlaceholder from '@/views/RoutePlaceholder.vue'
 
 declare module 'vue-router' {
@@ -45,8 +46,8 @@ const routes: RouteRecordRaw[] = [
     component: AppLayout,
     children: [
       { path: '', redirect: '/dashboard' },
-      // PR5 replaces the dashboard placeholder with DashboardView.
-      { path: 'dashboard', name: 'dashboard', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
+      // Dashboard landed in PR5; remaining modules keep the placeholder.
+      { path: 'dashboard', name: 'dashboard', component: DashboardView, meta: { roles: ALL_ROLES } },
       { path: 'ventas', name: 'ventas', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
       { path: 'devoluciones', name: 'devoluciones', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
       { path: 'finanzas', name: 'finanzas', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },

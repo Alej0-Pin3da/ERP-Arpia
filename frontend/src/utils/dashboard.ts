@@ -11,13 +11,13 @@
  *    labels are joined client-side (GET /productos + /variantes) with
  *    graceful fallbacks when a product/variant no longer exists.
  */
-import type {
-  MargenProductoRead,
-  ProductoRead,
-  VentasMensualesRead,
-  VarianteProductoRead,
-} from '@/types/api.d'
+import type { components } from '@/types/api.d'
 import { parseDecimal } from './format'
+
+type VentasMensualesRead = components['schemas']['VentasMensualesRead']
+type MargenProductoRead = components['schemas']['MargenProductoRead']
+type ProductoRead = components['schemas']['ProductoRead']
+type VarianteProductoRead = components['schemas']['VarianteProductoRead']
 
 /** One chart bar: a calendar month, zero-filled when the API has no row. */
 export interface FilledMonthRow {
