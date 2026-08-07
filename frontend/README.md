@@ -67,11 +67,14 @@ npm run format  # Prettier
 
 ## Generate API types
 
-Regenerates `src/types/api.d.ts` from the backend OpenAPI schema (requires the
-backend running on `localhost:8000`):
+Regenerates `src/types/api.d.ts` from the backend OpenAPI schema. The script
+sources the **production** schema (`https://api.arpia.com.co/api/v1/openapi.json`)
+so a local backend instance is not required. To generate from a local backend
+instead, pass its URL explicitly:
 
 ```bash
 npm run gen:api
+npx openapi-typescript http://localhost:8000/api/v1/openapi.json -o src/types/api.d.ts
 ```
 
 ## Environment variables
