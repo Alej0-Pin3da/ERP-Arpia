@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -14,6 +15,8 @@ def registrar_compra(
     proveedor_id: int | None,
     cantidad: str | Decimal,
     precio_unitario: str | Decimal,
+    fecha_compra: datetime | None = None,
+    commit: bool = True,
 ) -> CompraInsumo:
     """Register a purchase and recompute the weighted-average cost in one transaction.
 
@@ -21,8 +24,20 @@ def registrar_compra(
       same insumo serialize on the row lock (no lost updates).
     - Computes nuevo_costo = (stock*cost + cantidad*price) / (stock + cantidad) in
       Decimal without rounding; NUMERIC(15,4) storage quantizes at write.
-    - Commits atomically (single commit); on any failure rolls back and re-raises.
+    - ``fecha_compra``: optional timezone-aware datetime (TIMESTAMPTZ). Omitted or
+      None keeps the current behavior (server_default ``now()``); an explicit aware
+      value is persisted as-is. The WAC formula never uses the date. A naive datetime
+      is rejected with TypeError — never persist an ambiguous timestamp.
+    - ``commit=True`` (default) commits atomically; ``commit=False`` leaves the
+      caller in control of the transaction (used by historical batch loads).
+      On any failure rolls back and re-raises.
     """
+    if fecha_compra is not None and fecha_compra.tzinfo is None:
+        raise TypeError(
+            "fecha_compra must be timezone-aware (TIMESTAMPTZ column); "
+            "got a naive datetime. Pass an aware datetime or None for server_default now()."
+        )
+
     cantidad_dec = Decimal(str(cantidad))
     precio_dec = Decimal(str(precio_unitario))
 
@@ -52,10 +67,12 @@ def registrar_compra(
             proveedor_id=proveedor_id,
             cantidad_comprada=cantidad_dec,
             precio_unitario_compra=precio_dec,
+            fecha_compra=fecha_compra,
         )
         db.add(compra)
-        db.commit()
-        db.refresh(compra)
+        if commit:
+            db.commit()
+            db.refresh(compra)
         return compra
     except IntegrityError:
         # FK/constraint violation (e.g. concurrent insumo deletion) -> no 500 leak.
