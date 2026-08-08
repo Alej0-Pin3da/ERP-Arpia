@@ -147,8 +147,9 @@ export const analiticosApi = {
 // --- insumos / compras ------------------------------------------------------
 
 export const insumosApi = {
-  list(): Promise<Res<'/api/v1/insumos', 'get'>> {
-    return client.get('/insumos').then((r) => r.data)
+  /** GET /insumos — supports limit/offset (the backend defaults to limit=50). */
+  list(params?: Query<'/api/v1/insumos', 'get'>): Promise<Res<'/api/v1/insumos', 'get'>> {
+    return client.get('/insumos', { params }).then((r) => r.data)
   },
   get(
     params: PathParams<'/api/v1/insumos/{insumo_id}', 'get'>,
@@ -172,8 +173,9 @@ export const insumosApi = {
 }
 
 export const comprasApi = {
-  list(): Promise<Res<'/api/v1/compras-insumos', 'get'>> {
-    return client.get('/compras-insumos').then((r) => r.data)
+  /** GET /compras-insumos — optional insumo_id filter + limit/offset. */
+  list(params?: Query<'/api/v1/compras-insumos', 'get'>): Promise<Res<'/api/v1/compras-insumos', 'get'>> {
+    return client.get('/compras-insumos', { params }).then((r) => r.data)
   },
   create(
     body: ReqBody<'/api/v1/compras-insumos', 'post'>,
