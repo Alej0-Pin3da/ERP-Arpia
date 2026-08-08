@@ -12,8 +12,10 @@
 #   3) Sync backend to the app dir
 #   4) Run alembic migrations
 #   5) Restart the Passenger app
+#   6) (Optional) Deploy the frontend — enabled with DEPLOY_FRONTEND=1
 #
 # Adjust CLONE / APP / VENV / REPO_URL if the server layout changes.
+# Frontend docroot / URL live in scripts/deploy-frontend.sh.
 # =============================================================================
 set -euo pipefail
 
@@ -61,6 +63,20 @@ alembic current
 
 echo "==> [6/6] Restarting Passenger app"
 touch "$APP/passenger_wsgi.py"
+
+# =============================================================================
+# Optional step 7: frontend deploy (static SPA -> app.arpia.com.co docroot).
+# Disabled by default so backend deploys behave exactly as before.
+# Enable with:  DEPLOY_FRONTEND=1 bash scripts/deploy.sh [branch]
+# The frontend is a static bundle (no Passenger restart needed); this just
+# builds frontend/ and syncs dist/ to FRONTEND_DOCROOT in deploy-frontend.sh.
+# =============================================================================
+if [ "${DEPLOY_FRONTEND:-0}" = "1" ]; then
+  echo "==> [7/7] Deploying frontend"
+  bash "$CLONE/scripts/deploy-frontend.sh" "$BRANCH"
+else
+  echo "==> [7/7] Skipping frontend deploy (set DEPLOY_FRONTEND=1 to enable)"
+fi
 
 echo ""
 echo "==> Deploy complete. Verify:"
