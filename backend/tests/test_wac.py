@@ -9,6 +9,7 @@ SessionLocal for concurrency), matching the design's service-level test strategy
 """
 
 import threading
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -414,3 +415,154 @@ def test_different_insumos_run_in_parallel(categoria_fixture):
     assert cost_a == Decimal("7.6667") and cost_b == Decimal("7.6667")
     _cleanup_insumo(ins_a)
     _cleanup_insumo(ins_b)
+
+
+# ---------------------------------------------------------------------------
+# Requirement: fecha_compra opcional + commit controlado (migracion slice 2)
+# ---------------------------------------------------------------------------
+
+
+def _read_compra_fecha(compra_id: int) -> datetime | None:
+    db = SessionLocal()
+    try:
+        compra = db.get(CompraInsumo, compra_id)
+        return compra.fecha_compra if compra else None
+    finally:
+        db.close()
+
+
+def test_compra_fecha_explicita_persistida(categoria_fixture):
+    """fecha_compra aware explícita -> se persiste esa fecha (TIMESTAMPTZ)."""
+    ins = _make_insumo(categoria_fixture["id"], stock="10", costo="5")
+    try:
+        db = SessionLocal()
+        try:
+            fecha = datetime(2025, 10, 25, 14, 30, 0, tzinfo=timezone.utc)
+            compra = registrar_compra(
+                db,
+                insumo_id=ins,
+                proveedor_id=None,
+                cantidad="10",
+                precio_unitario="9",
+                fecha_compra=fecha,
+            )
+        finally:
+            db.close()
+        persistida = _read_compra_fecha(compra.id)
+        assert persistida is not None
+        assert persistida.astimezone(timezone.utc) == fecha
+        # La fecha NO participa en la formula WAC: stock/costo identicos.
+        stock, costo = _read_inventory(ins)
+        assert stock == Decimal("20")
+        assert costo == Decimal("7")
+    finally:
+        _cleanup_insumo(ins)
+
+
+def test_compra_fecha_none_usa_server_default(categoria_fixture):
+    """fecha_compra=None (omision) -> server_default now(), comportamiento intacto."""
+    ins = _make_insumo(categoria_fixture["id"], stock="0", costo="0")
+    try:
+        antes = datetime.now(timezone.utc)
+        db = SessionLocal()
+        try:
+            compra = registrar_compra(
+                db,
+                insumo_id=ins,
+                proveedor_id=None,
+                cantidad="10",
+                precio_unitario="9",
+                fecha_compra=None,
+            )
+        finally:
+            db.close()
+        despues = datetime.now(timezone.utc) + timedelta(seconds=5)
+        persistida = _read_compra_fecha(compra.id)
+        assert persistida is not None
+        assert persistida.astimezone(timezone.utc) >= antes.astimezone(timezone.utc)
+        assert persistida.astimezone(timezone.utc) <= despues.astimezone(timezone.utc)
+    finally:
+        _cleanup_insumo(ins)
+
+
+def test_compra_fecha_naive_rechazada(categoria_fixture):
+    """fecha_compra naive (sin zona) -> TypeError claro; nada se persiste."""
+    ins = _make_insumo(categoria_fixture["id"], stock="10", costo="5")
+    try:
+        db = SessionLocal()
+        try:
+            with pytest.raises(TypeError, match="aware"):
+                registrar_compra(
+                    db,
+                    insumo_id=ins,
+                    proveedor_id=None,
+                    cantidad="10",
+                    precio_unitario="9",
+                    fecha_compra=datetime(2025, 10, 25, 14, 30, 0),  # naive
+                )
+        finally:
+            db.close()
+        stock, costo = _read_inventory(ins)
+        assert stock == Decimal("10")
+        assert costo == Decimal("5")
+        assert _purchase_count(ins) == 0
+    finally:
+        _cleanup_insumo(ins)
+
+
+def test_commit_false_rollback_deja_sin_efecto(categoria_fixture):
+    """commit=False -> el service NO commitea; rollback del caller anula todo."""
+    ins = _make_insumo(categoria_fixture["id"], stock="10", costo="5")
+    try:
+        db = SessionLocal()
+        try:
+            registrar_compra(
+                db,
+                insumo_id=ins,
+                proveedor_id=None,
+                cantidad="10",
+                precio_unitario="9",
+                fecha_compra=datetime(2025, 10, 25, tzinfo=timezone.utc),
+                commit=False,
+            )
+        finally:
+            db.rollback()
+            db.close()
+        stock, costo = _read_inventory(ins)
+        assert stock == Decimal("10")
+        assert costo == Decimal("5")
+        assert _purchase_count(ins) == 0
+    finally:
+        _cleanup_insumo(ins)
+
+
+def test_commit_false_transaccion_controlada_por_caller(categoria_fixture):
+    """commit=False -> el caller decide: con commit() posterior SI persiste."""
+    ins = _make_insumo(categoria_fixture["id"], stock="10", costo="5")
+    try:
+        db = SessionLocal()
+        try:
+            compra = registrar_compra(
+                db,
+                insumo_id=ins,
+                proveedor_id=None,
+                cantidad="10",
+                precio_unitario="9",
+                fecha_compra=datetime(2025, 10, 25, tzinfo=timezone.utc),
+                commit=False,
+            )
+            db.commit()
+            db.refresh(compra)
+        finally:
+            db.close()
+        stock, costo = _read_inventory(ins)
+        assert stock == Decimal("20")
+        assert costo == Decimal("7")
+        assert _purchase_count(ins) == 1
+        persistida = _read_compra_fecha(compra.id)
+        assert persistida is not None
+        assert persistida.astimezone(timezone.utc) == datetime(
+            2025, 10, 25, tzinfo=timezone.utc
+        )
+    finally:
+        _cleanup_insumo(ins)
