@@ -27,6 +27,7 @@ import VentasView from '@/views/VentasView.vue'
 import DevolucionesView from '@/views/DevolucionesView.vue'
 import FinanzasView from '@/views/FinanzasView.vue'
 import InventarioView from '@/views/InventarioView.vue'
+import ProductosView from '@/views/ProductosView.vue'
 import RoutePlaceholder from '@/views/RoutePlaceholder.vue'
 
 declare module 'vue-router' {
@@ -56,7 +57,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'devoluciones', name: 'devoluciones', component: DevolucionesView, meta: { roles: ALL_ROLES } },
       { path: 'finanzas', name: 'finanzas', component: FinanzasView, meta: { roles: ALL_ROLES } },
       { path: 'inventario', name: 'inventario', component: InventarioView, meta: { roles: ALL_ROLES } },
-      { path: 'productos', name: 'productos', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
+      { path: 'productos', name: 'productos', component: ProductosView, meta: { roles: ALL_ROLES } },
       { path: 'maestros', name: 'maestros', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
       { path: 'usuarios', name: 'usuarios', component: RoutePlaceholder, meta: { roles: ['admin'] } },
     ],
