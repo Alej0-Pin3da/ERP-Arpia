@@ -24,6 +24,7 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import LoginView from '@/views/LoginView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import VentasView from '@/views/VentasView.vue'
+import DevolucionesView from '@/views/DevolucionesView.vue'
 import RoutePlaceholder from '@/views/RoutePlaceholder.vue'
 
 declare module 'vue-router' {
@@ -50,7 +51,7 @@ const routes: RouteRecordRaw[] = [
       // Dashboard landed in PR5; remaining modules keep the placeholder.
       { path: 'dashboard', name: 'dashboard', component: DashboardView, meta: { roles: ALL_ROLES } },
       { path: 'ventas', name: 'ventas', component: VentasView, meta: { roles: ALL_ROLES } },
-      { path: 'devoluciones', name: 'devoluciones', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
+      { path: 'devoluciones', name: 'devoluciones', component: DevolucionesView, meta: { roles: ALL_ROLES } },
       { path: 'finanzas', name: 'finanzas', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
       { path: 'inventario', name: 'inventario', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
       { path: 'productos', name: 'productos', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
