@@ -29,7 +29,7 @@ import FinanzasView from '@/views/FinanzasView.vue'
 import InventarioView from '@/views/InventarioView.vue'
 import ProductosView from '@/views/ProductosView.vue'
 import MaestrosView from '@/views/MaestrosView.vue'
-import RoutePlaceholder from '@/views/RoutePlaceholder.vue'
+import UsuariosView from '@/views/UsuariosView.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -60,7 +60,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'inventario', name: 'inventario', component: InventarioView, meta: { roles: ALL_ROLES } },
       { path: 'productos', name: 'productos', component: ProductosView, meta: { roles: ALL_ROLES } },
       { path: 'maestros', name: 'maestros', component: MaestrosView, meta: { roles: ALL_ROLES } },
-      { path: 'usuarios', name: 'usuarios', component: RoutePlaceholder, meta: { roles: ['admin'] } },
+      { path: 'usuarios', name: 'usuarios', component: UsuariosView, meta: { roles: ['admin'] } },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
