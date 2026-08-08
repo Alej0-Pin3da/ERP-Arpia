@@ -1,0 +1,99 @@
+<script setup lang="ts">
+/**
+ * Generic maestros form (PR11, spec MOD-5).
+ *
+ * One form renders every master-data entity from its field config
+ * (`fields` from `MAESTRO_ENTITIES`): one input per field, an email input
+ * when `inputType === 'email'`. Dual mode:
+ *  - create: emits the RAW values record on submit
+ *  - edit: prefills every field from the row being edited and emits the
+ *    current values
+ * Required fields block submission with an es-CO warning. The VIEW builds
+ * the typed Create/Update payload via the per-entity builders in
+ * utils/maestros (the generic form cannot know the entity's API schema).
+ */
+import { ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+
+import type { MaestroField, MaestroRow } from '@/utils/maestros'
+
+const props = defineProps<{
+  mode: 'create' | 'edit'
+  /** Field config from the entity config (drives inputs + gates). */
+  fields: MaestroField[]
+  /** Singular es-CO name for the submit label ("Crear Cliente"). */
+  singular: string
+  /** The row being edited — prefills every field in edit mode. */
+  initial?: MaestroRow | null
+  /** True while the parent is POSTing/PUTting — disables the submit button. */
+  saving?: boolean
+}>()
+
+const emit = defineEmits<{ submit: [values: Record<string, string>] }>()
+
+const values = ref<Record<string, string>>({})
+
+/** (Re)initialize the field registry when the config changes. */
+watch(
+  () => props.fields,
+  (fields) => {
+    const next: Record<string, string> = {}
+    for (const field of fields) next[field.key] = ''
+    values.value = next
+  },
+  { immediate: true },
+)
+
+/** Edit mode prefills every field from the row being edited. */
+watch(
+  () => props.initial,
+  (row) => {
+    if (row) {
+      const next = { ...values.value }
+      for (const field of props.fields) {
+        const raw = row[field.key]
+        next[field.key] = typeof raw === 'string' ? raw : ''
+      }
+      values.value = next
+    }
+  },
+  { immediate: true },
+)
+
+/** MOD-5: every required field must be filled (nombre on all entities). */
+function submit(): void {
+  for (const field of props.fields) {
+    if (field.required && (values.value[field.key] ?? '').trim() === '') {
+      ElMessage.warning(`${field.label} es obligatorio.`)
+      return
+    }
+  }
+  emit('submit', { ...values.value })
+}
+</script>
+
+<template>
+  <el-form label-position="top" class="maestro-form" @submit.prevent="submit">
+    <el-row :gutter="16">
+      <el-col v-for="field in fields" :key="field.key" :xs="24" :md="12">
+        <el-form-item :label="field.label">
+          <el-input
+            v-model="values[field.key]"
+            :type="field.inputType ?? 'text'"
+            :placeholder="field.placeholder"
+            :data-test="`maestro-${field.key}-input`"
+          />
+        </el-form-item>
+      </el-col>
+    </el-row>
+    <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-maestro">
+      {{ mode === 'edit' ? 'Guardar cambios' : `Crear ${singular}` }}
+    </el-button>
+  </el-form>
+</template>
+
+<style scoped>
+.maestro-form {
+  max-width: 48rem;
+}
+</style>
