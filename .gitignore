@@ -20,5 +20,7 @@ postgres_data/
 
 # Datos de negocio locales (hoja de cálculo de trabajo, no código)
 ARPIA.xlsx
+# Reportes generados por el pipeline de migración
+backend/migrate/reports/
 # CodeGraph local index (machine-local, regenerable)
 .codegraph/
