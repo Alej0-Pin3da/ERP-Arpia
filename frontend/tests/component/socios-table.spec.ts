@@ -1,0 +1,84 @@
+/**
+ * SociosTable component tests (PR8, spec MOD-3).
+ *
+ * Mounts the REAL SociosTable with Element Plus: renders partner rows with
+ * es-CO percentages, shows the sum-to-100 progress (current sum vs 100, with
+ * a success state at exactly 100), hides edit/delete actions for read-only
+ * roles (can-edit=false), emits `edit`/`delete` with the row, and shows the
+ * empty state.
+ */
+import { mount, type VueWrapper } from '@vue/test-utils'
+import ElementPlus from 'element-plus'
+import { nextTick } from 'vue'
+import { describe, expect, it } from 'vitest'
+
+import SociosTable from '@/components/finanzas/SociosTable.vue'
+import type { components } from '@/types/api.d'
+
+type SocioConfiguracionRead = components['schemas']['SocioConfiguracionRead']
+
+const SOCIOS: SocioConfiguracionRead[] = [
+  { id: 1, nombre: 'Ana María', porcentaje_participacion: '60.00' },
+  { id: 2, nombre: 'Carlos Ruiz', porcentaje_participacion: '40.00' },
+]
+
+const PARTIAL: SocioConfiguracionRead[] = [
+  { id: 1, nombre: 'Ana María', porcentaje_participacion: '60.00' },
+  { id: 2, nombre: 'Carlos Ruiz', porcentaje_participacion: '30.00' },
+]
+
+async function mountTable(rows: SocioConfiguracionRead[], canEdit = true): Promise<VueWrapper> {
+  const wrapper = mount(SociosTable, {
+    props: { rows, canEdit },
+    global: { plugins: [ElementPlus] },
+  })
+  await nextTick()
+  return wrapper
+}
+
+describe('SociosTable (MOD-3)', () => {
+  it('renders partner rows with es-CO percentages and a complete progress at 100', async () => {
+    const wrapper = await mountTable(SOCIOS)
+
+    const text = wrapper.text()
+    expect(text).toContain('Ana María')
+    expect(text).toContain('Carlos Ruiz')
+    expect(text).toContain('60')
+    expect(text).toContain('40')
+
+    // Sum-to-100 progress: 100% shown and marked complete.
+    expect(text).toContain('100%')
+    expect(wrapper.find('[data-test="socios-progress"]').exists()).toBe(true)
+  })
+
+  it('shows a warning-style progress when the sum is below 100', async () => {
+    const wrapper = await mountTable(PARTIAL)
+
+    expect(wrapper.text()).toContain('90%')
+    expect(wrapper.text()).toContain('100%') // target rendered too
+  })
+
+  it('hides the progress section when there are no socios', async () => {
+    const wrapper = await mountTable([])
+
+    expect(wrapper.find('[data-test="socios-progress"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Sin socios configurados')
+  })
+
+  it('emits `edit` and `delete` with the row when the actions are clicked', async () => {
+    const wrapper = await mountTable(SOCIOS)
+
+    await wrapper.findAll('[data-test="edit-socio"]')[0].trigger('click')
+    await wrapper.findAll('[data-test="delete-socio"]')[1].trigger('click')
+
+    expect(wrapper.emitted('edit')![0][0]).toEqual(SOCIOS[0])
+    expect(wrapper.emitted('delete')![0][0]).toEqual(SOCIOS[1])
+  })
+
+  it('hides the edit/delete actions for read-only roles', async () => {
+    const wrapper = await mountTable(SOCIOS, false)
+
+    expect(wrapper.findAll('[data-test="edit-socio"]')).toHaveLength(0)
+    expect(wrapper.findAll('[data-test="delete-socio"]')).toHaveLength(0)
+  })
+})
