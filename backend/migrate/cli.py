@@ -1,20 +1,21 @@
-"""Migration CLI (PR#1: infra + loader + normalize).
+"""Migration CLI for the historical ARPIA.xlsx -> ERP Arpia pipeline.
 
 Usage (from ``backend/``):
 
-    python -m migrate.cli --fase 0 --dry-run
-    python -m migrate.cli --all --dry-run --source ../ARPIA.xlsx
+    python -m migrate.cli --fase 1 --dry-run
+    python -m migrate.cli --fase 1 --commit
+    python -m migrate.cli --all --dry-run
 
 Flags (design #423 / tasks #424):
-    --source PATH      excel path (default: resolver ../ARPIA.xlsx from backend/)
-    --dry-run          default mode: load + parse + validate + report, 0 writes
-    --commit           actually persist (PR slices later add the write logic)
-    --fase N           run a single phase F0..F7
-    --all              run every phase in strict order
-    --force            allow re-run even when a phase marker exists
-    --canal STR        default canal_venta for sales phase (configurable; None)
+    --source PATH   excel path (default: resolver ../ARPIA.xlsx desde backend/)
+    --dry-run       default: plan + reporte, 0 escrituras
+    --commit        persistir (fases implementadas)
+    --fase N        correr una sola fase F0..F7
+    --all           correr todas las fases en orden estricto
+    --force         permitir re-run (reservado)
+    --canal STR     canal_venta por defecto para la fase F5 (reservado)
 
-Exit code: 0 on success, 1 if the report accumulated ERROR entries.
+Exit code: 0 si no hubo ERRORes, 1 en caso contrario.
 """
 
 from __future__ import annotations
@@ -23,124 +24,148 @@ import argparse
 import sys
 from pathlib import Path
 
-from migrate import FASES, get_fase
-from migrate.context import FaseOptions
-from migrate.loaders import LibroMigracion, SHEET_BOUNDS
+from migrate import FASES, FASE_RUNNERS, get_fase
+from migrate.context import FaseOptions, MigrationContext
+from migrate.loaders import HojaInexistenteError, LibroMigracion, SHEET_BOUNDS
 from migrate.report import Report
 
 _DEFAULT_SOURCE = Path(__file__).resolve().parents[2] / "ARPIA.xlsx"
-_EXTRA_MSG = (
-    "Las fases de negocio (catalogo, compras, BOM, stock, ventas, finanzas, "
-    "validacion) se implementan en slices posteriores; este slice (PR #1) "
-    "solo registra la infraestructura: loader, normalizador, reporte y CLI."
-)
 
 
 def construir_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="migrate.cli",
-        description="Pipeline de migracion historica ARPIA.xlsx -> ERP Arpia (dry-run por defecto).",
+        description="Pipeline migracion historica ARPIA.xlsx -> ERP Arpia (dry-run por defecto).",
     )
     parser.add_argument(
         "--source",
         type=Path,
         default=_DEFAULT_SOURCE,
-        help=f"Ruta del workbook (default: {_DEFAULT_SOURCE})",
+        help="Ruta del workbook (default: ../ARPIA.xlsx desde backend/).",
     )
-    modo = parser.add_mutually_exclusive_group()
-    modo.add_argument(
+    parser.add_argument(
+        "--modo",
+        choices=["dry-run", "commit"],
+        default="dry-run",
+        help="dry-run (default): plan + reporte, 0 escrituras. commit: persiste.",
+    )
+    parser.add_argument(
         "--dry-run",
-        dest="modo",
         action="store_const",
         const="dry-run",
-        default="dry-run",
-        help="Solo leer/parsear/reportar; cero escrituras (default).",
-    )
-    modo.add_argument(
-        "--commit",
         dest="modo",
+        help="Modo dry-run (default): plan y reporte sin escrituras.",
+    )
+    parser.add_argument(
+        "--commit",
         action="store_const",
         const="commit",
-        help="Persistir en DB (requiere implementacion de fase).",
+        dest="modo",
+        help="Persistir las escrituras de la fase (requiere DB reachable).",
     )
-    seleccion = parser.add_mutually_exclusive_group()
-    seleccion.add_argument(
-        "--fase", type=str, metavar="N",
-        help="Fase a ejecutar: F0..F7 (ej. '0' o 'F0').",
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Repetir la fase aunque exista marker (reservado).",
     )
-    seleccion.add_argument(
+    parser.add_argument(
+        "--canal",
+        dest="canal",
+        help="Canal de venta por defecto para la fase ventas (reservado).",
+    )
+    grupo = parser.add_mutually_exclusive_group()
+    grupo.add_argument(
+        "--fase",
+        type=str,
+        help="Ejecutar una sola fase (F0..F7).",
+    )
+    grupo.add_argument(
         "--all",
         dest="todas",
         action="store_true",
-        help="Ejecutar las 8 fases en orden estricto.",
+        help="Ejecutar todas las fases en orden estricto.",
     )
-    parser.add_argument("--force", action="store_true", help="Re-run aunque haya marker.")
-    parser.add_argument("--canal", default=None, help="canal_venta para fase de ventas.")
     return parser
 
 
-def _normalizar_fase(arg: str) -> str:
-    return arg if arg.upper().startswith("F") else f"F{arg}"
+def _normalizar_fase(value: str) -> str:
+    """Acepta '0' o 'F0' (cualquier case) -> canonical F0..F7."""
+    value = value.strip().upper()
+    if value.isdigit():
+        return f"F{int(value)}"
+    return value
 
 
 def _fases_a_correr(args) -> list[str]:
-    if args.todas:
+    if getattr(args, "todas", False):
         return [f.id for f in FASES]
-    if args.fase:
+    if getattr(args, "fase", None):
         return [_normalizar_fase(args.fase)]
-    # Ninguno -> default: correr todas (dry-run plan) como --all.
     return [f.id for f in FASES]
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = construir_parser()
-    args = parser.parse_args(argv)
+def _emitir(report: Report) -> int:
+    """Print the report entries + summary; 0 if no ERROR, else 1."""
+    for entry in report.entradas:
+        ubicacion = entry.hoja or ""
+        if entry.fila is not None:
+            ubicacion = f"{ubicacion}:{entry.fila}"
+        prefix = f"[{entry.nivel}]" + (f" [{ubicacion}]" if ubicacion else "")
+        print(prefix, entry.mensaje)
+    errores = sum(1 for e in report.entradas if e.nivel == "ERROR")
+    print(f"\nResumen: {len(report.entradas)} entradas, {errores} errores")
+    return 1 if errores else 0
+
+
+def main() -> None:
+    args = construir_parser().parse_args()
     options = FaseOptions(
         source=args.source,
         modo=args.modo,
-        fuerza=args.force,
-        canal_venta=args.canal,
+        fuerza=getattr(args, "force", False),
+        canal_venta=getattr(args, "canal", None),
     )
-
-    report = Report(fase="cli", modo=args.modo)
-
-    if not args.source.exists():
-        report.error("", None, None, f"archivo fuente no encontrado: {args.source}")
-        _emitir(report)
-        return 1
-
-    # Infra step: bounded read of the workbook (dry-run only writes nothing).
-    with LibroMigracion(args.source) as libro:
-        report.info("", None, None, f"workbook leido: {args.source.name} ({len(libro.hojas)} hojas)")
-        for hoja in libro.hojas:
-            if hoja in SHEET_BOUNDS:
-                lect = libro.leer_hoja(hoja, report=report)
-                report.info(hoja, None, None,
-                            f"{len(lect.filas)} filas de datos (descartadas={lect.descartadas}, "
-                            f"omitidas={lect.omitidas})")
-            else:
-                report.warn(hoja, None, None, "hoja sin bounds registrados; no leida")
-
     fases = _fases_a_correr(args)
-    for fid in fases:
-        fase = get_fase(fid)
-        report.info(fid, None, None, f"{fase.nombre}: pendiente de implementacion (slice posterior) - 0 escrituras")
+    report = Report(fase="+".join(fases), modo=args.modo)
 
-    report.info("", None, None, _EXTRA_MSG)
-
-    _emitir(report)
-    return 1 if report.tiene_errores else 0
-
-
-def _emitir(report: Report) -> None:
-    for linea in report.resumen_lineas():
-        print(linea)
+    # Infra: bounded read of every registered sheet (report WARN/INFO).
     try:
-        ruta = report.write()
-        print(f"Reporte: {ruta}")
-    except Exception as exc:  # pragma: no cover - filesystem edge
-        print(f"AVISO: no se pudo escribir el reporte JSON: {exc}")
+        with LibroMigracion(options.source) as libro:
+            for hoja in SHEET_BOUNDS:
+                try:
+                    libro.leer_hoja(hoja, report=report)
+                except HojaInexistenteError:
+                    report.warn(hoja, None, None, "hoja no presente en el workbook; omitida")
+    except FileNotFoundError as exc:
+        report.error("source", None, None, f"workbook no encontrado: {exc}")
+    except Exception as exc:
+        report.error("source", None, None, f"error abriendo workbook: {exc}")
+
+    # Phases.
+    for fase_id in fases:
+        fase = get_fase(fase_id)
+        runner = FASE_RUNNERS.get(fase_id)
+        if runner is None:
+            report.info(fase_id, None, None, f"{fase.nombre}: pendiente de implementacion")
+            continue
+        report.info(fase_id, None, None, f"{fase.nombre}: iniciando ({options.modo})")
+        try:
+            if options.modo == "commit":
+                from app.db.session import SessionLocal  # lazy: solo en commit
+
+                db = SessionLocal()
+                try:
+                    runner(MigrationContext.para_fase(options, fase_id).con_session(db))
+                finally:
+                    db.close()
+            else:
+                runner(MigrationContext.para_fase(options, fase_id))
+            report.info(fase_id, None, None, f"{fase.nombre}: OK ({options.modo})")
+        except Exception as exc:
+            report.error(fase_id, None, None, f"{fase.nombre}: {type(exc).__name__}: {exc}")
+
+    sys.exit(_emitir(report))
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
