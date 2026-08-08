@@ -12,8 +12,9 @@ Aplicación web de gestión de inventarios, producción y ventas para **ARPIA**.
 | **ORM** | **SQLAlchemy** | Mapeo de modelos a tablas y manejo de transacciones complejas. |
 | **Base de datos** | **PostgreSQL** | Precisión nativa con `NUMERIC`/`DECIMAL`, vital para cálculos financieros y WAC. |
 | **Migraciones** | **Alembic** | Cambios de esquema versionados y controlados. |
-| **Entorno** | **Docker + Docker Compose** | Paridad total local/producción: base de datos, backend y frontend orquestados. |
-| **Frontend** | Dashboard prototipo; migración futura a un framework reactivo (Vue.js o React). | |
+| **Entorno local** | **Docker + Docker Compose** | Base de datos, backend y frontend orquestados con paridad con producción. |
+| **Producción** | **cPanel (hosting compartido)** | API como app Python en `api.arpia.com.co` y frontend estático en `app.arpia.com.co`; despliegue vía `scripts/deploy.sh` y `scripts/deploy-frontend.sh`. |
+| **Frontend** | **Vue 3 + Vite + TypeScript + Pinia + Element Plus + ECharts** | SPA completa (auth, dashboard y módulos operativos) desplegada en producción. |
 
 **Decisión de arquitectura: monolito modular, no microservicios.** Para un equipo pequeño, una sola aplicación con dominios separados (carpetas/módulos de inventario, ventas, finanzas) y una sola base de datos es la opción correcta. La separación en microservicios solo se evalúa si el volumen o el equipo lo justifican, y en ese caso cada servicio debería tener su propio esquema, no una base compartida.
 
@@ -111,14 +112,16 @@ Controla las salidas, calcula márgenes y distribuye utilidades.
 
 ## 3. Hoja de Ruta de Desarrollo (Roadmap)
 
-### Fase 1: Infraestructura y Modelado (Semanas 1-2)
+> **Estado: Fases 1–6 COMPLETADAS e implementadas en producción** (verificado agosto 2026). API en `api.arpia.com.co`, frontend en `app.arpia.com.co`.
+
+### Fase 1: Infraestructura y Modelado (Semanas 1-2) — ✅ COMPLETADA
 1.  **Inicialización:** Crear el repositorio y configurar `docker-compose.yml` con PostgreSQL y FastAPI.
 2.  **Modelos ORM:** Traducir el esquema relacional a clases de SQLAlchemy (incluye `Clientes` y `Usuarios`).
 3.  **Migraciones:** Configurar Alembic para manejar cambios de esquema de manera controlada.
 4.  **Autenticación y permisos:** Login JWT y roles (`admin`, `operador`, `consulta`); los endpoints protegidos según rol.
 5.  **CRUD Básico:** `Proveedores`, `Categorias_Insumos`, `Insumos` y `Clientes`.
 
-### Fase 2: Lógica Central de Costos - WAC (Semana 3)
+### Fase 2: Lógica Central de Costos - WAC (Semana 3) — ✅ COMPLETADA
 1.  **Endpoint de Compras:** Registrar `Compras_Insumos`.
 2.  **Motor WAC:** Al registrar una compra, dentro de la **misma transacción**:
     ```
@@ -128,23 +131,23 @@ Controla las salidas, calcula márgenes y distribuye utilidades.
     Con `SELECT ... FOR UPDATE` sobre la fila de `Insumos` para evitar condiciones de carrera entre compras simultáneas.
 3.  **Testing:** Validar que el WAC responda correctamente a fluctuaciones de precios y a compras concurrentes.
 
-### Fase 3: Ingeniería de Producto y BOM Multinivel (Semanas 4-5)
+### Fase 3: Ingeniería de Producto y BOM Multinivel (Semanas 4-5) — ✅ COMPLETADA
 1.  **Endpoints de Productos:** CRUD para `Productos`, `Tipos_Producto` y `Variantes_Producto`.
 2.  **Gestión de Recetas:** Lógica para asignar insumos a un producto (`BOM_Insumos`, con variantes y desperdicio) y productos a un combo (`BOM_Productos`).
 3.  **Cálculo Dinámico de Costos:** Servicio recursivo con memoización que recibe `producto_id` (+ variante opcional) y retorna el costo de producción al día de hoy, recorriendo el BOM, aplicando desperdicio y consultando los costos promedios actuales. Esta misma función se reutiliza en Fase 4: no duplicar la lógica.
 
-### Fase 4: Ventas y Descarga de Inventario (Semanas 6-7)
+### Fase 4: Ventas y Descarga de Inventario (Semanas 6-7) — ✅ COMPLETADA
 1.  **Registro de Ventas:** Endpoint para procesar una venta nueva con su detalle.
 2.  **Motor de Inventario:** Al confirmar, la aplicación ejecuta la explosión de materiales (recorre el BOM del producto vendido, considerando variante y desperdicio) y resta de `stock_actual` en `Insumos`. Todo dentro de un bloque de transacción con `FOR UPDATE`.
 3.  **Cálculo de Márgenes:** Guardar `costo_unitario_aplicado` (snapshot WAC) junto a cada línea para obtener la utilidad neta real e históricamente estable.
 
-### Fase 5: Devoluciones, Finanzas y Dashboards (Semana 8)
+### Fase 5: Devoluciones, Finanzas y Dashboards (Semana 8) — ✅ COMPLETADA
 1.  **Devoluciones:** Endpoint que reembolsa, repone inventario (explosión inversa) y/o anula la venta.
 2.  **Distribución de Utilidades:** Lógica para que las ventas liquiden porcentajes según `Socios_Configuracion`.
 3.  **Gestión de Gastos:** CRUD para `Movimientos_Financieros`.
 4.  **Endpoints Analíticos:** Rutas que consolidan datos para el frontend (ventas mensuales, insumos con stock crítico según `stock_minimo`, margen por producto).
 
-### Fase 6: Frontend y Dashboard (Semana 9)
+### Fase 6: Frontend y Dashboard (Semana 9) — ✅ COMPLETADA
 1.  **Stack frontend:** Aplicación web (Vue o React) que consume la API `/api/v1`.
 2.  **Autenticación:** Login JWT con roles (`admin`, `operador`, `consulta`), sesión y guard de rutas.
 3.  **Dashboard analítico:** Paneles con ventas mensuales, insumos con stock crítico y margen por producto (consume los endpoints de Fase 5).
@@ -211,15 +214,40 @@ uvicorn app.main:app --reload
 
 > **Seguridad:** cambia `JWT_SECRET_KEY` y las contraseñas del seed antes de cualquier despliegue. Los secretos viven en `.env` (ignorado por git), nunca versionados.
 
+### Frontend (Vue 3 + Vite)
+
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173 con proxy a la API local :8000
+npm run build      # dist/ estático (lo que se despliega en cPanel)
+npm test           # Vitest
+```
+
 ### Tests
 
 ```bash
 cd backend
 .venv\Scripts\activate
-pytest
+pytest             # 212 tests: health, JWT login, roles, CRUD, WAC, BOM,
+                   # explosión de inventario, costos, ventas, devoluciones,
+                   # finanzas y analíticos, contra PostgreSQL real vía Docker.
 ```
 
 Los tests cubren health, login JWT, roles (401/403/201) y CRUD de insumos contra PostgreSQL real vía Docker. La configuración resuelve `.env` de forma absoluta respecto al backend, por lo que los comandos funcionan desde cualquier directorio.
+
+El frontend agrega **372 tests Vitest** (`frontend/tests/`, `npm test`): guards de rutas y auth, mappers, tablas, formularios y vistas de todos los módulos.
+
+### Despliegue a cPanel (producción)
+
+La producción corre en hosting cPanel, no Docker. Ver detalles en `frontend/README.md` (despliegue del SPA) y los scripts:
+
+```bash
+scripts/deploy.sh           # API: clone + rsync backend/, pip install en el venv
+                            # cPanel (/home/<user>/virtualenv/...), alembic upgrade head, restart
+scripts/deploy-frontend.sh  # build del SPA (detección del npm del server) + rsync
+                            # a app.arpia.com.co, protege .well-known, SPA htaccess
+```
 
 ---
 
