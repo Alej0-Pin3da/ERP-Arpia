@@ -50,7 +50,6 @@ import type { components } from '@/types/api.d'
 
 type ProductoRead = components['schemas']['ProductoRead']
 type TipoProductoRead = components['schemas']['TipoProductoRead']
-type VarianteProductoRead = components['schemas']['VarianteProductoRead']
 type BomInsumoRead = components['schemas']['BomInsumoRead']
 type BomProductoRead = components['schemas']['BomProductoRead']
 type InsumoRead = components['schemas']['InsumoRead']
@@ -78,11 +77,6 @@ const PRODUCTOS: ProductoRead[] = [
     costos_operativos_fijos: '0.00',
     precio_venta_sugerido: '8000.00',
   },
-]
-
-const VARIANTES: VarianteProductoRead[] = [
-  { id: 1, producto_id: 1, nombre_variante: 'Individual', precio_venta: '13000.00' },
-  { id: 2, producto_id: 1, nombre_variante: 'Docena', precio_venta: null },
 ]
 
 const INSUMOS: InsumoRead[] = [

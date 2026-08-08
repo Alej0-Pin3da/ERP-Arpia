@@ -16,7 +16,6 @@ import ElementPlus from 'element-plus'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import ProductosTable from '@/components/productos/ProductosTable.vue'
-import type { components } from '@/types/api.d'
 
 type ProductoRow = {
   id: number

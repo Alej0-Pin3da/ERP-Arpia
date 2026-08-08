@@ -37,7 +37,6 @@ import { parseDecimal } from './format'
 
 type ProductoRead = components['schemas']['ProductoRead']
 type TipoProductoRead = components['schemas']['TipoProductoRead']
-type VarianteProductoRead = components['schemas']['VarianteProductoRead']
 type VarianteProductoCreate = components['schemas']['VarianteProductoCreate']
 type VarianteProductoUpdate = components['schemas']['VarianteProductoUpdate']
 type BomInsumoRead = components['schemas']['BomInsumoRead']
