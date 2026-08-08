@@ -23,6 +23,7 @@ import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/layouts/AppLayout.vue'
 import LoginView from '@/views/LoginView.vue'
 import DashboardView from '@/views/DashboardView.vue'
+import VentasView from '@/views/VentasView.vue'
 import RoutePlaceholder from '@/views/RoutePlaceholder.vue'
 
 declare module 'vue-router' {
@@ -48,7 +49,7 @@ const routes: RouteRecordRaw[] = [
       { path: '', redirect: '/dashboard' },
       // Dashboard landed in PR5; remaining modules keep the placeholder.
       { path: 'dashboard', name: 'dashboard', component: DashboardView, meta: { roles: ALL_ROLES } },
-      { path: 'ventas', name: 'ventas', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
+      { path: 'ventas', name: 'ventas', component: VentasView, meta: { roles: ALL_ROLES } },
       { path: 'devoluciones', name: 'devoluciones', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
       { path: 'finanzas', name: 'finanzas', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
       { path: 'inventario', name: 'inventario', component: RoutePlaceholder, meta: { roles: ALL_ROLES } },
