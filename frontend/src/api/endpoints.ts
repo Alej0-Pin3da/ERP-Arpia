@@ -288,8 +288,9 @@ export const productosApi = {
 // --- maestros ---------------------------------------------------------------
 
 export const clientesApi = {
-  list(): Promise<Res<'/api/v1/clientes', 'get'>> {
-    return client.get('/clientes').then((r) => r.data)
+  /** GET /clientes — supports limit/offset (the backend defaults to limit=50). */
+  list(params?: Query<'/api/v1/clientes', 'get'>): Promise<Res<'/api/v1/clientes', 'get'>> {
+    return client.get('/clientes', { params }).then((r) => r.data)
   },
   create(body: ReqBody<'/api/v1/clientes', 'post'>): Promise<Res<'/api/v1/clientes', 'post'>> {
     return client.post('/clientes', body).then((r) => r.data)
@@ -308,8 +309,9 @@ export const clientesApi = {
 }
 
 export const proveedoresApi = {
-  list(): Promise<Res<'/api/v1/proveedores', 'get'>> {
-    return client.get('/proveedores').then((r) => r.data)
+  /** GET /proveedores — supports limit/offset (the backend defaults to limit=50). */
+  list(params?: Query<'/api/v1/proveedores', 'get'>): Promise<Res<'/api/v1/proveedores', 'get'>> {
+    return client.get('/proveedores', { params }).then((r) => r.data)
   },
   create(body: ReqBody<'/api/v1/proveedores', 'post'>): Promise<Res<'/api/v1/proveedores', 'post'>> {
     return client.post('/proveedores', body).then((r) => r.data)
@@ -349,8 +351,9 @@ export const tiposProductoApi = {
 }
 
 export const categoriasInsumosApi = {
-  list(): Promise<Res<'/api/v1/categorias-insumos', 'get'>> {
-    return client.get('/categorias-insumos').then((r) => r.data)
+  /** GET /categorias-insumos — supports limit/offset (backend default limit=100). */
+  list(params?: Query<'/api/v1/categorias-insumos', 'get'>): Promise<Res<'/api/v1/categorias-insumos', 'get'>> {
+    return client.get('/categorias-insumos', { params }).then((r) => r.data)
   },
   create(body: ReqBody<'/api/v1/categorias-insumos', 'post'>): Promise<Res<'/api/v1/categorias-insumos', 'post'>> {
     return client.post('/categorias-insumos', body).then((r) => r.data)
@@ -371,8 +374,9 @@ export const categoriasInsumosApi = {
 // --- usuarios ---------------------------------------------------------------
 
 export const usuariosApi = {
-  list(): Promise<Res<'/api/v1/usuarios', 'get'>> {
-    return client.get('/usuarios').then((r) => r.data)
+  /** GET /usuarios — supports limit/offset (the backend defaults to limit=50). */
+  list(params?: Query<'/api/v1/usuarios', 'get'>): Promise<Res<'/api/v1/usuarios', 'get'>> {
+    return client.get('/usuarios', { params }).then((r) => r.data)
   },
   create(body: ReqBody<'/api/v1/usuarios', 'post'>): Promise<Res<'/api/v1/usuarios', 'post'>> {
     return client.post('/usuarios', body).then((r) => r.data)
