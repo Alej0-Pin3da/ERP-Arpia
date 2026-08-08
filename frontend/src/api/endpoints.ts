@@ -238,10 +238,44 @@ export const productosApi = {
   ): Promise<Res<'/api/v1/productos/{producto_id}/bom/insumos', 'get'>> {
     return client.get(`/productos/${params.producto_id}/bom/insumos`).then((r) => r.data)
   },
+  createBomInsumo(
+    params: PathParams<'/api/v1/productos/{producto_id}/bom/insumos', 'post'>,
+    body: ReqBody<'/api/v1/productos/{producto_id}/bom/insumos', 'post'>,
+  ): Promise<Res<'/api/v1/productos/{producto_id}/bom/insumos', 'post'>> {
+    return client.post(`/productos/${params.producto_id}/bom/insumos`, body).then((r) => r.data)
+  },
+  updateBomInsumo(
+    params: PathParams<'/api/v1/productos/{producto_id}/bom/insumos/{linea_id}', 'put'>,
+    body: ReqBody<'/api/v1/productos/{producto_id}/bom/insumos/{linea_id}', 'put'>,
+  ): Promise<Res<'/api/v1/productos/{producto_id}/bom/insumos/{linea_id}', 'put'>> {
+    return client.put(`/productos/${params.producto_id}/bom/insumos/${params.linea_id}`, body).then((r) => r.data)
+  },
+  deleteBomInsumo(
+    params: PathParams<'/api/v1/productos/{producto_id}/bom/insumos/{linea_id}', 'delete'>,
+  ): Promise<Res<'/api/v1/productos/{producto_id}/bom/insumos/{linea_id}', 'delete'>> {
+    return client.delete(`/productos/${params.producto_id}/bom/insumos/${params.linea_id}`).then((r) => r.data)
+  },
   listBomProductos(
     params: PathParams<'/api/v1/productos/{producto_id}/bom/productos', 'get'>,
   ): Promise<Res<'/api/v1/productos/{producto_id}/bom/productos', 'get'>> {
     return client.get(`/productos/${params.producto_id}/bom/productos`).then((r) => r.data)
+  },
+  createBomProducto(
+    params: PathParams<'/api/v1/productos/{producto_id}/bom/productos', 'post'>,
+    body: ReqBody<'/api/v1/productos/{producto_id}/bom/productos', 'post'>,
+  ): Promise<Res<'/api/v1/productos/{producto_id}/bom/productos', 'post'>> {
+    return client.post(`/productos/${params.producto_id}/bom/productos`, body).then((r) => r.data)
+  },
+  updateBomProducto(
+    params: PathParams<'/api/v1/productos/{producto_id}/bom/productos/{linea_id}', 'put'>,
+    body: ReqBody<'/api/v1/productos/{producto_id}/bom/productos/{linea_id}', 'put'>,
+  ): Promise<Res<'/api/v1/productos/{producto_id}/bom/productos/{linea_id}', 'put'>> {
+    return client.put(`/productos/${params.producto_id}/bom/productos/${params.linea_id}`, body).then((r) => r.data)
+  },
+  deleteBomProducto(
+    params: PathParams<'/api/v1/productos/{producto_id}/bom/productos/{linea_id}', 'delete'>,
+  ): Promise<Res<'/api/v1/productos/{producto_id}/bom/productos/{linea_id}', 'delete'>> {
+    return client.delete(`/productos/${params.producto_id}/bom/productos/${params.linea_id}`).then((r) => r.data)
   },
   costo(
     params: PathParams<'/api/v1/productos/{producto_id}/costo', 'get'>,
@@ -294,8 +328,9 @@ export const proveedoresApi = {
 }
 
 export const tiposProductoApi = {
-  list(): Promise<Res<'/api/v1/tipos-producto', 'get'>> {
-    return client.get('/tipos-producto').then((r) => r.data)
+  /** GET /tipos-producto — supports limit/offset (the backend defaults to limit=50). */
+  list(params?: Query<'/api/v1/tipos-producto', 'get'>): Promise<Res<'/api/v1/tipos-producto', 'get'>> {
+    return client.get('/tipos-producto', { params }).then((r) => r.data)
   },
   create(body: ReqBody<'/api/v1/tipos-producto', 'post'>): Promise<Res<'/api/v1/tipos-producto', 'post'>> {
     return client.post('/tipos-producto', body).then((r) => r.data)
