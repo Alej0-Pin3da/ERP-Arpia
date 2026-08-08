@@ -45,14 +45,21 @@ const chartOption = computed(() => ({
   xAxis: {
     type: 'category' as const,
     data: props.rows.map((row) => row.label),
+    axisLabel: { color: 'rgba(255, 255, 255, 0.65)' },
+    axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.2)' } },
+    axisTick: { show: false },
   },
-  yAxis: { type: 'value' as const },
+  yAxis: {
+    type: 'value' as const,
+    axisLabel: { color: 'rgba(255, 255, 255, 0.65)' },
+    splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.08)' } },
+  },
   series: [
     {
       name: 'Ventas',
       type: 'bar' as const,
       data: props.rows.map((row) => row.total),
-      itemStyle: { color: 'var(--el-color-primary, #409eff)' },
+      itemStyle: { color: 'var(--el-color-primary, #8c6ca1)', borderRadius: [4, 4, 0, 0] },
     },
   ],
 }))

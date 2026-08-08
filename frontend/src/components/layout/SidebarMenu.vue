@@ -34,4 +34,35 @@ const items = computed(() => RoleMenuFilter(auth.role))
 .sidebar-menu {
   border-right: none;
 }
+
+.sidebar-menu :deep(.el-menu-item) {
+  position: relative;
+  font-family: var(--arpia-font-button);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.sidebar-menu :deep(.el-menu-item:hover) {
+  color: #ffffff;
+  background: rgba(140, 108, 161, 0.25);
+}
+
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  color: var(--arpia-primary-soft);
+  background: rgba(140, 108, 161, 0.25);
+}
+
+.sidebar-menu :deep(.el-menu-item.is-active::before) {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--arpia-brand-gradient);
+}
 </style>

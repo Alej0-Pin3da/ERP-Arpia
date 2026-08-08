@@ -19,7 +19,7 @@ const route = useRoute()
 <style scoped>
 .route-placeholder {
   padding: 2rem;
-  color: #6b7280;
+  color: var(--arpia-text-muted);
   text-align: center;
 }
 

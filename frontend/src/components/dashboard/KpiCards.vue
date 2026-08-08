@@ -46,18 +46,27 @@ const cards = computed(() => [
 <style scoped>
 .kpi-card {
   margin-bottom: 1rem;
+  border: 1px solid var(--arpia-border);
+  border-radius: 0;
+  background: var(--arpia-card);
+  box-shadow: none;
 }
 
 .kpi-label {
   margin: 0 0 0.5rem;
-  color: #606266;
-  font-size: 0.85rem;
+  font-family: var(--arpia-font-heading);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--arpia-gold);
 }
 
 .kpi-value {
   margin: 0;
+  font-family: var(--arpia-font-heading);
   font-size: 1.5rem;
   font-weight: 600;
-  color: var(--el-color-primary);
+  color: var(--arpia-primary-soft);
 }
 </style>

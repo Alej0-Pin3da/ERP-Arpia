@@ -58,7 +58,10 @@ async function onSubmit(): Promise<void> {
 <template>
   <div class="login-page">
     <div class="login-card">
-      <h1 class="login-title">ERP Arpia</h1>
+      <h1 class="login-title">
+        ERP <span class="login-title__gold">Arpia</span>
+      </h1>
+      <p class="login-eyebrow arpia-eyebrow">Sistema de gestión</p>
       <p class="login-subtitle">Inicie sesión para continuar</p>
 
       <el-alert
@@ -115,31 +118,80 @@ async function onSubmit(): Promise<void> {
 
 <style scoped>
 .login-page {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(160deg, #1f2937 0%, #111827 100%);
+  padding: 2rem;
+  background: var(--arpia-bg-gradient);
+  overflow: hidden;
+}
+
+/* Editorial top bar — brand gradient signature. */
+.login-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--arpia-brand-gradient);
+}
+
+/* Soft brand glow behind the card. */
+.login-page::after {
+  content: '';
+  position: absolute;
+  width: 560px;
+  height: 560px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    rgba(140, 108, 161, 0.28) 0%,
+    rgba(41, 151, 170, 0.14) 45%,
+    transparent 70%
+  );
+  filter: blur(20px);
+  pointer-events: none;
 }
 
 .login-card {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 24rem;
   padding: 2.5rem 2rem;
-  background: #ffffff;
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 30px rgb(0 0 0 / 25%);
+  background: var(--arpia-card);
+  border: 1px solid var(--arpia-border);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 
 .login-title {
   margin: 0;
+  font-family: var(--arpia-font-heading);
+  font-weight: 600;
   font-size: 1.75rem;
-  color: #111827;
+  text-align: center;
+  color: var(--arpia-text-primary);
+}
+
+.login-title__gold {
+  font-family: var(--arpia-font-heading);
+  font-weight: 600;
+  color: var(--arpia-gold);
+}
+
+.login-eyebrow {
+  margin: 0.75rem 0 0;
+  text-align: center;
 }
 
 .login-subtitle {
   margin: 0.25rem 0 1.5rem;
-  color: #6b7280;
+  color: var(--arpia-text-muted);
+  text-align: center;
 }
 
 .login-error {

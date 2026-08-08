@@ -30,7 +30,10 @@ async function onLogout(): Promise<void> {
 <template>
   <el-container class="app-layout">
     <el-aside width="220px" class="app-layout__aside">
-      <div class="app-layout__brand">ERP Arpia</div>
+      <div class="app-layout__brand">
+        <span class="app-layout__brand-strong">ERP</span>
+        <span class="app-layout__brand-accent">Arpia</span>
+      </div>
       <SidebarMenu />
     </el-aside>
 
@@ -60,23 +63,37 @@ async function onLogout(): Promise<void> {
 .app-layout__aside {
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--el-border-color-light);
-  background: var(--el-bg-color);
+  background: var(--arpia-dark);
+  border-right: 1px solid var(--arpia-border);
 }
 
 .app-layout__brand {
-  padding: 1rem 1.25rem;
-  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 1.25rem 1.25rem;
+  font-family: var(--arpia-font-heading);
+  font-weight: 600;
   font-size: 1.125rem;
-  color: var(--el-color-primary);
+}
+
+.app-layout__brand-strong {
+  color: var(--arpia-text-primary);
+}
+
+.app-layout__brand-accent {
+  font-family: var(--arpia-font-heading);
+  font-weight: 600;
+  color: var(--arpia-gold);
 }
 
 .app-layout__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--el-border-color-light);
-  background: var(--el-bg-color);
+  background: var(--arpia-dark-bg);
+  border-bottom: 1px solid var(--arpia-border);
+  backdrop-filter: blur(8px);
 }
 
 .app-layout__user {
@@ -85,7 +102,13 @@ async function onLogout(): Promise<void> {
   gap: 0.5rem;
 }
 
+.app-layout__name {
+  font-family: var(--arpia-font-heading);
+  font-weight: 600;
+  color: var(--arpia-text-primary);
+}
+
 .app-layout__main {
-  background: var(--el-fill-color-blank);
+  background: var(--arpia-bg-gradient);
 }
 </style>
