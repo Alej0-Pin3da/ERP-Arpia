@@ -51,6 +51,53 @@ Preview the production build locally:
 npm run preview
 ```
 
+## Deploy
+
+The frontend is a **static SPA** (no server runtime) served from the
+`app.arpia.com.co` cPanel subdomain docroot. Build output goes to `frontend/dist/`
+and is uploaded as-is.
+
+### Build + deploy
+
+```bash
+# Local development
+npm run dev
+
+# Production build (output: frontend/dist/)
+npm run build
+
+# Deploy: build + sync dist/ to the server docroot
+bash scripts/deploy-frontend.sh            # latest main
+bash scripts/deploy-frontend.sh feature/x  # a specific branch
+```
+
+`scripts/deploy-frontend.sh` runs `npm ci && npm run build` and rsyncs
+`frontend/dist/` to `FRONTEND_DOCROOT` (default
+`/home/arpiacom/erp_arpia_frontend`, the app.arpia.com.co docroot — adjust the
+variable at the top of the script if the server layout differs). It then curls
+`FRONTEND_URL` (default `https://app.arpia.com.co`) as a post-deploy check.
+
+The backend `scripts/deploy.sh` can also deploy the frontend afterwards: set
+`DEPLOY_FRONTEND=1 bash scripts/deploy.sh`. It is off by default so backend
+deploys keep their exact previous behavior.
+
+### SPA routing (.htaccess)
+
+Vue Router uses history mode (`base: '/'`), so deep links (`/ventas`, `/usuarios`,
+...) must fall back to `index.html`. The file `frontend/public/.htaccess` is
+copied verbatim by Vite into `dist/` (public assets land at the dist root) and
+is deployed with the bundle. It rewrites every non-file, non-directory request
+to `index.html`. No extra server config is required for routing; the docroot
+must allow `.htaccess` overrides (cPanel default).
+
+### CORS (operational, not code)
+
+The SPA runs on `app.arpia.com.co` but calls the API on `api.arpia.com.co`, so
+the **production backend** must include `https://app.arpia.com.co` in its
+`CORS_ORIGINS` env var (and be restarted). This is a server-side env change —
+do it once after the first deploy, before relying on live API calls. Local dev
+uses `http://localhost:5173` (see `.env.development`).
+
 ## Tests
 
 ```bash
