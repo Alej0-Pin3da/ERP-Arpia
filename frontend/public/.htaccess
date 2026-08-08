@@ -1,0 +1,10 @@
+# ERP-Arpia frontend — SPA fallback for app.arpia.com.co (Vue Router history mode)
+#
+# Lives in frontend/public/ so Vite copies it verbatim to dist/ (it ends up at
+# the docroot root after deploy). Any request that is not an existing file or
+# directory is served index.html, letting client-side routes (/dashboard,
+# /ventas, ...) resolve on refresh without a 404.
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
