@@ -15,6 +15,7 @@
  */
 import type { components } from '@/types/api.d'
 import { parseDecimal } from './format'
+import { buildProductosById, productoNombre } from './lookup'
 
 type VentaRead = components['schemas']['VentaRead']
 type DetalleVentaRead = components['schemas']['DetalleVentaRead']
@@ -118,19 +119,18 @@ export function buildVentaRows(
   variantes: VarianteProductoRead[],
   clientes: ClienteRead[],
 ): VentaRow[] {
-  const productosById = new Map(productos.map((p) => [p.id, p]))
+  const productosById = buildProductosById(productos)
   const variantesById = new Map(variantes.map((v) => [v.id, v]))
   const clientesById = new Map(clientes.map((c) => [c.id, c]))
 
   return ventas.map((v) => {
     const cliente = v.cliente_id === null ? null : clientesById.get(v.cliente_id)
     const detalles = v.detalles.map((d: DetalleVentaRead) => {
-      const producto = productosById.get(d.producto_id)
       const variante = d.variante_id === null ? null : variantesById.get(d.variante_id)
       return {
         producto_id: d.producto_id,
         variante_id: d.variante_id,
-        nombre: producto ? producto.nombre : `Producto #${d.producto_id}`,
+        nombre: productoNombre(productosById, d.producto_id),
         variante:
           d.variante_id === null
             ? '(base)'
