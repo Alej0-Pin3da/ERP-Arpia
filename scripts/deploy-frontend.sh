@@ -26,7 +26,7 @@ REPO_URL="https://github.com/Alej0-Pin3da/ERP-Arpia.git"
 CLONE="${CLONE:-/home/arpiacom/repositories/ERP-Arpia}"
 FRONTEND_SRC="$CLONE/frontend"
 # app.arpia.com.co document root — ADJUST to the cPanel subdomain docroot.
-FRONTEND_DOCROOT="${FRONTEND_DOCROOT:-/home/arpiacom/erp_arpia_frontend}"
+FRONTEND_DOCROOT="${FRONTEND_DOCROOT:-/home/arpiacom/app.arpia.com.co}"
 # Live URL used for the post-deploy verification curl.
 FRONTEND_URL="${FRONTEND_URL:-https://app.arpia.com.co}"
 BRANCH="${1:-main}"
@@ -45,6 +45,24 @@ git checkout "$BRANCH"
 git pull --ff-only origin "$BRANCH"
 
 echo "==> [3/6] Verifying frontend source and building"
+
+# npm is often NOT on the SSH PATH on cPanel. Probe common locations and, if
+# needed, prepend the first found nodevenv bin dir so `npm` resolves below.
+if ! command -v npm >/dev/null 2>&1; then
+  for cand in /home/*/nodevenv/*/*/bin /opt/cpanel/ea-nodejs*/bin; do
+    if [ -x "$cand/npm" ]; then
+      export PATH="$cand:$PATH"
+      echo "    npm not on PATH — using $cand"
+      break
+    fi
+  done
+fi
+if ! command -v npm >/dev/null 2>&1; then
+  echo "ERROR: npm not found. Install Node.js in cPanel (Setup Node.js App)" >&2
+  echo "       or add npm to PATH." >&2
+  exit 1
+fi
+
 if [ ! -f "$FRONTEND_SRC/package.json" ]; then
   echo "ERROR: frontend/ not found at $FRONTEND_SRC" >&2
   echo "       This branch may predate Phase 6 — checkout a branch that has frontend/." >&2
@@ -64,7 +82,9 @@ echo "==> [5/6] Syncing dist/ to docroot ($FRONTEND_DOCROOT)"
 mkdir -p "$FRONTEND_DOCROOT"
 # Clean mirror of dist/: --delete removes stale hashed assets from old builds.
 # Keep server-side tweaks in frontend/public/ (e.g. .htaccess) so they survive.
+# .well-known/ is excluded so Let's Encrypt HTTP-01 challenges survive redeploys.
 rsync -av --delete \
+  --exclude='.well-known/' \
   --exclude='.env*' \
   --exclude='*.map' \
   --exclude='.DS_Store' \
