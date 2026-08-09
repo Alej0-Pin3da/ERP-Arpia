@@ -58,6 +58,7 @@ from migrate.normalize import (
     ClaveFecha,
     coerce_aware,
     fecha_para_fila,
+    normalizar_area_m2,
     normalizar_decimal,
     parsear_cantidad_unidad,
     unidad_canonica,
@@ -122,6 +123,9 @@ def normalizar_cantidad_compra(celda: object, unidad_objetivo: str) -> Decimal |
     - number (int/float/Decimal): taken as-is (asumida la unidad objetivo).
     - '4 mts' / '2,90 mts' / '50 cm': parsed, raw unit mapped via
       ``unidad_canonica``; converted when both are length (cm -> m; 100 cm = 1 m).
+    - '50 x 280 cm' (expresion area en telas, EXM-2 borde / design D4): solo
+      cuando la unidad objetivo es 'm', se interpreta como area -> m2
+      (50*280/10000 = 1.4). Caso real: INVERSION MARGARA A7.
     - None, '#DIV/0!', o texto sin cantidad+unidad interpretable -> None.
     """
     if celda is None:
@@ -132,11 +136,16 @@ def normalizar_cantidad_compra(celda: object, unidad_objetivo: str) -> Decimal |
     texto = str(celda).strip()
     if not texto or texto.startswith("#"):
         return None
+    objetivo = unidad_canonica(unidad_objetivo)
+    # EXM-2 borde: expresion de area en telas -> m2 (regla por hoja/tipo).
+    if objetivo == "m":
+        area = normalizar_area_m2(texto)
+        if area is not None:
+            return area
     cu = parsear_cantidad_unidad(texto)
     if cu is None:
         return None
     u = unidad_canonica(cu.unidad)
-    objetivo = unidad_canonica(unidad_objetivo)
     if u == objetivo:
         return cu.cantidad
     # Conversion de longitud a metro (Telas -> m); otros pares se rechazan.

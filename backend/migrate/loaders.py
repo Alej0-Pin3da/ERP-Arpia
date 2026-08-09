@@ -64,6 +64,14 @@ COL_MAP_CAMISETAS_INV = {
     "D": "Tipo", "E": "Origen", "F": "Color",
 }
 
+# Per-sheet column maps (EXM-1 error scenario): sheets whose physical header is
+# desalineado declare their real semantics; ``leer_hoja`` applies the mapping to
+# every row (key = semantic name) and reports the mismatch against the expected
+# header. Sheets without an entry keep the physical column-letter keys.
+COL_MAPS: dict[str, dict[str, str]] = {
+    "CAMISETAS INV": COL_MAP_CAMISETAS_INV,
+}
+
 # Known junk cells to report explicitly (sheet name -> (col letter, row)).
 JUMP_CELLS: dict[str, list[tuple[str, int]]] = {
     "VENTAS": [("M", 37)],
@@ -131,6 +139,20 @@ class LibroMigracion:
             # e.g. IDEAS: no data rows by design.
             return resultado
 
+        # EXM-1 error scenario: hoja con encabezado desalineado -> se aplica el
+        # mapeo de columnas propio, comprobado contra el encabezado esperado.
+        mapeo = COL_MAPS.get(hoja)
+        if mapeo is not None and report is not None:
+            header = ws.cell(row=1, column=column_index_from_string("D")).value
+            esperado = mapeo.get("D")
+            if header is None or str(header).strip() != esperado:
+                report.warn(
+                    hoja, 1, "D1",
+                    f"encabezado desalineado: fila real D/E/F = "
+                    f"Tipo/Origen/Color pero header dice {header!r}; "
+                    f"aplicado mapeo de columnas propio (EXM-1)",
+                )
+
         for fila_idx, row in enumerate(
             ws.iter_rows(min_row=first_row, max_row=last_row), start=first_row
         ):
@@ -159,6 +181,8 @@ class LibroMigracion:
                 resultado.descartadas += 1
                 continue
 
+            if mapeo is not None:
+                celdas = {mapeo.get(k, k): v for k, v in celdas.items()}
             resultado.filas.append(celdas)
 
         # Explicit junk cells (M37 suelta in VENTAS): report, never data.

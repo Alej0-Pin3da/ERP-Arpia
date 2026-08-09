@@ -212,6 +212,23 @@ def test_normalizar_cantidad_compra_rechaza_no_interpretables():
     assert normalizar_cantidad_compra("un metro aprox", "m") is None
 
 
+def test_normalizar_cantidad_compra_expresion_area_a_m2():
+    """EXM-2 borde: '50 x 280 cm' (expresion area en telas) -> 1.4 m2.
+
+    Real case: INVERSION MARGARA A7 = '50 x 280 cm' for a Telas insumo.
+    The area expression is interpreted as an area, not a length, and only for
+    the 'm' canonical target (design D4: area vs largo segun el insumo).
+    """
+    from migrate.purchases import normalizar_cantidad_compra
+
+    assert normalizar_cantidad_compra("50 x 280 cm", "m") == Decimal("1.4")
+    # Not an area expression: length strings keep their current behavior.
+    assert normalizar_cantidad_compra("10 mts", "m") == Decimal("10")
+    # Area is Telas-only: 'un' target must not consume the expression.
+    assert normalizar_cantidad_compra("50 x 280 cm", "un") is None
+
+
+
 # --------------------------------------------------------------------------- #
 # 2. Workbook -> plan: BOM filter, right sub-table, fecha policy
 # --------------------------------------------------------------------------- #

@@ -10,8 +10,9 @@ commit mode, applies it inside a single ``session_scope`` (EXM-4):
 
 - The snapshot sets ``stock_actual`` = the quantity of the OCT25 physical
   inventory at the cut, per insumo (the baseline F5 destocks against).
-  MATERIAL block: A = nombre, B = cantidad; HERRAJES block: D = nombre,
-  E = cantidad. The PRENDAS block (G) is reference only and never read.
+  MATERIAL block: B = nombre, D = cantidad; HERRAJES block: F = nombre,
+  H = cantidad (layout real de ARPIA.xlsx, `_BLOQUES_OCT25`). The PRENDAS
+  block (J..O) is reference only and never read.
 - ``stock_minimo`` y ``costo_promedio_actual`` are NOT touched: the cost is
   the F2 WAC outcome (compras historicas); an insumo without WAC keeps 0
   (design D4: "costos derivados de WAC, sin fondo -> 0, report").

@@ -82,6 +82,40 @@ def test_m37_suelta_reportada(mini_libro):
     assert any(e.celda == "M37" for e in warns)
 
 
+def test_camisetas_inv_aplica_mapeo_columnas_por_hoja(tmp_path):
+    """EXM-1 error scenario: CAMISETAS INV header desalineado -> se aplica el
+    mapeo de columnas propio de la hoja (D=tipo, E=origen, F=color reales)."""
+    from migrate.loaders import COL_MAP_CAMISETAS_INV
+    from migrate.report import Report
+
+    path = tmp_path / "camisetas-inv.xlsx"
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "CAMISETAS INV"
+    # Header R1 desalineado: dice E=Fecha, F=Provedor pero los datos reales
+    # ponen Tipo/Origen/Color en D/E/F (spec EXM-1 error scenario).
+    ws.append(["Cantidad", "Talla", "Costo", None, "Fecha", "Provedor"])
+    ws.append([1.0, "M", 11500.0, "Camiseta", "CALI", "Negra"])  # R2
+    wb.save(path)
+
+    report = Report(fase="test", modo="dry-run")
+    with LibroMigracion(path) as libro:
+        lect = libro.leer_hoja("CAMISETAS INV", report=report)
+    assert len(lect.filas) == 1
+    fila = lect.filas[0]
+    # El mapeo por hoja traduce las columnas fisicas a semanticas.
+    assert fila.get("Tipo") == "Camiseta"
+    assert fila.get("Origen") == "CALI"
+    assert fila.get("Color") == "Negra"
+    assert fila.get("Cantidad") == 1.0
+    # El encabezado desalineado se reporta (hoja/fila/celda, N7g).
+    warns = [e for e in report.entradas if e.nivel == "WARN" and e.hoja == "CAMISETAS INV"]
+    assert warns, "el encabezado desalineado debe reportarse como WARN"
+    assert any("desalineado" in e.mensaje.lower() for e in warns)
+    assert COL_MAP_CAMISETAS_INV["D"] == "Tipo"
+
+
+
 def test_todas_las_hojas_registradas():
     # El libro real tiene 24 hojas; el spec de bounds debe cubrirlas todas.
     from openpyxl import load_workbook as lw
