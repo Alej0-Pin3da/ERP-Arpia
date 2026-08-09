@@ -4,7 +4,7 @@ This package hosts the phase registry and the shared infrastructure of the
 historical data migration: Excel loading, normalization, execution context,
 reporting and the phase CLI. The catalog phase (F0/F1) is implemented in
 catalog.py; the remaining phases (purchases.py, bom.py, stock.py, sales.py,
-finanzas.py, validate.py) are added by later PR slices.
+finanzas.py, validate.py) are added by its own slice module.
 
 Artifacts live in ENGRAM only (no openspec/filesystem sync). The code on disk
 serves the pipeline itself.
@@ -58,6 +58,7 @@ def _registrar_runners() -> None:
     from migrate.purchases import cargar_compras
     from migrate.sales import cargar_ventas
     from migrate.stock import cargar_stock
+    from migrate.validate import cargar_validate
 
     registrar_fase("F0", bootstrap_catalog_phase)
     registrar_fase("F1", catalogar)
@@ -66,6 +67,7 @@ def _registrar_runners() -> None:
     registrar_fase("F4", cargar_stock)
     registrar_fase("F5", cargar_ventas)
     registrar_fase("F6", cargar_finanzas)
+    registrar_fase("F7", cargar_validate)
 
 
 _registrar_runners()
@@ -80,7 +82,9 @@ def get_fase(fase_id: str) -> Fase:
 
 
 # Fases whose business logic is already implemented (status reporting).
-FASES_IMPLEMENTADAS: tuple[str, ...] = ("F0", "F1", "F2", "F3", "F4", "F5", "F6")
+FASES_IMPLEMENTADAS: tuple[str, ...] = (
+    "F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7"
+)
 
 
 __all__ = [
