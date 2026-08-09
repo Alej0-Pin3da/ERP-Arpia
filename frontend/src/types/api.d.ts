@@ -707,6 +707,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/omisiones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Omisiones
+         * @description Paginated list of migration omissions with AND-combined filters
+         *     (MIG-3): every filter reduces both ``items`` and ``total``.
+         */
+        get: operations["list_omisiones_api_v1_omisiones_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/omisiones/{omision_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Omision
+         * @description Mark/unmark an omission as resolved (MIG-4); 404 when missing.
+         */
+        patch: operations["update_omision_api_v1_omisiones__omision_id__patch"];
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -1154,6 +1195,45 @@ export interface components {
             /** Socio Id */
             socio_id?: number | null;
         };
+        /** OmisionRead */
+        OmisionRead: {
+            /** Id */
+            id: number;
+            /** Corrida Id */
+            corrida_id: string | null;
+            /**
+             * Fecha Corrida
+             * Format: date-time
+             */
+            fecha_corrida: string;
+            /** Fase */
+            fase: string | null;
+            /** Hoja */
+            hoja: string | null;
+            /** Fila */
+            fila: number | null;
+            /** Celda */
+            celda: string | null;
+            /** Nivel */
+            nivel: string;
+            /** Mensaje */
+            mensaje: string;
+            /** Resuelta */
+            resuelta: boolean;
+            /**
+             * Creado En
+             * Format: date-time
+             */
+            creado_en: string;
+        };
+        /**
+         * OmisionUpdate
+         * @description PATCH body: mark/unmark the omission as resolved (MIG-4).
+         */
+        OmisionUpdate: {
+            /** Resuelta */
+            resuelta: boolean;
+        };
         /** Paginated[CategoriaInsumoRead] */
         Paginated_CategoriaInsumoRead_: {
             /** Items */
@@ -1193,6 +1273,13 @@ export interface components {
         Paginated_MovimientoRead_: {
             /** Items */
             items: components["schemas"]["MovimientoRead"][];
+            /** Total */
+            total: number;
+        };
+        /** Paginated[OmisionRead] */
+        Paginated_OmisionRead_: {
+            /** Items */
+            items: components["schemas"]["OmisionRead"][];
             /** Total */
             total: number;
         };
@@ -3759,6 +3846,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MargenProductoRead"][];
+                };
+            };
+        };
+    };
+    list_omisiones_api_v1_omisiones_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                fase?: string | null;
+                nivel?: ("WARN" | "ERROR") | null;
+                hoja?: string | null;
+                resuelta?: boolean | null;
+                fecha_desde?: string | null;
+                fecha_hasta?: string | null;
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paginated_OmisionRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_omision_api_v1_omisiones__omision_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                omision_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OmisionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OmisionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

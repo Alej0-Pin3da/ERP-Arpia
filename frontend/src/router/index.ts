@@ -29,6 +29,7 @@ import FinanzasView from '@/views/FinanzasView.vue'
 import InventarioView from '@/views/InventarioView.vue'
 import ProductosView from '@/views/ProductosView.vue'
 import MaestrosView from '@/views/MaestrosView.vue'
+import OmisionesView from '@/views/OmisionesView.vue'
 import UsuariosView from '@/views/UsuariosView.vue'
 
 declare module 'vue-router' {
@@ -60,6 +61,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'inventario', name: 'inventario', component: InventarioView, meta: { roles: ALL_ROLES } },
       { path: 'productos', name: 'productos', component: ProductosView, meta: { roles: ALL_ROLES } },
       { path: 'maestros', name: 'maestros', component: MaestrosView, meta: { roles: ALL_ROLES } },
+      { path: 'omisiones', name: 'omisiones', component: OmisionesView, meta: { roles: ALL_ROLES } },
       { path: 'usuarios', name: 'usuarios', component: UsuariosView, meta: { roles: ['admin'] } },
     ],
   },

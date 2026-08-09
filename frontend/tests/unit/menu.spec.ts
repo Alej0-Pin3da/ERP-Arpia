@@ -12,9 +12,9 @@ import { MENU_ITEMS, RoleMenuFilter, roleLabel, type MenuItem } from '@/utils/me
 
 describe('RoleMenuFilter (spec SHELL-4)', () => {
   it('exposes the full menu with the admin-only Usuarios item flagged', () => {
-    // 8 sections: Dashboard, Ventas, Devoluciones, Finanzas, Inventario,
-    // Productos, Maestros, Usuarios.
-    expect(MENU_ITEMS).toHaveLength(8)
+    // 9 sections: Dashboard, Ventas, Devoluciones, Finanzas, Inventario,
+    // Productos, Maestros, Omisiones, Usuarios.
+    expect(MENU_ITEMS).toHaveLength(9)
     const labels = MENU_ITEMS.map((item) => item.label)
     expect(labels).toEqual([
       'Dashboard',
@@ -24,33 +24,42 @@ describe('RoleMenuFilter (spec SHELL-4)', () => {
       'Inventario',
       'Productos',
       'Maestros',
+      'Omisiones',
       'Usuarios',
     ])
     expect(MENU_ITEMS.find((item) => item.label === 'Usuarios')?.roles).toEqual(['admin'])
+    expect(MENU_ITEMS.find((item) => item.label === 'Omisiones')?.roles).toEqual([
+      'admin',
+      'operador',
+      'consulta',
+    ])
   })
 
   it('gives an admin every menu item, including Usuarios', () => {
     const items = RoleMenuFilter('admin')
 
-    expect(items).toHaveLength(8)
+    expect(items).toHaveLength(9)
     expect(items.map((item) => item.label)).toContain('Usuarios')
+    expect(items.map((item) => item.label)).toContain('Omisiones')
   })
 
   it('hides the admin-only Usuarios item from an operador', () => {
     const items = RoleMenuFilter('operador')
 
-    expect(items).toHaveLength(7)
+    expect(items).toHaveLength(8)
     const labels = items.map((item) => item.label)
     expect(labels).not.toContain('Usuarios')
     expect(labels).toContain('Ventas')
     expect(labels).toContain('Dashboard')
+    expect(labels).toContain('Omisiones')
   })
 
   it('hides the admin-only Usuarios item from a consulta', () => {
     const items = RoleMenuFilter('consulta')
 
-    expect(items).toHaveLength(7)
+    expect(items).toHaveLength(8)
     expect(items.map((item) => item.label)).not.toContain('Usuarios')
+    expect(items.map((item) => item.label)).toContain('Omisiones')
   })
 
   it('returns an empty menu for an unknown or missing role', () => {

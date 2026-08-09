@@ -379,6 +379,25 @@ export const categoriasInsumosApi = {
   },
 }
 
+// --- omisiones --------------------------------------------------------------
+
+export const omisionesApi = {
+  /** GET /omisiones — paginated {items, total} + filters (fase/nivel/hoja/
+   *  resuelta/fechas/q). */
+  listOmisiones(
+    params?: Query<'/api/v1/omisiones', 'get'>,
+  ): Promise<Res<'/api/v1/omisiones', 'get'>> {
+    return client.get('/omisiones', { params }).then((r) => r.data)
+  },
+  /** PATCH /omisiones/{id} — mark/unmark resuelta (admin-only, MIG-4). */
+  updateOmision(
+    params: PathParams<'/api/v1/omisiones/{omision_id}', 'patch'>,
+    body: ReqBody<'/api/v1/omisiones/{omision_id}', 'patch'>,
+  ): Promise<Res<'/api/v1/omisiones/{omision_id}', 'patch'>> {
+    return client.patch(`/omisiones/${params.omision_id}`, body).then((r) => r.data)
+  },
+}
+
 // --- usuarios ---------------------------------------------------------------
 
 export const usuariosApi = {

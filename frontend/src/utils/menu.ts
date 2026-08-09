@@ -29,6 +29,7 @@ export const MENU_ITEMS: MenuItem[] = [
   { name: 'inventario', path: '/inventario', label: 'Inventario', roles: ['admin', 'operador', 'consulta'] },
   { name: 'productos', path: '/productos', label: 'Productos', roles: ['admin', 'operador', 'consulta'] },
   { name: 'maestros', path: '/maestros', label: 'Maestros', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'omisiones', path: '/omisiones', label: 'Omisiones', roles: ['admin', 'operador', 'consulta'] },
   { name: 'usuarios', path: '/usuarios', label: 'Usuarios', roles: ['admin'] },
 ]
 

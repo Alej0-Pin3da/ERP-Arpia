@@ -83,8 +83,9 @@ describe('AppLayout (spec SHELL-5)', () => {
     const { wrapper } = await mountLayout('admin')
 
     const labels = sidebarLabels(wrapper)
-    expect(labels).toHaveLength(8)
+    expect(labels).toHaveLength(9)
     expect(labels).toContain('Usuarios')
+    expect(labels).toContain('Omisiones')
     expect(labels).toEqual([
       'Dashboard',
       'Ventas',
@@ -93,6 +94,7 @@ describe('AppLayout (spec SHELL-5)', () => {
       'Inventario',
       'Productos',
       'Maestros',
+      'Omisiones',
       'Usuarios',
     ])
   })
@@ -101,18 +103,20 @@ describe('AppLayout (spec SHELL-5)', () => {
     const { wrapper } = await mountLayout('operador')
 
     const labels = sidebarLabels(wrapper)
-    expect(labels).toHaveLength(7)
+    expect(labels).toHaveLength(8)
     expect(labels).not.toContain('Usuarios')
     expect(labels).toContain('Ventas')
     expect(labels).toContain('Dashboard')
+    expect(labels).toContain('Omisiones')
   })
 
   it('hides the admin-only Usuarios entry for a consulta', async () => {
     const { wrapper } = await mountLayout('consulta')
 
     const labels = sidebarLabels(wrapper)
-    expect(labels).toHaveLength(7)
+    expect(labels).toHaveLength(8)
     expect(labels).not.toContain('Usuarios')
+    expect(labels).toContain('Omisiones')
   })
 
   it('highlights the active route and navigates from the sidebar', async () => {
