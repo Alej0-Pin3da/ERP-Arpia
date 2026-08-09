@@ -63,6 +63,12 @@ const PAYLOAD = { venta_id: 10, tipo: 'parcial' as const, items: [{ producto_id:
 
 const PAGE1 = { limit: 20, offset: 0 }
 
+/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+async function flushDialogTransition(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
 async function mountView(rol: string): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -72,7 +78,9 @@ async function mountView(rol: string): Promise<VueWrapper> {
     refreshToken: 'ref-1',
     user: { id: 2, nombre: 'Pepe Operador', email: 'pepe@arpia.com.co', rol },
   })
-  const wrapper = mount(DevolucionesView, { global: { plugins: [pinia, ElementPlus] } })
+  const wrapper = mount(DevolucionesView, {
+    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+  })
   await nextTick()
   await flushPromises()
   await flushPromises()
@@ -91,14 +99,14 @@ describe('DevolucionesView (MOD-2 + T7)', () => {
     ElMessage.closeAll()
   })
 
-  it('renders the joined list and the create section for an operador', async () => {
+  it('renders the joined list and the register button for an operador', async () => {
     const wrapper = await mountView('operador')
 
     const text = wrapper.text()
     expect(text).toContain('Parcial')
     expect(text).toContain('Cliente devolvió dos arepas')
     expect(text).toContain('$10.000,00')
-    expect(text).toContain('Registrar devolución') // create section present for operador
+    expect(wrapper.find('[data-test="nueva-devolucion"]').exists()).toBe(true)
 
     // List pages server-side; lookup join keeps limit:1000 against `.items`.
     expect(apiMocks.listProductos).toHaveBeenCalledWith({ limit: 1000 })
@@ -120,11 +128,11 @@ describe('DevolucionesView (MOD-2 + T7)', () => {
     expect(apiMocks.listDevoluciones).toHaveBeenCalledWith({ limit: 20, offset: 20 })
   })
 
-  it('hides the create section for a consulta (read-only list)', async () => {
+  it('hides the register button for a consulta (read-only list)', async () => {
     const wrapper = await mountView('consulta')
 
     expect(wrapper.text()).toContain('Parcial')
-    expect(wrapper.text()).not.toContain('Registrar devolución')
+    expect(wrapper.find('[data-test="nueva-devolucion"]').exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'DevolucionesForm' }).exists()).toBe(false)
   })
 
@@ -144,9 +152,15 @@ describe('DevolucionesView (MOD-2 + T7)', () => {
     expect(wrapper.text()).toContain('No se pudo cargar la lista de devoluciones')
   })
 
-  it('posts the form payload, shows the success message and refreshes the list', async () => {
+  it('opens the dialog, posts the form payload, shows the success message, closes and refreshes the list', async () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listDevoluciones).toHaveBeenCalledTimes(1)
+
+    // The form lives in an el-dialog opened from the toolbar button (FE-DLG-1).
+    expect(wrapper.findComponent({ name: 'DevolucionesForm' }).exists()).toBe(false)
+    await wrapper.find('[data-test="nueva-devolucion"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'DevolucionesForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'DevolucionesForm' }).vm.$emit('submit', PAYLOAD)
     await flushPromises()
@@ -155,6 +169,22 @@ describe('DevolucionesView (MOD-2 + T7)', () => {
     expect(apiMocks.createDevolucion).toHaveBeenCalledWith(PAYLOAD)
     expect(document.body.textContent).toContain('Devolución registrada correctamente')
     expect(apiMocks.listDevoluciones).toHaveBeenCalledTimes(2) // refreshed after create
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'DevolucionesForm' }).exists()).toBe(false)
+  })
+
+  it('cancels the register dialog without submitting (FE-DLG-2/3)', async () => {
+    const wrapper = await mountView('operador')
+
+    await wrapper.find('[data-test="nueva-devolucion"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'DevolucionesForm' }).exists()).toBe(true)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushDialogTransition()
+
+    expect(apiMocks.createDevolucion).not.toHaveBeenCalled()
+    expect(wrapper.findComponent({ name: 'DevolucionesForm' }).exists()).toBe(false)
   })
 
   it('applies the venta_id and fecha filters to the list query', async () => {

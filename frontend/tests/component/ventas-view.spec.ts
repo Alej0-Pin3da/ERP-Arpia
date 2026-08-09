@@ -104,6 +104,12 @@ const PAYLOAD = {
 
 const PAGE1 = { limit: 20, offset: 0 }
 
+/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+async function flushDialogTransition(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
 async function mountView(rol: string): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -113,7 +119,9 @@ async function mountView(rol: string): Promise<VueWrapper> {
     refreshToken: 'ref-1',
     user: { id: 2, nombre: 'Pepe Operador', email: 'pepe@arpia.com.co', rol },
   })
-  const wrapper = mount(VentasView, { global: { plugins: [pinia, ElementPlus] } })
+  const wrapper = mount(VentasView, {
+    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+  })
   await nextTick()
   await flushPromises()
   await flushPromises()
@@ -135,7 +143,7 @@ describe('VentasView (MOD-1 + T7)', () => {
     ElMessage.closeAll()
   })
 
-  it('renders the joined list and the register tab for an operador', async () => {
+  it('renders the joined list and the register button for an operador', async () => {
     const wrapper = await mountView('operador')
 
     const text = wrapper.text()
@@ -143,7 +151,7 @@ describe('VentasView (MOD-1 + T7)', () => {
     expect(text).toContain('Jugo de naranja ×1')
     expect(text).toContain('Juan Pérez')
     expect(text).toContain('$15.000,00')
-    expect(text).toContain('Registrar venta') // form tab present for operador
+    expect(wrapper.find('[data-test="nueva-venta"]').exists()).toBe(true) // register button for operador
 
     // List pages server-side; lookups join with limit:1000 against `.items`.
     expect(apiMocks.listVentas).toHaveBeenCalledWith(PAGE1)
@@ -180,11 +188,11 @@ describe('VentasView (MOD-1 + T7)', () => {
     expect(apiMocks.listVentas).toHaveBeenLastCalledWith({ ...PAGE1, canal_venta: 'feria' })
   })
 
-  it('hides the register form for a consulta (read-only list)', async () => {
+  it('hides the register button for a consulta (read-only list)', async () => {
     const wrapper = await mountView('consulta')
 
     expect(wrapper.text()).toContain('Arepa de huevo ×2')
-    expect(wrapper.text()).not.toContain('Registrar venta')
+    expect(wrapper.find('[data-test="nueva-venta"]').exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(false)
   })
 
@@ -204,9 +212,15 @@ describe('VentasView (MOD-1 + T7)', () => {
     expect(wrapper.text()).toContain('No se pudo cargar la lista de ventas')
   })
 
-  it('posts the form payload, shows the success message and refreshes the list', async () => {
+  it('opens the dialog, posts the form payload, shows the success message, closes and refreshes the list', async () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listVentas).toHaveBeenCalledTimes(1)
+
+    // The form lives in an el-dialog opened from the toolbar button (FE-DLG-1).
+    expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(false)
+    await wrapper.find('[data-test="nueva-venta"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'VentasForm' }).vm.$emit('submit', PAYLOAD)
     await flushPromises()
@@ -215,5 +229,37 @@ describe('VentasView (MOD-1 + T7)', () => {
     expect(apiMocks.createVenta).toHaveBeenCalledWith(PAYLOAD)
     expect(document.body.textContent).toContain('Venta registrada correctamente')
     expect(apiMocks.listVentas).toHaveBeenCalledTimes(2) // refreshed after create
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(false)
+  })
+
+  it('cancels the register dialog without submitting (FE-DLG-2/3)', async () => {
+    const wrapper = await mountView('operador')
+
+    await wrapper.find('[data-test="nueva-venta"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(true)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushDialogTransition()
+
+    expect(apiMocks.createVenta).not.toHaveBeenCalled()
+    expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(false)
+  })
+
+  it('keeps the dialog open and shows the error when the save fails (FE-DLG-2)', async () => {
+    apiMocks.createVenta.mockRejectedValue({ response: { data: { detail: 'Stock insuficiente' } } })
+    const wrapper = await mountView('operador')
+
+    await wrapper.find('[data-test="nueva-venta"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(true)
+
+    wrapper.findComponent({ name: 'VentasForm' }).vm.$emit('submit', PAYLOAD)
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('Stock insuficiente')
+    expect(apiMocks.listVentas).toHaveBeenCalledTimes(1) // no refresh on failure
+    expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(true)
   })
 })

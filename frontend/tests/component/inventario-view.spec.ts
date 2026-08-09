@@ -112,7 +112,9 @@ async function mountView(rol: string): Promise<VueWrapper> {
     refreshToken: 'ref-1',
     user: { id: 2, nombre: 'Pepe', email: 'pepe@arpia.com.co', rol },
   })
-  const wrapper = mount(InventarioView, { global: { plugins: [pinia, ElementPlus] } })
+  const wrapper = mount(InventarioView, {
+    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+  })
   await nextTick()
   await flushPromises()
   await flushPromises()
@@ -125,6 +127,12 @@ async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
   if (!item) throw new Error(`tab not found: "${label}"`)
   await item.trigger('click')
   await nextTick()
+  await flushPromises()
+}
+
+/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+async function flushDialogTransition(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
 }
 
@@ -178,7 +186,7 @@ describe('InventarioView (MOD-4 + T6)', () => {
     expect(wrapper.text()).toContain('Crítico') // Aceite: stock 2 < half of min 10
   })
 
-  it('operador registers compras but sees NO admin insumo actions', async () => {
+  it('operador registers compras via the dialog but sees NO admin insumo actions', async () => {
     const wrapper = await mountView('operador')
 
     expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(false)
@@ -187,28 +195,34 @@ describe('InventarioView (MOD-4 + T6)', () => {
     expect(apiMocks.listCategorias).not.toHaveBeenCalled() // categorias only for admin form
 
     await activateTab(wrapper, 'Compras')
+    // The create form lives in an el-dialog opened from the toolbar button (FE-DLG-1).
+    expect(wrapper.findComponent({ name: 'ComprasForm' }).exists()).toBe(false)
+    expect(wrapper.find('[data-test="nueva-compra"]').exists()).toBe(true)
+    await wrapper.find('[data-test="nueva-compra"]').trigger('click')
+    await nextTick()
     expect(wrapper.findComponent({ name: 'ComprasForm' }).exists()).toBe(true)
-    expect(wrapper.text()).toContain('Registrar compra')
   })
 
-  it('consulta sees read-only lists only — no compras form, no admin actions', async () => {
+  it('consulta sees read-only lists only — no compras button, no admin actions', async () => {
     const wrapper = await mountView('consulta')
 
     const text = wrapper.text()
     expect(text).toContain('Harina de maíz')
-    expect(text).not.toContain('Registrar compra')
+    expect(wrapper.find('[data-test="nueva-compra"]').exists()).toBe(false)
 
     await activateTab(wrapper, 'Compras')
+    expect(wrapper.find('[data-test="nueva-compra"]').exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'ComprasForm' }).exists()).toBe(false)
     expect(wrapper.findAll('[data-test="edit-insumo"]')).toHaveLength(0)
     expect(wrapper.findAll('[data-test="delete-insumo"]')).toHaveLength(0)
   })
 
-  it('admin sees the insumo create form, the edit/delete actions and loads categorias', async () => {
+  it('admin owns the insumo dialog button and the edit/delete actions and loads categorias', async () => {
     const wrapper = await mountView('admin')
 
-    expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(true)
-    expect(wrapper.text()).toContain('Crear insumo')
+    // The create form is inside a dialog — closed until the toolbar button opens it.
+    expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(false)
+    expect(wrapper.find('[data-test="nuevo-insumo"]').exists()).toBe(true)
     expect(wrapper.findAll('[data-test="edit-insumo"]')).toHaveLength(3)
     expect(wrapper.findAll('[data-test="delete-insumo"]')).toHaveLength(3)
     expect(apiMocks.listCategorias).toHaveBeenCalledTimes(1)
@@ -219,6 +233,8 @@ describe('InventarioView (MOD-4 + T6)', () => {
     expect(apiMocks.listInsumos).toHaveBeenCalledTimes(2) // table page + lookup
     await activateTab(wrapper, 'Compras')
 
+    await wrapper.find('[data-test="nueva-compra"]').trigger('click')
+    await nextTick()
     wrapper.findComponent({ name: 'ComprasForm' }).vm.$emit('submit', {
       insumo_id: 1,
       cantidad_comprada: 3,
@@ -282,9 +298,13 @@ describe('InventarioView (MOD-4 + T6)', () => {
     expect(apiMocks.listInsumos).toHaveBeenCalledWith({ ...PAGE1, q: 'harina' })
   })
 
-  it('creates an insumo as admin and refreshes the list', async () => {
+  it('opens the create dialog, creates an insumo as admin and refreshes the list', async () => {
     const wrapper = await mountView('admin')
     expect(apiMocks.listInsumos).toHaveBeenCalledTimes(2)
+
+    await wrapper.find('[data-test="nuevo-insumo"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'InsumoForm' }).vm.$emit('submit', {
       categoria_id: 1,
@@ -307,15 +327,18 @@ describe('InventarioView (MOD-4 + T6)', () => {
     })
     expect(document.body.textContent).toContain('Insumo creado correctamente')
     expect(apiMocks.listInsumos).toHaveBeenCalledTimes(4)
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(false)
   })
 
-  it('edits an insumo via the inline edit form and returns to the create form', async () => {
+  it('edits an insumo via the edit dialog and closes it on success', async () => {
     const wrapper = await mountView('admin')
 
     await wrapper.findAll('[data-test="edit-insumo"]')[0].trigger('click')
     await nextTick()
 
     expect(wrapper.text()).toContain('Editar insumo')
+    expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(true)
     wrapper.findComponent({ name: 'InsumoForm' }).vm.$emit('submit', {
       categoria_id: 1,
       nombre: 'Harina premium',
@@ -339,8 +362,48 @@ describe('InventarioView (MOD-4 + T6)', () => {
       },
     )
     expect(document.body.textContent).toContain('Insumo actualizado correctamente')
-    expect(wrapper.text()).toContain('Crear insumo') // back to the create form
     expect(apiMocks.listInsumos).toHaveBeenCalledTimes(4)
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(false)
+  })
+
+  it('cancels the create dialog without submitting (FE-DLG-2/3)', async () => {
+    const wrapper = await mountView('admin')
+
+    await wrapper.find('[data-test="nuevo-insumo"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(true)
+
+    // Esc closes the dialog without a submit (FE-DLG-3).
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushDialogTransition()
+
+    expect(apiMocks.createInsumo).not.toHaveBeenCalled()
+    expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(false)
+  })
+
+  it('keeps the dialog open and shows the error when the save fails (FE-DLG-2)', async () => {
+    apiMocks.createInsumo.mockRejectedValue({ response: { data: { detail: 'Nombre duplicado' } } })
+    const wrapper = await mountView('admin')
+
+    await wrapper.find('[data-test="nuevo-insumo"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(true)
+
+    wrapper.findComponent({ name: 'InsumoForm' }).vm.$emit('submit', {
+      categoria_id: 1,
+      nombre: 'Harina duplicada',
+      unidad_medida: 'kg',
+      stock_actual: 10,
+      stock_minimo: 5,
+      costo_promedio_actual: 3200,
+    })
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('Nombre duplicado')
+    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(2) // no refresh on failure
+    // Error keeps the dialog open (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(true)
   })
 
   it('deletes an insumo after the confirm dialog and refreshes', async () => {

@@ -55,11 +55,19 @@ async function mountView(): Promise<VueWrapper> {
     refreshToken: 'ref-1',
     user: { id: 1, nombre: 'Ana Admin', email: 'ana@arpia.com.co', rol: 'admin' },
   })
-  const wrapper = mount(UsuariosView, { global: { plugins: [pinia, ElementPlus] } })
+  const wrapper = mount(UsuariosView, {
+    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+  })
   await nextTick()
   await flushPromises()
   await flushPromises()
   return wrapper
+}
+
+/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+async function flushDialogTransition(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
 }
 
 describe('UsuariosView (MOD-5 usuarios + T6)', () => {
@@ -134,9 +142,15 @@ describe('UsuariosView (MOD-5 usuarios + T6)', () => {
     expect(wrapper.findAll('[data-test="edit-usuario"]')).toHaveLength(3)
   })
 
-  it('creates a user with the exact UsuarioCreate payload and refreshes', async () => {
+  it('opens the create dialog, creates a user with the exact UsuarioCreate payload and refreshes', async () => {
     const wrapper = await mountView()
     expect(apiMocks.list).toHaveBeenCalledTimes(1)
+
+    // The form lives in an el-dialog opened from the toolbar button (FE-DLG-1).
+    expect(wrapper.findComponent({ name: 'UsuarioForm' }).exists()).toBe(false)
+    await wrapper.find('[data-test="nuevo-usuario"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'UsuarioForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'UsuarioForm' }).vm.$emit('submit', {
       nombre: 'María Pérez',
@@ -155,12 +169,16 @@ describe('UsuariosView (MOD-5 usuarios + T6)', () => {
     })
     expect(document.body.textContent).toContain('Usuario creado correctamente')
     expect(apiMocks.list).toHaveBeenCalledTimes(2)
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'UsuarioForm' }).exists()).toBe(false)
   })
 
-  it('surfaces the 400 when the email is already registered', async () => {
+  it('surfaces the 400 when the email is already registered and keeps the dialog open (FE-DLG-2)', async () => {
     apiMocks.create.mockRejectedValueOnce({ response: { data: { detail: 'Email already registered' } } })
     const wrapper = await mountView()
 
+    await wrapper.find('[data-test="nuevo-usuario"]').trigger('click')
+    await nextTick()
     wrapper.findComponent({ name: 'UsuarioForm' }).vm.$emit('submit', {
       nombre: 'María Pérez',
       email: 'maria@arpia.com.co',
@@ -171,14 +189,16 @@ describe('UsuariosView (MOD-5 usuarios + T6)', () => {
 
     expect(document.body.textContent).toContain('Email already registered')
     expect(apiMocks.list).toHaveBeenCalledTimes(1) // no refresh after failure
+    expect(wrapper.findComponent({ name: 'UsuarioForm' }).exists()).toBe(true) // stays open
   })
 
-  it('edits another user rol via the inline form (rol-only PATCH) and refreshes', async () => {
+  it('edits another user rol via the edit dialog (rol-only PATCH) and refreshes', async () => {
     const wrapper = await mountView()
 
     await wrapper.findAll('[data-test="edit-usuario"]')[2].trigger('click') // Coni (id 3)
     await nextTick()
     expect(wrapper.text()).toContain('Editar usuario')
+    expect(wrapper.findComponent({ name: 'UsuarioForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'UsuarioForm' }).vm.$emit('submit', { rol: 'operador' })
     await flushPromises()
@@ -186,11 +206,12 @@ describe('UsuariosView (MOD-5 usuarios + T6)', () => {
     expect(apiMocks.update).toHaveBeenCalledTimes(1)
     expect(apiMocks.update).toHaveBeenCalledWith({ usuario_id: 3 }, { rol: 'operador' })
     expect(document.body.textContent).toContain('Usuario actualizado correctamente')
-    expect(wrapper.text()).toContain('Crear usuario') // back to create form
     expect(apiMocks.list).toHaveBeenCalledTimes(2)
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'UsuarioForm' }).exists()).toBe(false)
   })
 
-  it('surfaces the server 400 when the admin tries to demote self', async () => {
+  it('surfaces the server 400 when the admin tries to demote self and keeps the dialog open', async () => {
     apiMocks.update.mockRejectedValueOnce({
       response: { data: { detail: 'Cannot change your own role away from admin' } },
     })
@@ -204,6 +225,21 @@ describe('UsuariosView (MOD-5 usuarios + T6)', () => {
 
     expect(document.body.textContent).toContain('Cannot change your own role away from admin')
     expect(apiMocks.list).toHaveBeenCalledTimes(1) // account remains admin, no refresh
+    expect(wrapper.findComponent({ name: 'UsuarioForm' }).exists()).toBe(true) // stays open
+  })
+
+  it('cancels the create dialog without submitting (FE-DLG-2/3)', async () => {
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-test="nuevo-usuario"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'UsuarioForm' }).exists()).toBe(true)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushDialogTransition()
+
+    expect(apiMocks.create).not.toHaveBeenCalled()
+    expect(wrapper.findComponent({ name: 'UsuarioForm' }).exists()).toBe(false)
   })
 
   it('deletes another user after the confirm dialog (204) and refreshes', async () => {

@@ -91,7 +91,9 @@ async function mountView(rol: string): Promise<VueWrapper> {
     refreshToken: 'ref-1',
     user: { id: 2, nombre: 'Pepe Operador', email: 'pepe@arpia.com.co', rol },
   })
-  const wrapper = mount(FinanzasView, { global: { plugins: [pinia, ElementPlus] } })
+  const wrapper = mount(FinanzasView, {
+    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+  })
   await nextTick()
   await flushPromises()
   await flushPromises()
@@ -104,6 +106,12 @@ async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
   if (!item) throw new Error(`tab not found: "${label}"`)
   await item.trigger('click')
   await nextTick()
+  await flushPromises()
+}
+
+/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+async function flushDialogTransition(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
 }
 
@@ -127,7 +135,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders the three tabs, the joined movimientos list and the create sections for an operador', async () => {
+  it('renders the three tabs, the joined movimientos list and the create buttons for an operador', async () => {
     const wrapper = await mountView('operador')
 
     const text = wrapper.text()
@@ -148,11 +156,12 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     expect(apiMocks.listSocios).toHaveBeenCalledWith({ limit: 20, offset: 0 })
     expect(apiMocks.listSocios).toHaveBeenCalledWith({ limit: 1000 })
 
-    // Write sections present for operador.
+    // Write buttons present for operador; the forms live in el-dialogs (FE-DLG-1).
+    expect(wrapper.find('[data-test="nuevo-movimiento"]').exists()).toBe(true)
     await activateTab(wrapper, 'Liquidaciones')
     expect(wrapper.text()).toContain('Procesar liquidación')
     await activateTab(wrapper, 'Socios')
-    expect(wrapper.text()).toContain('Crear socio')
+    expect(wrapper.find('[data-test="nuevo-socio"]').exists()).toBe(true)
   })
 
   it('renders el-pagination on both lists and pages with new offsets', async () => {
@@ -195,9 +204,9 @@ describe('FinanzasView (MOD-3 + T7)', () => {
 
     const text = wrapper.text()
     expect(text).toContain('Ana María')
-    expect(text).not.toContain('Registrar movimiento')
+    expect(wrapper.find('[data-test="nuevo-movimiento"]').exists()).toBe(false)
     expect(text).not.toContain('Procesar liquidación')
-    expect(text).not.toContain('Crear socio')
+    expect(wrapper.find('[data-test="nuevo-socio"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-test="delete-movimiento"]')).toHaveLength(0)
     expect(wrapper.findAll('[data-test="edit-socio"]')).toHaveLength(0)
 
@@ -206,9 +215,15 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     expect(wrapper.findComponent({ name: 'SociosForm' }).exists()).toBe(false)
   })
 
-  it('creates a movimiento, shows the success message and refreshes the list', async () => {
+  it('opens the dialog, creates a movimiento, shows the success message, closes and refreshes the list', async () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(1)
+
+    // The form lives in an el-dialog opened from the toolbar button (FE-DLG-1).
+    expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(false)
+    await wrapper.find('[data-test="nuevo-movimiento"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'MovimientosForm' }).vm.$emit('submit', {
       tipo: 'Gasto',
@@ -221,6 +236,22 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     expect(apiMocks.createMovimiento).toHaveBeenCalledWith({ tipo: 'Gasto', descripcion: 'Compra de arepas', monto: 50000 })
     expect(document.body.textContent).toContain('Movimiento registrado correctamente')
     expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(2) // refreshed after create
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(false)
+  })
+
+  it('cancels the movimiento dialog without submitting (FE-DLG-2/3)', async () => {
+    const wrapper = await mountView('operador')
+
+    await wrapper.find('[data-test="nuevo-movimiento"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(true)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushDialogTransition()
+
+    expect(apiMocks.createMovimiento).not.toHaveBeenCalled()
+    expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(false)
   })
 
   it('soft-deletes a movimiento after the confirm dialog (DELETE expects 200)', async () => {
@@ -286,10 +317,14 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     expect(wrapper.text()).not.toContain('Resultado de la liquidación')
   })
 
-  it('creates a socio and refreshes the list', async () => {
+  it('opens the socio dialog, creates a socio and refreshes the list', async () => {
     const wrapper = await mountView('operador')
     await activateTab(wrapper, 'Socios')
     expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // table page + lookup
+
+    await wrapper.find('[data-test="nuevo-socio"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'SociosForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'SociosForm' }).vm.$emit('submit', {
       nombre: 'Luis Vega',
@@ -301,9 +336,11 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     expect(apiMocks.createSocio).toHaveBeenCalledWith({ nombre: 'Luis Vega', porcentaje_participacion: 25 })
     expect(document.body.textContent).toContain('Socio creado correctamente')
     expect(apiMocks.listSocios).toHaveBeenCalledTimes(4) // refreshed after create (2 per load)
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'SociosForm' }).exists()).toBe(false)
   })
 
-  it('edits a socio percentage via the inline edit form (PATCH percentage only)', async () => {
+  it('edits a socio percentage via the edit dialog (PATCH percentage only) and closes it on success', async () => {
     const wrapper = await mountView('operador')
     await activateTab(wrapper, 'Socios')
     expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // table page + lookup
@@ -311,8 +348,9 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     await wrapper.findAll('[data-test="edit-socio"]')[0].trigger('click')
     await nextTick()
 
-    // Inline edit form replaces the create form; the name is read-only.
+    // The edit form lives in the dialog; the name is read-only in edit mode.
     expect(wrapper.text()).toContain('Editar socio')
+    expect(wrapper.findComponent({ name: 'SociosForm' }).exists()).toBe(true)
     expect(wrapper.find('[data-test="nombre-socio-input"]').exists()).toBe(false)
 
     wrapper.findComponent({ name: 'SociosForm' }).vm.$emit('submit', { porcentaje_participacion: 20 })
@@ -323,8 +361,8 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     expect(document.body.textContent).toContain('Socio actualizado correctamente')
     expect(apiMocks.listSocios).toHaveBeenCalledTimes(4) // table + lookup, refreshed
 
-    // Back to the create form after the edit completes.
-    expect(wrapper.text()).toContain('Crear socio')
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'SociosForm' }).exists()).toBe(false)
   })
 
   it('deletes a socio after the confirm dialog and refreshes', async () => {
@@ -358,15 +396,16 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // no refresh after failure
   })
 
-  it('opens the movimiento edit form with prefill, PATCHes on submit, closes and refreshes (T9)', async () => {
+  it('opens the movimiento edit dialog with prefill, PATCHes on submit, closes and refreshes (T9)', async () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(1)
 
     await wrapper.findAll('[data-test="edit-movimiento"]')[0].trigger('click')
     await nextTick()
 
-    // The create form is replaced by the prefilled edit form.
+    // The edit form lives in the dialog with the create form replaced (T9 -> dialog).
     expect(wrapper.text()).toContain('Editar movimiento')
+    expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'MovimientosForm' }).vm.$emit('submit', {
       fecha: '2026-08-02T12:00:00',
@@ -389,12 +428,12 @@ describe('FinanzasView (MOD-3 + T7)', () => {
       },
     )
     expect(document.body.textContent).toContain('Movimiento actualizado correctamente')
-    // Success closes the edit form (back to create) and refreshes the list.
-    expect(wrapper.text()).toContain('Registrar movimiento')
+    // Success closes the dialog and refreshes the list (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(false)
     expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(2)
   })
 
-  it('keeps the edit form open and shows the server detail when the PATCH fails (T9)', async () => {
+  it('keeps the edit dialog open and shows the server detail when the PATCH fails (T9)', async () => {
     apiMocks.updateMovimiento.mockRejectedValue({
       response: {
         data: { detail: 'Los movimientos de una liquidación no permiten cambiar monto ni socio' },
@@ -406,6 +445,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     await wrapper.findAll('[data-test="edit-movimiento"]')[0].trigger('click')
     await nextTick()
     expect(wrapper.text()).toContain('Editar movimiento')
+    expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'MovimientosForm' }).vm.$emit('submit', {
       tipo: 'Retiro',
@@ -414,9 +454,9 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     })
     await flushPromises()
 
-    // Error surfaces the 422 detail and does NOT close the edit form.
+    // Error surfaces the 422 detail and does NOT close the dialog.
     expect(document.body.textContent).toContain('no permiten cambiar monto ni socio')
-    expect(wrapper.text()).toContain('Editar movimiento')
+    expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(true)
     expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(1) // no refresh on failure
   })
 

@@ -150,7 +150,9 @@ async function mountView(rol: string): Promise<VueWrapper> {
     refreshToken: 'ref-1',
     user: { id: 2, nombre: 'Pepe', email: 'pepe@arpia.com.co', rol },
   })
-  const wrapper = mount(ProductosView, { global: { plugins: [pinia, ElementPlus] } })
+  const wrapper = mount(ProductosView, {
+    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+  })
   await nextTick()
   await flushPromises()
   await flushPromises()
@@ -179,6 +181,12 @@ async function pickOption(popperClass: string, label: string): Promise<void> {
   if (!option) throw new Error(`option not found in ${popperClass}: "${label}"`)
   option.click()
   await nextTick()
+  await flushPromises()
+}
+
+/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+async function flushDialogTransition(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
 }
 
@@ -255,7 +263,7 @@ describe('ProductosView (MOD-5 + T6)', () => {
   it('operador sees read-only lists — no product form, no edit/delete/variantes actions', async () => {
     const wrapper = await mountView('operador')
 
-    expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(false)
+    expect(wrapper.find('[data-test="nuevo-producto"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-test="edit-producto"]')).toHaveLength(0)
     expect(wrapper.findAll('[data-test="delete-producto"]')).toHaveLength(0)
     expect(wrapper.findAll('[data-test="producto-variantes"]')).toHaveLength(0)
@@ -264,26 +272,32 @@ describe('ProductosView (MOD-5 + T6)', () => {
   it('consulta is read-only everywhere', async () => {
     const wrapper = await mountView('consulta')
 
-    expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(false)
+    expect(wrapper.find('[data-test="nuevo-producto"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-test="edit-producto"]')).toHaveLength(0)
 
     await activateTab(wrapper, 'BOM')
-    expect(wrapper.findComponent({ name: 'BomInsumoForm' }).exists()).toBe(false)
+    expect(wrapper.find('[data-test="nueva-linea-insumo"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-test="edit-bom-insumo"]')).toHaveLength(0)
   })
 
-  it('admin owns the product form, the edit/delete actions and the variantes button', async () => {
+  it('admin owns the dialog buttons, the edit/delete actions and the variantes button', async () => {
     const wrapper = await mountView('admin')
 
-    expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(true)
+    // The create form lives in an el-dialog — closed until the button opens it (FE-DLG-1).
+    expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(false)
+    expect(wrapper.find('[data-test="nuevo-producto"]').exists()).toBe(true)
     expect(wrapper.findAll('[data-test="edit-producto"]')).toHaveLength(2)
     expect(wrapper.findAll('[data-test="delete-producto"]')).toHaveLength(2)
     expect(wrapper.findAll('[data-test="producto-variantes"]')).toHaveLength(2)
   })
 
-  it('creates a product with the exact payload and refreshes the list', async () => {
+  it('opens the create dialog, creates a product with the exact payload and refreshes the list', async () => {
     const wrapper = await mountView('admin')
     expect(apiMocks.listProductos).toHaveBeenCalledTimes(2) // table page + lookup
+
+    await wrapper.find('[data-test="nuevo-producto"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'ProductoForm' }).vm.$emit('submit', {
       tipo_producto_id: 1,
@@ -304,15 +318,18 @@ describe('ProductosView (MOD-5 + T6)', () => {
     })
     expect(document.body.textContent).toContain('Producto creado correctamente')
     expect(apiMocks.listProductos).toHaveBeenCalledTimes(4)
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(false)
   })
 
-  it('edits a product via the inline edit form and returns to the create form', async () => {
+  it('edits a product via the edit dialog and closes it on success', async () => {
     const wrapper = await mountView('admin')
 
     await wrapper.findAll('[data-test="edit-producto"]')[0].trigger('click')
     await nextTick()
 
     expect(wrapper.text()).toContain('Editar producto')
+    expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(true)
     wrapper.findComponent({ name: 'ProductoForm' }).vm.$emit('submit', {
       tipo_producto_id: 1,
       nombre: 'Arepa premium',
@@ -334,8 +351,45 @@ describe('ProductosView (MOD-5 + T6)', () => {
       },
     )
     expect(document.body.textContent).toContain('Producto actualizado correctamente')
-    expect(wrapper.text()).toContain('Crear producto') // back to create form
     expect(apiMocks.listProductos).toHaveBeenCalledTimes(4)
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(false)
+  })
+
+  it('cancels the create dialog without submitting (FE-DLG-2/3)', async () => {
+    const wrapper = await mountView('admin')
+
+    await wrapper.find('[data-test="nuevo-producto"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(true)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushDialogTransition()
+
+    expect(apiMocks.createProducto).not.toHaveBeenCalled()
+    expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(false)
+  })
+
+  it('keeps the product dialog open and shows the error when the save fails (FE-DLG-2)', async () => {
+    apiMocks.createProducto.mockRejectedValue({ response: { data: { detail: 'Nombre duplicado' } } })
+    const wrapper = await mountView('admin')
+
+    await wrapper.find('[data-test="nuevo-producto"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(true)
+
+    wrapper.findComponent({ name: 'ProductoForm' }).vm.$emit('submit', {
+      tipo_producto_id: 1,
+      nombre: 'Arepa duplicada',
+      requiere_fabricacion: true,
+      costos_operativos_fijos: 5000,
+      precio_venta_sugerido: 12000,
+    })
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('Nombre duplicado')
+    expect(apiMocks.listProductos).toHaveBeenCalledTimes(2) // no refresh on failure
+    expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(true)
   })
 
   it('deletes a product after the confirm dialog (204) and refreshes', async () => {
@@ -366,7 +420,7 @@ describe('ProductosView (MOD-5 + T6)', () => {
     expect(apiMocks.listProductos).toHaveBeenCalledTimes(2) // no refresh after failure
   })
 
-  it('lazily loads the nested variantes and adds one with the exact payload', async () => {
+  it('lazily loads the nested variantes and adds one via the dialog with the exact payload', async () => {
     const wrapper = await mountView('admin')
 
     await wrapper.findAll('[data-test="producto-variantes"]')[0].trigger('click')
@@ -378,6 +432,12 @@ describe('ProductosView (MOD-5 + T6)', () => {
     expect(wrapper.text()).toContain('$13.000,00')
     expect(wrapper.text()).toContain('—') // null precio_venta
 
+    // The variante form lives in an el-dialog opened from the section button (FE-DLG-1).
+    expect(wrapper.findComponent({ name: 'VarianteForm' }).exists()).toBe(false)
+    await wrapper.find('[data-test="nueva-variante"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'VarianteForm' }).exists()).toBe(true)
+
     wrapper.findComponent({ name: 'VarianteForm' }).vm.$emit('submit', { nombre_variante: 'Docena' })
     await flushPromises()
 
@@ -385,6 +445,8 @@ describe('ProductosView (MOD-5 + T6)', () => {
     expect(apiMocks.createVariante).toHaveBeenCalledWith({ producto_id: 1 }, { nombre_variante: 'Docena' })
     expect(document.body.textContent).toContain('Variante creada correctamente')
     expect(apiMocks.listVariantes).toHaveBeenCalledTimes(2) // refresh after create
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'VarianteForm' }).exists()).toBe(false)
   })
 
   it('BOM tab loads both line lists for the selected product', async () => {
@@ -403,15 +465,19 @@ describe('ProductosView (MOD-5 + T6)', () => {
     expect(wrapper.text()).toContain('Detergente') // joined included product
   })
 
-  it('BOM admin adds an insumo line and surfaces the duplicate 409', async () => {
+  it('BOM admin adds an insumo line via the dialog and surfaces the duplicate 409', async () => {
     const wrapper = await mountView('admin')
     await activateTab(wrapper, 'BOM')
     await wrapper.find('[data-test="bom-product-select"]').trigger('click')
     await nextTick()
     await pickOption('bom-product-popper', 'Arepa de choclo')
 
-    expect(wrapper.findComponent({ name: 'BomInsumoForm' }).exists()).toBe(true)
+    // The BOM line forms live in el-dialogs opened from the section buttons (FE-DLG-1).
+    expect(wrapper.findComponent({ name: 'BomInsumoForm' }).exists()).toBe(false)
     expect(wrapper.findAll('[data-test="edit-bom-insumo"]')).toHaveLength(1)
+    await wrapper.find('[data-test="nueva-linea-insumo"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'BomInsumoForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'BomInsumoForm' }).vm.$emit('submit', {
       insumo_id: 1,
@@ -427,11 +493,15 @@ describe('ProductosView (MOD-5 + T6)', () => {
     )
     expect(document.body.textContent).toContain('Línea de BOM agregada correctamente')
     expect(apiMocks.listBomInsumos).toHaveBeenCalledTimes(2) // refresh after create
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'BomInsumoForm' }).exists()).toBe(false)
 
-    // Duplicate line -> backend 409 surfaced via server detail.
+    // Duplicate line -> backend 409 surfaced via server detail (dialog stays open).
     apiMocks.createBomInsumo.mockRejectedValueOnce({
       response: { data: { detail: 'BomInsumo line already exists for this product, insumo and variant' } },
     })
+    await wrapper.find('[data-test="nueva-linea-insumo"]').trigger('click')
+    await nextTick()
     wrapper.findComponent({ name: 'BomInsumoForm' }).vm.$emit('submit', {
       insumo_id: 1,
       cantidad_requerida: 2,
@@ -440,6 +510,35 @@ describe('ProductosView (MOD-5 + T6)', () => {
     await flushPromises()
 
     expect(document.body.textContent).toContain('BomInsumo line already exists for this product, insumo and variant')
+    expect(wrapper.findComponent({ name: 'BomInsumoForm' }).exists()).toBe(true)
+  })
+
+  it('BOM admin adds a combo line via the dialog with the exact payload (FE-DLG-1/2)', async () => {
+    const wrapper = await mountView('admin')
+    await activateTab(wrapper, 'BOM')
+    await wrapper.find('[data-test="bom-product-select"]').trigger('click')
+    await nextTick()
+    await pickOption('bom-product-popper', 'Arepa de choclo')
+
+    expect(wrapper.findComponent({ name: 'BomProductoForm' }).exists()).toBe(false)
+    await wrapper.find('[data-test="nueva-linea-combo"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'BomProductoForm' }).exists()).toBe(true)
+
+    wrapper.findComponent({ name: 'BomProductoForm' }).vm.$emit('submit', {
+      producto_incluido_id: 2,
+      cantidad: 2,
+    })
+    await flushPromises()
+
+    expect(apiMocks.createBomProducto).toHaveBeenCalledTimes(1)
+    expect(apiMocks.createBomProducto).toHaveBeenCalledWith(
+      { producto_id: 1 },
+      { producto_incluido_id: 2, cantidad: 2 },
+    )
+    expect(document.body.textContent).toContain('Línea de combo agregada correctamente')
+    expect(apiMocks.listBomProductos).toHaveBeenCalledTimes(2) // refresh after create
+    expect(wrapper.findComponent({ name: 'BomProductoForm' }).exists()).toBe(false)
   })
 
   it('Costo tab renders the grouped tree with the grand total', async () => {

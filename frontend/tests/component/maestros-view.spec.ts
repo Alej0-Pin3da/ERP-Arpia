@@ -87,7 +87,9 @@ async function mountView(rol: string): Promise<VueWrapper> {
     refreshToken: 'ref-1',
     user: { id: 2, nombre: 'Pepe', email: 'pepe@arpia.com.co', rol },
   })
-  const wrapper = mount(MaestrosView, { global: { plugins: [pinia, ElementPlus] } })
+  const wrapper = mount(MaestrosView, {
+    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+  })
   await nextTick()
   await flushPromises()
   await flushPromises()
@@ -100,6 +102,12 @@ async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
   if (!item) throw new Error(`tab not found: "${label}"`)
   await item.trigger('click')
   await nextTick()
+  await flushPromises()
+}
+
+/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+async function flushDialogTransition(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
 }
 
@@ -193,6 +201,7 @@ describe('MaestrosView (MOD-5 + T6)', () => {
     const wrapper = await mountView('operador')
 
     expect(wrapper.findAllComponents({ name: 'MaestroForm' })).toHaveLength(0)
+    expect(wrapper.findAll('[data-test^="nuevo-"]')).toHaveLength(0)
     expect(wrapper.findAll('[data-test="edit-maestro"]')).toHaveLength(0)
     expect(wrapper.findAll('[data-test="delete-maestro"]')).toHaveLength(0)
 
@@ -200,20 +209,25 @@ describe('MaestrosView (MOD-5 + T6)', () => {
     expect(consulta.findAllComponents({ name: 'MaestroForm' })).toHaveLength(0)
   })
 
-  it('admin owns one form per entity and the edit/delete actions on every row', async () => {
+  it('admin owns one dialog button per entity and the edit/delete actions on every row', async () => {
     const wrapper = await mountView('admin')
 
-    expect(wrapper.findAllComponents({ name: 'MaestroForm' })).toHaveLength(4)
+    // The forms live in el-dialogs — closed until a button opens them (FE-DLG-1).
+    expect(wrapper.findAllComponents({ name: 'MaestroForm' })).toHaveLength(0)
+    expect(wrapper.findAll('[data-test^="nuevo-"]')).toHaveLength(4)
     // 2 clientes + 2 proveedores + 1 tipo + 1 categoria = 6 rows with actions.
     expect(wrapper.findAll('[data-test="edit-maestro"]')).toHaveLength(6)
     expect(wrapper.findAll('[data-test="delete-maestro"]')).toHaveLength(6)
   })
 
-  it('creates a cliente with the exact ClienteCreate payload and refreshes', async () => {
+  it('creates a cliente via the dialog with the exact ClienteCreate payload and refreshes', async () => {
     const wrapper = await mountView('admin')
     expect(apiMocks.listClientes).toHaveBeenCalledTimes(1)
 
-    // First MaestroForm in mount order = the Clientes pane form.
+    await wrapper.find('[data-test="nuevo-clientes"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'MaestroForm' }).exists()).toBe(true)
+
     wrapper
       .findAllComponents({ name: 'MaestroForm' })[0]
       .vm.$emit('submit', { nombre: 'Sara López', documento_identidad: 'CC 456', email: '', telefono: '311555' })
@@ -228,9 +242,11 @@ describe('MaestrosView (MOD-5 + T6)', () => {
     })
     expect(document.body.textContent).toContain('Se creó Cliente correctamente')
     expect(apiMocks.listClientes).toHaveBeenCalledTimes(2)
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'MaestroForm' }).exists()).toBe(false)
   })
 
-  it('edits a proveedor via the inline edit form and returns to the create form', async () => {
+  it('edits a proveedor via the edit dialog and closes it on success', async () => {
     const wrapper = await mountView('admin')
     await activateTab(wrapper, 'Proveedores')
 
@@ -253,8 +269,23 @@ describe('MaestrosView (MOD-5 + T6)', () => {
       { nombre: 'Molino El Triunfo SAS', ubicacion: 'Medellín', url: null, contacto: 'Carlos Ramírez' },
     )
     expect(document.body.textContent).toContain('Se actualizó Proveedor correctamente')
-    expect(wrapper.text()).toContain('Crear Proveedor') // back to create form
     expect(apiMocks.listProveedores).toHaveBeenCalledTimes(2)
+    // Success closes the dialog (FE-DLG-2).
+    expect(wrapper.findComponent({ name: 'MaestroForm' }).exists()).toBe(false)
+  })
+
+  it('cancels a create dialog without submitting (FE-DLG-2/3)', async () => {
+    const wrapper = await mountView('admin')
+
+    await wrapper.find('[data-test="nuevo-tipos-producto"]').trigger('click')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'MaestroForm' }).exists()).toBe(true)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushDialogTransition()
+
+    expect(apiMocks.createTipo).not.toHaveBeenCalled()
+    expect(wrapper.findComponent({ name: 'MaestroForm' }).exists()).toBe(false)
   })
 
   it('deletes a tipo de producto after the confirm dialog (204) and refreshes', async () => {
@@ -287,11 +318,13 @@ describe('MaestrosView (MOD-5 + T6)', () => {
     expect(apiMocks.listTipos).toHaveBeenCalledTimes(1) // no refresh after failure
   })
 
-  it('creates a categoria de insumos with the exact payload', async () => {
+  it('creates a categoria de insumos via the dialog with the exact payload', async () => {
     const wrapper = await mountView('admin')
     await activateTab(wrapper, 'Categorías de insumos')
 
-    wrapper.findAllComponents({ name: 'MaestroForm' })[3].vm.$emit('submit', { nombre: 'Lácteos' })
+    await wrapper.find('[data-test="nuevo-categorias-insumos"]').trigger('click')
+    await nextTick()
+    wrapper.findAllComponents({ name: 'MaestroForm' })[0].vm.$emit('submit', { nombre: 'Lácteos' })
     await flushPromises()
 
     expect(apiMocks.createCategoria).toHaveBeenCalledTimes(1)
