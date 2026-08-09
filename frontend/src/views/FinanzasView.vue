@@ -29,6 +29,7 @@ import SociosForm from '@/components/finanzas/SociosForm.vue'
 import SociosTable from '@/components/finanzas/SociosTable.vue'
 import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/utils/format'
+import { buildListParams } from '@/utils/pagination'
 import {
   buildLiquidacionRows,
   buildMovimientoRows,
@@ -53,10 +54,23 @@ const activeTab = ref('movimientos')
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+// --- movimientos table: server-side pagination + tipo filter ---------------
 const movimientos = ref<MovimientoRead[]>([])
+const movimientosTotal = ref(0)
+const movimientosPage = ref(1)
+const movimientosPageSize = 20
+const filterTipo = ref<'Gasto' | 'Inversion' | 'Retiro' | null>(null)
+
+// --- socios table + lookup --------------------------------------------------
 const socios = ref<SocioConfiguracionRead[]>([])
+const sociosTotal = ref(0)
+const sociosPage = ref(1)
+const sociosPageSize = 20
+/** Full partner set for the socio name join + the socio select (design D3). */
+const sociosLookup = ref<SocioConfiguracionRead[]>([])
+
 /** Joined rows: socio name (or '—') + newest-first ledger order. */
-const movimientoRows = computed(() => buildMovimientoRows(movimientos.value, socios.value))
+const movimientoRows = computed(() => buildMovimientoRows(movimientos.value, sociosLookup.value))
 
 const savingMovimiento = ref(false)
 const savingLiquidacion = ref(false)
@@ -69,17 +83,36 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    const [movs, sociosList] = await Promise.all([
-      finanzasApi.listMovimientos(),
-      finanzasApi.listSocios(),
+    const [movs, sociosPage_, sociosLookup_] = await Promise.all([
+      finanzasApi.listMovimientos(
+        buildListParams({
+          page: movimientosPage.value,
+          pageSize: movimientosPageSize,
+          filtros: { tipo: filterTipo.value },
+        }),
+      ),
+      finanzasApi.listSocios(
+        buildListParams({ page: sociosPage.value, pageSize: sociosPageSize }),
+      ),
+      // D3: the socio select + name join need the full set.
+      finanzasApi.listSocios({ limit: 1000 }),
     ])
-    movimientos.value = movs
-    socios.value = sociosList
+    movimientos.value = movs.items
+    movimientosTotal.value = movs.total
+    socios.value = sociosPage_.items
+    sociosTotal.value = sociosPage_.total
+    sociosLookup.value = sociosLookup_.items
   } catch {
     error.value = 'No se pudo cargar la información de finanzas. Verifica la conexión con el servidor.'
   } finally {
     loading.value = false
   }
+}
+
+/** FE-2: the tipo filter resets the movimientos page to 1 and refetches. */
+function onMovimientoFilterChange(): void {
+  movimientosPage.value = 1
+  load()
 }
 
 /** Surface the server validation detail (422/400/409) when present. */
@@ -227,9 +260,22 @@ onMounted(load)
 
     <el-tabs v-model="activeTab">
       <el-tab-pane label="Movimientos" name="movimientos">
+        <div class="finanzas-toolbar">
+          <el-select
+            v-model="filterTipo"
+            clearable
+            placeholder="Filtrar por tipo"
+            data-test="movimiento-tipo-filter"
+            @change="onMovimientoFilterChange"
+          >
+            <el-option label="Gasto" value="Gasto" />
+            <el-option label="Inversión" value="Inversion" />
+            <el-option label="Retiro" value="Retiro" />
+          </el-select>
+        </div>
         <MovimientosForm
           v-if="canRegister"
-          :socios="socios"
+          :socios="sociosLookup"
           :saving="savingMovimiento"
           class="finanzas-form-section"
           @submit="onCreateMovimiento"
@@ -239,6 +285,15 @@ onMounted(load)
           :loading="loading"
           :can-delete="canRegister"
           @delete="onDeleteMovimiento"
+        />
+        <el-pagination
+          class="tabla-paginacion"
+          background
+          layout="total, prev, pager, next"
+          :total="movimientosTotal"
+          :page-size="movimientosPageSize"
+          :current-page="movimientosPage"
+          @current-change="(p: number) => { movimientosPage = p; load() }"
         />
       </el-tab-pane>
 
@@ -263,6 +318,15 @@ onMounted(load)
           :can-edit="canRegister"
           @edit="onEditSocio"
           @delete="onDeleteSocio"
+        />
+        <el-pagination
+          class="tabla-paginacion"
+          background
+          layout="total, prev, pager, next"
+          :total="sociosTotal"
+          :page-size="sociosPageSize"
+          :current-page="sociosPage"
+          @current-change="(p: number) => { sociosPage = p; load() }"
         />
 
         <div v-if="canRegister" class="socios-form-section">
@@ -306,6 +370,20 @@ onMounted(load)
 
 .finanzas-form-section {
   margin-bottom: 1rem;
+}
+
+.finanzas-toolbar {
+  max-width: 42rem;
+  margin-bottom: 1rem;
+}
+
+.finanzas-toolbar .el-select {
+  width: 12rem;
+}
+
+.tabla-paginacion {
+  margin-top: 1rem;
+  justify-content: flex-end;
 }
 
 .liquidacion-result {

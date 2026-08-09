@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * Ventas view (tasks 2.1+2.2, spec MOD-1).
+ * Ventas view (tasks 2.1+2.2, spec MOD-1 + ui-mantenimiento PR1 T7).
  *
  * Two tabs: the sales list and the register form.
- *  - List: GET /ventas is UNBOUNDED server-side, so it is sliced client-side
- *    to the most recent VENTAS_LIST_LIMIT (pagination deferred this phase) and
- *    joined client-side with /productos (limit 1000), their variantes (fetched
- *    ONLY for products present in the sliced ventas) and /clientes names.
+ *  - List: server-side paginated GET /ventas ({items,total} + canal_venta /
+ *    estado filters, design D3), joined client-side with /productos
+ *    (limit 1000, `.items`), their variantes (fetched ONLY for products
+ *    present in the current page) and /clientes names (limit 1000).
  *  - Register: VentasForm emits the VentaCreate payload; the view owns the
  *    POST, the success message and the list refresh. The form is hidden for
  *    consulta (read-only role — MOD-1 "consulta sees a read-only list").
@@ -18,17 +18,15 @@ import { clientesApi, productosApi, ventasApi } from '@/api/endpoints'
 import VentasForm from '@/components/ventas/VentasForm.vue'
 import VentasTable from '@/components/ventas/VentasTable.vue'
 import { useAuthStore } from '@/stores/auth'
+import { buildListParams } from '@/utils/pagination'
 import {
-  VENTAS_LIST_LIMIT,
   buildVentaRows,
-  sliceVentas,
   type VentaCreate,
   type VentaRow,
 } from '@/utils/ventas'
 import type {
   ClienteRead,
   ProductoRead,
-  VentaRead,
   VarianteProductoRead,
 } from '@/types/api.d'
 
@@ -42,6 +40,11 @@ const loading = ref(false)
 const saving = ref(false)
 const error = ref<string | null>(null)
 const rows = ref<VentaRow[]>([])
+const total = ref(0)
+const page = ref(1)
+const pageSize = 20
+const filterCanal = ref<'web' | 'whatsapp' | 'instagram' | 'feria' | null>(null)
+const filterEstado = ref<'completada' | 'anulada' | null>(null)
 const productos = ref<ProductoRead[]>([])
 const clientes = ref<ClienteRead[]>([])
 
@@ -51,8 +54,9 @@ async function loadVariantes(productoId: number): Promise<VarianteProductoRead[]
 }
 
 /** Variantes for the list join — only for products that have detail rows. */
-async function fetchVariantesForVentas(ventas: VentaRead[]): Promise<VarianteProductoRead[]> {
+async function fetchVariantesForVentas(ventas: VentaRow[]): Promise<VarianteProductoRead[]> {
   const ids = [...new Set(ventas.flatMap((v) => v.detalles.map((d) => d.producto_id)))]
+  if (ids.length === 0) return []
   const lists = await Promise.all(ids.map((producto_id) => productosApi.listVariantes({ producto_id })))
   return lists.flat()
 }
@@ -61,21 +65,35 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    const [ventas, productosList, clientesList] = await Promise.all([
-      ventasApi.list(),
-      productosApi.list({ limit: 1000 }),
-      clientesApi.list(),
+    const [ventasPage, productosList, clientesList] = await Promise.all([
+      ventasApi.list(
+        buildListParams({
+          page: page.value,
+          pageSize,
+          filtros: { canal_venta: filterCanal.value, estado: filterEstado.value },
+        }),
+      ),
+      productosApi.list({ limit: 1000 }), // D3: lookup join keeps the full set
+      clientesApi.list({ limit: 1000 }), // cliente name join + form options
     ])
-    productos.value = productosList
-    clientes.value = clientesList
-    const sliced = sliceVentas(ventas, VENTAS_LIST_LIMIT)
-    const variantes = await fetchVariantesForVentas(sliced)
-    rows.value = buildVentaRows(sliced, productosList, variantes, clientesList)
+    productos.value = productosList.items
+    clientes.value = clientesList.items
+    total.value = ventasPage.total
+    const variantes = await fetchVariantesForVentas(
+      buildVentaRows(ventasPage.items, productos.value, [], clientes.value),
+    )
+    rows.value = buildVentaRows(ventasPage.items, productos.value, variantes, clientes.value)
   } catch {
     error.value = 'No se pudo cargar la lista de ventas. Verifica la conexión con el servidor.'
   } finally {
     loading.value = false
   }
+}
+
+/** FE-2: filter changes reset to page 1 and refetch. */
+function onFilterChange(): void {
+  page.value = 1
+  load()
 }
 
 /** Surface the server validation detail (422 etc.) when present. */
@@ -129,11 +147,40 @@ onMounted(load)
 
     <el-tabs v-model="activeTab">
       <el-tab-pane label="Listado" name="listado">
-        <p class="list-note">
-          Mostrando las últimas {{ VENTAS_LIST_LIMIT }} ventas (el listado del servidor no está
-          paginado).
-        </p>
+        <div class="venta-toolbar">
+          <el-select
+            v-model="filterCanal"
+            clearable
+            placeholder="Canal de venta"
+            data-test="venta-canal-filter"
+            @change="onFilterChange"
+          >
+            <el-option label="Web" value="web" />
+            <el-option label="WhatsApp" value="whatsapp" />
+            <el-option label="Instagram" value="instagram" />
+            <el-option label="Feria" value="feria" />
+          </el-select>
+          <el-select
+            v-model="filterEstado"
+            clearable
+            placeholder="Estado"
+            data-test="venta-estado-filter"
+            @change="onFilterChange"
+          >
+            <el-option label="Completada" value="completada" />
+            <el-option label="Anulada" value="anulada" />
+          </el-select>
+        </div>
         <VentasTable :rows="rows" :loading="loading" />
+        <el-pagination
+          class="tabla-paginacion"
+          background
+          layout="total, prev, pager, next"
+          :total="total"
+          :page-size="pageSize"
+          :current-page="page"
+          @current-change="(p: number) => { page = p; load() }"
+        />
       </el-tab-pane>
 
       <el-tab-pane v-if="canRegister" label="Registrar venta" name="registrar">
@@ -165,9 +212,19 @@ onMounted(load)
   margin-bottom: 1rem;
 }
 
-.list-note {
-  margin: 0 0 0.75rem;
-  color: var(--el-text-color-secondary);
-  font-size: 0.85rem;
+.venta-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  max-width: 42rem;
+  margin-bottom: 1rem;
+}
+
+.venta-toolbar .el-select {
+  width: 12rem;
+}
+
+.tabla-paginacion {
+  margin-top: 1rem;
+  justify-content: flex-end;
 }
 </style>

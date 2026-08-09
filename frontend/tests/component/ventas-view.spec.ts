@@ -1,10 +1,11 @@
 /**
- * VentasView integration tests (tasks 2.1+2.2, spec MOD-1).
+ * VentasView integration tests (MOD-1 + ui-mantenimiento PR1 T7).
  *
  * Mounts the REAL VentasView + VentasTable + VentasForm against a mocked API
- * module: the unbounded /ventas list is sliced and joined client-side
- * (productos/variantes/clientes), the register tab is role-gated
- * (consulta = list only), and a submit routes the payload through
+ * module: the /ventas list is now server-side paginated ({items,total} +
+ * el-pagination + canal/estado filters replacing the old client-side slice),
+ * still joined client-side (productos/variantes/clientes), the register tab is
+ * role-gated (consulta = list only), and a submit routes the payload through
  * ventasApi.create, surfaces the success message and refreshes the list.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
@@ -101,6 +102,8 @@ const PAYLOAD = {
   detalles: [{ producto_id: 1, cantidad: 2, precio_unitario: 5000 }],
 }
 
+const PAGE1 = { limit: 20, offset: 0 }
+
 async function mountView(rol: string): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -117,12 +120,13 @@ async function mountView(rol: string): Promise<VueWrapper> {
   return wrapper
 }
 
-describe('VentasView (MOD-1)', () => {
+describe('VentasView (MOD-1 + T7)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    apiMocks.listVentas.mockResolvedValue(VENTAS)
-    apiMocks.listProductos.mockResolvedValue(PRODUCTOS)
-    apiMocks.listClientes.mockResolvedValue(CLIENTES)
+    // The list now pages server-side; lookups keep limit:1000 with `.items`.
+    apiMocks.listVentas.mockResolvedValue({ items: VENTAS, total: 1 })
+    apiMocks.listProductos.mockResolvedValue({ items: PRODUCTOS, total: 2 })
+    apiMocks.listClientes.mockResolvedValue({ items: CLIENTES, total: 1 })
     apiMocks.listVariantes.mockResolvedValue([])
     apiMocks.createVenta.mockResolvedValue(VENTAS[0])
   })
@@ -141,13 +145,39 @@ describe('VentasView (MOD-1)', () => {
     expect(text).toContain('$15.000,00')
     expect(text).toContain('Registrar venta') // form tab present for operador
 
-    // List data joined client-side: productos(1000) + clientes + variantes
-    // ONLY for the productos present in the ventas detalles.
+    // List pages server-side; lookups join with limit:1000 against `.items`.
+    expect(apiMocks.listVentas).toHaveBeenCalledWith(PAGE1)
     expect(apiMocks.listProductos).toHaveBeenCalledWith({ limit: 1000 })
-    expect(apiMocks.listClientes).toHaveBeenCalledTimes(1)
+    expect(apiMocks.listClientes).toHaveBeenCalledWith({ limit: 1000 })
     expect(apiMocks.listVariantes).toHaveBeenCalledTimes(2)
     expect(apiMocks.listVariantes).toHaveBeenCalledWith({ producto_id: 1 })
     expect(apiMocks.listVariantes).toHaveBeenCalledWith({ producto_id: 2 })
+  })
+
+  it('renders el-pagination and pages the list with a new offset', async () => {
+    const wrapper = await mountView('operador')
+    expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(true)
+    expect(apiMocks.listVentas).toHaveBeenCalledWith(PAGE1)
+
+    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    await flushPromises()
+    expect(apiMocks.listVentas).toHaveBeenCalledWith({ limit: 20, offset: 20 })
+  })
+
+  it('canal/estado filters reset to page 1 and refetch with the params', async () => {
+    const wrapper = await mountView('operador')
+
+    const select = wrapper.find('[data-test="venta-canal-filter"]')
+    await select.trigger('click')
+    await nextTick()
+    const option = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
+      (el) => el.textContent?.trim() === 'Feria',
+    )
+    expect(option).toBeDefined()
+    option!.click()
+    await flushPromises()
+
+    expect(apiMocks.listVentas).toHaveBeenLastCalledWith({ ...PAGE1, canal_venta: 'feria' })
   })
 
   it('hides the register form for a consulta (read-only list)', async () => {
@@ -159,7 +189,7 @@ describe('VentasView (MOD-1)', () => {
   })
 
   it('shows an empty state when there are no ventas', async () => {
-    apiMocks.listVentas.mockResolvedValue([])
+    apiMocks.listVentas.mockResolvedValue({ items: [], total: 0 })
 
     const wrapper = await mountView('operador')
 
@@ -178,8 +208,6 @@ describe('VentasView (MOD-1)', () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listVentas).toHaveBeenCalledTimes(1)
 
-    // The register form emits its built VentaCreate payload (shape covered by
-    // ventas-form.spec); the view owns the POST + refresh.
     wrapper.findComponent({ name: 'VentasForm' }).vm.$emit('submit', PAYLOAD)
     await flushPromises()
 

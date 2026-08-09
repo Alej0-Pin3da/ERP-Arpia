@@ -105,11 +105,12 @@ async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
   await flushPromises()
 }
 
-describe('FinanzasView (MOD-3)', () => {
+describe('FinanzasView (MOD-3 + T7)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    apiMocks.listMovimientos.mockResolvedValue(MOVIMIENTOS)
-    apiMocks.listSocios.mockResolvedValue(SOCIOS)
+    // Lists page server-side; the socios lookup keeps limit:1000 (D3).
+    apiMocks.listMovimientos.mockResolvedValue({ items: MOVIMIENTOS, total: 2 })
+    apiMocks.listSocios.mockResolvedValue({ items: SOCIOS, total: 2 })
     apiMocks.createMovimiento.mockResolvedValue(MOVIMIENTOS[0])
     apiMocks.deleteMovimiento.mockResolvedValue(MOVIMIENTOS[0])
     apiMocks.createSocio.mockResolvedValue({ id: 3, nombre: 'Luis Vega', porcentaje_participacion: '25.00' })
@@ -139,13 +140,51 @@ describe('FinanzasView (MOD-3)', () => {
 
     // Both lists fetched on mount (socios drive the join + the socio select).
     expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(1)
-    expect(apiMocks.listSocios).toHaveBeenCalledTimes(1)
+    expect(apiMocks.listMovimientos).toHaveBeenCalledWith({ limit: 20, offset: 0 })
+    expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // table page + lookup
+    expect(apiMocks.listSocios).toHaveBeenCalledWith({ limit: 20, offset: 0 })
+    expect(apiMocks.listSocios).toHaveBeenCalledWith({ limit: 1000 })
 
     // Write sections present for operador.
     await activateTab(wrapper, 'Liquidaciones')
     expect(wrapper.text()).toContain('Procesar liquidación')
     await activateTab(wrapper, 'Socios')
     expect(wrapper.text()).toContain('Crear socio')
+  })
+
+  it('renders el-pagination on both lists and pages with new offsets', async () => {
+    const wrapper = await mountView('operador')
+    // Movimientos table paginator (first ElPagination in the pane).
+    const paginators = wrapper.findAllComponents({ name: 'ElPagination' })
+    expect(paginators.length).toBeGreaterThanOrEqual(1)
+    expect(apiMocks.listMovimientos).toHaveBeenCalledWith({ limit: 20, offset: 0 })
+
+    // Two paginators exist (movimientos + socios); drive the movimientos one.
+    const movPaginador = paginators.find((p) => p.props('total') === 2)
+    expect(movPaginador).toBeDefined()
+    movPaginador!.vm.$emit('current-change', 2)
+    await flushPromises()
+    expect(apiMocks.listMovimientos).toHaveBeenCalledWith({ limit: 20, offset: 20 })
+  })
+
+  it('filters movimientos by tipo with page reset', async () => {
+    const wrapper = await mountView('operador')
+
+    const select = wrapper.find('[data-test="movimiento-tipo-filter"]')
+    await select.trigger('click')
+    await nextTick()
+    const option = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
+      (el) => el.textContent?.trim() === 'Gasto',
+    )
+    expect(option).toBeDefined()
+    option!.click()
+    await flushPromises()
+
+    expect(apiMocks.listMovimientos).toHaveBeenLastCalledWith({
+      limit: 20,
+      offset: 0,
+      tipo: 'Gasto',
+    })
   })
 
   it('consulta sees read-only lists only — no write actions, no Liquidaciones tab', async () => {
@@ -247,7 +286,7 @@ describe('FinanzasView (MOD-3)', () => {
   it('creates a socio and refreshes the list', async () => {
     const wrapper = await mountView('operador')
     await activateTab(wrapper, 'Socios')
-    expect(apiMocks.listSocios).toHaveBeenCalledTimes(1)
+    expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // table page + lookup
 
     wrapper.findComponent({ name: 'SociosForm' }).vm.$emit('submit', {
       nombre: 'Luis Vega',
@@ -258,12 +297,13 @@ describe('FinanzasView (MOD-3)', () => {
     expect(apiMocks.createSocio).toHaveBeenCalledTimes(1)
     expect(apiMocks.createSocio).toHaveBeenCalledWith({ nombre: 'Luis Vega', porcentaje_participacion: 25 })
     expect(document.body.textContent).toContain('Socio creado correctamente')
-    expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // refreshed after create
+    expect(apiMocks.listSocios).toHaveBeenCalledTimes(4) // refreshed after create (2 per load)
   })
 
   it('edits a socio percentage via the inline edit form (PATCH percentage only)', async () => {
     const wrapper = await mountView('operador')
     await activateTab(wrapper, 'Socios')
+    expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // table page + lookup
 
     await wrapper.findAll('[data-test="edit-socio"]')[0].trigger('click')
     await nextTick()
@@ -278,7 +318,7 @@ describe('FinanzasView (MOD-3)', () => {
     expect(apiMocks.updateSocio).toHaveBeenCalledTimes(1)
     expect(apiMocks.updateSocio).toHaveBeenCalledWith({ socio_id: 1 }, { porcentaje_participacion: 20 })
     expect(document.body.textContent).toContain('Socio actualizado correctamente')
-    expect(apiMocks.listSocios).toHaveBeenCalledTimes(2)
+    expect(apiMocks.listSocios).toHaveBeenCalledTimes(4) // table + lookup, refreshed
 
     // Back to the create form after the edit completes.
     expect(wrapper.text()).toContain('Crear socio')
@@ -288,7 +328,7 @@ describe('FinanzasView (MOD-3)', () => {
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
     const wrapper = await mountView('operador')
     await activateTab(wrapper, 'Socios')
-    expect(apiMocks.listSocios).toHaveBeenCalledTimes(1)
+    expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // table page + lookup
 
     await wrapper.findAll('[data-test="delete-socio"]')[0].trigger('click')
     await flushPromises()
@@ -296,7 +336,7 @@ describe('FinanzasView (MOD-3)', () => {
     expect(apiMocks.deleteSocio).toHaveBeenCalledTimes(1)
     expect(apiMocks.deleteSocio).toHaveBeenCalledWith({ socio_id: 1 })
     expect(document.body.textContent).toContain('Socio eliminado correctamente')
-    expect(apiMocks.listSocios).toHaveBeenCalledTimes(2)
+    expect(apiMocks.listSocios).toHaveBeenCalledTimes(4) // table + lookup, refreshed
   })
 
   it('surfaces the 409 when deleting a socio with payouts', async () => {
@@ -306,11 +346,13 @@ describe('FinanzasView (MOD-3)', () => {
     })
     const wrapper = await mountView('operador')
     await activateTab(wrapper, 'Socios')
+    expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // table page + lookup
 
     await wrapper.findAll('[data-test="delete-socio"]')[0].trigger('click')
     await flushPromises()
 
     expect(document.body.textContent).toContain('tiene movimientos asociados')
-    expect(apiMocks.listSocios).toHaveBeenCalledTimes(1) // no refresh after failure
+    expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // no refresh after failure
   })
 })
+

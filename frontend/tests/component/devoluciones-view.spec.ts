@@ -1,10 +1,11 @@
 /**
- * DevolucionesView integration tests (task 2.3, spec MOD-2).
+ * DevolucionesView integration tests (MOD-2 + ui-mantenimiento PR1 T7).
  *
  * Mounts the REAL DevolucionesView + DevolucionesTable + DevolucionesForm
- * against a mocked API module: the paginated /devoluciones list is joined
- * client-side (/productos?limit=1000), the filters drive the GET query, the
- * create section is role-gated (consulta = list only), and a submit routes
+ * against a mocked API module: the /devoluciones list is server-side paginated
+ * ({items,total} + el-pagination), joined client-side
+ * (/productos?limit=1000 against `.items`), the filters drive the GET query,
+ * the create section is role-gated (consulta = list only), and a submit routes
  * the payload through devolucionesApi.create, surfaces the success message
  * and refreshes the list.
  */
@@ -60,6 +61,8 @@ const PRODUCTOS = [
 
 const PAYLOAD = { venta_id: 10, tipo: 'parcial' as const, items: [{ producto_id: 1, cantidad: 2, precio_unitario: 5000 }] }
 
+const PAGE1 = { limit: 20, offset: 0 }
+
 async function mountView(rol: string): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -76,11 +79,11 @@ async function mountView(rol: string): Promise<VueWrapper> {
   return wrapper
 }
 
-describe('DevolucionesView (MOD-2)', () => {
+describe('DevolucionesView (MOD-2 + T7)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    apiMocks.listDevoluciones.mockResolvedValue(DEVOLUCIONES)
-    apiMocks.listProductos.mockResolvedValue(PRODUCTOS)
+    apiMocks.listDevoluciones.mockResolvedValue({ items: DEVOLUCIONES, total: 1 })
+    apiMocks.listProductos.mockResolvedValue({ items: PRODUCTOS, total: 1 })
     apiMocks.createDevolucion.mockResolvedValue(DEVOLUCIONES[0])
   })
 
@@ -97,15 +100,24 @@ describe('DevolucionesView (MOD-2)', () => {
     expect(text).toContain('$10.000,00')
     expect(text).toContain('Registrar devolución') // create section present for operador
 
-    // List data joined client-side: productos fetched at limit 1000; the
-    // paginated GET is called without filters on first load.
+    // List pages server-side; lookup join keeps limit:1000 against `.items`.
     expect(apiMocks.listProductos).toHaveBeenCalledWith({ limit: 1000 })
-    expect(apiMocks.listDevoluciones).toHaveBeenCalledWith({})
+    expect(apiMocks.listDevoluciones).toHaveBeenCalledWith(PAGE1)
 
     // Expand the row -> the joined product name renders.
     await wrapper.find('.el-table__expand-icon').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('Arepa de huevo')
+  })
+
+  it('renders el-pagination and pages the list with a new offset', async () => {
+    const wrapper = await mountView('operador')
+    expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(true)
+    expect(apiMocks.listDevoluciones).toHaveBeenCalledWith(PAGE1)
+
+    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    await flushPromises()
+    expect(apiMocks.listDevoluciones).toHaveBeenCalledWith({ limit: 20, offset: 20 })
   })
 
   it('hides the create section for a consulta (read-only list)', async () => {
@@ -117,7 +129,7 @@ describe('DevolucionesView (MOD-2)', () => {
   })
 
   it('shows an empty state when there are no devoluciones', async () => {
-    apiMocks.listDevoluciones.mockResolvedValue([])
+    apiMocks.listDevoluciones.mockResolvedValue({ items: [], total: 0 })
 
     const wrapper = await mountView('operador')
 
@@ -136,8 +148,6 @@ describe('DevolucionesView (MOD-2)', () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listDevoluciones).toHaveBeenCalledTimes(1)
 
-    // The form emits its built DevolucionCreate payload (shape covered by
-    // devoluciones-form.spec); the view owns the POST + refresh.
     wrapper.findComponent({ name: 'DevolucionesForm' }).vm.$emit('submit', PAYLOAD)
     await flushPromises()
 
@@ -155,12 +165,9 @@ describe('DevolucionesView (MOD-2)', () => {
     await wrapper.find('[data-test="apply-filters"]').trigger('click')
     await flushPromises()
 
-    expect(apiMocks.listDevoluciones).toHaveBeenLastCalledWith({ venta_id: 7 })
+    expect(apiMocks.listDevoluciones).toHaveBeenLastCalledWith({ ...PAGE1, venta_id: 7 })
 
-    // Fecha range bound by the view's date pickers (value-format YYYY-MM-DD):
-    // typing a value and blurring/change commits the picker model. Note:
-    // el-date-picker swallows fallthrough data-test attrs, so we locate the
-    // inner inputs by placeholder.
+    // Fecha range bound by the view's date pickers (value-format YYYY-MM-DD).
     const desde = wrapper.find('input[placeholder="Desde"]')
     await desde.setValue('2026-01-01')
     await desde.trigger('change')
@@ -171,6 +178,7 @@ describe('DevolucionesView (MOD-2)', () => {
     await flushPromises()
 
     expect(apiMocks.listDevoluciones).toHaveBeenLastCalledWith({
+      ...PAGE1,
       venta_id: 7,
       fecha_desde: '2026-01-01',
       fecha_hasta: '2026-01-31',
@@ -179,6 +187,6 @@ describe('DevolucionesView (MOD-2)', () => {
     // Limpiar resets the filters and reloads the unfiltered list.
     await wrapper.find('[data-test="clear-filters"]').trigger('click')
     await flushPromises()
-    expect(apiMocks.listDevoluciones).toHaveBeenLastCalledWith({})
+    expect(apiMocks.listDevoluciones).toHaveBeenLastCalledWith(PAGE1)
   })
 })

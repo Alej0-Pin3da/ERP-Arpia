@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * Devoluciones view (task 2.3, spec MOD-2).
+ * Devoluciones view (task 2.3, spec MOD-2 + ui-mantenimiento PR1 T7).
  *
  * Two sections: the returns list and the create form.
- *  - List: GET /devoluciones with optional filters (venta_id, fecha range) —
- *    the backend list IS paginated (limit<=500, default 100), so no client
- *    slice is needed; items are joined client-side with /productos?limit=1000
- *    (`Producto #{id}` fallback).
+ *  - List: server-side paginated GET /devoluciones ({items,total} +
+ *    el-pagination) with optional filters (venta_id, fecha range) — items are
+ *    joined client-side with /productos?limit=1000 (`Producto #{id}` fallback,
+ *    `.items` per D3).
  *  - Create: DevolucionesForm emits the DevolucionCreate payload; the view
  *    owns the POST, the success message and the list refresh. Form hidden for
  *    consulta (read-only role).
@@ -18,7 +18,8 @@ import { devolucionesApi, productosApi } from '@/api/endpoints'
 import DevolucionesForm from '@/components/devoluciones/DevolucionesForm.vue'
 import DevolucionesTable from '@/components/devoluciones/DevolucionesTable.vue'
 import { useAuthStore } from '@/stores/auth'
-import { buildDevolucionListParams, buildDevolucionRows, type DevolucionCreate, type DevolucionRow } from '@/utils/devoluciones'
+import { buildListParams } from '@/utils/pagination'
+import { buildDevolucionRows, type DevolucionCreate, type DevolucionRow } from '@/utils/devoluciones'
 import type { ProductoRead, VarianteProductoRead } from '@/types/api.d'
 
 const auth = useAuthStore()
@@ -31,6 +32,9 @@ const loading = ref(false)
 const saving = ref(false)
 const error = ref<string | null>(null)
 const rows = ref<DevolucionRow[]>([])
+const total = ref(0)
+const page = ref(1)
+const pageSize = 20
 const productos = ref<ProductoRead[]>([])
 
 /** List filters (MOD-2: venta_id, fecha_desde, fecha_hasta). */
@@ -45,12 +49,23 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    const [devoluciones, productosList] = await Promise.all([
-      devolucionesApi.list(buildDevolucionListParams(filtros)),
-      productosApi.list({ limit: 1000 }),
+    const [devolucionesPage, productosList] = await Promise.all([
+      devolucionesApi.list(
+        buildListParams({
+          page: page.value,
+          pageSize,
+          filtros: {
+            venta_id: filtros.venta_id,
+            fecha_desde: filtros.fecha_desde === '' ? null : filtros.fecha_desde,
+            fecha_hasta: filtros.fecha_hasta === '' ? null : filtros.fecha_hasta,
+          },
+        }),
+      ),
+      productosApi.list({ limit: 1000 }), // D3: lookup join keeps the full set
     ])
-    productos.value = productosList
-    rows.value = buildDevolucionRows(devoluciones, productosList)
+    productos.value = productosList.items
+    total.value = devolucionesPage.total
+    rows.value = buildDevolucionRows(devolucionesPage.items, productos.value)
   } catch {
     error.value = 'No se pudo cargar la lista de devoluciones. Verifica la conexión con el servidor.'
   } finally {
@@ -58,7 +73,9 @@ async function load(): Promise<void> {
   }
 }
 
+/** FE-2: filter changes reset to page 1 and refetch. */
 function applyFilters(): void {
+  page.value = 1
   void load()
 }
 
@@ -66,6 +83,7 @@ function clearFilters(): void {
   filtros.venta_id = null
   filtros.fecha_desde = ''
   filtros.fecha_hasta = ''
+  page.value = 1
   void load()
 }
 
@@ -151,6 +169,15 @@ onMounted(load)
     <el-tabs v-model="activeTab">
       <el-tab-pane label="Listado" name="listado">
         <DevolucionesTable :rows="rows" :loading="loading" />
+        <el-pagination
+          class="tabla-paginacion"
+          background
+          layout="total, prev, pager, next"
+          :total="total"
+          :page-size="pageSize"
+          :current-page="page"
+          @current-change="(p: number) => { page = p; load() }"
+        />
       </el-tab-pane>
 
       <el-tab-pane v-if="canRegister" label="Registrar devolución" name="registrar">
@@ -191,5 +218,10 @@ onMounted(load)
 
 .filter-field {
   width: 10rem;
+}
+
+.tabla-paginacion {
+  margin-top: 1rem;
+  justify-content: flex-end;
 }
 </style>
