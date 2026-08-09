@@ -65,15 +65,17 @@ def _mini_workbook(path: Path) -> None:
     bom2.append([4.0, None, None, None, None, None])  # junk numeric
 
     oct = wb.create_sheet("INVENTARIO OCT25")
-    # real sheet: header at R8, data rows R9..29 (per SHEET_BOUNDS)
-    oct.cell(row=8, column=1, value="MATERIAL")
-    oct.cell(row=8, column=2, value="CANTIDAD")
-    oct.cell(row=8, column=4, value="HERRAJES")
-    oct.cell(row=8, column=5, value="CANTIDAD")
-    oct.cell(row=9, column=1, value="Material Migra Test")
-    oct.cell(row=9, column=2, value="25 mts")
-    oct.cell(row=10, column=1, value="Argolla Migra Test")
-    oct.cell(row=10, column=2, value="34")
+    # real sheet (regression against ARPIA.xlsx 2026-08-08): header at R8,
+    # data rows R9..29; MATERIAL nombre=B cantidad=D, HERRAJES nombre=F
+    # cantidad=H (numero). Columnas A/C/E/G en blanco.
+    oct.cell(row=8, column=2, value="MATERIAL")
+    oct.cell(row=8, column=4, value="CANTIDAD")
+    oct.cell(row=8, column=6, value="HERRAJES")
+    oct.cell(row=8, column=8, value="CANTIDAD")
+    oct.cell(row=9, column=2, value="Material Migra Test")
+    oct.cell(row=9, column=4, value="25 mts")
+    oct.cell(row=10, column=6, value="Argolla Migra Test")
+    oct.cell(row=10, column=8, value="34")
     wb.save(path)
 
 
@@ -350,6 +352,48 @@ def test_catalogar_dry_run_real_no_escribe():
         assert plan.conteo_productos == len(PRODUCTOS_CATALOGO)
     finally:
         db.close()
+
+
+def test_oct25_layout_real_entra_al_universo_f1():
+    """Regression: INVENTARIO OCT25 uses MATERIAL B/D + HERRAJES F/H (real
+    ARPIA.xlsx layout, verified 2026-08-08). The 20 real materials (B) and the
+    14 real herrajes (F) MUST enter the F1 insumo universe, and the quantity
+    cells ('9,5 mts', '11 mts'...) MUST NOT be treated as material names."""
+    from migrate.catalog import _leer_materiales, clave_normalizada
+    from migrate.loaders import LibroMigracion
+
+    if not REAL_XLSX.exists():
+        pytest.skip("ARPIA.xlsx no disponible")
+
+    materiales_b = [
+        "Encaje negro sin pelitos", "Tela entrepierna negra",
+        "Tela entrepierna blanca",
+        "Encaje blanco chantilli (pelitos) para bicolor",
+        "Encaje negro chantilli (pelitos) para bicolor", "Tira de brasier blanca",
+        "Contorno para Bustier negro 2 cm ancho", "Tapa varilla Negro #1",
+        "Tapa varilla Negro #2", "Elastico de contorno de 1 cm blanco",
+        "Tapa Costura Negro", "Elastico plano negro", "Elastico plano blanco",
+        "Tira de brasier negra", "Sesgo de 2cm blanco", "Sesgo de 2cm negro",
+        "Mallatex negra", "Mallatex blanca",
+        "Ref 100 24 cm tul bordado negro",
+        "Ref 159 24 cm tul bordado rojo pastel",
+    ]
+    herrajes = [
+        "Argollas grandes", "* Argollas Medianas", "* Argollas Pequenas",
+        "* Ochos Grandes", "* Ochos Medianos", "* Ochos Pequenos",
+        "* Gancho G grandes", "* Gancho G Medianos", "* Ganchos G Pequenos",
+        "Varilla copa brasier talla 30", "Varilla copa brasier talla 32",
+        "Varilla copa brasier talla 36", "Varilla copa brasier talla 34",
+        "Variila plastica cortada 18cms",
+    ]
+    with LibroMigracion(REAL_XLSX) as libro:
+        universo = _leer_materiales(libro, None)
+    claves = set(universo)
+    for nombre in materiales_b + herrajes:
+        assert clave_normalizada(nombre) in claves, f"material OCT25 ausente: {nombre}"
+    # Cantidades de D (9,5 mts / 11 mts) nunca son nombres de insumo.
+    assert clave_normalizada("9,5 mts") not in claves
+    assert clave_normalizada("11 mts") not in claves
 
 
 def test_aplicar_plan_transaccional_y_cleanup(db):

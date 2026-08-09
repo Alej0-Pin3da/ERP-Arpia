@@ -388,8 +388,12 @@ def _leer_materiales(libro: LibroMigracion, report) -> dict[str, str]:
         for nombre in filtrar_materiales_validos(filas_de(hoja)):
             nombres.setdefault(clave_normalizada(nombre), nombre)
     if "INVENTARIO OCT25" in SHEET_BOUNDS:
+        # Layout real (verificado contra ARPIA.xlsx, 2026-08-08): MATERIAL
+        # nombre=B cantidad=D ('11 mts'); HERRAJES nombre=F cantidad=H (numero).
+        # D/H son cantidades, NUNCA nombres de insumo (antes se leia A/D y la
+        # cantidad '9,5 mts' de D entraba como material falso).
         for fila in filas_de("INVENTARIO OCT25"):
-            for col_nombre in ("A", "D"):
+            for col_nombre in ("B", "F"):
                 valor = fila.get(col_nombre)
                 if not isinstance(valor, str):
                     continue
