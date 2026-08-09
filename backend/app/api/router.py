@@ -11,6 +11,7 @@ from app.api.routes import (
     devoluciones,
     finanzas,
     insumos,
+    omisiones,
     productos,
     proveedores,
     tipos_productos,
@@ -34,3 +35,4 @@ api_router.include_router(ventas.router)
 api_router.include_router(devoluciones.router)
 api_router.include_router(finanzas.router)
 api_router.include_router(analiticos.router)
+api_router.include_router(omisiones.router)
