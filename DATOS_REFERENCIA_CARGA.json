@@ -1,0 +1,2627 @@
+{
+ "tipos": [
+  "Accesorio",
+  "Blusa",
+  "Combo",
+  "Corsetería",
+  "Lencería",
+  "Set"
+ ],
+ "proveedores": [
+  "Bexxhamel",
+  "JM Confecciones",
+  "SEHA Text",
+  "ZureTex"
+ ],
+ "categorias": [
+  "Empaques",
+  "Herrajes",
+  "Telas"
+ ],
+ "insumos": [
+  {
+   "nombre": "* Argollas Medianas",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "* Argollas Pequeñas",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "* Gancho G Medianos",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "* Gancho G grandes",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "* Ganchos G Pequeños",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "* Ochos Grandes",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "* Ochos Medianos",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "* Ochos Pequeños",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Argolla 10 mm",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Argolla 8 mm",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Argollas grandes",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Aro Copa Brasier",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Barilla poliester corset negro 8mm",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Boton Aro para las faldas",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Cadena gris delgada totebag",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Cadena plateada gruesa totebag",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Cinta Satin negra 1 1/2",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Contorno para Bustier negro 2 cm ancho",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Cordon Satin Rosa",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Cremallera num 3",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Elastico de Contorno",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Elastico de Contorno 1 CM",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Elastico pitillo rosa",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Elastico plano blanco",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Elastico plano negro",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Elástico de contorno de 1 cm blanco",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Encaje Elastico 19 cm blanco 10 mts",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Encaje Elastico 19 cm negro 10 mts",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Encaje blanco chantilli (pelitos) para bicolor",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Encaje de ramitas",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Encaje negro chantilli (pelitos) para bicolor",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Encaje negro sin pelitos",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Entretela elastica negra",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Entretela rigida blanca",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Framilon elastico plano 20 mts",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Franela Lycra",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Gabardina Ultra Poliester",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Gafete de 3",
+   "categoria": "Empaques",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Lino vertigo",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Mallatex blanca",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Mallatex negra",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Powernet negro delgado (corsets)",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Ref 100 24 cm tul bordado negro",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Ref 159 24 cm tul bordado rojo pastel",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Rosa tejida gris",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Satin elastico negro",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Satin elastico rosa",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Sesgo Elastico 10 mts",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Sesgo de 2cm blanco",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Sesgo de 2cm negro",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Sesgo elastico negro 2cm brillante",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Sesgo rigido para ojales corset",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Sesgo satin brillante",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Sublimacion para las totebag",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Super Brioni",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "TOTAL BLUSA MANGA CORTA",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Tapa Costura Negro",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Tapa varilla Negro #1",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Tapa varilla Negro #2",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Tapavarilla negro 10 mts",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Tela Maya Ilustrada",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Tela a cuadros",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Tela entrepierna blanca",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Tela entrepierna negra",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Telas algodon jersey retazos negro",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Tensor 8 de 10mm",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Terminales de cordon",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Tira de brasier",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Tira de brasier blanca",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Tira de brasier negra",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Tira de poliester para las totebag",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "VLQ",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Variila plastica cortada 18cms",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "Varilla copa brasier talla 30",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Varilla copa brasier talla 32",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Varilla copa brasier talla 34",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Varilla copa brasier talla 36",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "Zeta de 10 mm",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "deslizadores cremallera num 3",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "mallatex negro",
+   "categoria": "Telas",
+   "unidad": "m"
+  },
+  {
+   "nombre": "ojales metalicos 3/8 (grandes)",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  },
+  {
+   "nombre": "varilla plastica cortada 18 cm",
+   "categoria": "Herrajes",
+   "unidad": "un"
+  }
+ ],
+ "productos": [
+  {
+   "nombre": "Blusa Manga Corta",
+   "tipo": "Blusa"
+  },
+  {
+   "nombre": "Blusa Manga Larga",
+   "tipo": "Blusa"
+  },
+  {
+   "nombre": "Bralete",
+   "tipo": "Lencería"
+  },
+  {
+   "nombre": "Braleth diseño 1",
+   "tipo": "Lencería"
+  },
+  {
+   "nombre": "Bustier",
+   "tipo": "Lencería"
+  },
+  {
+   "nombre": "Cachetero",
+   "tipo": "Lencería"
+  },
+  {
+   "nombre": "Caja Despertar",
+   "tipo": "Combo"
+  },
+  {
+   "nombre": "Caja Despertar V2",
+   "tipo": "Combo"
+  },
+  {
+   "nombre": "Caja Saca Las Garras",
+   "tipo": "Combo"
+  },
+  {
+   "nombre": "Corset",
+   "tipo": "Corsetería"
+  },
+  {
+   "nombre": "Corset Artemisia",
+   "tipo": "Corsetería"
+  },
+  {
+   "nombre": "Corset Doble Cara",
+   "tipo": "Corsetería"
+  },
+  {
+   "nombre": "Corset Hypatia",
+   "tipo": "Corsetería"
+  },
+  {
+   "nombre": "Falda Emily",
+   "tipo": "Lencería"
+  },
+  {
+   "nombre": "Set Aelo",
+   "tipo": "Set"
+  },
+  {
+   "nombre": "Set Celeno",
+   "tipo": "Set"
+  },
+  {
+   "nombre": "Set Ocipete",
+   "tipo": "Set"
+  },
+  {
+   "nombre": "Tote Bag Arpia",
+   "tipo": "Accesorio"
+  }
+ ],
+ "stock_oct25": [
+  {
+   "insumo": "Encaje negro sin pelitos",
+   "cantidad": "11"
+  },
+  {
+   "insumo": "Argollas grandes",
+   "cantidad": "78.0"
+  },
+  {
+   "insumo": "Tela entrepierna negra",
+   "cantidad": "3"
+  },
+  {
+   "insumo": "* Argollas Medianas",
+   "cantidad": "120.0"
+  },
+  {
+   "insumo": "Tela entrepierna blanca",
+   "cantidad": "0.60"
+  },
+  {
+   "insumo": "* Argollas Pequeñas",
+   "cantidad": "100.0"
+  },
+  {
+   "insumo": "Encaje blanco chantilli (pelitos) para bicolor",
+   "cantidad": "9.5"
+  },
+  {
+   "insumo": "* Ochos Grandes",
+   "cantidad": "6.0"
+  },
+  {
+   "insumo": "Encaje negro chantilli (pelitos) para bicolor",
+   "cantidad": "9.5"
+  },
+  {
+   "insumo": "* Ochos Medianos",
+   "cantidad": "44.0"
+  },
+  {
+   "insumo": "Tira de brasier blanca",
+   "cantidad": "7"
+  },
+  {
+   "insumo": "* Ochos Pequeños",
+   "cantidad": "190.0"
+  },
+  {
+   "insumo": "Contorno para Bustier negro 2 cm ancho",
+   "cantidad": "19"
+  },
+  {
+   "insumo": "* Gancho G grandes",
+   "cantidad": "10.0"
+  },
+  {
+   "insumo": "* Gancho G Medianos",
+   "cantidad": "134.0"
+  },
+  {
+   "insumo": "* Ganchos G Pequeños",
+   "cantidad": "84.0"
+  },
+  {
+   "insumo": "Elástico de contorno de 1 cm blanco",
+   "cantidad": "6.5"
+  },
+  {
+   "insumo": "Varilla copa brasier talla 30",
+   "cantidad": "50.0"
+  },
+  {
+   "insumo": "Varilla copa brasier talla 32",
+   "cantidad": "50.0"
+  },
+  {
+   "insumo": "Elastico plano negro",
+   "cantidad": "10"
+  },
+  {
+   "insumo": "Varilla copa brasier talla 34",
+   "cantidad": "50.0"
+  },
+  {
+   "insumo": "Elastico plano blanco",
+   "cantidad": "10"
+  },
+  {
+   "insumo": "Varilla copa brasier talla 36",
+   "cantidad": "50.0"
+  },
+  {
+   "insumo": "Tira de brasier negra",
+   "cantidad": "10"
+  },
+  {
+   "insumo": "Variila plastica cortada 18cms",
+   "cantidad": "200.0"
+  },
+  {
+   "insumo": "Sesgo de 2cm blanco",
+   "cantidad": "10"
+  },
+  {
+   "insumo": "Sesgo de 2cm negro",
+   "cantidad": "6"
+  },
+  {
+   "insumo": "Mallatex negra",
+   "cantidad": "3"
+  },
+  {
+   "insumo": "Mallatex blanca",
+   "cantidad": "3"
+  },
+  {
+   "insumo": "Ref 100 24 cm tul bordado negro",
+   "cantidad": "39"
+  },
+  {
+   "insumo": "Ref 159 24 cm tul bordado rojo pastel",
+   "cantidad": "21"
+  }
+ ],
+ "compras": [
+  {
+   "insumo": "Elastico de Contorno",
+   "cantidad": "4",
+   "precio_u": "2000.0",
+   "fecha": "2024-02-17",
+   "proveedor": "Kilotelas",
+   "hoja": "INVERSION VALQUI",
+   "fila": 15
+  },
+  {
+   "insumo": "Tensor 8 de 10mm",
+   "cantidad": "100.0",
+   "precio_u": "70",
+   "fecha": "2024-02-17",
+   "proveedor": "Kilotelas",
+   "hoja": "INVERSION VALQUI",
+   "fila": 15
+  },
+  {
+   "insumo": "Zeta de 10 mm",
+   "cantidad": "100.0",
+   "precio_u": "102",
+   "fecha": "2024-02-17",
+   "proveedor": "Kilotelas",
+   "hoja": "INVERSION VALQUI",
+   "fila": 17
+  },
+  {
+   "insumo": "Argolla 10 mm",
+   "cantidad": "100.0",
+   "precio_u": "72",
+   "fecha": "2024-02-17",
+   "proveedor": "Las 3BBB premium",
+   "hoja": "INVERSION VALQUI",
+   "fila": 18
+  },
+  {
+   "insumo": "Sesgo Elastico 10 mts",
+   "cantidad": "10.00",
+   "precio_u": "6.3E+2",
+   "fecha": "2024-02-17",
+   "proveedor": "Las 3BBB premium",
+   "hoja": "INVERSION VALQUI",
+   "fila": 21
+  },
+  {
+   "insumo": "Argolla 10 mm",
+   "cantidad": "12.0",
+   "precio_u": "166.6666666666666666666666667",
+   "fecha": "2024-02-17",
+   "proveedor": "Gerrajes",
+   "hoja": "INVERSION VALQUI",
+   "fila": 29
+  },
+  {
+   "insumo": "Gafete de 3",
+   "cantidad": "1.0",
+   "precio_u": "800",
+   "fecha": "2024-02-17",
+   "proveedor": "Gerrajes",
+   "hoja": "INVERSION VALQUI",
+   "fila": 29
+  },
+  {
+   "insumo": "Tira de brasier",
+   "cantidad": "1.000",
+   "precio_u": "8E+2",
+   "fecha": "2024-02-17",
+   "proveedor": "Gerrajes",
+   "hoja": "INVERSION VALQUI",
+   "fila": 30
+  },
+  {
+   "insumo": "Franela Lycra",
+   "cantidad": "1.000",
+   "precio_u": "3.00E+4",
+   "fecha": "2024-02-17",
+   "proveedor": "Gerrajes",
+   "hoja": "INVERSION VALQUI",
+   "fila": 31
+  },
+  {
+   "insumo": "Tela Maya Ilustrada",
+   "cantidad": "15.000",
+   "precio_u": "38653.33333333333333333333333",
+   "fecha": "2024-02-17",
+   "proveedor": null,
+   "hoja": "INVERSION VALQUI",
+   "fila": 35
+  },
+  {
+   "insumo": "Elastico de Contorno 1 CM",
+   "cantidad": "1.000",
+   "precio_u": "7.0E+3",
+   "fecha": "2024-02-17",
+   "proveedor": "Corseteria",
+   "hoja": "INVERSION VALQUI",
+   "fila": 40
+  },
+  {
+   "insumo": "Cordon Satin Rosa",
+   "cantidad": "1000.0",
+   "precio_u": "3.5",
+   "fecha": "2024-02-17",
+   "proveedor": "Corseteria",
+   "hoja": "INVERSION VALQUI",
+   "fila": 41
+  },
+  {
+   "insumo": "Elastico pitillo rosa",
+   "cantidad": "1",
+   "precio_u": "600.0",
+   "fecha": "2024-02-17",
+   "proveedor": null,
+   "hoja": "INVERSION VALQUI",
+   "fila": 42
+  },
+  {
+   "insumo": "Aro Copa Brasier",
+   "cantidad": "50.0",
+   "precio_u": "247",
+   "fecha": "2024-02-17",
+   "proveedor": null,
+   "hoja": "INVERSION VALQUI",
+   "fila": 43
+  },
+  {
+   "insumo": "Argolla 8 mm",
+   "cantidad": "100.0",
+   "precio_u": "87",
+   "fecha": "2024-02-18",
+   "proveedor": "Etsy",
+   "hoja": "INVERSION VALQUI",
+   "fila": 44
+  },
+  {
+   "insumo": "Framilon elastico plano 20 mts",
+   "cantidad": "20.000",
+   "precio_u": "4.5E+2",
+   "fecha": "2024-02-18",
+   "proveedor": "Quili",
+   "hoja": "INVERSION VALQUI",
+   "fila": 45
+  },
+  {
+   "insumo": "Telas algodon jersey retazos negro",
+   "cantidad": "4.000",
+   "precio_u": "1125",
+   "fecha": "2024-02-19",
+   "proveedor": "The lingerie Formula",
+   "hoja": "INVERSION VALQUI",
+   "fila": 47
+  },
+  {
+   "insumo": "mallatex negro",
+   "cantidad": "0.500",
+   "precio_u": "8.0E+3",
+   "fecha": "2024-05-20",
+   "proveedor": "mercado libre",
+   "hoja": "INVERSION VALQUI",
+   "fila": 48
+  },
+  {
+   "insumo": "Rosa tejida gris",
+   "cantidad": "0.010",
+   "precio_u": "3.500E+5",
+   "fecha": "2024-09-07",
+   "proveedor": null,
+   "hoja": "INVERSION VALQUI",
+   "fila": 57
+  },
+  {
+   "insumo": "Tapavarilla negro 10 mts",
+   "cantidad": "10.0",
+   "precio_u": "900",
+   "fecha": "2024-09-07",
+   "proveedor": null,
+   "hoja": "INVERSION VALQUI",
+   "fila": 58
+  },
+  {
+   "insumo": "Encaje Elastico 19 cm negro 10 mts",
+   "cantidad": "10.0",
+   "precio_u": "2700",
+   "fecha": "2024-09-07",
+   "proveedor": null,
+   "hoja": "INVERSION VALQUI",
+   "fila": 61
+  },
+  {
+   "insumo": "Encaje Elastico 19 cm blanco 10 mts",
+   "cantidad": "10.0",
+   "precio_u": "2700",
+   "fecha": "2024-09-07",
+   "proveedor": null,
+   "hoja": "INVERSION VALQUI",
+   "fila": 62
+  },
+  {
+   "insumo": "Powernet negro delgado (corsets)",
+   "cantidad": "1.500",
+   "precio_u": "4.80E+4",
+   "fecha": "2024-09-07",
+   "proveedor": null,
+   "hoja": "INVERSION VALQUI",
+   "fila": 64
+  },
+  {
+   "insumo": "Tela a cuadros",
+   "cantidad": "1.000",
+   "precio_u": "1.19E+4",
+   "fecha": "2024-09-06",
+   "proveedor": null,
+   "hoja": "INVERSION VALQUI",
+   "fila": 66
+  },
+  {
+   "insumo": "Ref 100 24 cm tul bordado negro",
+   "cantidad": "39",
+   "precio_u": "10512.82051282051282051282051",
+   "fecha": "2025-10-25",
+   "proveedor": "Atenea bordados y encajes",
+   "hoja": "INVERSION VALQUI",
+   "fila": 72
+  },
+  {
+   "insumo": "Ref 159 24 cm tul bordado rojo pastel",
+   "cantidad": "21",
+   "precio_u": "9761.904761904761904761904762",
+   "fecha": "2025-10-25",
+   "proveedor": "Atenea bordados y encajes",
+   "hoja": "INVERSION VALQUI",
+   "fila": 73
+  },
+  {
+   "insumo": "Tira de poliester para las totebag",
+   "cantidad": "10",
+   "precio_u": "2300.0",
+   "fecha": "2026-03-27",
+   "proveedor": "Herrajes",
+   "hoja": "INVERSION VALQUI",
+   "fila": 90
+  },
+  {
+   "insumo": "deslizadores cremallera num 3",
+   "cantidad": "12.0",
+   "precio_u": "208.3333333333333333333333333",
+   "fecha": "2026-03-27",
+   "proveedor": "Herrajes",
+   "hoja": "INVERSION VALQUI",
+   "fila": 91
+  },
+  {
+   "insumo": "Terminales de cordon",
+   "cantidad": "12.0",
+   "precio_u": "208.3333333333333333333333333",
+   "fecha": "2026-03-27",
+   "proveedor": "Herrajes",
+   "hoja": "INVERSION VALQUI",
+   "fila": 92
+  },
+  {
+   "insumo": "Lino vertigo",
+   "cantidad": "0.90",
+   "precio_u": "1.700E+4",
+   "fecha": "2026-03-27",
+   "proveedor": null,
+   "hoja": "INVERSION VALQUI",
+   "fila": 93
+  },
+  {
+   "insumo": "Sublimacion para las totebag",
+   "cantidad": "2",
+   "precio_u": "20000.0",
+   "fecha": "2026-03-27",
+   "proveedor": null,
+   "hoja": "INVERSION VALQUI",
+   "fila": 94
+  },
+  {
+   "insumo": "Super Brioni",
+   "cantidad": "2.90",
+   "precio_u": "4934.482758620689655172413793",
+   "fecha": "2026-03-27",
+   "proveedor": "ICOLTEX",
+   "hoja": "INVERSION VALQUI",
+   "fila": 95
+  },
+  {
+   "insumo": "Gabardina Ultra Poliester",
+   "cantidad": "8",
+   "precio_u": "18653.0",
+   "fecha": "2026-03-03",
+   "proveedor": "CasaTextil",
+   "hoja": "INVERSION VALQUI",
+   "fila": 98
+  },
+  {
+   "insumo": "Entretela elastica negra",
+   "cantidad": "3",
+   "precio_u": "5500.0",
+   "fecha": "2026-03-27",
+   "proveedor": "almacen de la 6ta",
+   "hoja": "INVERSION VALQUI",
+   "fila": 100
+  },
+  {
+   "insumo": "Boton Aro para las faldas",
+   "cantidad": "144.0",
+   "precio_u": "221.9861111111111111111111111",
+   "fecha": "2026-07-18",
+   "proveedor": "las 3BBB",
+   "hoja": "INVERSION VALQUI",
+   "fila": 108
+  },
+  {
+   "insumo": "Encaje de ramitas",
+   "cantidad": "10",
+   "precio_u": "3500.0",
+   "fecha": "2026-07-18",
+   "proveedor": "La corseteria",
+   "hoja": "INVERSION VALQUI",
+   "fila": 109
+  },
+  {
+   "insumo": "Entretela rigida blanca",
+   "cantidad": "1",
+   "precio_u": "19000.0",
+   "fecha": "2026-07-18",
+   "proveedor": "cartago",
+   "hoja": "INVERSION VALQUI",
+   "fila": 112
+  },
+  {
+   "insumo": "ojales metalicos 3/8 (grandes)",
+   "cantidad": "200.0",
+   "precio_u": "200",
+   "fecha": "2026-07-18",
+   "proveedor": "gerrajes",
+   "hoja": "INVERSION VALQUI",
+   "fila": 113
+  },
+  {
+   "insumo": "mallatex negro",
+   "cantidad": "0.50",
+   "precio_u": "8.00E+3",
+   "fecha": "2024-02-08",
+   "proveedor": "textiles F&M",
+   "hoja": "INVERSION MARGARA",
+   "fila": 5
+  },
+  {
+   "insumo": "varilla plastica cortada 18 cm",
+   "cantidad": "200.0",
+   "precio_u": "144",
+   "fecha": "2024-10-23",
+   "proveedor": "auratex",
+   "hoja": "INVERSION MARGARA",
+   "fila": 35
+  }
+ ],
+ "bom_insumos": [
+  {
+   "producto": "Braleth diseño 1",
+   "insumo": "Encaje Elastico 19 cm blanco 10 mts",
+   "cant": "0.2652631578947368421052631579",
+   "hoja": "Braleth diseño 1"
+  },
+  {
+   "producto": "Braleth diseño 1",
+   "insumo": "Encaje Elastico 19 cm negro 10 mts",
+   "cant": "0.3368421052631578947368421053",
+   "hoja": "Braleth diseño 1"
+  },
+  {
+   "producto": "Braleth diseño 1",
+   "insumo": "Encaje Elastico 19 cm blanco 10 mts",
+   "cant": "0.3368421052631578947368421053",
+   "hoja": "Braleth diseño 1"
+  },
+  {
+   "producto": "Braleth diseño 1",
+   "insumo": "Argolla 10 mm",
+   "cant": "2",
+   "hoja": "Braleth diseño 1"
+  },
+  {
+   "producto": "Braleth diseño 1",
+   "insumo": "Tensor 8 de 10mm",
+   "cant": "2",
+   "hoja": "Braleth diseño 1"
+  },
+  {
+   "producto": "Braleth diseño 1",
+   "insumo": "Elastico de Contorno",
+   "cant": "0.008",
+   "hoja": "Braleth diseño 1"
+  },
+  {
+   "producto": "Braleth diseño 1",
+   "insumo": "Elastico pitillo rosa",
+   "cant": "0.0005",
+   "hoja": "Braleth diseño 1"
+  },
+  {
+   "producto": "Braleth diseño 1",
+   "insumo": "Tira de brasier",
+   "cant": "0.009",
+   "hoja": "Braleth diseño 1"
+  },
+  {
+   "producto": "Cachetero",
+   "insumo": "Encaje Elastico 19 cm negro 10 mts",
+   "cant": "0.3694736842105263157894736842",
+   "hoja": "Noche y Dia CACHETERO"
+  },
+  {
+   "producto": "Cachetero",
+   "insumo": "Franela Lycra",
+   "cant": "0.0104",
+   "hoja": "Noche y Dia CACHETERO"
+  },
+  {
+   "producto": "Cachetero",
+   "insumo": "Sesgo Elastico 10 mts",
+   "cant": "0.01",
+   "hoja": "Noche y Dia CACHETERO"
+  },
+  {
+   "producto": "Bralete",
+   "insumo": "Encaje Elastico 19 cm negro 10 mts",
+   "cant": "0.2652631578947368421052631579",
+   "hoja": "Noche y Dia"
+  },
+  {
+   "producto": "Bralete",
+   "insumo": "Encaje Elastico 19 cm blanco 10 mts",
+   "cant": "0.2652631578947368421052631579",
+   "hoja": "Noche y Dia"
+  },
+  {
+   "producto": "Bralete",
+   "insumo": "Encaje Elastico 19 cm negro 10 mts",
+   "cant": "0.3368421052631578947368421053",
+   "hoja": "Noche y Dia"
+  },
+  {
+   "producto": "Bralete",
+   "insumo": "Encaje Elastico 19 cm blanco 10 mts",
+   "cant": "0.3368421052631578947368421053",
+   "hoja": "Noche y Dia"
+  },
+  {
+   "producto": "Bralete",
+   "insumo": "Argolla 10 mm",
+   "cant": "2",
+   "hoja": "Noche y Dia"
+  },
+  {
+   "producto": "Bralete",
+   "insumo": "Tensor 8 de 10mm",
+   "cant": "2",
+   "hoja": "Noche y Dia"
+  },
+  {
+   "producto": "Bralete",
+   "insumo": "Elastico de Contorno",
+   "cant": "0.008",
+   "hoja": "Noche y Dia"
+  },
+  {
+   "producto": "Bralete",
+   "insumo": "Elastico pitillo rosa",
+   "cant": "0.0005",
+   "hoja": "Noche y Dia"
+  },
+  {
+   "producto": "Bralete",
+   "insumo": "Tira de brasier",
+   "cant": "0.009",
+   "hoja": "Noche y Dia"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Ref 159 24 cm tul bordado rojo pastel",
+   "cant": "0.18",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Ref 159 24 cm tul bordado rojo pastel",
+   "cant": "0.18",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Ref 159 24 cm tul bordado rojo pastel",
+   "cant": "0.62",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Ref 159 24 cm tul bordado rojo pastel",
+   "cant": "0.62",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Satin elastico negro",
+   "cant": "0.0396",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Satin elastico negro",
+   "cant": "0.0396",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Satin elastico negro",
+   "cant": "0.1612",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Satin elastico negro",
+   "cant": "0.1612",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Tira de brasier",
+   "cant": "0.0204",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Tapavarilla negro 10 mts",
+   "cant": "240",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Aro Copa Brasier",
+   "cant": "2",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Argolla 10 mm",
+   "cant": "8",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Argolla 8 mm",
+   "cant": "3",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Tensor 8 de 10mm",
+   "cant": "7",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Zeta de 10 mm",
+   "cant": "5",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Elastico de Contorno 1 CM",
+   "cant": "0.0065",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Framilon elastico plano 20 mts",
+   "cant": "0.0054",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "Sesgo Elastico 10 mts",
+   "cant": "0.006",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset",
+   "insumo": "varilla plastica cortada 18 cm",
+   "cant": "11",
+   "hoja": "CORSET"
+  },
+  {
+   "producto": "Corset Doble Cara",
+   "insumo": "Lino vertigo",
+   "cant": "0.48",
+   "hoja": "CORSET DOBLE CARA"
+  },
+  {
+   "producto": "Corset Doble Cara",
+   "insumo": "Tela Maya Ilustrada",
+   "cant": "0.48",
+   "hoja": "CORSET DOBLE CARA"
+  },
+  {
+   "producto": "Corset Doble Cara",
+   "insumo": "Entretela elastica negra",
+   "cant": "0.48",
+   "hoja": "CORSET DOBLE CARA"
+  },
+  {
+   "producto": "Corset Doble Cara",
+   "insumo": "Cinta Satin negra 1 1/2",
+   "cant": "0.015",
+   "hoja": "CORSET DOBLE CARA"
+  },
+  {
+   "producto": "Corset Doble Cara",
+   "insumo": "Terminales de cordon",
+   "cant": "2",
+   "hoja": "CORSET DOBLE CARA"
+  },
+  {
+   "producto": "Corset Doble Cara",
+   "insumo": "Barilla poliester corset negro 8mm",
+   "cant": "90",
+   "hoja": "CORSET DOBLE CARA"
+  },
+  {
+   "producto": "Corset Doble Cara",
+   "insumo": "Sesgo satin brillante",
+   "cant": "0.007",
+   "hoja": "CORSET DOBLE CARA"
+  },
+  {
+   "producto": "Corset Doble Cara",
+   "insumo": "ojales metalicos 3/8 (grandes)",
+   "cant": "14",
+   "hoja": "CORSET DOBLE CARA"
+  },
+  {
+   "producto": "Corset Artemisia",
+   "insumo": "Tela a cuadros",
+   "cant": "0.48",
+   "hoja": "CORSET ARTEMISIA"
+  },
+  {
+   "producto": "Corset Artemisia",
+   "insumo": "Super Brioni",
+   "cant": "0.48",
+   "hoja": "CORSET ARTEMISIA"
+  },
+  {
+   "producto": "Corset Artemisia",
+   "insumo": "Entretela elastica negra",
+   "cant": "0.48",
+   "hoja": "CORSET ARTEMISIA"
+  },
+  {
+   "producto": "Corset Artemisia",
+   "insumo": "Cinta Satin negra 1 1/2",
+   "cant": "0.015",
+   "hoja": "CORSET ARTEMISIA"
+  },
+  {
+   "producto": "Corset Artemisia",
+   "insumo": "Terminales de cordon",
+   "cant": "2",
+   "hoja": "CORSET ARTEMISIA"
+  },
+  {
+   "producto": "Corset Artemisia",
+   "insumo": "Barilla poliester corset negro 8mm",
+   "cant": "90",
+   "hoja": "CORSET ARTEMISIA"
+  },
+  {
+   "producto": "Corset Artemisia",
+   "insumo": "Tela a cuadros",
+   "cant": "0.288",
+   "hoja": "CORSET ARTEMISIA"
+  },
+  {
+   "producto": "Corset Artemisia",
+   "insumo": "Tela a cuadros",
+   "cant": "0.248",
+   "hoja": "CORSET ARTEMISIA"
+  },
+  {
+   "producto": "Corset Artemisia",
+   "insumo": "ojales metalicos 3/8 (grandes)",
+   "cant": "8",
+   "hoja": "CORSET ARTEMISIA"
+  },
+  {
+   "producto": "Corset Artemisia",
+   "insumo": "Sesgo satin brillante",
+   "cant": "0.007",
+   "hoja": "CORSET ARTEMISIA"
+  },
+  {
+   "producto": "Falda Emily",
+   "insumo": "Tela a cuadros",
+   "cant": "2.34",
+   "hoja": "FALDA EMILY"
+  },
+  {
+   "producto": "Falda Emily",
+   "insumo": "Boton Aro para las faldas",
+   "cant": "6",
+   "hoja": "FALDA EMILY"
+  },
+  {
+   "producto": "Falda Emily",
+   "insumo": "Entretela rigida blanca",
+   "cant": "0.05",
+   "hoja": "FALDA EMILY"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Encaje de ramitas",
+   "cant": "0.088",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Encaje de ramitas",
+   "cant": "0.088",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Encaje de ramitas",
+   "cant": "0.04",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Encaje de ramitas",
+   "cant": "0.04",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Powernet negro delgado (corsets)",
+   "cant": "0.1296",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Powernet negro delgado (corsets)",
+   "cant": "0.1296",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Powernet negro delgado (corsets)",
+   "cant": "0.1296",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Powernet negro delgado (corsets)",
+   "cant": "0.1296",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "mallatex negro",
+   "cant": "0.058",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "mallatex negro",
+   "cant": "0.058",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Entretela elastica negra",
+   "cant": "0.02",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Tapavarilla negro 10 mts",
+   "cant": "200",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Aro Copa Brasier",
+   "cant": "2",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Sesgo satin brillante",
+   "cant": "0.02",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Corset Hypatia",
+   "insumo": "Cinta Satin negra 1 1/2",
+   "cant": "0.015",
+   "hoja": "Corset Hypatia"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Ref 100 24 cm tul bordado negro",
+   "cant": "0.1875",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Ref 100 24 cm tul bordado negro",
+   "cant": "0.1875",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Satin elastico rosa",
+   "cant": "0.045",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Satin elastico rosa",
+   "cant": "0.045",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Framilon elastico plano 20 mts",
+   "cant": "0.004",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Tapavarilla negro 10 mts",
+   "cant": "139",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Tira de brasier",
+   "cant": "0.009",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Sesgo elastico negro 2cm brillante",
+   "cant": "0.325",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Argolla 8 mm",
+   "cant": "3",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Sesgo rigido para ojales corset",
+   "cant": "30",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Tensor 8 de 10mm",
+   "cant": "2",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Argolla 10 mm",
+   "cant": "2",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Cordon Satin Rosa",
+   "cant": "150",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "varilla plastica cortada 18 cm",
+   "cant": "6",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Aro Copa Brasier",
+   "cant": "2",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Bustier",
+   "insumo": "Elastico de Contorno 1 CM",
+   "cant": "0.006",
+   "hoja": "BUSTIER"
+  },
+  {
+   "producto": "Blusa Manga Larga",
+   "insumo": "Tela Maya Ilustrada",
+   "cant": "0.2368",
+   "hoja": "BLUSAS"
+  },
+  {
+   "producto": "Blusa Manga Corta",
+   "insumo": "Tela Maya Ilustrada",
+   "cant": "0.074",
+   "hoja": "BLUSAS"
+  },
+  {
+   "producto": "Blusa Manga Larga",
+   "insumo": "Tela Maya Ilustrada",
+   "cant": "0.243",
+   "hoja": "BLUSAS"
+  },
+  {
+   "producto": "Blusa Manga Corta",
+   "insumo": "Tela Maya Ilustrada",
+   "cant": "0.243",
+   "hoja": "BLUSAS"
+  },
+  {
+   "producto": "Blusa Manga Larga",
+   "insumo": "Tela Maya Ilustrada",
+   "cant": "0.243",
+   "hoja": "BLUSAS"
+  },
+  {
+   "producto": "Blusa Manga Corta",
+   "insumo": "Tela Maya Ilustrada",
+   "cant": "0.243",
+   "hoja": "BLUSAS"
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "insumo": "Tira de poliester para las totebag",
+   "cant": "0.0074",
+   "hoja": "TOTEBAG"
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "insumo": "Tira de poliester para las totebag",
+   "cant": "0.0074",
+   "hoja": "TOTEBAG"
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "insumo": "Sublimacion para las totebag",
+   "cant": "0.467",
+   "hoja": "TOTEBAG"
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "insumo": "Gabardina Ultra Poliester",
+   "cant": "0.5",
+   "hoja": "TOTEBAG"
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "insumo": "deslizadores cremallera num 3",
+   "cant": "2",
+   "hoja": "TOTEBAG"
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "insumo": "Cremallera num 3",
+   "cant": "40",
+   "hoja": "TOTEBAG"
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "insumo": "Super Brioni",
+   "cant": "0.5",
+   "hoja": "TOTEBAG"
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "insumo": "Cadena plateada gruesa totebag",
+   "cant": "48",
+   "hoja": "TOTEBAG"
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "insumo": "Cadena gris delgada totebag",
+   "cant": "53",
+   "hoja": "TOTEBAG"
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "insumo": "Rosa tejida gris",
+   "cant": "0.0001",
+   "hoja": "TOTEBAG"
+  }
+ ],
+ "bom_productos": [],
+ "ventas": [
+  {
+   "producto": "CAJA SACA LAS GARRAS",
+   "variante": "S",
+   "cant": "1",
+   "precio": "295000",
+   "costo": "129388",
+   "fecha": "2025-12-13",
+   "cliente": "gaby",
+   "fila": 2
+  },
+  {
+   "producto": "SET AELO",
+   "variante": "S",
+   "cant": "1",
+   "precio": "80000.0",
+   "costo": "38805",
+   "fecha": "2025-12-13",
+   "cliente": "celes",
+   "fila": 3
+  },
+  {
+   "producto": "Blusa Manga Larga",
+   "variante": "M",
+   "cant": "1",
+   "precio": "90000",
+   "costo": "21561",
+   "fecha": "2026-01-05",
+   "cliente": "Maira *Comic",
+   "fila": 4
+  },
+  {
+   "producto": "SET OCIPETE",
+   "variante": "S",
+   "cant": "1",
+   "precio": "71250.0",
+   "costo": "26109",
+   "fecha": "2026-03-20",
+   "cliente": "gaby",
+   "fila": 5
+  },
+  {
+   "producto": "SET OCIPETE",
+   "variante": null,
+   "cant": "1",
+   "precio": "71250.0",
+   "costo": "26109",
+   "fecha": "2026-03-28",
+   "cliente": "Valeria Amiga gaby",
+   "fila": 6
+  },
+  {
+   "producto": "SET AELO",
+   "variante": "XS",
+   "cant": "1",
+   "precio": "82500.0",
+   "costo": "38805",
+   "fecha": "2026-03-29",
+   "cliente": "Juan jose",
+   "fila": 7
+  },
+  {
+   "producto": "SET AELO",
+   "variante": "S",
+   "cant": "1",
+   "precio": "82500.0",
+   "costo": "38805",
+   "fecha": "2026-03-31",
+   "cliente": "Valentina hermana ale",
+   "fila": 8
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "variante": null,
+   "cant": "1",
+   "precio": "45000.0",
+   "costo": "25765.09524",
+   "fecha": "2026-03-31",
+   "cliente": "Valentina hermana ale",
+   "fila": 9
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "variante": null,
+   "cant": "1",
+   "precio": "45000.0",
+   "costo": "25765.09524",
+   "fecha": "2026-03-31",
+   "cliente": "Camila",
+   "fila": 10
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "variante": null,
+   "cant": "1",
+   "precio": "45000.0",
+   "costo": "25765.09524",
+   "fecha": "2026-04-24",
+   "cliente": "celeste",
+   "fila": 11
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "variante": null,
+   "cant": "1",
+   "precio": "45000.0",
+   "costo": "25765.09524",
+   "fecha": "2026-04-29",
+   "cliente": "Valqui",
+   "fila": 15
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "variante": null,
+   "cant": "1",
+   "precio": "45000.0",
+   "costo": "25765.09524",
+   "fecha": "2026-05-19",
+   "cliente": "Maira *Comic",
+   "fila": 16
+  },
+  {
+   "producto": "Tote Bag Arpia",
+   "variante": null,
+   "cant": "1",
+   "precio": "45000.0",
+   "costo": "25765.09524",
+   "fecha": "2026-05-19",
+   "cliente": "Maira *Comic",
+   "fila": 17
+  }
+ ],
+ "movimientos": [
+  {
+   "fecha": "2023-03-17",
+   "tipo": "Inversion",
+   "desc": "Termofijadora",
+   "monto": "960000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2023-04-14",
+   "tipo": "Gasto",
+   "desc": "camisetas:2 croptop 2 camiseta hombre (algodon peinado 155 gr/ tela fria 165 gr 40-1)",
+   "monto": "61000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2023-04-17",
+   "tipo": "Gasto",
+   "desc": "camisetas: 2 croptop 2 camisetas hombre (algodon pima peruano 190 gr)",
+   "monto": "194000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2023-07-22",
+   "tipo": "Inversion",
+   "desc": "Madera + tornillos",
+   "monto": "354500",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2023-07-23",
+   "tipo": "Inversion",
+   "desc": "Reglas Modisteria",
+   "monto": "37600.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2023-07-31",
+   "tipo": "Inversion",
+   "desc": "Teflon 40 X 60",
+   "monto": "72000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2023-07-31",
+   "tipo": "Inversion",
+   "desc": "Cinta Térmica X 5",
+   "monto": "43830",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-05",
+   "tipo": "Gasto",
+   "desc": "Hosting y dominio",
+   "monto": "283360.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Franela color piel",
+   "monto": "6250.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Franela color negro",
+   "monto": "6250.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Velo surcido negro",
+   "monto": "6000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Elastico Trenzado (7 mm)",
+   "monto": "3400.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Elastico eljowoo15",
+   "monto": "7800.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Encaje elastico negro",
+   "monto": "7600.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Hilaza venus negro",
+   "monto": "3000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Hilaza venus piel",
+   "monto": "3000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Hilo poliester venus negro",
+   "monto": "2200.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Hilo poliester venus piel",
+   "monto": "2200.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Hilo poliester venus negro",
+   "monto": "2200.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Hilo poliester venus piel",
+   "monto": "2200.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Tensor 8 numero 10",
+   "monto": "1800.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Zeta numero 10",
+   "monto": "2000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Zeta numero 2 CM",
+   "monto": "2400.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Agujas punta de bola Colla",
+   "monto": "12700.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Agujas punta de bola Fill",
+   "monto": "12700.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Agujas punta de bola Plana",
+   "monto": "2200.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Alfileres",
+   "monto": "2000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Alfileres",
+   "monto": "3500.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Encaje negro",
+   "monto": "4000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Encaje vino",
+   "monto": "4000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Tull bordado cafe",
+   "monto": "4500.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Tull bordado piel",
+   "monto": "4500.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Gasto",
+   "desc": "Tull bordado blanco",
+   "monto": "4500.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-17",
+   "tipo": "Inversion",
+   "desc": "Varillas media copa",
+   "monto": "5000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-18",
+   "tipo": "Inversion",
+   "desc": "Patron brasier media copa",
+   "monto": "52706.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-18",
+   "tipo": "Inversion",
+   "desc": "Patron Bralets Quili",
+   "monto": "15900.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-19",
+   "tipo": "Inversion",
+   "desc": "Patron pantys",
+   "monto": "69831.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-05-20",
+   "tipo": "Inversion",
+   "desc": "Brazo estampar",
+   "monto": "341100.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-06-25",
+   "tipo": "Inversion",
+   "desc": "Lamparas",
+   "monto": "91418.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-06-25",
+   "tipo": "Inversion",
+   "desc": "tijeras + corta hilo + deshenebradores",
+   "monto": "41000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-06-29",
+   "tipo": "Gasto",
+   "desc": "Elasticos cosrseteria etc",
+   "monto": "76000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-07-23",
+   "tipo": "Gasto",
+   "desc": "telas + sesgos + tira +gafetes",
+   "monto": "39000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-07-23",
+   "tipo": "Inversion",
+   "desc": "accesorio collarin 2 cm",
+   "monto": "90000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-07-23",
+   "tipo": "Inversion",
+   "desc": "maniqui",
+   "monto": "40000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-09-07",
+   "tipo": "Gasto",
+   "desc": "Franela lycra 1 mt (blanco y negro)",
+   "monto": "30000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-09-07",
+   "tipo": "Gasto",
+   "desc": "Hilaza negra",
+   "monto": "9300.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-09-07",
+   "tipo": "Gasto",
+   "desc": "Sesgo Elastico 2 10 mts",
+   "monto": "6300.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-09-07",
+   "tipo": "Gasto",
+   "desc": "Elastico contorno negro 2cm 10 mts",
+   "monto": "18000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-09-07",
+   "tipo": "Gasto",
+   "desc": "Encaje elastico negro 23 cm 10 mts",
+   "monto": "36000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-09-07",
+   "tipo": "Gasto",
+   "desc": "Encaje elastico 6 cm negro",
+   "monto": "12200.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-09-07",
+   "tipo": "Gasto",
+   "desc": "Encaje elastico 6 cm blanco",
+   "monto": "12200.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-09-06",
+   "tipo": "Gasto",
+   "desc": "Herrajes / gafetes / copas prehormadas",
+   "monto": "83000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-09-16",
+   "tipo": "Gasto",
+   "desc": "Encaje 6 cm calidad negro 8 mts",
+   "monto": "22400.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-09-16",
+   "tipo": "Gasto",
+   "desc": "Encaje 6 cm calidad blanco 8 mts",
+   "monto": "22400.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-09-13",
+   "tipo": "Gasto",
+   "desc": "Tira de Brasier negro 10 mts",
+   "monto": "6000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-09-13",
+   "tipo": "Gasto",
+   "desc": "Telas algodon jersey retazos blanco",
+   "monto": "6500.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-10-03",
+   "tipo": "Gasto",
+   "desc": "marquillas en satin",
+   "monto": "66000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2025-10-25",
+   "tipo": "Gasto",
+   "desc": "envio telas atenea",
+   "monto": "18000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2025-10-27",
+   "tipo": "Gasto",
+   "desc": "velo estrella (papel empaque)",
+   "monto": "19000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2025-10-27",
+   "tipo": "Gasto",
+   "desc": "Bolsa de seguridad negra 25 x 35",
+   "monto": "22500.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2025-10-27",
+   "tipo": "Gasto",
+   "desc": "Bolsa de seguridad rosa 25 x 35",
+   "monto": "25000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2026-07-25",
+   "tipo": "Inversion",
+   "desc": "Stand en feria NANA 1 dia",
+   "monto": "60000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2026-07-18",
+   "tipo": "Gasto",
+   "desc": "Powernet negro delgado",
+   "monto": "72000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2026-07-18",
+   "tipo": "Gasto",
+   "desc": "Tejido plano sim popelina (a cuadros bn)",
+   "monto": "11900.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2026-07-18",
+   "tipo": "Gasto",
+   "desc": "Tela noche de viena negra",
+   "monto": "16000.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2026-07-18",
+   "tipo": "Inversion",
+   "desc": "terminal metalico para cintas",
+   "monto": "2400.0",
+   "socio": "Valqui",
+   "hoja": "INVERSION VALQUI"
+  },
+  {
+   "fecha": "2024-02-08",
+   "tipo": "Inversion",
+   "desc": "restante maquinas industriales",
+   "monto": "1099000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-02-08",
+   "tipo": "Gasto",
+   "desc": "Folder sesgo para plana",
+   "monto": "45000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-02-08",
+   "tipo": "Gasto",
+   "desc": "mallatex rosa",
+   "monto": "4000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-02-08",
+   "tipo": "Gasto",
+   "desc": "malla piel",
+   "monto": "11500.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-02-08",
+   "tipo": "Inversion",
+   "desc": "forro varilla piel",
+   "monto": "4000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-02-08",
+   "tipo": "Inversion",
+   "desc": "forro varilla negro",
+   "monto": "4000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-02-08",
+   "tipo": "Gasto",
+   "desc": "tira brasier negro",
+   "monto": "3200.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-02-08",
+   "tipo": "Gasto",
+   "desc": "tira brasier piel",
+   "monto": "3200.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-02-08",
+   "tipo": "Gasto",
+   "desc": "herrajes en forma 8 / G",
+   "monto": "4800.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-02-08",
+   "tipo": "Gasto",
+   "desc": "sesgo 2 cm piel",
+   "monto": "2400.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-02-08",
+   "tipo": "Gasto",
+   "desc": "sesgo 2 cm negro",
+   "monto": "2400.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-02-08",
+   "tipo": "Gasto",
+   "desc": "Gafetes",
+   "monto": "4800",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-06-29",
+   "tipo": "Gasto",
+   "desc": "Encajes",
+   "monto": "41000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-06-29",
+   "tipo": "Gasto",
+   "desc": "varios retazos",
+   "monto": "52000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-07-03",
+   "tipo": "Inversion",
+   "desc": "configuracion tecnico maquinas",
+   "monto": "200000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-07-13",
+   "tipo": "Gasto",
+   "desc": "papeleria + oraganizacion",
+   "monto": "100000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-07-16",
+   "tipo": "Gasto",
+   "desc": "Piel de durazno + tejido de punto",
+   "monto": "22400.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-07-16",
+   "tipo": "Gasto",
+   "desc": "Encaje y elasticos",
+   "monto": "18900.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-07-22",
+   "tipo": "Inversion",
+   "desc": "maniqui",
+   "monto": "150000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-08-28",
+   "tipo": "Gasto",
+   "desc": "encaje bicolor",
+   "monto": "27000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2025-01-16",
+   "tipo": "Inversion",
+   "desc": "Maquina Zigsiadora Industrial",
+   "monto": "2200000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2023-07-31",
+   "tipo": "Gasto",
+   "desc": "Gillotina",
+   "monto": "85000.0",
+   "socio": "ARPIA",
+   "hoja": "STICKERS"
+  },
+  {
+   "fecha": "2023-07-31",
+   "tipo": "Gasto",
+   "desc": "Papel Adhesivo",
+   "monto": "67054",
+   "socio": "ARPIA",
+   "hoja": "STICKERS"
+  },
+  {
+   "fecha": "2023-07-31",
+   "tipo": "Inversion",
+   "desc": "Plancha Corte + Bisturí",
+   "monto": "68000",
+   "socio": "ARPIA",
+   "hoja": "STICKERS"
+  },
+  {
+   "fecha": "2023-07-31",
+   "tipo": "Gasto",
+   "desc": "Papel Fotográfico 240Grs",
+   "monto": "53200",
+   "socio": "ARPIA",
+   "hoja": "STICKERS"
+  },
+  {
+   "fecha": "2024-06-04",
+   "tipo": "Inversion",
+   "desc": "impresion patrones",
+   "monto": "150000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-10-08",
+   "tipo": "Inversion",
+   "desc": "Sellos Arpia",
+   "monto": "154000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-10-08",
+   "tipo": "Gasto",
+   "desc": "Hilos + Hilazas",
+   "monto": "62500.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-10-08",
+   "tipo": "Gasto",
+   "desc": "Encaje negro",
+   "monto": "27000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-10-08",
+   "tipo": "Gasto",
+   "desc": "encaje blanco",
+   "monto": "27000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-10-08",
+   "tipo": "Gasto",
+   "desc": "Tira brasier negro",
+   "monto": "6000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-10-08",
+   "tipo": "Gasto",
+   "desc": "Tira brasier blanco",
+   "monto": "6000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-10-17",
+   "tipo": "Gasto",
+   "desc": "gafete 3x2 blanco",
+   "monto": "45466.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-10-17",
+   "tipo": "Gasto",
+   "desc": "gafete 3x2 negro",
+   "monto": "35800.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-10-23",
+   "tipo": "Inversion",
+   "desc": "ARCO METALICO 2001 30",
+   "monto": "12350.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-10-23",
+   "tipo": "Inversion",
+   "desc": "ARCO METALICO 2001 32",
+   "monto": "12350.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-10-23",
+   "tipo": "Inversion",
+   "desc": "ARCO METALICO 2001 34",
+   "monto": "12350.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2024-10-23",
+   "tipo": "Inversion",
+   "desc": "ARCO METALICO 2001 36",
+   "monto": "12350.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2025-02-02",
+   "tipo": "Gasto",
+   "desc": "HOSTING ARPIA",
+   "monto": "382360.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  },
+  {
+   "fecha": "2025-01-05",
+   "tipo": "Gasto",
+   "desc": "Decoracion fotos Arpia",
+   "monto": "108000.0",
+   "socio": "Margarita",
+   "hoja": "INVERSION MARGARA"
+  }
+ ],
+ "socios": [
+  "ARPIA",
+  "Margarita",
+  "Valqui"
+ ]
+}

@@ -283,3 +283,182 @@ VALUES (1, '2026-01-05 10:00:00+00', 'Cambio de talla', 95000.0, 'total', 1);
 8. **App → Omisiones**: revisar si quedó algo del proceso de migración.
 
 **Regla de oro**: todo lo actual se carga desde la app (que mantiene stock/costo/estados consistentes); lo histórico (fechas pasadas) se carga en DBeaver y se ajusta el stock/costo manualmente.
+
+---
+
+## 7. DATOS DE REFERENCIA (qué cargar en cada tabla)
+
+> Datos extraídos del archivo `ARPIA.xlsx` original. El archivo completo con TODOS los datos (82 insumos, 40 compras, 13 ventas, 106 movimientos, 107 BOM) está en **`DATOS_REFERENCIA_CARGA.json`** (en la raíz del proyecto). Acá están los datos maestros para arrancar.
+
+### 7.1 Tipos_Producto (6)
+
+| nombre |
+|---|
+| Accesorio |
+| Blusa |
+| Combo |
+| Corsetería |
+| Lencería |
+| Set |
+
+### 7.2 Categorias_Insumos (3)
+
+| nombre |
+|---|
+| Empaques |
+| Herrajes |
+| Telas |
+
+### 7.3 Proveedores (4)
+
+| nombre |
+|---|
+| Bexxhamel |
+| JM Confecciones |
+| SEHA Text |
+| ZureTex |
+
+### 7.4 Socios_Configuracion (3) — ⚠️ la suma debe dar 100
+
+| nombre | porcentaje_participacion |
+|---|---|
+| Valqui | 40 |
+| Margarita | 30 |
+| ARPIA | 30 |
+
+### 7.5 Productos (18)
+
+| nombre | tipo |
+|---|---|
+| Blusa Manga Corta | Blusa |
+| Blusa Manga Larga | Blusa |
+| Bralete | Lencería |
+| Braleth diseño 1 | Lencería |
+| Bustier | Lencería |
+| Cachetero | Lencería |
+| Caja Despertar | Combo |
+| Caja Despertar V2 | Combo |
+| Caja Saca Las Garras | Combo |
+| Corset | Corsetería |
+| Corset Artemisia | Corsetería |
+| Corset Doble Cara | Corsetería |
+| Corset Hypatia | Corsetería |
+| Falda Emily | Lencería |
+| Set Aelo | Set |
+| Set Celeno | Set |
+| Set Ocipete | Set |
+| Tote Bag Arpia | Accesorio |
+
+### 7.6 Stock inicial (INVENTARIO OCT25 — 31 insumos)
+
+| insumo | cantidad |
+|---|---|
+| Encaje negro sin pelitos | 11 |
+| Argollas grandes | 78.0 |
+| Tela entrepierna negra | 3 |
+| * Argollas Medianas | 120.0 |
+| Tela entrepierna blanca | 0.60 |
+| * Argollas Pequeñas | 100.0 |
+| Encaje blanco chantilli (pelitos) para bicolor | 9.5 |
+| * Ochos Grandes | 6.0 |
+| Encaje negro chantilli (pelitos) para bicolor | 9.5 |
+| * Ochos Medianos | 44.0 |
+| Tira de brasier blanca | 7 |
+| * Ochos Pequeños | 190.0 |
+| Contorno para Bustier negro 2 cm ancho | 19 |
+| * Gancho G grandes | 10.0 |
+| * Gancho G Medianos | 134.0 |
+| * Ganchos G Pequeños | 84.0 |
+| Elástico de contorno de 1 cm blanco | 6.5 |
+| Varilla copa brasier talla 30 | 50.0 |
+| Varilla copa brasier talla 32 | 50.0 |
+| Elastico plano negro | 10 |
+| Varilla copa brasier talla 34 | 50.0 |
+| Elastico plano blanco | 10 |
+| Varilla copa brasier talla 36 | 50.0 |
+| Tira de brasier negra | 10 |
+| Variila plastica cortada 18cms | 200.0 |
+| Sesgo de 2cm blanco | 10 |
+| Sesgo de 2cm negro | 6 |
+| Mallatex negra | 3 |
+| Mallatex blanca | 3 |
+| Ref 100 24 cm tul bordado negro | 39 |
+| Ref 159 24 cm tul bordado rojo pastel | 21 |
+
+### 7.7 Ventas históricas (13) — solo DBeaver (fecha + costo)
+
+| fecha | producto | variante | cant | precio | cliente |
+|---|---|---|---|---|---|
+| 2025-12-13 | CAJA SACA LAS GARRAS | S | 1 | 295000 | gaby |
+| 2025-12-13 | SET AELO | S | 1 | 80000.0 | celes |
+| 2026-01-05 | Blusa Manga Larga | M | 1 | 90000 | Maira *Comic |
+| 2026-03-20 | SET OCIPETE | S | 1 | 71250.0 | gaby |
+| 2026-03-28 | SET OCIPETE | | 1 | 71250.0 | Valeria Amiga gaby |
+| 2026-03-29 | SET AELO | XS | 1 | 82500.0 | Juan jose |
+| 2026-03-31 | SET AELO | S | 1 | 82500.0 | Valentina hermana ale |
+| 2026-03-31 | Tote Bag Arpia | | 1 | 45000.0 | Valentina hermana ale |
+| 2026-03-31 | Tote Bag Arpia | | 1 | 45000.0 | Camila |
+| 2026-04-24 | Tote Bag Arpia | | 1 | 45000.0 | celeste |
+| 2026-04-29 | Tote Bag Arpia | | 1 | 45000.0 | Valqui |
+| 2026-05-19 | Tote Bag Arpia | | 1 | 45000.0 | Maira *Comic |
+| 2026-05-19 | Tote Bag Arpia | | 1 | 45000.0 | Maira *Comic |
+
+### 7.8 Compras históricas (40) — solo DBeaver (fecha) — ejemplos
+
+Las 40 compras completas están en `DATOS_REFERENCIA_CARGA.json` (sección `compras`). Ejemplos:
+
+| fecha | insumo | cantidad | precio_u | proveedor |
+|---|---|---|---|---|
+| 2024-02-17 | Elastico de Contorno | 4 | 2000.0 | Kilotelas |
+| 2024-02-17 | Tensor 8 de 10mm | 100.0 | 70 | Kilotelas |
+| 2024-02-17 | Zeta de 10 mm | 100.0 | 102 | Kilotelas |
+| 2024-02-17 | Argolla 10 mm | 100.0 | 72 | Las 3BBB premium |
+| 2024-02-17 | Sesgo Elastico 10 mts | 10.00 | 630 | Las 3BBB premium |
+| 2024-02-17 | Argolla 10 mm | 12.0 | 166.67 | Gerrajes |
+| 2024-02-17 | Gafete de 3 | 1.0 | 800 | Gerrajes |
+| 2024-02-17 | Tira de brasier | 1.000 | 800 | Gerrajes |
+| 2024-02-17 | Franela Lycra | 1.000 | 30000 | Gerrajes |
+| 2024-02-17 | Tela Maya Ilustrada | 15.000 | 38653.33 | |
+
+> ⚠️ Al cargar compras históricas en DBeaver, acordate de **sumar el stock y recalcular el costo promedio** del insumo en la tabla `"Insumos"` (la app lo hace automáticamente; DBeaver no).
+
+### 7.9 Movimientos financieros (106) — app o DBeaver
+
+Los 106 movimientos completos están en `DATOS_REFERENCIA_CARGA.json` (sección `movimientos`). Ejemplos:
+
+| fecha | tipo | descripcion | monto | socio |
+|---|---|---|---|---|
+| 2023-03-17 | Inversion | Termofijadora | 960000.0 | Valqui |
+| 2023-04-14 | Gasto | camisetas: 2 croptop 2 camiseta hombre | 61000.0 | Valqui |
+| 2023-07-22 | Inversion | Madera + tornillos | 354500 | Valqui |
+| 2023-07-31 | Inversion | Teflon 40 X 60 | 72000.0 | Valqui |
+| 2024-02-05 | Gasto | Hosting y dominio | 283360.0 | Valqui |
+| 2024-02-17 | Gasto | Franela color piel | 6250.0 | Valqui |
+| 2024-02-17 | Gasto | Velo surcido negro | 6000.0 | Valqui |
+| 2024-02-17 | Gasto | Elastico Trenzado (7 mm) | 3400.0 | Valqui |
+
+> Para cargar movimientos con fecha pasada: crear en la app (fecha = hoy) y **después editar la fecha** con el botón Editar. También podés insertarlos directo en DBeaver.
+
+### 7.10 BOM (107 líneas) — app (pantalla Productos)
+
+Las 107 líneas de recetas (producto → insumo + cantidad) están en `DATOS_REFERENCIA_CARGA.json` (sección `bom_insumos`). Se cargan desde la app en **Productos → BOM** de cada producto.
+
+---
+
+## 8. ARCHIVO DE REFERENCIA COMPLETO
+
+**`DATOS_REFERENCIA_CARGA.json`** (en la raíz del proyecto) contiene TODO el detalle:
+
+| sección | contenido |
+|---|---|
+| `tipos` | 6 tipos de producto |
+| `categorias` | 3 categorías de insumos |
+| `proveedores` | 4 proveedores |
+| `socios` | 3 socios (Valqui, Margarita, ARPIA) |
+| `productos` | 18 productos con su tipo |
+| `insumos` | 82 insumos con categoría y unidad |
+| `stock_oct25` | 31 insumos con stock inicial |
+| `compras` | 40 compras históricas (fecha, cantidad, precio, proveedor) |
+| `bom_insumos` | 107 líneas de receta BOM |
+| `ventas` | 13 ventas históricas (fecha, producto, variante, precio, cliente) |
+| `movimientos` | 106 movimientos financieros (fecha, tipo, descripción, monto, socio) |
