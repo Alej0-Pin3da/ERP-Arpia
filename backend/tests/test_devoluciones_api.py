@@ -301,7 +301,8 @@ def test_get_devoluciones_consulta_allowed(client, consulta_token):
     """consulta CAN GET /devoluciones (audited role, DEV-4)."""
     resp = client.get("/api/v1/devoluciones", headers=_auth(consulta_token))
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+    body = resp.json()
+    assert set(body.keys()) == {"items", "total"}
 
 
 # ---------------------------------------------------------------------------
@@ -656,16 +657,17 @@ def test_get_devoluciones_filtros_y_paginacion(client, admin_token):
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert len(body) == 1
-        assert body[0]["venta_id"] == v2["id"]
-        assert len(body[0]["items"]) == 1
+        assert len(body["items"]) == 1
+        assert body["total"] == 1
+        assert body["items"][0]["venta_id"] == v2["id"]
+        assert len(body["items"][0]["items"]) == 1
 
         # pagination -> at most 1 row
         resp = client.get(
             "/api/v1/devoluciones?limit=1", headers=_auth(admin_token)
         )
         assert resp.status_code == 200
-        assert len(resp.json()) == 1
+        assert len(resp.json()["items"]) == 1
 
         # fecha range excluding both returns -> empty (real filter ran)
         resp = client.get(
@@ -673,16 +675,53 @@ def test_get_devoluciones_filtros_y_paginacion(client, admin_token):
             headers=_auth(admin_token),
         )
         assert resp.status_code == 200
-        assert resp.json() == []
+        body = resp.json()
+        assert body["items"] == []
+        assert body["total"] == 0
 
         # unknown venta -> empty
         resp = client.get(
             "/api/v1/devoluciones?venta_id=99999999", headers=_auth(admin_token)
         )
         assert resp.status_code == 200
-        assert resp.json() == []
+        assert resp.json() == {"items": [], "total": 0}
     finally:
         _cleanup_devoluciones([v1["id"], v2["id"]])
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_get_devoluciones_q_motivo(client, admin_token):
+    """Global q searches the motivo field (DEV-4 + API-3)."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        venta = _crear_venta(client, admin_token, _venta_payload(prod_id))
+        tag = f"motivo-{_unique()}"
+        resp = client.post(
+            "/api/v1/devoluciones",
+            json={"venta_id": venta["id"], "tipo": "total", "motivo": tag},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 201
+
+        resp = client.get(
+            "/api/v1/devoluciones",
+            params={"q": tag},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 1
+        assert body["items"][0]["motivo"] == tag
+    finally:
+        _cleanup_devoluciones([venta["id"]])
         _cleanup_ventas_for_producto(prod_id)
         _cleanup_producto(prod_id)
         _cleanup_insumo(ins_id)

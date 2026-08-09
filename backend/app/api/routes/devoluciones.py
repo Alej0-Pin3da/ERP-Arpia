@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_roles
 from app.models.usuarios import Usuario
+from app.schemas.common import Paginated
 from app.schemas.devoluciones import DevolucionCreate, DevolucionRead
 from app.services.devoluciones import listar_devoluciones, registrar_devolucion
 
@@ -37,23 +38,27 @@ def create_devolucion(
     return registrar_devolucion(db, user.id, payload.model_dump())
 
 
-@router.get("", response_model=list[DevolucionRead])
+@router.get("", response_model=Paginated[DevolucionRead])
 def list_devoluciones(
     db: Session = Depends(get_db),
     _: Usuario = Depends(audited_user),
     venta_id: int | None = None,
     fecha_desde: date | None = None,
     fecha_hasta: date | None = None,
+    q: str | None = None,
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ):
     """List returns ordered by id with items + Venta reference, optionally
-    filtered by venta_id and a fecha range, paginated."""
-    return listar_devoluciones(
+    filtered by venta_id, a fecha range and a global q on motivo, paginated
+    into ``{items, total}`` (total counts the filtered set)."""
+    rows, total = listar_devoluciones(
         db,
         venta_id=venta_id,
         fecha_desde=fecha_desde,
         fecha_hasta=fecha_hasta,
+        q=q,
         limit=limit,
         offset=offset,
     )
+    return Paginated[DevolucionRead](items=list(rows), total=total)

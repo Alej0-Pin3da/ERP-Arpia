@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.deps import get_db, require_admin, require_roles
 from app.models.insumos import CategoriaInsumo, Insumo
+from app.schemas.common import Paginated
 from app.schemas.insumo import InsumoCreate, InsumoRead, InsumoUpdate
+from app.services.paginacion import paginar
 
 router = APIRouter(prefix="/insumos", tags=["insumos"])
 
@@ -19,21 +21,27 @@ def _to_read(insumo: Insumo) -> InsumoRead:
     return data
 
 
-@router.get("", response_model=list[InsumoRead])
+@router.get("", response_model=Paginated[InsumoRead])
 def list_insumos(
     limit: int = 50,
     offset: int = 0,
+    q: str | None = None,
+    categoria_id: int | None = None,
     db: Session = Depends(get_db),
     _: Insumo = Depends(audited_user),
 ):
-    stmt = (
-        select(Insumo)
-        .options(selectinload(Insumo.categoria))
-        .order_by(Insumo.id)
-        .limit(limit)
-        .offset(offset)
-    )
-    return [_to_read(i) for i in db.scalars(stmt).all()]
+    stmt = select(Insumo).options(selectinload(Insumo.categoria)).order_by(Insumo.id)
+    if q is not None:
+        stmt = stmt.where(
+            or_(
+                Insumo.nombre.ilike(f"%{q}%"),
+                Insumo.unidad_medida.ilike(f"%{q}%"),
+            )
+        )
+    if categoria_id is not None:
+        stmt = stmt.where(Insumo.categoria_id == categoria_id)
+    rows, total = paginar(db, stmt, limit, offset)
+    return Paginated[InsumoRead](items=[_to_read(i) for i in rows], total=total)
 
 
 @router.get("/{insumo_id}", response_model=InsumoRead)

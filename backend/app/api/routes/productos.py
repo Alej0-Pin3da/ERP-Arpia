@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_admin, require_roles
 from app.models.productos import Producto, TipoProducto, VarianteProducto
+from app.schemas.common import Paginated
 from app.schemas.producto import (
     ProductoCreate,
     ProductoRead,
@@ -13,6 +14,7 @@ from app.schemas.producto import (
     VarianteProductoRead,
     VarianteProductoUpdate,
 )
+from app.services.paginacion import paginar
 
 router = APIRouter(prefix="/productos", tags=["productos"])
 
@@ -24,18 +26,27 @@ audited_user = require_roles("admin", "operador", "consulta")
 # ---------------------------------------------------------------------------
 
 
-@router.get("", response_model=list[ProductoRead])
+@router.get("", response_model=Paginated[ProductoRead])
 def list_productos(
     tipo_producto_id: int | None = None,
+    q: str | None = None,
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
     _: Producto = Depends(audited_user),
 ):
-    stmt = select(Producto).order_by(Producto.id).limit(limit).offset(offset)
+    stmt = select(Producto).order_by(Producto.id)
     if tipo_producto_id is not None:
         stmt = stmt.where(Producto.tipo_producto_id == tipo_producto_id)
-    return list(db.scalars(stmt).all())
+    if q is not None:
+        stmt = stmt.where(
+            or_(
+                Producto.nombre.ilike(f"%{q}%"),
+                TipoProducto.nombre.ilike(f"%{q}%"),
+            )
+        ).join(TipoProducto)
+    rows, total = paginar(db, stmt, limit, offset)
+    return Paginated[ProductoRead](items=list(rows), total=total)
 
 
 @router.get("/{producto_id}", response_model=ProductoRead)

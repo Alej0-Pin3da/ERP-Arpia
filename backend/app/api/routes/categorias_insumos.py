@@ -9,26 +9,27 @@ from app.schemas.categoria_insumo import (
     CategoriaInsumoRead,
     CategoriaInsumoUpdate,
 )
+from app.schemas.common import Paginated
+from app.services.paginacion import paginar
 
 router = APIRouter(prefix="/categorias-insumos", tags=["categorias-insumos"])
 
 audited_user = require_roles("admin", "operador", "consulta")
 
 
-@router.get("", response_model=list[CategoriaInsumoRead])
+@router.get("", response_model=Paginated[CategoriaInsumoRead])
 def list_categorias(
     limit: int = 100,
     offset: int = 0,
+    q: str | None = None,
     db: Session = Depends(get_db),
     _: CategoriaInsumo = Depends(audited_user),
 ):
-    stmt = (
-        select(CategoriaInsumo)
-        .order_by(CategoriaInsumo.id)
-        .limit(limit)
-        .offset(offset)
-    )
-    return list(db.scalars(stmt).all())
+    stmt = select(CategoriaInsumo).order_by(CategoriaInsumo.id)
+    if q is not None:
+        stmt = stmt.where(CategoriaInsumo.nombre.ilike(f"%{q}%"))
+    rows, total = paginar(db, stmt, limit, offset)
+    return Paginated[CategoriaInsumoRead](items=list(rows), total=total)
 
 
 @router.get("/{categoria_id}", response_model=CategoriaInsumoRead)

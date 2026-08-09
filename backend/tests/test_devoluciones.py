@@ -669,13 +669,15 @@ def test_listar_devoluciones_filtra_por_venta_y_pagina():
                 db.close()
         db = SessionLocal()
         try:
-            solo_v2 = listar_devoluciones(db, venta_id=v2_id)
+            solo_v2, total_v2 = listar_devoluciones(db, venta_id=v2_id)
             assert len(solo_v2) == 1
+            assert total_v2 == 1  # total counts the filtered set (API-1)
             assert solo_v2[0].venta_id == v2_id
             assert solo_v2[0].venta.id == v2_id  # venta reference cargada
             assert len(solo_v2[0].items) == 1  # items cargados
-            paginado = listar_devoluciones(db, limit=1)
+            paginado, total_pag = listar_devoluciones(db, limit=1)
             assert len(paginado) == 1
+            assert total_pag == 2  # limit ignored by the total count
         finally:
             db.close()
     finally:

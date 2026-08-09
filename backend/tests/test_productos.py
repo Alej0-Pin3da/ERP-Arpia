@@ -153,20 +153,43 @@ def test_get_tipo_missing_returns_404(client, admin_token):
 
 
 def test_list_tipos_paginated_limit_offset_order_by_id(client, admin_token):
-    tipo_ids = [_make_tipo() for _ in range(5)]
+    prefix = f"Tipo Pag {_unique()}"
+    tipo_ids = [_make_tipo(nombre=f"{prefix} {i}") for i in range(5)]
     try:
         resp = client.get(
-            "/api/v1/tipos-producto?limit=2&offset=2",
+            "/api/v1/tipos-producto",
+            params={"q": prefix, "limit": 2, "offset": 2},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert resp.status_code == 200
-        rows = resp.json()
+        body = resp.json()
+        assert set(body.keys()) == {"items", "total"}
+        rows = body["items"]
         assert len(rows) == 2
+        assert body["total"] == 5  # count of the filtered set (q), limit ignored
         ordered_ids = sorted(tipo_ids)
         assert [row["id"] for row in rows] == ordered_ids[2:4]
     finally:
         for tipo_id in tipo_ids:
             _cleanup_tipo(tipo_id)
+
+
+def test_list_tipos_empty_y_422(client, admin_token):
+    """q with no match -> {items: [], total: 0}; invalid typed param -> 422."""
+    resp = client.get(
+        "/api/v1/tipos-producto",
+        params={"q": "zzz_no_existe_999"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"items": [], "total": 0}
+
+    resp = client.get(
+        "/api/v1/tipos-producto",
+        params={"limit": "abc"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 422
 
 
 def test_update_tipo_returns_200(client, admin_token):
@@ -322,13 +345,45 @@ def test_list_productos_filter_by_tipo(client, admin_token):
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert resp.status_code == 200
-        rows = resp.json()
+        body = resp.json()
+        rows = body["items"]
+        assert set(body.keys()) == {"items", "total"}
         assert len(rows) >= 1
         assert all(row["tipo_producto_id"] == tipo_a for row in rows)
         assert any(row["id"] == producto_a for row in rows)
     finally:
         _cleanup_tipo(tipo_a)
         _cleanup_tipo(tipo_b)
+
+
+def test_list_productos_q_y_total_filtrado(client, admin_token):
+    """q searches nombre; total == count of the filtered set."""
+    prefix = f"Prod Pag {_unique()}"
+    tipo_id = _make_tipo()
+    p1 = _make_producto(tipo_id, nombre=f"{prefix} Uno")
+    p2 = _make_producto(tipo_id, nombre=f"{prefix} Dos")
+    try:
+        resp = client.get(
+            "/api/v1/productos",
+            params={"q": prefix},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 2
+        assert {row["id"] for row in body["items"]} == {p1, p2}
+
+        resp = client.get(
+            "/api/v1/productos",
+            params={"q": f"{prefix} Dos"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.json()["total"] == 1
+        assert resp.json()["items"][0]["id"] == p2
+    finally:
+        _cleanup_producto(p1)
+        _cleanup_producto(p2)
+        _cleanup_tipo(tipo_id)
 
 
 # ---------------------------------------------------------------------------
@@ -467,4 +522,5 @@ def test_get_productos_consulta_allowed(client, consulta_token):
         headers={"Authorization": f"Bearer {consulta_token}"},
     )
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+    body = resp.json()
+    assert set(body.keys()) == {"items", "total"}

@@ -1,24 +1,40 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_admin
 from app.core.security import hash_password
 from app.models.usuarios import Usuario
+from app.schemas.common import Paginated
 from app.schemas.usuario import UsuarioCreate, UsuarioRead, UsuarioUpdate
+from app.services.paginacion import paginar
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
 
 
-@router.get("", response_model=list[UsuarioRead])
+@router.get("", response_model=Paginated[UsuarioRead])
 def list_usuarios(
     limit: int = 50,
     offset: int = 0,
+    q: str | None = None,
+    rol: Literal["admin", "operador", "consulta"] | None = None,
     db: Session = Depends(get_db),
     _: Usuario = Depends(require_admin),
 ):
-    stmt = select(Usuario).order_by(Usuario.id).limit(limit).offset(offset)
-    return list(db.scalars(stmt).all())
+    stmt = select(Usuario).order_by(Usuario.id)
+    if q is not None:
+        stmt = stmt.where(
+            or_(
+                Usuario.nombre.ilike(f"%{q}%"),
+                Usuario.email.ilike(f"%{q}%"),
+            )
+        )
+    if rol is not None:
+        stmt = stmt.where(Usuario.rol == rol)
+    rows, total = paginar(db, stmt, limit, offset)
+    return Paginated[UsuarioRead](items=list(rows), total=total)
 
 
 @router.get("/{usuario_id}", response_model=UsuarioRead)

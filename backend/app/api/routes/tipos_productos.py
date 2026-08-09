@@ -5,27 +5,28 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_admin, require_roles
 from app.models.productos import TipoProducto
+from app.schemas.common import Paginated
 from app.schemas.producto import TipoProductoCreate, TipoProductoRead, TipoProductoUpdate
+from app.services.paginacion import paginar
 
 router = APIRouter(prefix="/tipos-producto", tags=["tipos-producto"])
 
 audited_user = require_roles("admin", "operador", "consulta")
 
 
-@router.get("", response_model=list[TipoProductoRead])
+@router.get("", response_model=Paginated[TipoProductoRead])
 def list_tipos_producto(
     limit: int = 50,
     offset: int = 0,
+    q: str | None = None,
     db: Session = Depends(get_db),
     _: TipoProducto = Depends(audited_user),
 ):
-    stmt = (
-        select(TipoProducto)
-        .order_by(TipoProducto.id)
-        .limit(limit)
-        .offset(offset)
-    )
-    return list(db.scalars(stmt).all())
+    stmt = select(TipoProducto).order_by(TipoProducto.id)
+    if q is not None:
+        stmt = stmt.where(TipoProducto.nombre.ilike(f"%{q}%"))
+    rows, total = paginar(db, stmt, limit, offset)
+    return Paginated[TipoProductoRead](items=list(rows), total=total)
 
 
 @router.get("/{tipo_producto_id}", response_model=TipoProductoRead)

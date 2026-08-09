@@ -11,7 +11,7 @@ The caller owns nothing else — this service performs the single commit.
 from decimal import Decimal
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -171,11 +171,14 @@ def listar_devoluciones(
     venta_id: int | None = None,
     fecha_desde=None,
     fecha_hasta=None,
+    q: str | None = None,
     limit: int = 100,
     offset: int = 0,
-) -> list[Devolucion]:
+) -> tuple[list[Devolucion], int]:
     """List returns ordered by id, with their line items and Venta reference,
-    optionally filtered by venta_id and a fecha range (DEV-4)."""
+    optionally filtered by venta_id, a fecha range (DEV-4) and a global q on
+    the motivo. Returns ``(rows, total)`` where total counts the filtered set
+    (limit/offset ignored) — the {items, total} contract (API-1)."""
     stmt = (
         select(Devolucion)
         .options(
@@ -190,4 +193,8 @@ def listar_devoluciones(
         stmt = stmt.where(Devolucion.fecha >= fecha_desde)
     if fecha_hasta is not None:
         stmt = stmt.where(Devolucion.fecha <= fecha_hasta)
-    return list(db.scalars(stmt.limit(limit).offset(offset)))
+    if q is not None:
+        stmt = stmt.where(Devolucion.motivo.ilike(f"%{q}%"))
+    total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
+    rows = list(db.scalars(stmt.limit(limit).offset(offset)))
+    return rows, total

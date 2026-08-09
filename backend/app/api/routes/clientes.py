@@ -1,25 +1,38 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_admin, require_roles
 from app.models.clientes import Cliente
 from app.schemas.cliente import ClienteCreate, ClienteRead, ClienteUpdate
+from app.schemas.common import Paginated
+from app.services.paginacion import paginar
 
 router = APIRouter(prefix="/clientes", tags=["clientes"])
 
 audited_user = require_roles("admin", "operador", "consulta")
 
 
-@router.get("", response_model=list[ClienteRead])
+@router.get("", response_model=Paginated[ClienteRead])
 def list_clientes(
     limit: int = 50,
     offset: int = 0,
+    q: str | None = None,
     db: Session = Depends(get_db),
     _: Cliente = Depends(audited_user),
 ):
-    stmt = select(Cliente).order_by(Cliente.id).limit(limit).offset(offset)
-    return list(db.scalars(stmt).all())
+    stmt = select(Cliente).order_by(Cliente.id)
+    if q is not None:
+        stmt = stmt.where(
+            or_(
+                Cliente.nombre.ilike(f"%{q}%"),
+                Cliente.documento_identidad.ilike(f"%{q}%"),
+                Cliente.email.ilike(f"%{q}%"),
+                Cliente.telefono.ilike(f"%{q}%"),
+            )
+        )
+    rows, total = paginar(db, stmt, limit, offset)
+    return Paginated[ClienteRead](items=list(rows), total=total)
 
 
 @router.get("/{cliente_id}", response_model=ClienteRead)

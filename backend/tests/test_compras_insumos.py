@@ -140,7 +140,9 @@ def test_get_consulta_200(client, consulta_token, categoria_fixture):
     try:
         resp = client.get(URL, headers=_auth(consulta_token))
         assert resp.status_code == 200
-        assert isinstance(resp.json(), list)
+        body = resp.json()
+        assert set(body.keys()) == {"items", "total"}
+        assert isinstance(body["items"], list)
     finally:
         _cleanup_insumo(insumo_id)
 
@@ -224,8 +226,10 @@ def test_list_paginated_limit_offset(client, operador_token, categoria_fixture):
             headers=_auth(operador_token),
         )
         assert resp.status_code == 200
-        rows = resp.json()
+        body = resp.json()
+        rows = body["items"]
         assert len(rows) == 2
+        assert body["total"] == 4  # count of the filtered set, limit ignored
         assert [row["id"] for row in rows] == created_ids[2:4]
     finally:
         _cleanup_insumo(insumo_id)
@@ -247,10 +251,11 @@ def test_list_filter_by_insumo(client, operador_token, categoria_fixture):
         resp = client.get(
             URL, params={"insumo_id": insumo_a}, headers=_auth(operador_token)
         )
-        rows = resp.json()
+        body = resp.json()
+        rows = body["items"]
         assert len(rows) == 1
+        assert body["total"] == 1
         assert rows[0]["insumo_id"] == insumo_a
-        assert rows[0]["id"] == resp.json()[0]["id"]
     finally:
         _cleanup_insumo(insumo_a)
         _cleanup_insumo(insumo_b)
@@ -272,10 +277,41 @@ def test_list_ordered_by_id(client, operador_token, categoria_fixture):
         resp = client.get(
             URL, params={"insumo_id": insumo_id}, headers=_auth(operador_token)
         )
-        rows = resp.json()
+        rows = resp.json()["items"]
         assert [row["id"] for row in rows] == sorted(created_ids)
     finally:
         _cleanup_insumo(insumo_id)
+
+
+def test_list_empty_y_out_of_range_no_404(client, operador_token):
+    """No rows -> {items: [], total: 0}; offset beyond set -> empty, no 404."""
+    resp = client.get(
+        URL,
+        params={"insumo_id": 99999999},
+        headers=_auth(operador_token),
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"items": [], "total": 0}
+
+    resp = client.get(
+        URL,
+        params={"limit": 5, "offset": 999999},
+        headers=_auth(operador_token),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["items"] == []
+    assert body["total"] >= 0
+
+
+def test_list_proveedor_id_422(client, operador_token):
+    """Typed filter with an invalid type -> 422 (API-3), nothing partial."""
+    resp = client.get(
+        URL,
+        params={"proveedor_id": "abc"},
+        headers=_auth(operador_token),
+    )
+    assert resp.status_code == 422
 
 
 # ---------------------------------------------------------------------------

@@ -1,25 +1,37 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_admin, require_roles
 from app.models.proveedores import Proveedor
+from app.schemas.common import Paginated
 from app.schemas.proveedor import ProveedorCreate, ProveedorRead, ProveedorUpdate
+from app.services.paginacion import paginar
 
 router = APIRouter(prefix="/proveedores", tags=["proveedores"])
 
 audited_user = require_roles("admin", "operador", "consulta")
 
 
-@router.get("", response_model=list[ProveedorRead])
+@router.get("", response_model=Paginated[ProveedorRead])
 def list_proveedores(
     limit: int = 50,
     offset: int = 0,
+    q: str | None = None,
     db: Session = Depends(get_db),
     _: Proveedor = Depends(audited_user),
 ):
-    stmt = select(Proveedor).order_by(Proveedor.id).limit(limit).offset(offset)
-    return list(db.scalars(stmt).all())
+    stmt = select(Proveedor).order_by(Proveedor.id)
+    if q is not None:
+        stmt = stmt.where(
+            or_(
+                Proveedor.nombre.ilike(f"%{q}%"),
+                Proveedor.ubicacion.ilike(f"%{q}%"),
+                Proveedor.contacto.ilike(f"%{q}%"),
+            )
+        )
+    rows, total = paginar(db, stmt, limit, offset)
+    return Paginated[ProveedorRead](items=list(rows), total=total)
 
 
 @router.get("/{proveedor_id}", response_model=ProveedorRead)

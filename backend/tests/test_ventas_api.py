@@ -278,7 +278,66 @@ def test_get_ventas_consulta_allowed(client, consulta_token):
         headers={"Authorization": f"Bearer {consulta_token}"},
     )
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+    body = resp.json()
+    assert set(body.keys()) == {"items", "total"}
+
+
+def test_get_ventas_paginado_filtros(client, operador_token):
+    """Ventas paginates with limit/offset and filters canal_venta + estado."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        for _ in range(3):
+            resp = client.post(
+                "/api/v1/ventas",
+                json=_venta_payload(prod_id, canal="feria"),
+                headers={"Authorization": f"Bearer {operador_token}"},
+            )
+            assert resp.status_code == 201
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id, canal="web"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+
+        # limit/offset honored + total = full filtered count
+        resp = client.get(
+            "/api/v1/ventas",
+            params={"canal_venta": "feria", "limit": 2, "offset": 0},
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["items"]) == 2
+        assert body["total"] == 3
+        assert all(v["canal_venta"] == "feria" for v in body["items"])
+
+        # empty filter -> {items: [], total: 0}
+        resp = client.get(
+            "/api/v1/ventas",
+            params={"estado": "anulada"},
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"items": [], "total": 0}
+
+        # invalid canal -> 422
+        resp = client.get(
+            "/api/v1/ventas",
+            params={"canal_venta": "tienda"},
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 422
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
 
 
 # ---------------------------------------------------------------------------

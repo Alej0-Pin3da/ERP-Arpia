@@ -68,9 +68,37 @@ def test_list_usuarios_admin(client, admin_token):
     resp = client.get("/api/v1/usuarios", headers=_auth(admin_token))
     assert resp.status_code == 200
     body = resp.json()
-    assert isinstance(body, list)
-    assert len(body) >= 1
-    assert all("password_hash" not in u for u in body)
+    assert set(body.keys()) == {"items", "total"}
+    assert isinstance(body["items"], list)
+    assert len(body["items"]) >= 1
+    assert body["total"] >= len(body["items"])
+    assert all("password_hash" not in u for u in body["items"])
+
+
+def test_list_usuarios_filtro_rol_y_q(client, admin_token):
+    resp = client.get(
+        "/api/v1/usuarios",
+        params={"rol": "consulta"},
+        headers=_auth(admin_token),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert all(u["rol"] == "consulta" for u in body["items"])
+    assert body["total"] == len(body["items"])  # small page; rol filter ran
+
+    resp = client.get(
+        "/api/v1/usuarios",
+        params={"q": "zzz_no_existe_999"},
+        headers=_auth(admin_token),
+    )
+    assert resp.json() == {"items": [], "total": 0}
+
+    resp = client.get(
+        "/api/v1/usuarios",
+        params={"rol": "invalido"},
+        headers=_auth(admin_token),
+    )
+    assert resp.status_code == 422
 
 
 def test_admin_cannot_delete_self(client, admin_token):

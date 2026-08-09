@@ -10,13 +10,16 @@
 Mutations require admin|operador; lists are audited (admin|operador|consulta).
 """
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_roles
-from app.models.finanzas import SociosConfiguracion
+from app.models.finanzas import MovimientoFinanciero, SociosConfiguracion
 from app.models.usuarios import Usuario
+from app.schemas.common import Paginated
 from app.schemas.finanzas import (
     LiquidacionCreate,
     MovimientoCreate,
@@ -31,9 +34,9 @@ from app.services.finanzas import (
     crear_socio_configuracion,
     eliminar_movimiento,
     eliminar_socio_configuracion,
-    listar_movimientos,
     settle_liquidacion,
 )
+from app.services.paginacion import paginar
 
 router = APIRouter(prefix="/finanzas", tags=["finanzas"])
 
@@ -60,13 +63,24 @@ def create_movimiento(
     return crear_movimiento(db, payload.model_dump())
 
 
-@router.get("/movimientos", response_model=list[MovimientoRead])
-def list_movimientos(
+@router.get("/movimientos", response_model=Paginated[MovimientoRead])
+def list_movimientos_route(
+    limit: int = 50,
+    offset: int = 0,
+    tipo: Literal["Gasto", "Inversion", "Retiro"] | None = None,
     db: Session = Depends(get_db),
     _: Usuario = Depends(audited_user),
 ):
-    """List active movements (soft-deleted rows are excluded)."""
-    return listar_movimientos(db)
+    """List active movements (soft-deleted rows are excluded), paginated with
+    {items, total} and an optional tipo filter (API-1/API-3)."""
+    stmt = select(MovimientoFinanciero).where(
+        MovimientoFinanciero.estado == "activo"
+    )
+    if tipo is not None:
+        stmt = stmt.where(MovimientoFinanciero.tipo == tipo)
+    stmt = stmt.order_by(MovimientoFinanciero.id)
+    rows, total = paginar(db, stmt, limit, offset)
+    return Paginated[MovimientoRead](items=list(rows), total=total)
 
 
 @router.delete("/movimientos/{movimiento_id}", response_model=MovimientoRead)
@@ -104,13 +118,22 @@ def crear_liquidacion(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/socios", response_model=list[SocioConfiguracionRead])
+@router.get("/socios", response_model=Paginated[SocioConfiguracionRead])
 def list_socios(
+    limit: int = 50,
+    offset: int = 0,
+    q: str | None = None,
     db: Session = Depends(get_db),
     _: Usuario = Depends(audited_user),
 ):
-    """List partner participation rows ordered by id."""
-    return list(db.scalars(select(SociosConfiguracion).order_by(SociosConfiguracion.id)))
+    """List partner participation rows ordered by id, paginated {items, total}
+    with an optional q search on nombre (API-1/API-3)."""
+    stmt = select(SociosConfiguracion)
+    if q is not None:
+        stmt = stmt.where(SociosConfiguracion.nombre.ilike(f"%{q}%"))
+    stmt = stmt.order_by(SociosConfiguracion.id)
+    rows, total = paginar(db, stmt, limit, offset)
+    return Paginated[SocioConfiguracionRead](items=list(rows), total=total)
 
 
 @router.post(

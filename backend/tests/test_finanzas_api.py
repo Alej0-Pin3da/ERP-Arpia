@@ -147,7 +147,46 @@ def test_get_movimientos_consulta_allowed(client, consulta_token):
         "/api/v1/finanzas/movimientos", headers=_auth(consulta_token)
     )
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+    body = resp.json()
+    assert set(body.keys()) == {"items", "total"}
+
+
+def test_get_movimientos_paginado_y_filtro_tipo(client, admin_token):
+    """Movimientos paginate (limit/offset) and filter by tipo; total counts
+    the filtered set (API-1/API-3)."""
+    for tipo in ("Gasto", "Gasto", "Inversion"):
+        resp = client.post(
+            "/api/v1/finanzas/movimientos",
+            json=_movimiento_payload(tipo=tipo),
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 201
+
+    resp = client.get(
+        "/api/v1/finanzas/movimientos",
+        params={"tipo": "Gasto", "limit": 1, "offset": 0},
+        headers=_auth(admin_token),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["items"]) == 1
+    assert body["items"][0]["tipo"] == "Gasto"
+    assert body["total"] == 2
+
+    resp = client.get(
+        "/api/v1/finanzas/movimientos",
+        params={"tipo": "Retiro"},
+        headers=_auth(admin_token),
+    )
+    assert resp.json() == {"items": [], "total": 0}
+
+    resp = client.get(
+        "/api/v1/finanzas/movimientos",
+        params={"tipo": "Prestamo"},
+        headers=_auth(admin_token),
+    )
+    assert resp.status_code == 422
+    _cleanup_all()
 
 
 def test_delete_movimiento_soft_delete(client, admin_token):
@@ -171,7 +210,7 @@ def test_delete_movimiento_soft_delete(client, admin_token):
             "/api/v1/finanzas/movimientos", headers=_auth(admin_token)
         )
         assert lista.status_code == 200
-        assert mov_id not in [m["id"] for m in lista.json()]
+        assert mov_id not in [m["id"] for m in lista.json()["items"]]
     finally:
         _cleanup_all()
 
@@ -239,7 +278,9 @@ def test_socio_crear_suma_exacta_100_201(client, admin_token):
         s_id = _crear_socio(client, admin_token, "100")
         resp = client.get("/api/v1/finanzas/socios", headers=_auth(admin_token))
         assert resp.status_code == 200
-        assert s_id in [s["id"] for s in resp.json()]
+        body = resp.json()
+        assert set(body.keys()) == {"items", "total"}
+        assert s_id in [s["id"] for s in body["items"]]
     finally:
         _cleanup_all()
 
@@ -312,5 +353,37 @@ def test_socio_eliminar_bloqueado_con_pagos_409(client, admin_token):
             f"/api/v1/finanzas/socios/{a_id}", headers=_auth(admin_token)
         )
         assert resp.status_code == 409
+    finally:
+        _cleanup_all()
+
+
+def test_get_socios_paginado_y_q(client, admin_token):
+    """Socios paginate (limit/offset) and search by q; total counts filtered."""
+    try:
+        nombre = f"Socio Pag {_unique()}"
+        resp = client.post(
+            "/api/v1/finanzas/socios",
+            json={"nombre": nombre, "porcentaje_participacion": "100"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 201
+
+        resp = client.get(
+            "/api/v1/finanzas/socios",
+            params={"q": nombre, "limit": 10, "offset": 0},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert set(body.keys()) == {"items", "total"}
+        assert body["total"] == 1
+        assert body["items"][0]["nombre"] == nombre
+
+        resp = client.get(
+            "/api/v1/finanzas/socios",
+            params={"q": "zzz_no_existe_999"},
+            headers=_auth(admin_token),
+        )
+        assert resp.json() == {"items": [], "total": 0}
     finally:
         _cleanup_all()
