@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Movimientos create form (PR8, spec MOD-3).
+ * Movimientos form (PR8, spec MOD-3; T9 edit mode).
  *
  * Element Plus form that maps to POST /finanzas/movimientos
  * (MovimientoCreate): required tipo (Gasto|Inversion|Retiro), descripcion
@@ -9,35 +9,77 @@
  * service only 400s on a nonexistent id), so there is no per-tipo required
  * rule to enforce client-side.
  *
- * The view owns the POST, the success message and the list refresh.
+ * Edit mode (T9): same pattern as SociosForm — `mode: 'edit'` + `initial`
+ * prefill via watch, submit emits the MovimientoUpdate PATCH body through
+ * `buildMovimientoUpdatePayload`. The Fecha field appears in edit mode only
+ * (create rows get the server's now()). For liquidacion-born rows (initial.
+ * liquidacion_id != null) monto and socio are DISABLED and never sent — the
+ * real protection is the server-side guard (FIN-2 -> 422); the UI is
+ * reinforcement only.
+ *
+ * The view owns the POST/PATCH, the success message and the list refresh.
  */
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import {
   TIPO_MOVIMIENTO,
   buildMovimientoPayload,
+  buildMovimientoUpdatePayload,
   tipoMovimientoLabel,
   type MovimientoCreate,
   type MovimientoTipo,
+  type MovimientoUpdate,
 } from '@/utils/finanzas'
-import type { SocioConfiguracionRead } from '@/types/api.d'
+import type { MovimientoRead, SocioConfiguracionRead } from '@/types/api.d'
 
-defineProps<{
-  /** Partner rows for the optional socio select (view loads /finanzas/socios). */
-  socios: SocioConfiguracionRead[]
-  /** True while the parent is POSTing — disables the submit button. */
-  saving?: boolean
+const props = withDefaults(
+  defineProps<{
+    /** Partner rows for the optional socio select (view loads /finanzas/socios). */
+    socios: SocioConfiguracionRead[]
+    /** 'create' POSTs; 'edit' PATCHes with `initial` as the prefill. */
+    mode?: 'create' | 'edit'
+    /** The row being edited (prefills every editable field in edit mode). */
+    initial?: MovimientoRead | null
+    /** True while the parent is POST/PATCHing — disables the submit button. */
+    saving?: boolean
+  }>(),
+  { mode: 'create', initial: null, saving: false },
+)
+
+const emit = defineEmits<{
+  submit: [payload: MovimientoCreate | MovimientoUpdate]
 }>()
 
-const emit = defineEmits<{ submit: [payload: MovimientoCreate] }>()
-
+const fecha = ref<string | null>(null)
 const tipo = ref<MovimientoTipo | null>(null)
 const descripcion = ref('')
 const monto = ref<number | null>(null)
 const socioId = ref<number | null>(null)
 
-/** MOD-3: client-side gates — tipo, descripcion and monto are required. */
+/** T9/FIN-2: liquidacion-born rows freeze monto+socio (UI reinforcement only —
+ *  the server 422s any attempt to change them). */
+const frozenMontoSocio = computed(
+  () => props.mode === 'edit' && props.initial?.liquidacion_id != null,
+)
+
+watch(
+  () => props.initial,
+  (mov) => {
+    if (mov) {
+      // The date picker works on "YYYY-MM-DDTHH:mm:ss" (no timezone suffix).
+      fecha.value = mov.fecha ? mov.fecha.replace('Z', '') : null
+      tipo.value = mov.tipo as MovimientoTipo
+      descripcion.value = mov.descripcion
+      monto.value = Number.parseFloat(mov.monto)
+      socioId.value = mov.socio_id
+    }
+  },
+  { immediate: true },
+)
+
+/** MOD-3/T9: client gates — tipo and descripcion required; monto required
+ *  whenever it is part of the payload (create + edit of non-liquidacion rows). */
 function submit(): void {
   if (tipo.value === null) {
     ElMessage.warning('Selecciona el tipo de movimiento.')
@@ -47,8 +89,22 @@ function submit(): void {
     ElMessage.warning('Escribe una descripción del movimiento.')
     return
   }
-  if (monto.value === null || monto.value <= 0) {
+  if (!frozenMontoSocio.value && (monto.value === null || monto.value <= 0)) {
     ElMessage.warning('El monto debe ser mayor a cero.')
+    return
+  }
+  if (props.mode === 'edit') {
+    emit(
+      'submit',
+      buildMovimientoUpdatePayload({
+        fecha: fecha.value,
+        tipo: tipo.value,
+        descripcion: descripcion.value,
+        monto: monto.value,
+        socio_id: socioId.value,
+        frozenMontoSocio: frozenMontoSocio.value,
+      }),
+    )
     return
   }
   emit(
@@ -66,6 +122,18 @@ function submit(): void {
 <template>
   <el-form label-position="top" class="movimiento-form" @submit.prevent="submit">
     <el-row :gutter="16">
+      <el-col v-if="mode === 'edit'" :xs="24" :md="6">
+        <el-form-item label="Fecha">
+          <el-date-picker
+            v-model="fecha"
+            type="datetime"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            placeholder="Selecciona la fecha"
+            class="movimiento-field"
+            data-test="fecha-picker"
+          />
+        </el-form-item>
+      </el-col>
       <el-col :xs="24" :md="6">
         <el-form-item label="Tipo de movimiento">
           <el-select v-model="tipo" class="movimiento-field" data-test="tipo-movimiento-select">
@@ -91,6 +159,7 @@ function submit(): void {
             :precision="2"
             :step="1000"
             :controls="false"
+            :disabled="frozenMontoSocio"
             class="movimiento-field"
             data-test="monto-input"
           />
@@ -103,6 +172,7 @@ function submit(): void {
             clearable
             filterable
             placeholder="Sin socio"
+            :disabled="frozenMontoSocio"
             class="movimiento-field"
             data-test="socio-select"
           >
@@ -113,9 +183,17 @@ function submit(): void {
     </el-row>
 
     <div class="form-footer">
-      <span class="form-hint">El socio se asocia a un retiro o gasto puntual; es opcional.</span>
+      <span class="form-hint">
+        {{
+          mode === 'edit'
+            ? frozenMontoSocio
+              ? 'Los movimientos de una liquidación no permiten cambiar monto ni socio.'
+              : 'Edita los campos que necesites; la fecha, el tipo y la descripción también son editables.'
+            : 'El socio se asocia a un retiro o gasto puntual; es opcional.'
+        }}
+      </span>
       <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-movimiento">
-        Registrar movimiento
+        {{ mode === 'edit' ? 'Guardar cambios' : 'Registrar movimiento' }}
       </el-button>
     </div>
   </el-form>

@@ -135,3 +135,83 @@ describe('MovimientosForm (MOD-3 create)', () => {
     })
   })
 })
+
+describe('MovimientosForm (T9 edit mode)', () => {
+  const INITIAL: components['schemas']['MovimientoRead'] = {
+    id: 7,
+    fecha: '2026-08-01T10:00:00Z',
+    tipo: 'Gasto',
+    descripcion: 'Compra de arepas',
+    monto: '50000.00',
+    socio_id: 1,
+    estado: 'activo',
+    liquidacion_id: null,
+  }
+
+  const LIQUIDACION: components['schemas']['MovimientoRead'] = {
+    id: 8,
+    fecha: '2026-08-03T15:00:00Z',
+    tipo: 'Retiro',
+    descripcion: 'Liquidación abc',
+    monto: '30000.00',
+    socio_id: 1,
+    estado: 'activo',
+    liquidacion_id: 'abc00',
+  }
+
+  async function mountEdit(initial: components['schemas']['MovimientoRead']): Promise<VueWrapper> {
+    const wrapper = mount(MovimientosForm, {
+      props: { mode: 'edit', initial, socios: SOCIOS, saving: false },
+      global: { plugins: [ElementPlus] },
+    })
+    await nextTick()
+    return wrapper
+  }
+
+  it('prefills every editable field from `initial` (watch prefill, same pattern as SociosForm)', async () => {
+    const wrapper = await mountEdit(INITIAL)
+
+    expect((wrapper.find('[data-test="descripcion-input"]').element as HTMLInputElement).value).toBe('Compra de arepas')
+    // el-input-number renders the prefilled amount with the configured precision (2).
+    expect((wrapper.find('[data-test="monto-input"] input').element as HTMLInputElement).value).toBe('50000.00')
+    expect(wrapper.find('[data-test="socio-select"]').text()).toContain('Ana María')
+    expect(wrapper.find('[data-test="tipo-movimiento-select"]').text()).toContain('Gasto')
+    // The Fecha field is prefilled with the row's date (normalized, no 'Z').
+    expect(wrapper.findComponent({ name: 'ElDatePicker' }).props('modelValue')).toBe('2026-08-01T10:00:00')
+  })
+
+  it('emits the MovimientoUpdate payload on submit in edit mode', async () => {
+    const wrapper = await mountEdit(INITIAL)
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.emitted('submit')![0][0]).toEqual({
+      fecha: '2026-08-01T10:00:00',
+      tipo: 'Gasto',
+      descripcion: 'Compra de arepas',
+      monto: 50000,
+      socio_id: 1,
+    })
+  })
+
+  it('disables monto and socio for liquidacion rows (UI reinforcement; server is backstop)', async () => {
+    const wrapper = await mountEdit(LIQUIDACION)
+
+    expect(wrapper.find('[data-test="monto-input"] input').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-test="socio-select"] input').attributes('disabled')).toBeDefined()
+  })
+
+  it('omits monto/socio_id from the edit payload for liquidacion rows (FIN-2)', async () => {
+    const wrapper = await mountEdit(LIQUIDACION)
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.emitted('submit')![0][0]).toEqual({
+      fecha: '2026-08-03T15:00:00',
+      tipo: 'Retiro',
+      descripcion: 'Liquidación abc',
+    })
+  })
+})

@@ -19,6 +19,7 @@ import {
   buildLiquidacionRows,
   buildMovimientoPayload,
   buildMovimientoRows,
+  buildMovimientoUpdatePayload,
   buildSocioPayload,
   buildSocioUpdatePayload,
   sumaParticipacion,
@@ -119,6 +120,49 @@ describe('finanzas mappers (MOD-3)', () => {
     expect(
       buildMovimientoPayload({ tipo: 'Retiro', descripcion: 'Retiro a socio', monto: 150000, socio_id: 1 }),
     ).toEqual({ tipo: 'Retiro', descripcion: 'Retiro a socio', monto: 150000, socio_id: 1 })
+  })
+
+  it('maps the edit form to the MovimientoUpdate payload (fecha/tipo/descripcion/monto/socio)', () => {
+    expect(
+      buildMovimientoUpdatePayload({
+        fecha: '2026-08-01T10:00:00',
+        tipo: 'Gasto',
+        descripcion: '  Arriendo corregido  ',
+        monto: 800000,
+        socio_id: 2,
+      }),
+    ).toEqual({
+      fecha: '2026-08-01T10:00:00',
+      tipo: 'Gasto',
+      descripcion: 'Arriendo corregido',
+      monto: 800000,
+      socio_id: 2,
+    })
+  })
+
+  it('omits a null socio_id and an empty fecha from the update payload', () => {
+    expect(
+      buildMovimientoUpdatePayload({
+        fecha: '',
+        tipo: 'Inversion',
+        descripcion: 'Horno nuevo',
+        monto: 1000000,
+        socio_id: null,
+      }),
+    ).toEqual({ tipo: 'Inversion', descripcion: 'Horno nuevo', monto: 1000000 })
+  })
+
+  it('freezes monto/socio_id for liquidacion rows (FIN-2) — omitted from the payload', () => {
+    expect(
+      buildMovimientoUpdatePayload({
+        fecha: '2026-08-03T15:00:00',
+        tipo: 'Retiro',
+        descripcion: 'Nota corregida',
+        monto: 30000,
+        socio_id: 1,
+        frozenMontoSocio: true,
+      }),
+    ).toEqual({ fecha: '2026-08-03T15:00:00', tipo: 'Retiro', descripcion: 'Nota corregida' })
   })
 
   it('maps the liquidacion form to the LiquidacionCreate payload, omitting empty notas', () => {

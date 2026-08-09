@@ -104,6 +104,14 @@ export const finanzasApi = {
   ): Promise<Res<'/api/v1/finanzas/movimientos/{movimiento_id}', 'delete'>> {
     return client.delete(`/finanzas/movimientos/${params.movimiento_id}`).then((r) => r.data)
   },
+  /** PATCH — partial update (fecha/tipo/descripcion/monto/socio_id); the
+   *  backend 422s monto/socio on liquidacion-born rows (FIN-2). */
+  updateMovimiento(
+    params: PathParams<'/api/v1/finanzas/movimientos/{movimiento_id}', 'patch'>,
+    body: ReqBody<'/api/v1/finanzas/movimientos/{movimiento_id}', 'patch'>,
+  ): Promise<Res<'/api/v1/finanzas/movimientos/{movimiento_id}', 'patch'>> {
+    return client.patch(`/finanzas/movimientos/${params.movimiento_id}`, body).then((r) => r.data)
+  },
   listSocios(): Promise<Res<'/api/v1/finanzas/socios', 'get'>> {
     return client.get('/finanzas/socios').then((r) => r.data)
   },

@@ -26,6 +26,7 @@ const { apiMocks } = vi.hoisted(() => ({
   apiMocks: {
     listMovimientos: vi.fn(),
     createMovimiento: vi.fn(),
+    updateMovimiento: vi.fn(),
     deleteMovimiento: vi.fn(),
     listSocios: vi.fn(),
     createSocio: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock('@/api/endpoints', () => ({
   finanzasApi: {
     listMovimientos: apiMocks.listMovimientos,
     createMovimiento: apiMocks.createMovimiento,
+    updateMovimiento: apiMocks.updateMovimiento,
     deleteMovimiento: apiMocks.deleteMovimiento,
     listSocios: apiMocks.listSocios,
     createSocio: apiMocks.createSocio,
@@ -112,6 +114,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     apiMocks.listMovimientos.mockResolvedValue({ items: MOVIMIENTOS, total: 2 })
     apiMocks.listSocios.mockResolvedValue({ items: SOCIOS, total: 2 })
     apiMocks.createMovimiento.mockResolvedValue(MOVIMIENTOS[0])
+    apiMocks.updateMovimiento.mockResolvedValue(MOVIMIENTOS[0])
     apiMocks.deleteMovimiento.mockResolvedValue(MOVIMIENTOS[0])
     apiMocks.createSocio.mockResolvedValue({ id: 3, nombre: 'Luis Vega', porcentaje_participacion: '25.00' })
     apiMocks.updateSocio.mockResolvedValue({ id: 1, nombre: 'Ana María', porcentaje_participacion: '20.00' })
@@ -353,6 +356,74 @@ describe('FinanzasView (MOD-3 + T7)', () => {
 
     expect(document.body.textContent).toContain('tiene movimientos asociados')
     expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // no refresh after failure
+  })
+
+  it('opens the movimiento edit form with prefill, PATCHes on submit, closes and refreshes (T9)', async () => {
+    const wrapper = await mountView('operador')
+    expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(1)
+
+    await wrapper.findAll('[data-test="edit-movimiento"]')[0].trigger('click')
+    await nextTick()
+
+    // The create form is replaced by the prefilled edit form.
+    expect(wrapper.text()).toContain('Editar movimiento')
+
+    wrapper.findComponent({ name: 'MovimientosForm' }).vm.$emit('submit', {
+      fecha: '2026-08-02T12:00:00',
+      tipo: 'Retiro',
+      descripcion: 'Retiro a socio',
+      monto: 150000,
+      socio_id: 1,
+    })
+    await flushPromises()
+
+    expect(apiMocks.updateMovimiento).toHaveBeenCalledTimes(1)
+    expect(apiMocks.updateMovimiento).toHaveBeenCalledWith(
+      { movimiento_id: 2 },
+      {
+        fecha: '2026-08-02T12:00:00',
+        tipo: 'Retiro',
+        descripcion: 'Retiro a socio',
+        monto: 150000,
+        socio_id: 1,
+      },
+    )
+    expect(document.body.textContent).toContain('Movimiento actualizado correctamente')
+    // Success closes the edit form (back to create) and refreshes the list.
+    expect(wrapper.text()).toContain('Registrar movimiento')
+    expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the edit form open and shows the server detail when the PATCH fails (T9)', async () => {
+    apiMocks.updateMovimiento.mockRejectedValue({
+      response: {
+        data: { detail: 'Los movimientos de una liquidación no permiten cambiar monto ni socio' },
+      },
+    })
+    const wrapper = await mountView('operador')
+    expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(1)
+
+    await wrapper.findAll('[data-test="edit-movimiento"]')[0].trigger('click')
+    await nextTick()
+    expect(wrapper.text()).toContain('Editar movimiento')
+
+    wrapper.findComponent({ name: 'MovimientosForm' }).vm.$emit('submit', {
+      tipo: 'Retiro',
+      descripcion: 'Retiro a socio',
+      monto: 150000,
+    })
+    await flushPromises()
+
+    // Error surfaces the 422 detail and does NOT close the edit form.
+    expect(document.body.textContent).toContain('no permiten cambiar monto ni socio')
+    expect(wrapper.text()).toContain('Editar movimiento')
+    expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(1) // no refresh on failure
+  })
+
+  it('consulta sees no edit action on the movimientos table (T9)', async () => {
+    const wrapper = await mountView('consulta')
+
+    expect(wrapper.findAll('[data-test="edit-movimiento"]')).toHaveLength(0)
   })
 })
 

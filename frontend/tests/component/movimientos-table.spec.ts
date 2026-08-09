@@ -44,9 +44,9 @@ const ROWS: MovimientoRow[] = [
   },
 ]
 
-async function mountTable(rows: MovimientoRow[], canDelete = true): Promise<VueWrapper> {
+async function mountTable(rows: MovimientoRow[], canDelete = true, canEdit = false): Promise<VueWrapper> {
   const wrapper = mount(MovimientosTable, {
-    props: { rows, canDelete },
+    props: { rows, canDelete, canEdit },
     global: { plugins: [ElementPlus] },
   })
   await nextTick()
@@ -82,6 +82,23 @@ describe('MovimientosTable (MOD-3)', () => {
 
     expect(wrapper.emitted('delete')).toBeDefined()
     expect(wrapper.emitted('delete')![0][0]).toEqual(ROWS[0])
+  })
+
+  it('emits `edit` with the row when the edit action is clicked (T9)', async () => {
+    const wrapper = await mountTable(ROWS, true, true)
+
+    const buttons = wrapper.findAll('[data-test="edit-movimiento"]')
+    expect(buttons).toHaveLength(3)
+    await buttons[0].trigger('click')
+
+    expect(wrapper.emitted('edit')).toBeDefined()
+    expect(wrapper.emitted('edit')![0][0]).toEqual(ROWS[0])
+  })
+
+  it('hides the edit action when can-edit is false (read-only roles)', async () => {
+    const wrapper = await mountTable(ROWS, true, false)
+
+    expect(wrapper.findAll('[data-test="edit-movimiento"]')).toHaveLength(0)
   })
 
   it('hides the delete action for read-only roles', async () => {

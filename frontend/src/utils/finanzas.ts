@@ -27,6 +27,7 @@ import { parseDecimal } from './format'
 type MovimientoRead = components['schemas']['MovimientoRead']
 type SocioConfiguracionRead = components['schemas']['SocioConfiguracionRead']
 export type MovimientoCreate = components['schemas']['MovimientoCreate']
+export type MovimientoUpdate = components['schemas']['MovimientoUpdate']
 export type LiquidacionCreate = components['schemas']['LiquidacionCreate']
 export type SocioConfiguracionCreate = components['schemas']['SocioConfiguracionCreate']
 export type SocioConfiguracionUpdate = components['schemas']['SocioConfiguracionUpdate']
@@ -131,6 +132,47 @@ export function buildMovimientoPayload(form: MovimientoPayloadInput): Movimiento
     monto: form.monto,
     ...(form.socio_id !== null ? { socio_id: form.socio_id } : {}),
   }
+}
+
+/** The edit form model (maps to MovimientoUpdate via buildMovimientoUpdatePayload). */
+export interface MovimientoUpdatePayloadInput {
+  /** ISO datetime as picked; omitted from the payload when empty. */
+  fecha: string | null
+  tipo: MovimientoTipo
+  descripcion: string
+  /** Money amount; omitted when null (should only happen for frozen rows). */
+  monto: number | null
+  /** Optional partner; omitted from the payload when null. */
+  socio_id: number | null
+  /** True for liquidacion-born rows: monto/socio are frozen server-side
+   *  (FIN-2 -> 422), so they are NEVER sent in the PATCH body. */
+  frozenMontoSocio?: boolean
+}
+
+/**
+ * T9: map the edit form to the MovimientoUpdate PATCH body. Only the fields
+ * the backend accepts for a movement are included: fecha/tipo/descripcion
+ * always (when present), monto/socio_id ONLY when the row is not a
+ * liquidacion-born one (FIN-2 — sending them would 422 server-side).
+ */
+export function buildMovimientoUpdatePayload(
+  form: MovimientoUpdatePayloadInput,
+): MovimientoUpdate {
+  const payload: MovimientoUpdate = {}
+  if (form.fecha !== null && form.fecha !== '') {
+    payload.fecha = form.fecha
+  }
+  payload.tipo = form.tipo
+  payload.descripcion = form.descripcion.trim()
+  if (form.frozenMontoSocio !== true) {
+    if (form.monto !== null) {
+      payload.monto = form.monto
+    }
+    if (form.socio_id !== null) {
+      payload.socio_id = form.socio_id
+    }
+  }
+  return payload
 }
 
 /** The settlement form model (maps to LiquidacionCreate). */

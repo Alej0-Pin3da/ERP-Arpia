@@ -37,6 +37,7 @@ import {
   type LiquidacionRow,
   type MovimientoCreate,
   type MovimientoRow,
+  type MovimientoUpdate,
 } from '@/utils/finanzas'
 import type {
   MovimientoRead,
@@ -78,6 +79,9 @@ const savingSocio = ref(false)
 
 const liquidacionRows = ref<LiquidacionRow[]>([])
 const editingSocio = ref<SocioConfiguracionRead | null>(null)
+/** T9: the movimiento being edited (create form swaps to the prefilled edit
+ *  form while set; success clears it, an error keeps it open). */
+const editingMovimiento = ref<MovimientoRead | null>(null)
 
 async function load(): Promise<void> {
   loading.value = true
@@ -181,6 +185,33 @@ async function onCreateLiquidacion(payload: LiquidacionCreate): Promise<void> {
   }
 }
 
+/** T9: the table emits the joined row; resolve the full MovimientoRead from
+ *  the current page state to prefill the edit form. */
+function onEditMovimiento(row: MovimientoRow): void {
+  editingMovimiento.value = movimientos.value.find((m) => m.id === row.id) ?? null
+}
+
+function cancelEditMovimiento(): void {
+  editingMovimiento.value = null
+}
+
+/** T9: PATCH the movement. Success closes the edit form and refreshes; an
+ *  error (e.g. the FIN-2 422 on liquidacion rows) shows the message and keeps
+ *  the edit form open. */
+async function onUpdateMovimiento(payload: MovimientoUpdate): Promise<void> {
+  if (editingMovimiento.value === null) return
+  savingMovimiento.value = true
+  try {
+    await finanzasApi.updateMovimiento({ movimiento_id: editingMovimiento.value.id }, payload)
+    ElMessage.success('Movimiento actualizado correctamente')
+    editingMovimiento.value = null
+    await load()
+  } catch (err) {
+    ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el movimiento. Verifica los datos e inténtalo de nuevo.')
+  } finally {
+    savingMovimiento.value = false
+  }
+}
 /** MOD-3: POST a socio; the exact-100 sum rule is enforced server-side (422). */
 async function onCreateSocio(payload: SocioConfiguracionCreate): Promise<void> {
   savingSocio.value = true
@@ -273,18 +304,37 @@ onMounted(load)
             <el-option label="Retiro" value="Retiro" />
           </el-select>
         </div>
-        <MovimientosForm
-          v-if="canRegister"
-          :socios="sociosLookup"
-          :saving="savingMovimiento"
-          class="finanzas-form-section"
-          @submit="onCreateMovimiento"
-        />
+        <template v-if="canRegister">
+          <MovimientosForm
+            v-if="editingMovimiento === null"
+            mode="create"
+            :socios="sociosLookup"
+            :saving="savingMovimiento"
+            class="finanzas-form-section"
+            @submit="onCreateMovimiento"
+          />
+          <div v-else class="movimiento-edit-section">
+            <h3>Editar movimiento</h3>
+            <MovimientosForm
+              mode="edit"
+              :initial="editingMovimiento"
+              :socios="sociosLookup"
+              :saving="savingMovimiento"
+              class="finanzas-form-section"
+              @submit="onUpdateMovimiento"
+            />
+            <el-button size="small" data-test="cancel-edit-movimiento" @click="cancelEditMovimiento">
+              Cancelar edición
+            </el-button>
+          </div>
+        </template>
         <MovimientosTable
           :rows="movimientoRows"
           :loading="loading"
           :can-delete="canRegister"
+          :can-edit="canRegister"
           @delete="onDeleteMovimiento"
+          @edit="onEditMovimiento"
         />
         <el-pagination
           class="tabla-paginacion"
@@ -370,6 +420,15 @@ onMounted(load)
 
 .finanzas-form-section {
   margin-bottom: 1rem;
+}
+
+.movimiento-edit-section {
+  max-width: 56rem;
+  margin-bottom: 1rem;
+}
+
+.movimiento-edit-section h3 {
+  margin: 0 0 0.5rem;
 }
 
 .finanzas-toolbar {

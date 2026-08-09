@@ -562,7 +562,13 @@ export interface paths {
         delete: operations["delete_movimiento_api_v1_finanzas_movimientos__movimiento_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Movimiento Route
+         * @description Partial update of a movement (FIN-1): fecha/tipo/descripcion/monto/
+         *     socio_id, only the sent fields applied. Liquidacion-born rows freeze
+         *     monto/socio_id server-side (FIN-2 -> 422).
+         */
+        patch: operations["update_movimiento_route_api_v1_finanzas_movimientos__movimiento_id__patch"];
         trace?: never;
     };
     "/api/v1/finanzas/liquidaciones": {
@@ -1127,6 +1133,26 @@ export interface components {
             estado: string;
             /** Liquidacion Id */
             liquidacion_id: string | null;
+        };
+        /**
+         * MovimientoUpdate
+         * @description PATCH body for /finanzas/movimientos/{id} (FIN-1).
+         *
+         *     Every field is optional; only the fields actually sent are applied
+         *     (the route passes ``model_dump(exclude_unset=True)``). The liquidation
+         *     guard for monto/socio_id lives in the service (FIN-2).
+         */
+        MovimientoUpdate: {
+            /** Fecha */
+            fecha?: string | null;
+            /** Tipo */
+            tipo?: ("Gasto" | "Inversion" | "Retiro") | null;
+            /** Descripcion */
+            descripcion?: string | null;
+            /** Monto */
+            monto?: number | string | null;
+            /** Socio Id */
+            socio_id?: number | null;
         };
         /** Paginated[CategoriaInsumoRead] */
         Paginated_CategoriaInsumoRead_: {
@@ -3458,6 +3484,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovimientoRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_movimiento_route_api_v1_finanzas_movimientos__movimiento_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movimiento_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MovimientoUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
