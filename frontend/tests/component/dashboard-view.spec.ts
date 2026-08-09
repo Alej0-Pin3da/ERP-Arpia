@@ -79,7 +79,8 @@ describe('DashboardView (DASH-1..3)', () => {
     apiMocks.ventasMensuales.mockResolvedValue(VENTAS)
     apiMocks.insumosBajoStock.mockResolvedValue(BAJO_STOCK)
     apiMocks.margenPorProducto.mockResolvedValue(MARGENES)
-    apiMocks.listProductos.mockResolvedValue(PRODUCTOS)
+    // The list contract is now {items, total} — the view joins on `.items`.
+    apiMocks.listProductos.mockResolvedValue({ items: PRODUCTOS, total: PRODUCTOS.length })
     apiMocks.listVariantes.mockResolvedValue([])
   })
 

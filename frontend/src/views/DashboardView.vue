@@ -62,7 +62,8 @@ async function load(): Promise<void> {
     ventasMensuales.value = ventas
     bajoStock.value = stock
     const variantes = await fetchVariantesForMargenes(margenes)
-    margenRows.value = buildMargenRows(margenes, productos, variantes)
+    // productos is now Paginated<...> — the lookup join uses `.items` (D10).
+    margenRows.value = buildMargenRows(margenes, productos.items, variantes)
   } catch {
     error.value = 'No se pudo cargar el tablero. Verifica la conexión con el servidor.'
   } finally {

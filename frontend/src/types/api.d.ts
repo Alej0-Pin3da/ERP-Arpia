@@ -502,7 +502,8 @@ export interface paths {
         /**
          * List Devoluciones
          * @description List returns ordered by id with items + Venta reference, optionally
-         *     filtered by venta_id and a fecha range, paginated.
+         *     filtered by venta_id, a fecha range and a global q on motivo, paginated
+         *     into ``{items, total}`` (total counts the filtered set).
          */
         get: operations["list_devoluciones_api_v1_devoluciones_get"];
         put?: never;
@@ -527,10 +528,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Movimientos
-         * @description List active movements (soft-deleted rows are excluded).
+         * List Movimientos Route
+         * @description List active movements (soft-deleted rows are excluded), paginated with
+         *     {items, total} and an optional tipo filter (API-1/API-3).
          */
-        get: operations["list_movimientos_api_v1_finanzas_movimientos_get"];
+        get: operations["list_movimientos_route_api_v1_finanzas_movimientos_get"];
         put?: never;
         /**
          * Create Movimiento
@@ -593,7 +595,8 @@ export interface paths {
         };
         /**
          * List Socios
-         * @description List partner participation rows ordered by id.
+         * @description List partner participation rows ordered by id, paginated {items, total}
+         *     with an optional q search on nombre (API-1/API-3).
          */
         get: operations["list_socios_api_v1_finanzas_socios_get"];
         put?: never;
@@ -1125,6 +1128,90 @@ export interface components {
             /** Liquidacion Id */
             liquidacion_id: string | null;
         };
+        /** Paginated[CategoriaInsumoRead] */
+        Paginated_CategoriaInsumoRead_: {
+            /** Items */
+            items: components["schemas"]["CategoriaInsumoRead"][];
+            /** Total */
+            total: number;
+        };
+        /** Paginated[ClienteRead] */
+        Paginated_ClienteRead_: {
+            /** Items */
+            items: components["schemas"]["ClienteRead"][];
+            /** Total */
+            total: number;
+        };
+        /** Paginated[CompraInsumoRead] */
+        Paginated_CompraInsumoRead_: {
+            /** Items */
+            items: components["schemas"]["CompraInsumoRead"][];
+            /** Total */
+            total: number;
+        };
+        /** Paginated[DevolucionRead] */
+        Paginated_DevolucionRead_: {
+            /** Items */
+            items: components["schemas"]["DevolucionRead"][];
+            /** Total */
+            total: number;
+        };
+        /** Paginated[InsumoRead] */
+        Paginated_InsumoRead_: {
+            /** Items */
+            items: components["schemas"]["InsumoRead"][];
+            /** Total */
+            total: number;
+        };
+        /** Paginated[MovimientoRead] */
+        Paginated_MovimientoRead_: {
+            /** Items */
+            items: components["schemas"]["MovimientoRead"][];
+            /** Total */
+            total: number;
+        };
+        /** Paginated[ProductoRead] */
+        Paginated_ProductoRead_: {
+            /** Items */
+            items: components["schemas"]["ProductoRead"][];
+            /** Total */
+            total: number;
+        };
+        /** Paginated[ProveedorRead] */
+        Paginated_ProveedorRead_: {
+            /** Items */
+            items: components["schemas"]["ProveedorRead"][];
+            /** Total */
+            total: number;
+        };
+        /** Paginated[SocioConfiguracionRead] */
+        Paginated_SocioConfiguracionRead_: {
+            /** Items */
+            items: components["schemas"]["SocioConfiguracionRead"][];
+            /** Total */
+            total: number;
+        };
+        /** Paginated[TipoProductoRead] */
+        Paginated_TipoProductoRead_: {
+            /** Items */
+            items: components["schemas"]["TipoProductoRead"][];
+            /** Total */
+            total: number;
+        };
+        /** Paginated[UsuarioRead] */
+        Paginated_UsuarioRead_: {
+            /** Items */
+            items: components["schemas"]["UsuarioRead"][];
+            /** Total */
+            total: number;
+        };
+        /** Paginated[VentaRead] */
+        Paginated_VentaRead_: {
+            /** Items */
+            items: components["schemas"]["VentaRead"][];
+            /** Total */
+            total: number;
+        };
         /** ProductoCreate */
         ProductoCreate: {
             /** Tipo Producto Id */
@@ -1537,6 +1624,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -1550,7 +1638,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProveedorRead"][];
+                    "application/json": components["schemas"]["Paginated_ProveedorRead_"];
                 };
             };
             /** @description Validation Error */
@@ -1697,6 +1785,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -1710,7 +1799,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CategoriaInsumoRead"][];
+                    "application/json": components["schemas"]["Paginated_CategoriaInsumoRead_"];
                 };
             };
             /** @description Validation Error */
@@ -1857,6 +1946,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                q?: string | null;
+                categoria_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -1870,7 +1961,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InsumoRead"][];
+                    "application/json": components["schemas"]["Paginated_InsumoRead_"];
                 };
             };
             /** @description Validation Error */
@@ -2018,6 +2109,8 @@ export interface operations {
                 limit?: number;
                 offset?: number;
                 insumo_id?: number | null;
+                proveedor_id?: number | null;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -2031,7 +2124,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CompraInsumoRead"][];
+                    "application/json": components["schemas"]["Paginated_CompraInsumoRead_"];
                 };
             };
             /** @description Validation Error */
@@ -2083,6 +2176,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -2096,7 +2190,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ClienteRead"][];
+                    "application/json": components["schemas"]["Paginated_ClienteRead_"];
                 };
             };
             /** @description Validation Error */
@@ -2242,6 +2336,7 @@ export interface operations {
         parameters: {
             query?: {
                 tipo_producto_id?: number | null;
+                q?: string | null;
                 limit?: number;
                 offset?: number;
             };
@@ -2257,7 +2352,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProductoRead"][];
+                    "application/json": components["schemas"]["Paginated_ProductoRead_"];
                 };
             };
             /** @description Validation Error */
@@ -2833,6 +2928,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -2846,7 +2942,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TipoProductoRead"][];
+                    "application/json": components["schemas"]["Paginated_TipoProductoRead_"];
                 };
             };
             /** @description Validation Error */
@@ -2993,6 +3089,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                q?: string | null;
+                rol?: ("admin" | "operador" | "consulta") | null;
             };
             header?: never;
             path?: never;
@@ -3006,7 +3104,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UsuarioRead"][];
+                    "application/json": components["schemas"]["Paginated_UsuarioRead_"];
                 };
             };
             /** @description Validation Error */
@@ -3150,7 +3248,12 @@ export interface operations {
     };
     list_ventas_api_v1_ventas_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+                canal_venta?: ("web" | "whatsapp" | "instagram" | "feria") | null;
+                estado?: ("completada" | "anulada") | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3163,7 +3266,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VentaRead"][];
+                    "application/json": components["schemas"]["Paginated_VentaRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -3207,6 +3319,7 @@ export interface operations {
                 venta_id?: number | null;
                 fecha_desde?: string | null;
                 fecha_hasta?: string | null;
+                q?: string | null;
                 limit?: number;
                 offset?: number;
             };
@@ -3222,7 +3335,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DevolucionRead"][];
+                    "application/json": components["schemas"]["Paginated_DevolucionRead_"];
                 };
             };
             /** @description Validation Error */
@@ -3269,9 +3382,13 @@ export interface operations {
             };
         };
     };
-    list_movimientos_api_v1_finanzas_movimientos_get: {
+    list_movimientos_route_api_v1_finanzas_movimientos_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+                tipo?: ("Gasto" | "Inversion" | "Retiro") | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3284,7 +3401,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MovimientoRead"][];
+                    "application/json": components["schemas"]["Paginated_MovimientoRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -3388,7 +3514,11 @@ export interface operations {
     };
     list_socios_api_v1_finanzas_socios_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+                q?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3401,7 +3531,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SocioConfiguracionRead"][];
+                    "application/json": components["schemas"]["Paginated_SocioConfiguracionRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
