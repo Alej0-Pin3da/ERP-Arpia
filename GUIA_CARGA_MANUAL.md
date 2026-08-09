@@ -4,6 +4,16 @@
 
 ---
 
+## RESUMEN EN 30 SEGUNDOS
+
+**Desde la app** (mantienen consistencia automática): Tipos de producto, Categorías de insumos, Proveedores, Clientes, Socios, Insumos (con stock y costo inicial), Productos, Variantes, BOM, Compras (fecha de hoy), Ventas (actuales), Movimientos de finanzas (y editar la fecha después), Devoluciones, Usuarios.
+
+**Solo desde DBeaver** (la app NO permite): compras con fecha histórica, ventas con fecha histórica, editar/eliminar compras, editar/eliminar ventas, editar/eliminar devoluciones. ⚠️ Al insertar compras/ventas directo en DBeaver hay que **ajustar el stock/costo del insumo a mano** (la app lo hace sola; DBeaver no).
+
+**Dato clave**: los movimientos de finanzas se crean desde la app y la fecha se **edita después con el botón Editar** — no hace falta DBeaver para el histórico de finanzas.
+
+---
+
 ## 0. CÓMO CONECTAR DESDE DBEAVER
 
 1. Abrir DBeaver → Nueva conexión → **PostgreSQL**.
