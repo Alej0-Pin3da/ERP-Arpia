@@ -12,10 +12,21 @@ and, in commit mode, registers the purchases through
 Filtering (design D4 / spec 'compras-insumos'): ONLY catalog (BOM) insumos
 enter WAC. A row whose name is not in the F1 catalog universe (equipment,
 cursos, hosting, prestamo, ...) is EXCLUDED here and goes to
-Movimientos_Financieros in a later phase (F6). The right-hand sub-tables
-(VALQUI J..N, MARGARA H..o) are price lists / summarized duplicates of the
-left block (same insumo, same total, expressed in cm or cm2); loading them
-would double-count WAC, so they are counted and never registered.
+Movimientos_Financieros in a later phase (F6).
+
+Sub-tablas derechas (P1 fix de remediacion): ya NO se descartan todas. La
+sub-tabla derecha de VALQUI (J..N: Producto/Largo CMS/Ancho CMS/Valor) y la de
+MARGARA (H..L: Cantidad/Producto/Costo/Fecha/Provedor) son fuentes de compra
+SOLO cuando el item de la derecha NO aparece en el bloque izquierdo de la
+MISMA hoja (es fuente unica, no duplicado). Cuando la derecha duplica algo ya
+comprado a la izquierda (mismo item en la misma hoja) se descarta como antes
+(duplicado). Cantidad derecha VALQUI: K es 'Largo CMS' -> en la unidad
+canonica del insumo (Herrajes 'un' -> K piezas; Telas 'm' -> K cm / 100;
+'cm2' -> K x L). Precio unitario = M / cantidad. Fecha/proveedor: los del
+bloque izquierdo de la misma fila (VALQUI) o propios K/L (MARGARA).
+Caso real: 'Argolla 10 mm' R18 (J18) es fuente unica -> compra 100 un @ 72;
+'Ref 100 24 cm tul bordado negro' R34 duplica la compra izquierda B80 -> se
+descarta.
 
 Quantity (EXM-2): the cell may be a bare number (12) -> taken as-is in the
 insumo's canonical unit; or a quantity+unit string ('4 mts', '50 cm',
@@ -51,7 +62,12 @@ from sqlalchemy import select
 
 from app.models import CompraInsumo, Insumo, Proveedor
 from app.services.wac import registrar_compra
-from migrate.catalog import _leer_materiales, clave_normalizada, normalizar_nombre
+from migrate.catalog import (
+    _es_material_valido,
+    _leer_materiales,
+    clave_normalizada,
+    normalizar_nombre,
+)
 from migrate.context import MigrationContext, savepoint, session_scope
 from migrate.loaders import HojaInexistenteError, LibroMigracion, SHEET_BOUNDS
 from migrate.normalize import (
@@ -70,9 +86,22 @@ HOJAS_COMPRAS: tuple[tuple[str, str, str, str, str, str], ...] = (
     ("INVERSION MARGARA", "A", "B", "C", "D", "E"),
 )
 
-# Right-hand sub-tables (J..N in VALQUI, H..o in MARGARA): price lists that
-# duplicate the left block; they never become purchases (see module docstring).
-_COLS_DERECHA = frozenset("JKLMN")
+# Right-hand sub-tables (P1 fix). Layout real verificado en ARPIA.xlsx:
+# - VALQUI J..N: J=Producto, K=Largo CMS, L=Ancho CMS, M=Valor (N=Unitario).
+#   La cantidad K es 'Largo CMS': conteo (Herrajes 'un'), cm -> m (Telas) o
+#   K x L cm2. Fecha/proveedor = los del bloque izquierdo de la misma fila.
+# - MARGARA H..L ('INVERSION MARZO/OCTUBRE MARGARA'): H=Cantidad (con o sin
+#   unidad), I=Producto, J=Costo, K=Fecha, L=Provedor (fechas propias).
+_COLS_DERECHA: dict[str, dict[str, str]] = {
+    "INVERSION VALQUI": {
+        "nombre": "J", "cantidad": "K", "ancho": "L", "costo": "M",
+        "fecha": "E", "proveedor": "F",
+    },
+    "INVERSION MARGARA": {
+        "nombre": "I", "cantidad": "H", "ancho": None, "costo": "J",
+        "fecha": "K", "proveedor": "L",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -94,7 +123,7 @@ class ConteosCompras:
     """Counters of the phase (reporte N7a / EXM-1)."""
 
     no_bom: int = 0         # no esta en el catalogo F1 -> finanzas (F6)
-    derecha: int = 0         # filas de la sub-tabla derecha ignoradas
+    derecha: int = 0         # sub-tabla derecha descartada (dup / no-BOM)
     sin_cantidad: int = 0    # cantidad/costo no interpretable (EXM-2)
     sin_fecha: int = 0       # fecha vacia sin contigua heredable (D5) -> omitida
     planificadas: int = 0    # filas que entran al plan (BOM ok)
@@ -169,12 +198,135 @@ def _unidad_de_insumo(nombre: str) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def _es_subtabla_derecha(fila: dict[str, object]) -> bool:
-    """True si la fila solo tiene celdas de la sub-tabla derecha (J..M) y no del
-    bloque izquierdo (A..F): es una fila de la lista de precios duplicada."""
-    izquierda = any(col in fila for col in ("A", "B", "C", "D", "E", "F"))
-    derecha = any(col in _COLS_DERECHA for col in fila)
-    return derecha and not izquierda
+def _cantidad_subtabla_derecha(
+    celda: object, ancho: object, unidad_objetivo: str
+) -> Decimal | None:
+    """Cantidad de la sub-tabla derecha en la unidad canonica del insumo.
+
+    VALQUI: K = 'Largo CMS'. Herrajes 'un' -> K es el conteo (100 un);
+    Telas 'm' -> K cm / 100 (1000 cm = 10 m); 'cm2' -> K x L (L default 1).
+    MARGARA: H ya trae cantidad+unidad ('10 mts' / 200) -> parser normal.
+    """
+    if celda is None:
+        return None
+    if isinstance(celda, str):
+        # MARGARA / VALQUI con cantidad textual: parser de cantidad+unidad.
+        return normalizar_cantidad_compra(celda, unidad_objetivo)
+    valor = normalizar_decimal(celda)
+    if valor is None or valor <= 0:
+        return None
+    u = unidad_canonica(unidad_objetivo)
+    if u == "m":
+        return valor * Decimal("0.01")  # K en cm -> metros
+    if u == "cm2":
+        ancho_dec = normalizar_decimal(ancho) if ancho is not None else None
+        return valor * (ancho_dec if ancho_dec and ancho_dec > 0 else Decimal("1"))
+    return valor  # 'un' (o kg/g): K es el conteo
+
+
+def _procesar_subtabla_derecha(
+    plan: ComprasPlan,
+    fila: dict[str, object],
+    indx: int,
+    hoja: str,
+    universo: dict[str, str],
+    nombres_izquierda: set[str],
+    ultima_fecha: dict[ClaveFecha, object],
+    report,
+) -> bool:
+    """Procesa la celda derecha de la fila (P1 fix).
+
+    Criterio documentado: la derecha genera compra SOLO cuando su item es un
+    insumo BOM y NO aparece en el bloque izquierdo de la MISMA hoja (fuente
+    unica). Si duplica un item de la izquierda -> se descarta (duplicado,
+    como antes) y cuenta en ``conteos.derecha``. Devuelve True si la fila
+    tenia contenido derecho (para el contador).
+    """
+    config = _COLS_DERECHA.get(hoja)
+    if config is None:
+        return False
+    nombre_raw = fila.get(config["nombre"])
+    if not isinstance(nombre_raw, str) or not nombre_raw.strip():
+        return False
+    nombre = normalizar_nombre(nombre_raw)
+    if not _es_material_valido(nombre):
+        return False  # headers 'Producto'/'Herrajes' o filas junk
+    conteos = plan.conteos
+    if nombre in nombres_izquierda:
+        conteos.derecha += 1  # duplica el bloque izquierdo de la misma hoja
+        return True
+    clave_ins = clave_normalizada(nombre)
+    if clave_ins not in universo:
+        conteos.derecha += 1  # lista de precios sin compra asociada (no-BOM)
+        return True
+    nombre_display = universo[clave_ins]
+    unidad_obj = _unidad_de_insumo(nombre_display)
+    cantidad = _cantidad_subtabla_derecha(
+        fila.get(config["cantidad"]), fila.get(config["ancho"]), unidad_obj
+    )
+    if cantidad is None:
+        conteos.sin_cantidad += 1
+        if report:
+            report.warn(
+                hoja, indx, config["cantidad"],
+                f"{nombre_display} (sub-tabla derecha): cantidad "
+                f"{fila.get(config['cantidad'])!r} no interpretable; "
+                f"fila excluida (EXM-2)",
+            )
+        return True
+    costo_total = normalizar_decimal(fila.get(config["costo"]))
+    if costo_total is None or costo_total <= 0:
+        conteos.sin_cantidad += 1
+        if report:
+            report.warn(
+                hoja, indx, config["costo"],
+                f"{nombre_display} (sub-tabla derecha): costo no interpretable; "
+                f"fila excluida",
+            )
+        return True
+    precio_unitario = costo_total / cantidad
+
+    proveedor_raw = fila.get(config["proveedor"])
+    proveedor_nombre = (
+        normalizar_nombre(proveedor_raw)
+        if proveedor_raw is not None
+        else None
+    )
+    fecha_raw = fila.get(config["fecha"])
+    clave_f = ClaveFecha(clave_ins, proveedor_nombre or "<sin-proveedor>")
+    fecha = fecha_para_fila(fecha_raw, clave_f, ultima_fecha)
+    if fecha is None:
+        conteos.sin_fecha += 1
+        if report:
+            report.warn(
+                hoja, indx, config["fecha"],
+                f"{nombre_display} (sub-tabla derecha): fecha vacia y sin fila "
+                f"contigua del mismo insumo+proveedor; omitida (D5, nunca now())",
+            )
+        return True
+    fecha = coerce_aware(fecha)
+    plan.compras.append(
+        CompraPlan(
+            insumo_nombre=nombre_display,
+            cantidad=cantidad,
+            precio_unitario=precio_unitario,
+            fecha=fecha,
+            proveedor_nombre=proveedor_nombre,
+            hoja=hoja,
+            fila=indx,
+            fecha_heredada=fecha_raw is None,
+        )
+    )
+    conteos.planificadas += 1
+    if report:
+        report.info(
+            hoja, indx, config["nombre"],
+            f"sub-tabla derecha (fuente unica): {nombre_display} "
+            f"{cantidad} @ {precio_unitario:.2f} fecha "
+            f"{fecha.date() if fecha else '?'}"
+            f"{' (fecha heredada)' if fecha_raw is None else ''}",
+        )
+    return True
 
 
 def _universo_bom(libro, report) -> dict[str, str]:
@@ -185,11 +337,24 @@ def _universo_bom(libro, report) -> dict[str, str]:
     }
 
 
+def _nombres_izquierda_hoja(filas: list[dict[str, object]], col_nom: str) -> set[str]:
+    """Nombres (display) del bloque izquierdo de la hoja: la derecha que
+    repita uno de estos se considera duplicado y se descarta."""
+    nombres: set[str] = set()
+    for fila in filas:
+        valor = fila.get(col_nom)
+        if isinstance(valor, str) and valor.strip():
+            nombres.add(normalizar_nombre(valor))
+    return nombres
+
+
 def plan_compras(libro, report=None) -> ComprasPlan:
     """Build the purchase plan from the bounded workbook (read-only).
 
-    Solo el bloque izquierdo de las hojas de compra; cada fila se filtra por el
-    universo BOM; fechas bajo politica D5; never now().
+    Bloque izquierdo + sub-tabla derecha (P1 fix): la derecha se procesa solo
+    cuando el item NO aparece en el bloque izquierdo de la misma hoja (fuente
+    unica); cada fila se filtra por el universo BOM; fechas bajo politica D5;
+    never now().
     """
     plan = ComprasPlan()
     conteos = plan.conteos
@@ -205,79 +370,104 @@ def plan_compras(libro, report=None) -> ComprasPlan:
                 report.warn(hoja, None, None, "hoja ausente en este workbook; omitida")
             continue
         filas = lectura.filas
+        nombres_izquierda = _nombres_izquierda_hoja(filas, col_nom)
         ultima_fecha: dict[ClaveFecha, object] = {}
         for indx, fila in enumerate(filas, start=SHEET_BOUNDS[hoja][0]):
-            if _es_subtabla_derecha(fila):
-                conteos.derecha += 1
-                continue
             cantidad_raw = fila.get(col_cant)
             if cantidad_raw is None and hoja == "INVERSION VALQUI":
                 # Bloque Kilotelas (R56-78): la cantidad va en C cuando A esta vacia.
                 cantidad_raw = fila.get("C")
             nombre = fila.get(col_nom)
-            if not isinstance(nombre, str):
-                continue
-            clave_ins = clave_normalizada(nombre)
-            if clave_ins not in universo:
-                conteos.no_bom += 1
-                continue
-            nombre_display = universo[clave_ins]
-            unidad_obj = _unidad_de_insumo(nombre_display)
-            cantidad = normalizar_cantidad_compra(cantidad_raw, unidad_obj)
-            if cantidad is None:
-                conteos.sin_cantidad += 1
-                if report:
-                    report.warn(
-                        hoja, indx, col_cant,
-                        f"{nombre_display}: cantidad {cantidad_raw!r} no interpretable; "
-                        f"fila excluida (EXM-2)",
-                    )
-                continue
-            costo_total = normalizar_decimal(fila.get(col_costo))
-            if costo_total is None or costo_total <= 0:
-                conteos.sin_cantidad += 1
-                if report:
-                    report.warn(
-                        hoja, indx, col_costo,
-                        f"{nombre_display}: costo no interpretable; fila excluida",
-                    )
-                continue
-            precio_unitario = costo_total / cantidad
-
-            proveedor_raw = fila.get(col_prov)
-            proveedor_nombre = (
-                normalizar_nombre(proveedor_raw)
-                if proveedor_raw is not None
-                else None
-            )
-            fecha_raw = fila.get(col_fecha)
-            clave_f = ClaveFecha(clave_ins, proveedor_nombre or "<sin-proveedor>")
-            fecha = fecha_para_fila(fecha_raw, clave_f, ultima_fecha)
-            if fecha is None:
-                conteos.sin_fecha += 1
-                if report:
-                    report.warn(
-                        hoja, indx, col_fecha,
-                        f"{nombre_display}: fecha vacia y sin fila contigua del mismo "
-                        f"insumo+proveedor; omitida (D5, nunca now())",
-                    )
-                continue
-            # Fecha del Excel (posible naive) -> aware (TIMESTAMPTZ, sin ambiguedad).
-            fecha = coerce_aware(fecha)
-            plan.compras.append(
-                CompraPlan(
-                    insumo_nombre=nombre_display,
-                    cantidad=cantidad,
-                    precio_unitario=precio_unitario,
-                    fecha=fecha,
-                    proveedor_nombre=proveedor_nombre,
-                    hoja=hoja,
-                    fila=indx,
-                    fecha_heredada=fecha_raw is None,
+            if isinstance(nombre, str):
+                _procesar_fila_izquierda(
+                    plan, fila, indx, hoja, col_cant, col_costo, col_fecha,
+                    col_prov, cantidad_raw, nombre, universo, ultima_fecha,
+                    report,
                 )
+            _procesar_subtabla_derecha(
+                plan, fila, indx, hoja, universo, nombres_izquierda,
+                ultima_fecha, report,
             )
-            conteos.planificadas += 1
     return plan
+
+
+def _procesar_fila_izquierda(
+    plan: ComprasPlan,
+    fila: dict[str, object],
+    indx: int,
+    hoja: str,
+    col_cant: str,
+    col_costo: str,
+    col_fecha: str,
+    col_prov: str,
+    cantidad_raw: object,
+    nombre: str,
+    universo: dict[str, str],
+    ultima_fecha: dict[ClaveFecha, object],
+    report,
+) -> None:
+    """Procesa una fila del bloque izquierdo (compra WAC BOM-only)."""
+    conteos = plan.conteos
+    clave_ins = clave_normalizada(nombre)
+    if clave_ins not in universo:
+        conteos.no_bom += 1
+        return
+    nombre_display = universo[clave_ins]
+    unidad_obj = _unidad_de_insumo(nombre_display)
+    cantidad = normalizar_cantidad_compra(cantidad_raw, unidad_obj)
+    if cantidad is None:
+        conteos.sin_cantidad += 1
+        if report:
+            report.warn(
+                hoja, indx, col_cant,
+                f"{nombre_display}: cantidad {cantidad_raw!r} no interpretable; "
+                f"fila excluida (EXM-2)",
+            )
+        return
+    costo_total = normalizar_decimal(fila.get(col_costo))
+    if costo_total is None or costo_total <= 0:
+        conteos.sin_cantidad += 1
+        if report:
+            report.warn(
+                hoja, indx, col_costo,
+                f"{nombre_display}: costo no interpretable; fila excluida",
+            )
+        return
+    precio_unitario = costo_total / cantidad
+
+    proveedor_raw = fila.get(col_prov)
+    proveedor_nombre = (
+        normalizar_nombre(proveedor_raw)
+        if proveedor_raw is not None
+        else None
+    )
+    fecha_raw = fila.get(col_fecha)
+    clave_f = ClaveFecha(clave_ins, proveedor_nombre or "<sin-proveedor>")
+    fecha = fecha_para_fila(fecha_raw, clave_f, ultima_fecha)
+    if fecha is None:
+        conteos.sin_fecha += 1
+        if report:
+            report.warn(
+                hoja, indx, col_fecha,
+                f"{nombre_display}: fecha vacia y sin fila contigua del mismo "
+                f"insumo+proveedor; omitida (D5, nunca now())",
+            )
+        return
+    # Fecha del Excel (posible naive) -> aware (TIMESTAMPTZ, sin ambiguedad).
+    fecha = coerce_aware(fecha)
+    plan.compras.append(
+        CompraPlan(
+            insumo_nombre=nombre_display,
+            cantidad=cantidad,
+            precio_unitario=precio_unitario,
+            fecha=fecha,
+            proveedor_nombre=proveedor_nombre,
+            hoja=hoja,
+            fila=indx,
+            fecha_heredada=fecha_raw is None,
+        )
+    )
+    conteos.planificadas += 1
 
 
 # ------------------------------------------------------------------------- #

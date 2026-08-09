@@ -450,6 +450,37 @@ def test_n7c_montos_y_socios_ok(db, mini_libro):
     assert _no_resultado(res, "N7c").estado == "OK"
 
 
+def _mini_workbook_n7c_dup(path: Path) -> None:
+    """Mini VALQUI con DOS movimientos identicos del mismo equipo.
+
+    La fila duplicada tiene la MISMA clave natural (fecha, tipo, monto, socio,
+    descripcion) -> el apply F6 la deduplica (NFR-1). N7c debe comparar contra
+    el plan DEDUP (mismo criterio que el apply), no contar el duplicado 2x.
+    """
+    _mini_workbook(path)
+    wb = openpyxl.load_workbook(path)
+    inv = wb["INVERSION VALQUI"]
+    # R5: segundo movimiento identico a R4 (P_MOV 320000 @ FECHA_MOV).
+    inv.cell(row=5, column=1, value=1)
+    inv.cell(row=5, column=2, value=P_MOV)
+    inv.cell(row=5, column=4, value=320000)
+    inv.cell(row=5, column=5, value=datetime(2025, 8, 1))
+    wb.save(path)
+
+
+def test_n7c_plan_movimiento_duplicado_cuenta_una_vez(db, tmp_path):
+    """P3 fix: movimientos del plan con clave natural duplicada se cuentan UNA
+    vez (el apply F6 deduplica por clave, NFR-1). Sin el fix la suma del plan
+    (640000) difiere de la DB (320000) -> ERROR."""
+    path = tmp_path / "mini-validate-dup.xlsx"
+    _mini_workbook_n7c_dup(path)
+    _preparar_entorno(db)
+    res = _controllers(db, path)
+    n7c = _no_resultado(res, "N7c")
+    assert n7c.estado == "OK"
+    assert "duplicada" in n7c.mensaje  # desviacion conocida documentada
+
+
 def test_n7c_monto_cero_es_error(db, mini_libro):
     _preparar_entorno(db)
     mov = db.query(MovimientoFinanciero).filter(
@@ -480,6 +511,47 @@ def test_n7c_socios_menos_cien_error(db, mini_libro):
 def test_n7d_cuadre_exacto(db, mini_libro):
     """Snapshot 10 + compra 2 - explosion de 1 venta (Corset: 2 m) = 10."""
     _preparar_entorno(db)
+    res = _controllers(db, mini_libro)
+    assert _no_resultado(res, "N7d").estado == "OK"
+
+
+# Fecha del corte fisico del snapshot OCT25 (design: stock OCT25 = 2025-10-25).
+FECHA_CORTE_OCT25 = datetime(2025, 10, 25, tzinfo=timezone.utc)
+FECHA_POST_CORTE = datetime(2025, 11, 1, tzinfo=timezone.utc)
+
+
+def test_n7d_compra_del_corte_no_se_suma(db, mini_libro):
+    """P2 fix: la compra que constituye el corte fisico (fecha == OCT25) no se
+    suma al cuadre: el snapshot YA la contiene (Ref 100: 39 + 0 - consumos)."""
+    _preparar_entorno(db)
+    tela = db.query(Insumo).filter(Insumo.nombre == P_TELA).first()
+    db.add(CompraInsumo(
+        insumo_id=tela.id,
+        proveedor_id=None,
+        fecha_compra=FECHA_CORTE_OCT25,
+        cantidad_comprada=Decimal("10"),
+        precio_unitario_compra=Decimal("100"),
+    ))
+    db.commit()
+    res = _controllers(db, mini_libro)
+    # esperado = snapshot 10 + compra pre-corte 2 + 0 (corte excluida) - 2 = 10.
+    assert _no_resultado(res, "N7d").estado == "OK"
+
+
+def test_n7d_compra_post_corte_si_suma(db, mini_libro):
+    """P2 fix: compras POSTERIORES al corte (fecha > OCT25) SI suman al stock
+    del corte (son compras nuevas despues del inventario)."""
+    _preparar_entorno(db)
+    tela = db.query(Insumo).filter(Insumo.nombre == P_TELA).first()
+    db.add(CompraInsumo(
+        insumo_id=tela.id,
+        proveedor_id=None,
+        fecha_compra=FECHA_POST_CORTE,
+        cantidad_comprada=Decimal("3"),
+        precio_unitario_compra=Decimal("100"),
+    ))
+    tela.stock_actual = Decimal("13")  # 10 + 3 post-corte - 2 consumidos
+    db.commit()
     res = _controllers(db, mini_libro)
     assert _no_resultado(res, "N7d").estado == "OK"
 

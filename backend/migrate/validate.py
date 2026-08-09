@@ -73,6 +73,14 @@ _UMBRAL_FECHA_SEG = 86400
 TOLERANCIA_CUADRE = Decimal("0.0005")
 TOLERANCIA_DINERO = Decimal("0.001")
 
+# P2 fix: fecha del CORTE FISICO del snapshot INVENTARIO OCT25. El stock del
+# snapshot YA contiene la compra que lo constituye (p.ej. los tules Atenea
+# comprados el 2025-10-25 = stock 39/21 m del corte), asi que esa compra NO se
+# suma al cuadre (N7d: snapshot + compras != corte - explosiones). Las compras
+# pre-corte y post-corte (fecha > corte, compras nuevas posteriores al
+# inventario) SI suman.
+FECHA_CORTE_SNAPSHOT = datetime(2025, 10, 25, tzinfo=timezone.utc).date()
+
 
 @dataclass(frozen=True)
 class CheckResult:
@@ -276,6 +284,7 @@ def _n7b_stock_negativo(db, plan: PlanValidacion) -> CheckResult:
 def _n7c_finanzas(db, plan: PlanValidacion) -> CheckResult:
     """Montos > 0 + suma por tipo + socios == 100 (FIN-2), scoped al plan."""
     errores: list[str] = []
+    notas: list[str] = []
     faltante = False
 
     descripciones_plan = {clave_normalizada(m.descripcion) for m in plan.finanzas.movimientos}
@@ -289,8 +298,26 @@ def _n7c_finanzas(db, plan: PlanValidacion) -> CheckResult:
         else:
             if any(m.monto is not None and m.monto <= 0 for m in scoped):
                 errores.append("movimiento del plan con monto <= 0")
+            # P3 fix: el plan se suma DEDUP por clave natural (fecha, tipo,
+            # monto, socio, descripcion) — el mismo criterio del apply F6
+            # (NFR-1): un movimiento repetido en el Excel (misma clave) se
+            # persiste UNA vez. Contar el duplicado 2x falsearia la suma
+            # (caso real: hilo poliester venus negro/piel 2200 x2 = dif 4400).
+            vistos: set[tuple] = set()
+            dedup = 0
             suma_plan: dict[str, Decimal] = defaultdict(Decimal)
             for m in plan.finanzas.movimientos:
+                clave_mov = (
+                    m.fecha.date().isoformat() if m.fecha else "SIN-FECHA",
+                    m.tipo,
+                    _moneda(m.monto),
+                    clave_normalizada(m.socio_nombre) if m.socio_nombre else None,
+                    clave_normalizada(m.descripcion),
+                )
+                if clave_mov in vistos:
+                    dedup += 1
+                    continue
+                vistos.add(clave_mov)
                 suma_plan[m.tipo] += m.monto if m.monto else Decimal("0")
             suma_db: dict[str, Decimal] = defaultdict(Decimal)
             for m in scoped:
@@ -300,6 +327,11 @@ def _n7c_finanzas(db, plan: PlanValidacion) -> CheckResult:
                     errores.append(
                         f"suma por tipo {tipo!r}: DB {suma_db[tipo]} != plan {suma_plan[tipo]}"
                     )
+            if dedup:
+                notas.append(
+                    f"desviacion conocida: {dedup} movimientos del plan con clave "
+                    f"natural duplicada contados una sola vez (idempotencia F6)"
+                )
 
     nombres_socios = {clave_normalizada(n) for n, _ in SOCIOS}
     socios = [
@@ -317,6 +349,8 @@ def _n7c_finanzas(db, plan: PlanValidacion) -> CheckResult:
     situacion = "; ".join(errores) if errores else (
         "socios ausentes (F6 no corrida)" if faltante else "finanzas coherentes con el plan"
     )
+    if notas:
+        situacion = situacion + " | " + "; ".join(notas)
     return CheckResult("N7c", estado, f"finanzas: {situacion}")
 
 
@@ -331,9 +365,14 @@ def _n7d_cuadre(db, plan: PlanValidacion) -> CheckResult:
     }
 
     compras_total: dict[int, Decimal] = defaultdict(Decimal)
-    for insumo_id, cantidad in db.query(
-        CompraInsumo.insumo_id, CompraInsumo.cantidad_comprada
+    for insumo_id, fecha_compra, cantidad in db.query(
+        CompraInsumo.insumo_id, CompraInsumo.fecha_compra,
+        CompraInsumo.cantidad_comprada,
     ).all():
+        # P2 fix: la compra del mismo dia del corte es el stock fisico del
+        # snapshot (ya contado en F4); no se vuelve a sumar.
+        if fecha_compra is not None and fecha_compra.date() == FECHA_CORTE_SNAPSHOT:
+            continue
         compras_total[insumo_id] += cantidad if cantidad else Decimal("0")
 
     # Explosion: por cada detalle de venta, cantidad x BOM del mismo producto

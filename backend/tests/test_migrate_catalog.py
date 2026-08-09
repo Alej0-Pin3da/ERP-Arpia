@@ -153,6 +153,26 @@ def test_clave_normalizada_ignora_acentos_para_dedup():
     assert clave_normalizada("Tela Maya") == clave_normalizada(" tela   maya ")
 
 
+def test_clave_normalizada_colapsa_sinonimos_de_numero():
+    """P1 fix: variantes ortograficas de 'numero' se colapsan en la clave.
+
+    'Argolla numero 10 mm' significa 'argolla numero 10' (ordinal), NO un valor
+    fijo: la palabra numero/nro/num/No. se ELIMINA cuando precede a un digito,
+    unificando la compra 'Argolla numero 10 mm' con el BOM 'Argolla 10 mm'.
+    """
+    from migrate.catalog import clave_normalizada, normalizar_nombre
+
+    assert clave_normalizada("Argolla numero 10 mm") == clave_normalizada("Argolla 10 mm")
+    assert clave_normalizada("Argolla nro 10 mm") == clave_normalizada("Argolla 10 mm")
+    assert clave_normalizada("Argolla num 10 mm") == clave_normalizada("Argolla 10 mm")
+    assert clave_normalizada("Argolla No. 10 mm") == clave_normalizada("Argolla 10 mm")
+    assert clave_normalizada("Cremallera num 3") == clave_normalizada("Cremallera 3")
+    # Display name conserva acentos y la palabra original (solo la clave colapsa).
+    assert normalizar_nombre("Argolla numero 10 mm") == "Argolla numero 10 mm"
+    # Un 'no' dentro de una palabra (p.ej. 'vino') NO se toca.
+    assert clave_normalizada("Encaje vino 3") != clave_normalizada("Encaje 3")
+
+
 def test_resolver_unidad_desde_nombre():
     from migrate.catalog import resolver_unidad
 

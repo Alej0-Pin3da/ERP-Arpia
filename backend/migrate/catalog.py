@@ -114,6 +114,16 @@ PRODUCTOS_CATALOGO: tuple[dict[str, object], ...] = (
 # Pure normalization (dedup keys are accent/case-insensitive)
 # --------------------------------------------------------------------------- #
 
+# P1 fix (remediacion EXM-1): sinonimos de la palabra 'numero' como ORDINAL.
+# 'Argolla numero 10 mm' significa 'argolla numero 10' (el numero 10), no un
+# valor fijo: la palabra (numero/nro/num/No./Nro.) se ELIMINA cuando precede a
+# un digito, unificando variantes ortograficas de un mismo material en la clave
+# (compra 'Argolla numero 10 mm' == BOM 'Argolla 10 mm'). Se aplica SOLO en la
+# clave de dedup (el display name conserva la grafia original del Excel).
+_SINONIMOS_NUMERO_RE = re.compile(
+    r"\b(?:numero|nro|num|no)\s*\.?\s+(?=\d)|nº\s+(?=\d)|n°\s+(?=\d)"
+)
+
 
 def normalizar_nombre(texto: object) -> str:
     """Collapse whitespace preserving accents and case (display name)."""
@@ -123,12 +133,17 @@ def normalizar_nombre(texto: object) -> str:
 
 
 def clave_normalizada(nombre: object) -> str:
-    """Accent/case-insensitive dedup key (Lenceria==Lenceria, Tela==tela)."""
+    """Accent/case-insensitive dedup key (Lenceria==Lenceria, Tela==tela).
+
+    Tambien colapsa las variantes ortograficas del ordinal 'numero' cuando
+    preceden a un digito (P1 fix): 'Argolla numero 10 mm' == 'Argolla 10 mm'.
+    """
     texto = normalizar_nombre(nombre).casefold()
-    return "".join(
+    texto = "".join(
         ch for ch in unicodedata.normalize("NFD", texto)
         if unicodedata.category(ch) != "Mn"
     )
+    return _SINONIMOS_NUMERO_RE.sub("", texto)
 
 
 # --------------------------------------------------------------------------- #

@@ -278,6 +278,107 @@ def test_plan_compras_sin_fecha_ni_heredable_omitida(mini_libro):
 
 
 # --------------------------------------------------------------------------- #
+# 2b. P1 fix: sub-tabla derecha como fuente UNICA (no duplicada)
+# --------------------------------------------------------------------------- #
+
+
+def _mini_workbook_derecha(path: Path) -> None:
+    """Mini con sub-tabla derecha REAL (layout VALQUI J..N).
+
+    - CORSET: 4 materiales BOM (Tela, Argolla, + dos que solo existen en la
+      derecha: 'Tela Derecha' y 'Argolla Derecha').
+    - VALQUI: left block R3..R5 (compra Tela, Argolla, Tela Derecha) y la
+      sub-tabla derecha J..N:
+      * R15 J='Argolla Derecha' (K=100, L=1, M=7200) -> fuente UNICA: la
+        derecha no duplica la izquierda -> compra 100 un @ 72, fecha E15.
+      * R16 J='Tela Derecha' (K=400, L=1, M=200) -> DUPLICA la compra
+        izquierda R5 (mismo item) -> se descarta como antes.
+    """
+    wb = openpyxl.Workbook()
+    bom = wb.active
+    bom.title = "CORSET"
+    bom.append(["CORSET", None, None, None, None, None, None, None, "TANGA"])
+    bom.append(["Producto", "Ancho", "Alto", "cantidad Cms", "valor metro", "valor total"])
+    bom.append([f"{PREFIX_TEST} Tela", 64, 37, 2368, 2.5, None])
+    bom.append([f"{PREFIX_TEST} Argolla", 2, 1, 2, 72, None])
+    bom.append([f"{PREFIX_TEST} Tela Derecha", 64, 37, 2368, 2.5, None])
+    bom.append([f"{PREFIX_TEST} Argolla Derecha", 2, 1, 2, 72, None])
+
+    inv = wb.create_sheet("INVERSION VALQUI")
+    inv.cell(row=2, column=1, value="Cantidad")
+    inv.cell(row=2, column=2, value="Producto")
+    inv.cell(row=2, column=4, value="Costo")
+    inv.cell(row=2, column=5, value="Fecha")
+    inv.cell(row=2, column=6, value="Provedor")
+    inv.cell(row=13, column=10, value="Producto")   # header sub-tabla J..N
+    inv.cell(row=13, column=11, value="Largo CMS")
+    inv.cell(row=13, column=12, value="Ancho CMS")
+    inv.cell(row=13, column=13, value="Valor")
+    inv.cell(row=13, column=14, value="Unitario")
+    # R3..R5: bloque izquierdo
+    inv.cell(row=3, column=1, value="4 mts")
+    inv.cell(row=3, column=2, value=f"{PREFIX_TEST} Tela")
+    inv.cell(row=3, column=4, value=200)
+    inv.cell(row=3, column=5, value=datetime(2026, 2, 17))
+    inv.cell(row=4, column=1, value=12)
+    inv.cell(row=4, column=2, value=f"{PREFIX_TEST} Argolla")
+    inv.cell(row=4, column=4, value=2400)
+    inv.cell(row=4, column=5, value=datetime(2026, 2, 17))
+    inv.cell(row=5, column=1, value="4 mts")
+    inv.cell(row=5, column=2, value=f"{PREFIX_TEST} Tela Derecha")
+    inv.cell(row=5, column=4, value=200)
+    inv.cell(row=5, column=5, value=datetime(2026, 2, 17))
+    # R15: derecha fuente unica -> Argolla Derecha 100 un @ 72 (fecha E15)
+    inv.cell(row=15, column=10, value=f"{PREFIX_TEST} Argolla Derecha")
+    inv.cell(row=15, column=11, value=100)
+    inv.cell(row=15, column=12, value=1)
+    inv.cell(row=15, column=13, value=7200)
+    inv.cell(row=15, column=5, value=datetime(2026, 2, 17))
+    # R16: derecha duplica izquierda (Tela Derecha ya comprada en R5) -> descarte
+    inv.cell(row=16, column=10, value=f"{PREFIX_TEST} Tela Derecha")
+    inv.cell(row=16, column=11, value=400)
+    inv.cell(row=16, column=12, value=1)
+    inv.cell(row=16, column=13, value=200)
+    wb.save(path)
+
+
+@pytest.fixture
+def mini_libro_derecha(tmp_path) -> Path:
+    path = tmp_path / "mini-purchases-derecha.xlsx"
+    _mini_workbook_derecha(path)
+    return path
+
+
+def test_plan_compras_derecha_fuente_unica_genera_compra(mini_libro_derecha):
+    """P1 fix: un item de la sub-tabla derecha NO presente en el bloque
+    izquierdo de la misma hoja es fuente UNICA -> se procesa como compra
+    (cantidad = K en la unidad canonica, precio = M / K, fecha del bloque
+    izquierdo de la misma fila)."""
+    plan = _plan_de(mini_libro_derecha)
+    compra = next(
+        c for c in plan.compras
+        if c.insumo_nombre == f"{PREFIX_TEST} Argolla Derecha"
+    )
+    assert compra.cantidad == 100          # K=100 en 'un' (Herrajes)
+    assert compra.precio_unitario == 72    # M/K = 7200/100
+    assert compra.fecha == DIA             # fecha del left E de la misma fila
+    assert compra.hoja == "INVERSION VALQUI"
+
+
+def test_plan_compras_derecha_duplicada_se_descarta(mini_libro_derecha):
+    """P1 fix: cuando la derecha duplica un item YA comprado en la izquierda
+    de la misma hoja, se descarta como antes (no se duplica WAC)."""
+    plan = _plan_de(mini_libro_derecha)
+    tela_derecha = [
+        c for c in plan.compras
+        if c.insumo_nombre == f"{PREFIX_TEST} Tela Derecha"
+    ]
+    assert len(tela_derecha) == 1          # solo la compra izquierda R5
+    assert tela_derecha[0].cantidad == 4   # 4 mts (no la copia de 400cm)
+    assert plan.conteos.derecha >= 1       # la fila derecha duplicada se cuenta
+
+
+# --------------------------------------------------------------------------- #
 # 3. DB: aplicar + WAC + idempotencia + rollback
 # --------------------------------------------------------------------------- #
 
