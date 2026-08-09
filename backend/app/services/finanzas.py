@@ -83,6 +83,42 @@ def eliminar_movimiento(db: Session, movimiento_id: int) -> MovimientoFinanciero
     return movimiento
 
 
+def actualizar_movimiento(
+    db: Session, movimiento_id: int, payload: dict
+) -> MovimientoFinanciero:
+    """Partial update of a movement (FIN-1 PATCH).
+
+    Applies ONLY the fields present in ``payload`` (the route passes
+    ``model_dump(exclude_unset=True)``). Rules, in order:
+    - missing id or soft-deleted (estado != 'activo') -> 404;
+    - FIN-2 server-side guard: a liquidacion-born row freezes monto/socio_id —
+      any attempt to send either field -> 422 (fecha/tipo/descripcion remain
+      editable);
+    - a concrete socio_id that does not exist -> 400 "Socio no existe"
+      (consistent with crear_movimiento).
+    """
+    movimiento = db.get(MovimientoFinanciero, movimiento_id)
+    if movimiento is None or movimiento.estado != "activo":
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+
+    # FIN-2: the server is the backstop — UI disabling is not enough.
+    if movimiento.liquidacion_id is not None and {"monto", "socio_id"} & payload.keys():
+        raise HTTPException(
+            status_code=422,
+            detail="Los movimientos de una liquidación no permiten cambiar monto ni socio",
+        )
+
+    if "socio_id" in payload and payload["socio_id"] is not None:
+        if db.get(SociosConfiguracion, payload["socio_id"]) is None:
+            raise HTTPException(status_code=400, detail="Socio no existe")
+
+    for campo, valor in payload.items():
+        setattr(movimiento, campo, valor)
+    db.commit()
+    db.refresh(movimiento)
+    return movimiento
+
+
 def settle_liquidacion(
     db: Session,
     monto: str | Decimal,

@@ -19,6 +19,21 @@ class MovimientoCreate(BaseModel):
     socio_id: int | None = None
 
 
+class MovimientoUpdate(BaseModel):
+    """PATCH body for /finanzas/movimientos/{id} (FIN-1).
+
+    Every field is optional; only the fields actually sent are applied
+    (the route passes ``model_dump(exclude_unset=True)``). The liquidation
+    guard for monto/socio_id lives in the service (FIN-2).
+    """
+
+    fecha: datetime | None = None
+    tipo: Literal["Gasto", "Inversion", "Retiro"] | None = None
+    descripcion: str | None = Field(default=None, min_length=1, max_length=500)
+    monto: Decimal | None = Field(default=None, gt=0)
+    socio_id: int | None = None
+
+
 class MovimientoRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

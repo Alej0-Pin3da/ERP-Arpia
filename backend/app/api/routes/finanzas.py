@@ -24,11 +24,13 @@ from app.schemas.finanzas import (
     LiquidacionCreate,
     MovimientoCreate,
     MovimientoRead,
+    MovimientoUpdate,
     SocioConfiguracionCreate,
     SocioConfiguracionRead,
     SocioConfiguracionUpdate,
 )
 from app.services.finanzas import (
+    actualizar_movimiento,
     actualizar_socio_configuracion,
     crear_movimiento,
     crear_socio_configuracion,
@@ -91,6 +93,21 @@ def delete_movimiento(
 ):
     """Soft delete a movement (estado -> 'inactivo')."""
     return eliminar_movimiento(db, movimiento_id)
+
+
+@router.patch("/movimientos/{movimiento_id}", response_model=MovimientoRead)
+def update_movimiento_route(
+    movimiento_id: int,
+    payload: MovimientoUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(mutation_user),
+):
+    """Partial update of a movement (FIN-1): fecha/tipo/descripcion/monto/
+    socio_id, only the sent fields applied. Liquidacion-born rows freeze
+    monto/socio_id server-side (FIN-2 -> 422)."""
+    return actualizar_movimiento(
+        db, movimiento_id, payload.model_dump(exclude_unset=True)
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@ setup against SessionLocal, FK-ordered cleanup (movimientos before socios).
 """
 
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -22,6 +23,7 @@ from fastapi import HTTPException
 from app.db.session import SessionLocal
 from app.models import MovimientoFinanciero, SociosConfiguracion
 from app.services.finanzas import (
+    actualizar_movimiento,
     actualizar_socio_configuracion,
     crear_movimiento,
     crear_socio_configuracion,
@@ -371,3 +373,219 @@ def test_socio_eliminar_sin_movimientos_ok():
             db.close()
     finally:
         _cleanup_socios([a_id])
+
+
+# ---------------------------------------------------------------------------
+# FIN-1: actualizar_movimiento (T3 — PATCH /finanzas/movimientos/{id})
+# ---------------------------------------------------------------------------
+
+
+def test_actualizar_movimiento_aplica_campos_parciales():
+    """PATCH parcial aplica SOLO los campos enviados (fecha/tipo/descripcion/
+    monto/socio_id) y deja el resto intacto (FIN-1 PATCH)."""
+    a_id, b_id = _socios_60_40()
+    try:
+        db = SessionLocal()
+        try:
+            mov = crear_movimiento(db, _movimiento_payload(tipo="Gasto", monto="10"))
+            mov_id = mov.id
+        finally:
+            db.close()
+        db = SessionLocal()
+        try:
+            actualizado = actualizar_movimiento(
+                db,
+                mov_id,
+                {"descripcion": "Nueva descripcion", "monto": Decimal("25.50"), "socio_id": a_id},
+            )
+        finally:
+            db.close()
+        assert actualizado.descripcion == "Nueva descripcion"
+        assert actualizado.monto == Decimal("25.5000")
+        assert actualizado.socio_id == a_id
+        assert actualizado.tipo == "Gasto"  # no enviado -> intacto
+        assert actualizado.estado == "activo"
+        _cleanup_movimientos([mov_id])
+    finally:
+        _cleanup_socios([a_id, b_id])
+
+
+def test_actualizar_movimiento_cambia_fecha_y_tipo():
+    """fecha y tipo son editables en un movimiento normal (FIN-1)."""
+    db = SessionLocal()
+    try:
+        mov = crear_movimiento(db, _movimiento_payload(tipo="Gasto"))
+        mov_id = mov.id
+    finally:
+        db.close()
+    nueva_fecha = datetime(2026, 6, 15, 12, 30, 0, tzinfo=timezone.utc)
+    db = SessionLocal()
+    try:
+        actualizado = actualizar_movimiento(
+            db, mov_id, {"fecha": nueva_fecha, "tipo": "Retiro"}
+        )
+    finally:
+        db.close()
+    assert actualizado.fecha.replace(tzinfo=None) == nueva_fecha.replace(tzinfo=None)
+    assert actualizado.tipo == "Retiro"
+    _cleanup_movimientos([mov_id])
+
+
+def test_actualizar_movimiento_payload_vacio_ok():
+    """Payload vacío -> 200 sin cambios (no-op aceptado, FIN-1)."""
+    db = SessionLocal()
+    try:
+        mov = crear_movimiento(db, _movimiento_payload())
+        mov_id = mov.id
+        original = (mov.tipo, mov.descripcion, mov.monto, mov.socio_id)
+    finally:
+        db.close()
+    db = SessionLocal()
+    try:
+        actualizado = actualizar_movimiento(db, mov_id, {})
+    finally:
+        db.close()
+    assert (actualizado.tipo, actualizado.descripcion, actualizado.monto, actualizado.socio_id) == original
+    _cleanup_movimientos([mov_id])
+
+
+def test_actualizar_movimiento_404_inexistente():
+    """id inexistente -> 404 (FIN-1)."""
+    db = SessionLocal()
+    try:
+        with pytest.raises(HTTPException) as excinfo:
+            actualizar_movimiento(db, 99999999, {"descripcion": "x"})
+    finally:
+        db.rollback()
+        db.close()
+    assert excinfo.value.status_code == 404
+
+
+def test_actualizar_movimiento_404_inactivo():
+    """Soft-deleted (estado='inactivo') -> 404 (FIN-1)."""
+    db = SessionLocal()
+    try:
+        mov = crear_movimiento(db, _movimiento_payload())
+        mov_id = mov.id
+        eliminar_movimiento(db, mov_id)
+    finally:
+        db.close()
+    db = SessionLocal()
+    try:
+        with pytest.raises(HTTPException) as excinfo:
+            actualizar_movimiento(db, mov_id, {"descripcion": "x"})
+    finally:
+        db.rollback()
+        db.close()
+    assert excinfo.value.status_code == 404
+    _cleanup_movimientos([mov_id])
+
+
+def test_actualizar_movimiento_socio_inexistente_400():
+    """socio_id que no existe -> 400 y nada se persiste (FIN-1)."""
+    db = SessionLocal()
+    try:
+        mov = crear_movimiento(db, _movimiento_payload())
+        mov_id = mov.id
+    finally:
+        db.close()
+    db = SessionLocal()
+    try:
+        with pytest.raises(HTTPException) as excinfo:
+            actualizar_movimiento(db, mov_id, {"socio_id": 99999999})
+    finally:
+        db.rollback()
+        db.close()
+    assert excinfo.value.status_code == 400
+    _cleanup_movimientos([mov_id])
+
+
+def test_actualizar_movimiento_liquidacion_monto_422():
+    """Fila de liquidación (liquidacion_id NOT NULL) + monto -> 422 y sin
+    persistencia (FIN-2 server-side guard)."""
+    a_id, b_id = _socios_60_40()
+    try:
+        db = SessionLocal()
+        try:
+            movs = settle_liquidacion(db, Decimal("1000"), liquidacion_id="LIQ-UPD01")
+            mov_id = movs[0].id
+            monto_original = movs[0].monto
+            key = movs[0].liquidacion_id[:10]
+        finally:
+            db.close()
+        db = SessionLocal()
+        try:
+            with pytest.raises(HTTPException) as excinfo:
+                actualizar_movimiento(db, mov_id, {"monto": Decimal("9999")})
+        finally:
+            db.rollback()
+            db.close()
+        assert excinfo.value.status_code == 422
+        db = SessionLocal()
+        try:
+            row = db.get(MovimientoFinanciero, mov_id)
+            assert row.monto == monto_original  # sin cambios
+        finally:
+            db.close()
+        _cleanup_movimientos_por_liquidacion(key)
+    finally:
+        _cleanup_socios([a_id, b_id])
+
+
+def test_actualizar_movimiento_liquidacion_socio_422():
+    """Fila de liquidación + socio_id -> 422 (FIN-2 server-side guard)."""
+    a_id, b_id = _socios_60_40()
+    try:
+        db = SessionLocal()
+        try:
+            movs = settle_liquidacion(db, Decimal("1000"), liquidacion_id="LIQ-UPD02")
+            mov_id = movs[0].id
+            socio_original = movs[0].socio_id
+            key = movs[0].liquidacion_id[:10]
+        finally:
+            db.close()
+        db = SessionLocal()
+        try:
+            with pytest.raises(HTTPException) as excinfo:
+                actualizar_movimiento(db, mov_id, {"socio_id": a_id})
+        finally:
+            db.rollback()
+            db.close()
+        assert excinfo.value.status_code == 422
+        db = SessionLocal()
+        try:
+            row = db.get(MovimientoFinanciero, mov_id)
+            assert row.socio_id == socio_original  # sin cambios
+        finally:
+            db.close()
+        _cleanup_movimientos_por_liquidacion(key)
+    finally:
+        _cleanup_socios([a_id, b_id])
+
+
+def test_actualizar_movimiento_liquidacion_descripcion_ok():
+    """Fila de liquidación + solo descripcion -> 200; monto y liquidacion_id
+    intactos (FIN-2: fecha/descripcion/tipo SÍ editables)."""
+    a_id, b_id = _socios_60_40()
+    try:
+        db = SessionLocal()
+        try:
+            movs = settle_liquidacion(db, Decimal("1000"), liquidacion_id="LIQ-UPD03")
+            mov_id = movs[0].id
+            monto_original = movs[0].monto
+            key = movs[0].liquidacion_id[:10]
+        finally:
+            db.close()
+        db = SessionLocal()
+        try:
+            actualizado = actualizar_movimiento(
+                db, mov_id, {"descripcion": "Nota corregida"}
+            )
+        finally:
+            db.close()
+        assert actualizado.descripcion == "Nota corregida"
+        assert actualizado.monto == monto_original
+        assert actualizado.liquidacion_id is not None
+        _cleanup_movimientos_por_liquidacion(key)
+    finally:
+        _cleanup_socios([a_id, b_id])

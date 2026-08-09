@@ -387,3 +387,176 @@ def test_get_socios_paginado_y_q(client, admin_token):
         assert resp.json() == {"items": [], "total": 0}
     finally:
         _cleanup_all()
+
+
+# ---------------------------------------------------------------------------
+# FIN-1: PATCH /finanzas/movimientos/{id} (T3)
+# ---------------------------------------------------------------------------
+
+
+def _crear_movimiento_activo(client, token: str, tipo: str = "Gasto") -> int:
+    resp = client.post(
+        "/api/v1/finanzas/movimientos",
+        json=_movimiento_payload(tipo=tipo, monto="10"),
+        headers=_auth(token),
+    )
+    assert resp.status_code == 201
+    return resp.json()["id"]
+
+
+def test_patch_movimiento_operador_200(client, operador_token):
+    """PATCH válido (operador) -> 200 con valores nuevos y campos no enviados
+    intactos (FIN-1)."""
+    try:
+        mov_id = _crear_movimiento_activo(client, operador_token)
+        resp = client.patch(
+            f"/api/v1/finanzas/movimientos/{mov_id}",
+            json={"descripcion": "Editada por operador", "monto": "25.50"},
+            headers=_auth(operador_token),
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["descripcion"] == "Editada por operador"
+        assert Decimal(body["monto"]) == Decimal("25.50")
+        assert body["tipo"] == "Gasto"  # no enviado -> intacto
+        assert body["estado"] == "activo"
+    finally:
+        _cleanup_all()
+
+
+def test_patch_movimiento_consulta_403(client, consulta_token):
+    """consulta -> 403 on PATCH (mutation)."""
+    resp = client.patch(
+        "/api/v1/finanzas/movimientos/1",
+        json={"descripcion": "x"},
+        headers=_auth(consulta_token),
+    )
+    assert resp.status_code == 403
+
+
+def test_patch_movimiento_404(client, admin_token):
+    """id inexistente -> 404."""
+    resp = client.patch(
+        "/api/v1/finanzas/movimientos/99999999",
+        json={"descripcion": "x"},
+        headers=_auth(admin_token),
+    )
+    assert resp.status_code == 404
+
+
+def test_patch_movimiento_soft_deleted_404(client, admin_token):
+    """Soft-deleted movimiento -> 404."""
+    try:
+        mov_id = _crear_movimiento_activo(client, admin_token)
+        resp = client.delete(
+            f"/api/v1/finanzas/movimientos/{mov_id}", headers=_auth(admin_token)
+        )
+        assert resp.status_code == 200
+        resp = client.patch(
+            f"/api/v1/finanzas/movimientos/{mov_id}",
+            json={"descripcion": "x"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 404
+    finally:
+        _cleanup_all()
+
+
+def test_patch_movimiento_422_tipo_invalido(client, admin_token):
+    """tipo inválido -> 422 (schema Literal)."""
+    try:
+        mov_id = _crear_movimiento_activo(client, admin_token)
+        resp = client.patch(
+            f"/api/v1/finanzas/movimientos/{mov_id}",
+            json={"tipo": "Prestamo"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 422
+    finally:
+        _cleanup_all()
+
+
+def test_patch_movimiento_socio_inexistente_400(client, admin_token):
+    """socio_id inexistente -> 400 'Socio no existe' (FIN-1)."""
+    try:
+        mov_id = _crear_movimiento_activo(client, admin_token)
+        resp = client.patch(
+            f"/api/v1/finanzas/movimientos/{mov_id}",
+            json={"socio_id": 99999999},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 400
+        assert "Socio no existe" in resp.json()["detail"]
+    finally:
+        _cleanup_all()
+
+
+def test_patch_movimiento_liquidacion_monto_422(client, admin_token):
+    """Fila de liquidación + monto -> 422 con mensaje claro (FIN-2)."""
+    a_id, b_id = _crear_socios_60_40(client, admin_token)
+    try:
+        resp = client.post(
+            "/api/v1/finanzas/liquidaciones",
+            json={"monto": "1000", "liquidacion_id": "LIQ-PAT01"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 201
+        mov_id = resp.json()[0]["id"]
+        resp = client.patch(
+            f"/api/v1/finanzas/movimientos/{mov_id}",
+            json={"monto": "9999"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 422
+        assert "liquidación" in resp.json()["detail"]
+    finally:
+        _cleanup_all()
+
+
+def test_patch_movimiento_liquidacion_socio_422(client, admin_token):
+    """Fila de liquidación + socio_id -> 422 (FIN-2)."""
+    a_id, b_id = _crear_socios_60_40(client, admin_token)
+    try:
+        resp = client.post(
+            "/api/v1/finanzas/liquidaciones",
+            json={"monto": "1000", "liquidacion_id": "LIQ-PAT02"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 201
+        mov_id = resp.json()[0]["id"]
+        resp = client.patch(
+            f"/api/v1/finanzas/movimientos/{mov_id}",
+            json={"socio_id": a_id},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 422
+    finally:
+        _cleanup_all()
+
+
+def test_patch_movimiento_liquidacion_descripcion_200(client, admin_token):
+    """Fila de liquidación + solo descripcion -> 200; monto y liquidacion_id
+    intactos (FIN-2: campos descriptivos editables)."""
+    a_id, b_id = _crear_socios_60_40(client, admin_token)
+    try:
+        resp = client.post(
+            "/api/v1/finanzas/liquidaciones",
+            json={"monto": "1000", "liquidacion_id": "LIQ-PAT03"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 201
+        mov = resp.json()[0]
+        mov_id = mov["id"]
+        monto_original = Decimal(mov["monto"])
+        resp = client.patch(
+            f"/api/v1/finanzas/movimientos/{mov_id}",
+            json={"descripcion": "Nota corregida"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["descripcion"] == "Nota corregida"
+        assert Decimal(body["monto"]) == monto_original
+        assert body["liquidacion_id"] is not None
+    finally:
+        _cleanup_all()
