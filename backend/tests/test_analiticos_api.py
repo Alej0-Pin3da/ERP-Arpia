@@ -228,9 +228,10 @@ def test_ventas_mensuales_consulta_allowed(client, consulta_token):
 
 
 def test_ventas_mensuales_excluye_anuladas(client, admin_token):
-    """Two months: 2026-01 has 2 completada (100+200), 2026-02 has 1 completada
+    """Two months: 2027-01 has 2 completada (100+200), 2027-02 has 1 completada
     (50) + 1 anulada (9999) -> totals/counts only include non-anulada rows
-    (ANA-1)."""
+    (ANA-1). Los meses 2027 no colisionan con las ventas reales de la migracion
+    cargada (2025-12..2026-05), asi el total por mes es determinista."""
     cat_id = _make_categoria()
     ins_id = _make_insumo(cat_id, costo="999", stock="0")  # current WAC 999
     tipo_id = _make_tipo()
@@ -238,10 +239,10 @@ def test_ventas_mensuales_excluye_anuladas(client, admin_token):
     _make_linea_insumo(prod_id, ins_id)
     try:
         v_ids = [
-            _insertar_venta(prod_id, datetime(2026, 1, 15, 12, 0, 0), "100", precio="100", costo="60"),
-            _insertar_venta(prod_id, datetime(2026, 1, 20, 12, 0, 0), "200", precio="100", costo="70"),
-            _insertar_venta(prod_id, datetime(2026, 2, 5, 12, 0, 0), "50", precio="100", costo="50"),
-            _insertar_venta(prod_id, datetime(2026, 2, 10, 12, 0, 0), "9999", estado="anulada", precio="100", costo="10"),
+            _insertar_venta(prod_id, datetime(2027, 1, 15, 12, 0, 0), "100", precio="100", costo="60"),
+            _insertar_venta(prod_id, datetime(2027, 1, 20, 12, 0, 0), "200", precio="100", costo="70"),
+            _insertar_venta(prod_id, datetime(2027, 2, 5, 12, 0, 0), "50", precio="100", costo="50"),
+            _insertar_venta(prod_id, datetime(2027, 2, 10, 12, 0, 0), "9999", estado="anulada", precio="100", costo="10"),
         ]
         resp = client.get(
             "/api/v1/analiticos/ventas-mensuales", headers=_auth(admin_token)
@@ -249,11 +250,11 @@ def test_ventas_mensuales_excluye_anuladas(client, admin_token):
         assert resp.status_code == 200
         por_mes = {r["mes"]: r for r in resp.json()}
 
-        enero = por_mes["2026-01-01"]
+        enero = por_mes["2027-01-01"]
         assert Decimal(enero["total"]) == Decimal("300.0000")  # 100 + 200
         assert enero["cantidad"] == 2
 
-        febrero = por_mes["2026-02-01"]
+        febrero = por_mes["2027-02-01"]
         assert Decimal(febrero["total"]) == Decimal("50.0000")  # anulada 9999 EXCLUDED
         assert febrero["cantidad"] == 1
     finally:

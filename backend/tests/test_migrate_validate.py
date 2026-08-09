@@ -59,13 +59,18 @@ P = f"{PREFIX} Validate"
 # Names injected by tests; cleanup deletes exactly these, never catalog rows.
 P_TELA = f"{P} Tela"
 P_PROV = f"{P} Proveedor"
-P_PROD = "Corset"  # bomb sheet product ('Corset' block of the real workbook)
+# Producto de prueba UNICO (no 'Corset'): la DB real ya tiene el producto
+# 'Corset' de la migracion cargada con combos BOM_Productos que lo referencian
+# (FK RESTRICT); usar ese nombre romperia el cleanup por FK violation.
+P_PROD = f"{P} Corset"
 P_VAR = "S"
 P_CLI = f"{P} Cliente"
 P_MOV = f"{P} Movimiento"
 
 FECHA_VENTA = datetime(2024, 10, 20, tzinfo=timezone.utc)
+FECHA_VENTA2 = datetime(2024, 11, 5, tzinfo=timezone.utc)
 FECHA_COMPRA = datetime(2025, 9, 15, tzinfo=timezone.utc)
+FECHA_COMPRA2 = datetime(2025, 9, 20, tzinfo=timezone.utc)
 FECHA_MOV = datetime(2025, 8, 1, tzinfo=timezone.utc)
 
 PRECIO_VENTA = Decimal("71250")
@@ -237,11 +242,18 @@ def _borrar_socios_y_tipos(db) -> None:
         ).first()
         if con_movimientos is None:
             db.delete(socio)
-    db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
-    ).delete(synchronize_session=False)
+    # Tipos canonicos: se borran SOLO si ningun producto (real de la migracion
+    # o de otro modulo) los referencia; con la migracion cargada los productos
+    # reales usan estos tipos -> se conservan (patron _borrar_filas_test).
+    for nombre_tipo in ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]:
+        tipo = db.query(TipoProducto).filter(TipoProducto.nombre == nombre_tipo).first()
+        if tipo is None:
+            continue
+        con_productos = db.query(Producto).filter(
+            Producto.tipo_producto_id == tipo.id
+        ).first()
+        if con_productos is None:
+            db.delete(tipo)
     db.commit()
 
 
@@ -294,7 +306,9 @@ def _preparar_entorno(db) -> None:
         precio_unitario_compra=Decimal("100"),
     ))
 
-    # Socios F6 (spec FIN-2): sum == 100.
+    # Socios F6 (spec FIN-2): sum == 100. FORZAMOS los % canonicos 40/30/30 en
+    # cada test (un test anterior pudo alterarlos para provocar ERROR y la DB
+    # real ya tiene estos socios con la migracion cargada).
     for nombre, pct in SOCIOS_ESPERADOS.items():
         socio_existente = db.query(SociosConfiguracion).filter(
             SociosConfiguracion.nombre == nombre
@@ -303,16 +317,25 @@ def _preparar_entorno(db) -> None:
             db.add(SociosConfiguracion(
                 nombre=nombre, porcentaje_participacion=pct
             ))
+        else:
+            socio_existente.porcentaje_participacion = pct
     db.flush()
 
     var = next(v for v in producto.variantes if v.nombre_variante == P_VAR)
-    # BOM de 'Corset': consume 2 m de tela por unidad.
+    # BOM de 'Corset': consume 2 m de tela por unidad. Igual que el apply F3
+    # real, la receta se inserta con variante_id=None (BOM-1).
     db.add(BomInsumo(
         producto_id=producto.id,
         insumo_id=tela.id,
-        variante_id=var.id,
+        variante_id=None,
         cantidad_requerida=Decimal("2"),
     ))
+    # Cliente de la venta (el apply F5 hace upsert por nombre normalizado).
+    cliente = db.query(Cliente).filter(Cliente.nombre == P_CLI).first()
+    if cliente is None:
+        cliente = Cliente(nombre=P_CLI)
+        db.add(cliente)
+        db.flush()
     # Venta historica real (VTA-1/VTA-2): costo FULL snapshot, precio tal-cual.
     venta = Venta(
         fecha=FECHA_VENTA,
@@ -320,7 +343,7 @@ def _preparar_entorno(db) -> None:
         descuento_porcentaje=Decimal("0"),
         total_venta=PRECIO_VENTA,  # 1 x precio tal-cual (VTA-2, sin doble desc)
         estado="completada",
-        cliente=None,
+        cliente_id=cliente.id,
     )
     db.add(venta)
     db.flush()
@@ -355,8 +378,11 @@ def _preparar_entorno(db) -> None:
 def _controllers(db, mini_lib) -> dict[str, object]:
     from migrate.validate import checks_n7, plan_para_validacion
 
+    # El mini-workbook usa una hoja CORSET cuyo bloque receta apunta al
+    # producto de PRUEBA (P_PROD), no al 'Corset' real del catalogo.
+    bloques_bom = {"CORSET": (P_PROD, None)}
     with LibroMigracion(mini_lib) as libro:
-        plan = plan_para_validacion(libro)
+        plan = plan_para_validacion(libro, bloques_bom=bloques_bom)
         return {c.id: c for c in checks_n7(db, plan)}
 
 
@@ -413,6 +439,124 @@ def test_n7a_conteo_duplicado_es_error(db, mini_libro):
         stock_actual=Decimal("0"),
         stock_minimo=Decimal("0"),
         costo_promedio_actual=Decimal("0"),
+    ))
+    db.commit()
+    res = _controllers(db, mini_libro)
+    assert _no_resultado(res, "N7a").estado == "ERROR"
+
+
+# --------------------------------------------------------------------------- #
+# fix3: N7a cuenta por CLAVE NATURAL (no por nombre simple de la entidad)
+# --------------------------------------------------------------------------- #
+
+
+def _mini_workbook_dos_compras(path: Path) -> None:
+    """Mini con DOS compras del MISMO insumo (fechas/cantidades distintas).
+
+    Caso real del fix: Argolla 10 mm con R18 (100un) + R29 (12un) son compras
+    legitimas, no un duplicado. El N7a viejo agrupaba por nombre de insumo y
+    contaba 2 -> ERROR falso; el corregido agrupa por clave natural
+    (insumo, fecha, cantidad, precio) -> 2 claves distintas -> OK.
+    """
+    _mini_workbook(path)
+    wb = openpyxl.load_workbook(path)
+    inv = wb["INVERSION VALQUI"]
+    # R5: segunda compra del mismo insumo, fecha y cantidad distintas.
+    inv.cell(row=5, column=1, value="3 mts")
+    inv.cell(row=5, column=2, value=P_TELA)
+    inv.cell(row=5, column=4, value=150)  # costo -> precio_unitario 50
+    inv.cell(row=5, column=5, value=datetime(2025, 9, 20))
+    wb.save(path)
+
+
+def _mini_workbook_dos_ventas(path: Path) -> None:
+    """Mini con DOS ventas del mismo producto en fechas distintas."""
+    _mini_workbook(path)
+    wb = openpyxl.load_workbook(path)
+    ventas = wb["VENTAS"]
+    ventas.append([P_PROD, P_VAR, None, None, None, None, 71250.0, COSTO_VENTA,
+                   45141, None, None, None, datetime(2024, 11, 5), "vino",
+                   None, P_CLI])
+    wb.save(path)
+
+
+def test_n7a_dos_compras_mismo_insumo_no_error(db, tmp_path):
+    """fix3: 2 compras legitimas del mismo insumo (fecha/cantidad distintas)
+    NO son duplicado -> N7a OK. Antes: ERROR por agrupar por nombre."""
+    path = tmp_path / "mini-validate-2compras.xlsx"
+    _mini_workbook_dos_compras(path)
+    _preparar_entorno(db)
+    tela = db.query(Insumo).filter(Insumo.nombre == P_TELA).first()
+    prov = db.query(Proveedor).filter(Proveedor.nombre == P_PROV).first()
+    db.add(CompraInsumo(
+        insumo_id=tela.id, proveedor_id=prov.id,
+        fecha_compra=FECHA_COMPRA2, cantidad_comprada=Decimal("3"),
+        precio_unitario_compra=Decimal("50"),
+    ))
+    db.commit()
+    res = _controllers(db, path)
+    assert _no_resultado(res, "N7a").estado == "OK"
+
+
+def test_n7a_dos_movimientos_identicos_error(db, mini_libro):
+    """fix3: 2 movimientos con la MISMA clave natural -> N7a ERROR (un re-run
+    de F6 habria duplicado la fila identica)."""
+    _preparar_entorno(db)
+    mov = db.query(MovimientoFinanciero).filter(
+        MovimientoFinanciero.descripcion == P_MOV
+    ).first()
+    db.add(MovimientoFinanciero(
+        tipo=mov.tipo, descripcion=mov.descripcion, monto=mov.monto,
+        fecha=mov.fecha, socio_id=mov.socio_id, estado="activo",
+    ))
+    db.commit()
+    res = _controllers(db, mini_libro)
+    assert _no_resultado(res, "N7a").estado == "ERROR"
+
+
+def test_n7a_dos_ventas_fechas_distintas_no_error(db, tmp_path):
+    """fix3: 2 ventas del MISMO producto en fechas distintas son legitimas
+    (claves distintas) -> N7a OK. Antes: ERROR por agrupar por producto."""
+    path = tmp_path / "mini-validate-2ventas.xlsx"
+    _mini_workbook_dos_ventas(path)
+    _preparar_entorno(db)
+    producto = db.query(Producto).filter(Producto.nombre == P_PROD).first()
+    var = next(v for v in producto.variantes if v.nombre_variante == P_VAR)
+    cli = db.query(Cliente).filter(Cliente.nombre == P_CLI).first()
+    venta2 = Venta(
+        fecha=FECHA_VENTA2, canal_venta="feria", descuento_porcentaje=Decimal("0"),
+        total_venta=PRECIO_VENTA, estado="completada",
+        cliente_id=cli.id if cli else None,
+    )
+    db.add(venta2)
+    db.flush()
+    db.add(DetalleVenta(
+        venta_id=venta2.id, producto_id=producto.id, variante_id=var.id,
+        cantidad=Decimal("1"), precio_unitario_aplicado=PRECIO_VENTA,
+        costo_unitario_aplicado=COSTO_VENTA,
+    ))
+    db.commit()
+    res = _controllers(db, path)
+    assert _no_resultado(res, "N7a").estado == "OK"
+
+
+def test_n7a_dos_ventas_identicas_error(db, mini_libro):
+    """fix3: 2 ventas EXACTAMENTE identicas (misma clave natural) -> N7a ERROR
+    (un re-run de F5 habria duplicado la fila identica)."""
+    _preparar_entorno(db)
+    venta = db.query(Venta).filter(Venta.fecha == FECHA_VENTA).first()
+    det = next(d for d in venta.detalles)
+    clon = Venta(
+        fecha=venta.fecha, canal_venta="feria", descuento_porcentaje=Decimal("0"),
+        total_venta=venta.total_venta, estado="completada",
+        cliente_id=venta.cliente_id,
+    )
+    db.add(clon)
+    db.flush()
+    db.add(DetalleVenta(
+        venta_id=clon.id, producto_id=det.producto_id, variante_id=det.variante_id,
+        cantidad=det.cantidad, precio_unitario_aplicado=det.precio_unitario_aplicado,
+        costo_unitario_aplicado=det.costo_unitario_aplicado,
     ))
     db.commit()
     res = _controllers(db, mini_libro)
@@ -620,8 +764,16 @@ def test_n7f_fechas_reales_ok(db, mini_libro):
 
 
 def test_n7f_compra_con_fecha_now_error(db, mini_libro):
+    """Compra del insumo de PRUEBA con fecha now() -> ERROR. Se filtra por el
+    insumo test: con la migracion cargada, `first()` sin filtro tomarla una
+    compra real fuera de alcance y la corromperia."""
     _preparar_entorno(db)
-    compra = db.query(CompraInsumo).first()
+    compra = (
+        db.query(CompraInsumo)
+        .join(Insumo, CompraInsumo.insumo_id == Insumo.id)
+        .filter(Insumo.nombre == P_TELA)
+        .first()
+    )
     compra.fecha_compra = datetime.now(timezone.utc)
     db.commit()
     res = _controllers(db, mini_libro)
@@ -640,8 +792,16 @@ def test_n7g_sin_duplicados_ok(db, mini_libro):
 
 
 def test_n7g_compra_duplicada_error(db, mini_libro):
+    """Compra del insumo de PRUEBA duplicada (misma clave natural F2) -> ERROR.
+    Se filtra por el insumo test: con la migracion cargada, `first()` sin
+    filtro tomarla una compra real fuera del alcance del plan mini."""
     _preparar_entorno(db)
-    compra = db.query(CompraInsumo).first()
+    compra = (
+        db.query(CompraInsumo)
+        .join(Insumo, CompraInsumo.insumo_id == Insumo.id)
+        .filter(Insumo.nombre == P_TELA)
+        .first()
+    )
     db.add(CompraInsumo(
         insumo_id=compra.insumo_id,
         proveedor_id=compra.proveedor_id,

@@ -52,11 +52,11 @@ def _borrar_filas_test(db) -> None:
     db.query(Insumo).filter(
         Insumo.nombre.in_([P_AJUSTE, P_AJUSTE2, P_FANTASMA])
     ).delete(synchronize_session=False)
-    db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
-    ).delete(synchronize_session=False)
+    # Tipos canonicos: SOLO si ningun producto los referencia (con la migracion
+    # real cargada los productos reales los usan -> se conservan).
+    from tests.conftest import borrar_tipos_canonicos_si_libres
+
+    borrar_tipos_canonicos_si_libres(db)
     db.commit()
 
 

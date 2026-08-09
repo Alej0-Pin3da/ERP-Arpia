@@ -157,12 +157,12 @@ def _borrar_filas_test(db) -> None:
     db.query(Producto).filter(Producto.nombre.in_([P_SET, P_TOTE])).delete(
         synchronize_session=False
     )
-    # Remove the canonical catalog tipos that bootstrap_catalogo() inserts.
-    db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
-    ).delete(synchronize_session=False)
+    # Remove the canonical catalog tipos that bootstrap_catalogo() inserts —
+    # SOLO si ningun producto los referencia (con la migracion real cargada
+    # los productos reales los usan y se conservan; patron _borrar_filas_test).
+    from tests.conftest import borrar_tipos_canonicos_si_libres
+
+    borrar_tipos_canonicos_si_libres(db)
     db.commit()
 
 
@@ -291,9 +291,11 @@ def test_aplicar_ventas_inserta_con_fecha_real_canal_y_snapshot(db, mini_ventas)
     db.commit()
 
     assert res["insertadas"] == 2
-    ventas = db.query(Venta).all()
-    assert len(ventas) == 2
-    for v in ventas:
+    # Scoped a las ventas de PRUEBA (la migracion real ya cargo sus 13 ventas).
+    ids = _ventas_id_de_test(db)
+    assert len(ids) == 2
+    for vid in ids:
+        v = db.query(Venta).get(vid)
         assert v.canal_venta == "feria"  # decision producto
         assert v.estado == "completada"
         assert v.descuento_porcentaje == Decimal("0")  # sin doble descuento
@@ -359,8 +361,14 @@ def test_aplicar_ventas_idempotente(db, mini_ventas):
     aplicar_ventas(db, plan, canal_venta="feria")  # re-ejecucion
     db.commit()
 
-    assert db.query(Venta).count() == 2  # no duplica
-    assert db.query(DetalleVenta).count() == 2
+    # Scoped a las ventas de PRUEBA: la DB real ya tiene las 14 ventas de la
+    # migracion cargada; un count() global las incluiria (patron
+    # _borrar_filas_test — nunca asumir DB vacia).
+    ids = _ventas_id_de_test(db)
+    assert len(ids) == 2  # no duplica
+    assert (
+        db.query(DetalleVenta).filter(DetalleVenta.venta_id.in_(ids)).count() == 2
+    )
 
 
 def test_aplicar_ventas_cliente_upsert(db, mini_ventas):
@@ -395,9 +403,9 @@ def test_aplicar_ventas_stock_insuficiente_rollback(db, mini_ventas):
         aplicar_ventas(db, plan, canal_venta="feria")
     assert exc.value.status_code == 409
     db.rollback()
-    # EXM-4: ninguna venta de la fase queda persistida (rollback de fase)
-    assert db.query(Venta).count() == 0
-    assert db.query(DetalleVenta).count() == 0
+    # EXM-4: ninguna venta de la fase queda persistida (rollback de fase).
+    # Scoped a las filas de prueba: la migracion real ya cargo sus ventas.
+    assert not _ventas_id_de_test(db)
 
 
 # --------------------------------------------------------------------------- #

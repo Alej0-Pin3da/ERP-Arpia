@@ -9,6 +9,27 @@ from app.models import CategoriaInsumo, Usuario
 ADMIN_EMAIL = "admin@arpia.com"
 ADMIN_PASSWORD = "Admin123!"
 
+TIPOS_CANONICOS = ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
+
+
+def borrar_tipos_canonicos_si_libres(db) -> None:
+    """Borra los 6 Tipos_Producto canonicos de bootstrap_catalogo() SOLO si
+    ningun Producto los referencia (con la migracion real cargada los
+    productos reales usan estos tipos -> se conservan; patron
+    _borrar_filas_test: nunca tocar filas de la migracion cargada)."""
+    from app.models import Producto, TipoProducto
+
+    for nombre in TIPOS_CANONICOS:
+        tipo = db.query(TipoProducto).filter(TipoProducto.nombre == nombre).first()
+        if tipo is None:
+            continue
+        con_productos = db.query(Producto).filter(
+            Producto.tipo_producto_id == tipo.id
+        ).first()
+        if con_productos is None:
+            db.delete(tipo)
+    db.flush()
+
 
 @pytest.fixture(scope="session")
 def client():

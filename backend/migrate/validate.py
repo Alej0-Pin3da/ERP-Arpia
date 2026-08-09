@@ -35,13 +35,14 @@ The F7 runner is registered in ``migrate/__init__.py`` (FASES_IMPLEMENTADAS+F7).
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from app.models import (
     BomInsumo,
+    Cliente,
     CompraInsumo,
     DetalleVenta,
     Insumo,
@@ -50,8 +51,8 @@ from app.models import (
     Proveedor,
     SociosConfiguracion,
     TipoProducto,
-    Venta,
     VarianteProducto,
+    Venta,
 )
 from migrate.bom import BomPlan, plan_bom
 from migrate.catalog import (
@@ -64,7 +65,12 @@ from migrate.context import MigrationContext
 from migrate.finanzas import FinanzasPlan, SOCIOS, plan_finanzas
 from migrate.loaders import LibroMigracion
 from migrate.purchases import ComprasPlan, plan_compras
-from migrate.sales import VentasPlan, plan_ventas
+from migrate.sales import (
+    VentasPlan,
+    plan_ventas,
+    _producto_por_nombre,
+    _variante_por_nombre,
+)
 from migrate.stock import StockPlan, plan_stock
 
 # Historical rows live ~1 year before the server; anything within 1 day of
@@ -132,12 +138,18 @@ class PlanValidacion:
 # --------------------------------------------------------------------------- #
 
 
-def plan_para_validacion(libro: LibroMigracion, report=None) -> PlanValidacion:
-    """Run the phase plans that feed the N7 checks (read-only)."""
+def plan_para_validacion(
+    libro: LibroMigracion, report=None, bloques_bom: dict[str, tuple[str, str | None]] | None = None
+) -> PlanValidacion:
+    """Run the phase plans that feed the N7 checks (read-only).
+
+    ``bloques_bom`` maps recipe sheets to catalog products (defaults to the
+    canonical ``BLOQUES_BOM``); tests inject a mini-book mapping so the BOM
+    plan points at their own test product instead of a catalog one."""
     return PlanValidacion(
         catalogo=plan_catalogo(libro, report),
         compras=plan_compras(libro, report),
-        bom=plan_bom(libro, report),
+        bom=plan_bom(libro, report, bloques_bom),
         stock=plan_stock(libro, report),
         ventas=plan_ventas(libro, report),
         finanzas=plan_finanzas(libro, report),
@@ -157,51 +169,143 @@ def _conteo_por_clave(db, col) -> dict[str, int]:
     return conteos
 
 
-def _identidades_bom_db(db) -> dict[str, int]:
-    """BOM ids 'producto|insumo' present in the DB (rows per id)."""
-    conteos: dict[str, int] = defaultdict(int)
+def _clave_bom(linea) -> tuple:
+    """Clave natural BOM del plan: (producto, insumo, variante). El plan no
+    modela variante y el apply F3 inserta SIEMPRE variante NULL (BOM-1), asi
+    que la clave esperada lleva None."""
+    return (
+        clave_normalizada(linea.producto_nombre),
+        clave_normalizada(linea.insumo_nombre),
+        None,
+    )
+
+
+def _clave_mov_plan(mov) -> tuple:
+    """Clave natural F6 del plan: (fecha, tipo, monto, socio, descripcion),
+    identica a finanzas._clave_movimiento (idempotencia del apply)."""
+    return (
+        mov.fecha.date().isoformat() if mov.fecha else "SIN-FECHA",
+        mov.tipo,
+        _moneda(mov.monto),
+        clave_normalizada(mov.socio_nombre) if mov.socio_nombre else None,
+        clave_normalizada(mov.descripcion),
+    )
+
+
+def _clave_venta_plan(db, venta) -> tuple:
+    """Clave natural F5 del plan: (fecha, cliente, producto, variante,
+    cantidad, precio, costo) — identica a sales._clave_venta (idempotencia
+    del apply). La variante se resuelve contra el catalogo COMO HACE EL APPLY
+    (_variante_por_nombre): si la variante del Excel no existe en F1, la
+    venta se persiste con variante NULL y la clave va con None."""
+    producto = _producto_por_nombre(db, venta.producto_nombre)
+    variante_key = None
+    if producto is not None and venta.variante_nombre:
+        variante_id = _variante_por_nombre(db, producto.id, venta.variante_nombre)
+        if variante_id is not None:
+            variante_key = clave_normalizada(venta.variante_nombre)
+    return (
+        venta.fecha.date().isoformat(),
+        clave_normalizada(venta.cliente_nombre) if venta.cliente_nombre else None,
+        clave_normalizada(venta.producto_nombre),
+        variante_key,
+        venta.cantidad,
+        _moneda(venta.precio),
+        _moneda(venta.costo),
+    )
+
+
+def _identidades_bom_db(db) -> dict[tuple, int]:
+    """BOM ids keyed by the EXACT natural key (producto, insumo, variante):
+    dos filas con la misma clave son un duplicado real (re-run de F3 habria
+    duplicado la fila identica). Variantes distintas NO son duplicado."""
+    conteos: dict[tuple, int] = defaultdict(int)
     filas = (
-        db.query(BomInsumo, Producto.nombre, Insumo.nombre)
+        db.query(BomInsumo, Producto.nombre, Insumo.nombre,
+                 VarianteProducto.nombre_variante)
         .join(Producto, BomInsumo.producto_id == Producto.id)
         .join(Insumo, BomInsumo.insumo_id == Insumo.id)
+        .outerjoin(VarianteProducto, BomInsumo.variante_id == VarianteProducto.id)
         .all()
     )
-    for _bom, producto, insumo in filas:
-        conteos[
-            f"{clave_normalizada(producto)}|{clave_normalizada(insumo)}"
-        ] += 1
+    for _bom, producto, insumo, variante in filas:
+        conteos[(
+            clave_normalizada(producto),
+            clave_normalizada(insumo),
+            clave_normalizada(variante) if variante else None,
+        )] += 1
     return conteos
 
 
-def _identidades_compras_db(db) -> dict[str, int]:
-    """Compra ids keyed by the insumo name (the F2 natural id)."""
-    conteos: dict[str, int] = defaultdict(int)
+def _identidades_compras_db(db) -> dict[tuple, int]:
+    """Compra ids keyed by the F2 natural key (insumo, fecha, cantidad,
+    precio) — la misma clave del apply `_clave_compra_existente`. Dos compras
+    del mismo insumo en fechas/cantidades distintas NO son duplicado."""
+    conteos: dict[tuple, int] = defaultdict(int)
     filas = (
-        db.query(Insumo.nombre)
+        db.query(Insumo.nombre, CompraInsumo.fecha_compra,
+                 CompraInsumo.cantidad_comprada, CompraInsumo.precio_unitario_compra)
         .join(CompraInsumo, CompraInsumo.insumo_id == Insumo.id)
         .all()
     )
-    for (insumo,) in filas:
-        conteos[clave_normalizada(insumo)] += 1
+    for insumo, fecha, cantidad, precio in filas:
+        conteos[(
+            clave_normalizada(insumo),
+            fecha.date().isoformat(),
+            _moneda(cantidad),
+            _moneda(precio),
+        )] += 1
     return conteos
 
 
-def _identidades_ventas_db(db) -> dict[str, int]:
-    """Venta ids keyed by the product name (Detalle_Ventas referenced rows)."""
-    conteos: dict[str, int] = defaultdict(int)
+def _identidades_ventas_db(db) -> dict[tuple, int]:
+    """Venta ids keyed by the F5 natural key (fecha, cliente, producto,
+    variante, cantidad, precio, costo) — la misma clave del apply
+    `sales._clave_venta`. Ventas del mismo producto en fechas/clientes
+    distintos NO son duplicado."""
+    conteos: dict[tuple, int] = defaultdict(int)
     filas = (
-        db.query(Producto.nombre)
-        .join(DetalleVenta, DetalleVenta.producto_id == Producto.id)
+        db.query(Venta.fecha, Cliente.nombre, Producto.nombre,
+                 VarianteProducto.nombre_variante, DetalleVenta.cantidad,
+                 DetalleVenta.precio_unitario_aplicado,
+                 DetalleVenta.costo_unitario_aplicado)
+        .join(DetalleVenta, DetalleVenta.venta_id == Venta.id)
+        .join(Producto, DetalleVenta.producto_id == Producto.id)
+        .outerjoin(Cliente, Venta.cliente_id == Cliente.id)
+        .outerjoin(VarianteProducto, DetalleVenta.variante_id == VarianteProducto.id)
         .all()
     )
-    for (producto,) in filas:
-        conteos[clave_normalizada(producto)] += 1
+    for fecha, cliente, producto, variante, cantidad, precio, costo in filas:
+        conteos[(
+            fecha.date().isoformat(),
+            clave_normalizada(cliente) if cliente else None,
+            clave_normalizada(producto),
+            clave_normalizada(variante) if variante else None,
+            cantidad,
+            _moneda(precio),
+            _moneda(costo),
+        )] += 1
     return conteos
 
 
-def _identidades_movimientos_db(db) -> dict[str, int]:
-    """Movimiento ids keyed by the normalized descripcion."""
-    return _conteo_por_clave(db, MovimientoFinanciero.descripcion)
+def _identidades_movimientos_db(db) -> dict[tuple, int]:
+    """Movimiento ids keyed by the F6 natural key (fecha, tipo, monto, socio,
+    descripcion) — la misma clave del apply `finanzas._clave_movimiento`. Dos
+    movimientos con la misma descripcion pero distinta clave NO son dup."""
+    conteos: dict[tuple, int] = defaultdict(int)
+    socio_por_id = {
+        s.id: clave_normalizada(s.nombre)
+        for s in db.query(SociosConfiguracion).all()
+    }
+    for m in db.query(MovimientoFinanciero).all():
+        conteos[(
+            m.fecha.date().isoformat(),
+            m.tipo,
+            _moneda(m.monto),
+            socio_por_id.get(m.socio_id) if m.socio_id else None,
+            clave_normalizada(m.descripcion),
+        )] += 1
+    return conteos
 
 
 def _identidades_socios_db(db) -> dict[str, int]:
@@ -216,20 +320,24 @@ def _productos_del_plan(plan: PlanValidacion) -> list[str]:
 
 
 def _n7a_conteos(db, plan: PlanValidacion) -> CheckResult:
-    """Dominios tipificados: esperado = filas del plan; DB = filas con identidad."""
-    esperados_por_dominio: list[tuple[str, list[str]]] = [
-        ("proveedores", [normalizar_nombre(p.nombre) for p in plan.catalogo.proveedores]),
-        ("insumos", [normalizar_nombre(i.nombre) for i in plan.catalogo.insumos]),
-        ("tipos", [normalizar_nombre(t) for t in plan.catalogo.tipos]),
-        ("productos", _productos_del_plan(plan)),
-        ("bom_insumos", [
-            f"{clave_normalizada(l.producto_nombre)}|{clave_normalizada(l.insumo_nombre)}"
-            for l in plan.bom.insumos
-        ]),
-        ("compras", [normalizar_nombre(c.insumo_nombre) for c in plan.compras.compras]),
-        ("ventas", [normalizar_nombre(v.producto_nombre) for v in plan.ventas.ventas]),
-        ("movimientos", [normalizar_nombre(m.descripcion) for m in plan.finanzas.movimientos]),
-        ("socios", [normalizar_nombre(n) for n, _ in SOCIOS]),
+    """Dominios tipificados: esperado = filas del plan; DB = filas con
+    identidad. Las identidades de los dominios de FILAS (compras, ventas,
+    movimientos, BOM) son las CLAVES NATURALES COMPLETAS del apply (NFR-1):
+    multiples filas legitimas (misma entidad en fechas/cantidades distintas)
+    NO son duplicado; un duplicado es la misma clave natural con count > el
+    esperado del plan (un re-run habria duplicado UNA fila identica). Los
+    catalogos (proveedores, insumos, tipos, productos, socios) siguen siendo
+    unicos por nombre (fix3)."""
+    esperados_por_dominio: list[tuple[str, list]] = [
+        ("proveedores", [clave_normalizada(p.nombre) for p in plan.catalogo.proveedores]),
+        ("insumos", [clave_normalizada(i.nombre) for i in plan.catalogo.insumos]),
+        ("tipos", [clave_normalizada(t) for t in plan.catalogo.tipos]),
+        ("productos", [clave_normalizada(n) for n in _productos_del_plan(plan)]),
+        ("bom_insumos", [_clave_bom(l) for l in plan.bom.insumos]),
+        ("compras", [_clave_compra(c) for c in plan.compras.compras]),
+        ("ventas", [_clave_venta_plan(db, v) for v in plan.ventas.ventas]),
+        ("movimientos", [_clave_mov_plan(m) for m in plan.finanzas.movimientos]),
+        ("socios", [clave_normalizada(n) for n, _ in SOCIOS]),
     ]
     db_claves = {
         "proveedores": _conteo_por_clave(db, Proveedor.nombre),
@@ -247,15 +355,17 @@ def _n7a_conteos(db, plan: PlanValidacion) -> CheckResult:
     faltantes = 0
     duplicados = 0
     for nombre, esperados in esperados_por_dominio:
-        presentes = 0
-        for esperado in esperados:
-            cuenta = db_claves[nombre].get(clave_normalizada(esperado), 0)
-            if cuenta >= 1:
-                presentes += 1
-                if cuenta > 1:
-                    duplicados += 1
-            else:
+        plan_por_clave: Counter = Counter(esperados)
+        db_por_clave = db_claves[nombre]
+        presentes = sum(
+            1 for clave in esperados if db_por_clave.get(clave, 0) >= 1
+        )
+        for clave, esperadas in plan_por_clave.items():
+            cuenta = db_por_clave.get(clave, 0)
+            if cuenta == 0:
                 faltantes += 1
+            elif cuenta > esperadas:
+                duplicados += 1
         piezas.append(f"{nombre} {presentes}/{len(esperados)}")
 
     estado = "ERROR" if duplicados else ("WARN" if faltantes else "OK")

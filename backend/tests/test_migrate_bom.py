@@ -133,14 +133,12 @@ def _borrar_filas_test(db) -> None:
     db.query(Producto).filter(
         Producto.nombre.in_([P_CORSET, P_BLUSA_ML, P_BLUSA_MC, P_COMBO])
     ).delete(synchronize_session=False)
-    # Remove the canonical catalog tipos that bootstrap_catalogo() inserts.
-    # They are migration content, not app seed data; leaving them pollutes the
-    # shared per-sheet DB and breaks pagination tests that assume an empty table.
-    db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
-    ).delete(synchronize_session=False)
+    # Remove the canonical catalog tipos that bootstrap_catalogo() inserts —
+    # SOLO si ningun producto los referencia (con la migracion real cargada
+    # los productos reales los usan y se conservan; patron _borrar_filas_test).
+    from tests.conftest import borrar_tipos_canonicos_si_libres
+
+    borrar_tipos_canonicos_si_libres(db)
     db.commit()
 
 

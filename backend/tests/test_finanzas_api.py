@@ -33,11 +33,40 @@ def _unique() -> str:
 
 @pytest.fixture(scope="module", autouse=True)
 def _finanzas_api_tablas_limpias():
-    """Start the module with no partner rows / movements (see module docstring)."""
+    """Start the module with no partner rows / movements (see module docstring).
+
+    La DB real puede tener la MIGRACION cargada (3 socios canonicos 40/30/30 +
+    sus movimientos): ese estado se RESPALDA antes de limpiar y se RESTAURA al
+    final del modulo (patron: nunca borrar la migracion cargada)."""
     db = SessionLocal()
     try:
+        socios = [
+            (s.id, s.nombre, s.porcentaje_participacion)
+            for s in db.query(SociosConfiguracion).all()
+        ]
+        movs = [
+            (m.id, m.fecha, m.tipo, m.descripcion, m.monto, m.socio_id,
+             m.estado, m.liquidacion_id)
+            for m in db.query(MovimientoFinanciero).all()
+        ]
         db.query(MovimientoFinanciero).delete()
         db.query(SociosConfiguracion).delete()
+        db.commit()
+        yield
+        # Restaurar el estado pre-modulo (filas de la migracion u otros modulos).
+        db.query(MovimientoFinanciero).delete()
+        db.query(SociosConfiguracion).delete()
+        db.commit()
+        for sid, nombre, pct in socios:
+            db.add(SociosConfiguracion(
+                id=sid, nombre=nombre, porcentaje_participacion=pct
+            ))
+        db.commit()
+        for mid, fecha, tipo, desc, monto, socio_id, estado, liq in movs:
+            db.add(MovimientoFinanciero(
+                id=mid, fecha=fecha, tipo=tipo, descripcion=desc, monto=monto,
+                socio_id=socio_id, estado=estado, liquidacion_id=liq,
+            ))
         db.commit()
     finally:
         db.close()

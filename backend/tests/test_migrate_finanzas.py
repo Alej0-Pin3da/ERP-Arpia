@@ -208,11 +208,11 @@ def _borrar_socios_y_tipos(db) -> None:
         ).first()
         if con_movimientos is None:
             db.delete(socio)
-    db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
-    ).delete(synchronize_session=False)
+    # Tipos_Producto canonicos: SOLO si ningun producto los referencia (con la
+    # migracion real cargada los productos reales los usan -> se conservan).
+    from tests.conftest import borrar_tipos_canonicos_si_libres
+
+    borrar_tipos_canonicos_si_libres(db)
     db.commit()
 
 
@@ -384,28 +384,48 @@ def test_aplicar_es_idempotente(db, mini_finanzas):
     aplicar_finanzas(db, plan)  # re-ejecucion
     db.commit()
 
-    # 3 movimientos reales: termo (VALQUI) + prestamo (VALQUI) + marg (MARGARA)
-    assert db.query(MovimientoFinanciero).count() == 3
+    # 3 movimientos reales: termo (VALQUI) + prestamo (VALQUI) + marg (MARGARA).
+    # Scoped a las filas de PRUEBA: la DB real ya tiene los movimientos de la
+    # migracion cargada (patron _borrar_filas_test — nunca asumir DB vacia).
+    movs_test = db.query(MovimientoFinanciero).filter(
+        MovimientoFinanciero.descripcion.like(f"{PREFIX}%")
+    ).all()
+    assert len(movs_test) == 3
     # no se duplican ni el prestamo ni el equipo
 
 
 def test_rollback_no_persiste_nada(db, mini_finanzas):
-    """Si el caller hace rollback: cero movimientos y cero socios residuales."""
+    """Si el caller hace rollback: cero movimientos de prueba y los socios
+    canonicos quedan como estaban (sin filas residuales de la fase)."""
     from app.models import SociosConfiguracion
     from migrate.finanzas import aplicar_finanzas
 
     _preparar_entorno(db)
     _borrar_test(db)
+    # Los 3 socios canonicos YA existen (migracion real cargada); la fase usa
+    # get-or-create, asi que un rollback no debe alterar su estado ni crear
+    # movimientos de prueba.
+    socios_antes = {
+        s.nombre: s.porcentaje_participacion
+        for s in db.query(SociosConfiguracion).all()
+        if s.nombre in SOCIOS_ESPERADOS
+    }
     plan = _plan_de(mini_finanzas)
     aplicar_finanzas(db, plan)  # writes in the session (no commit)
     db.rollback()  # caller aborts the phase (EXM-4)
-    assert db.query(MovimientoFinanciero).count() == 0
+    # Scoped a filas de PRUEBA: la migracion real ya dejo sus movimientos.
     assert (
-        db.query(SociosConfiguracion)
-        .filter(SociosConfiguracion.nombre.in_(SOCIOS_ESPERADOS))
+        db.query(MovimientoFinanciero)
+        .filter(MovimientoFinanciero.descripcion.like(f"{PREFIX}%"))
         .count()
         == 0
     )
+    socios_despues = {
+        s.nombre: s.porcentaje_participacion
+        for s in db.query(SociosConfiguracion).all()
+        if s.nombre in SOCIOS_ESPERADOS
+    }
+    assert socios_despues == socios_antes  # sin cambios netos por el rollback
 
 
 def test_dry_run_registrada_en_runner():

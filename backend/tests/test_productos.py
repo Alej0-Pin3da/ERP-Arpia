@@ -155,6 +155,18 @@ def test_get_tipo_missing_returns_404(client, admin_token):
 def test_list_tipos_paginated_limit_offset_order_by_id(client, admin_token):
     tipo_ids = [_make_tipo() for _ in range(5)]
     try:
+        # Listado completo real (incluye los tipos canonicos que la migracion
+        # cargada deja en la DB): la paginacion se verifica contra la ventana
+        # esperada del listado total ordenado por id, no contra un estado
+        # asumido de DB vacia.
+        resp_all = client.get(
+            "/api/v1/tipos-producto?limit=1000",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp_all.status_code == 200
+        all_ids = [row["id"] for row in resp_all.json()]
+        assert set(tipo_ids) <= set(all_ids)  # los 5 del test estan presentes
+
         resp = client.get(
             "/api/v1/tipos-producto?limit=2&offset=2",
             headers={"Authorization": f"Bearer {admin_token}"},
@@ -162,8 +174,7 @@ def test_list_tipos_paginated_limit_offset_order_by_id(client, admin_token):
         assert resp.status_code == 200
         rows = resp.json()
         assert len(rows) == 2
-        ordered_ids = sorted(tipo_ids)
-        assert [row["id"] for row in rows] == ordered_ids[2:4]
+        assert [row["id"] for row in rows] == all_ids[2:4]
     finally:
         for tipo_id in tipo_ids:
             _cleanup_tipo(tipo_id)

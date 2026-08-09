@@ -102,12 +102,12 @@ def _borrar_filas_test(db) -> None:
     db.query(Insumo).filter(
         Insumo.nombre.in_([P_TELA, P_ARG, P_LINO])
     ).delete(synchronize_session=False)
-    # Remove the canonical catalog tipos that bootstrap_catalogo() inserts.
-    db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
-    ).delete(synchronize_session=False)
+    # Remove the canonical catalog tipos that bootstrap_catalogo() inserts —
+    # SOLO si ningun producto los referencia (con la migracion real cargada
+    # los productos reales los usan y se conservan; patron _borrar_filas_test).
+    from tests.conftest import borrar_tipos_canonicos_si_libres
+
+    borrar_tipos_canonicos_si_libres(db)
     db.commit()
 
 
