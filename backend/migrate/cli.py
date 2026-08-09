@@ -189,6 +189,27 @@ def ejecutar(
     # y listar los archivos escritos en stdout.
     ruta = run_report.write(reports_dir)
     print(f"\nTrazabilidad: {ruta}")
+    # MIG-2 (design D7): en modo commit, cada entrada WARN/ERROR de la corrida
+    # se persiste en Migracion_Omisiones con corrida = nombre de la traza. El
+    # fallo de persistencia es NO-fatal: WARN al reporte interno, exit code y
+    # JSON de la traza intactos (la traza ya fue escrita).
+    if options.modo == "commit":
+        try:
+            from app.db.session import SessionLocal  # lazy: solo en commit
+            from migrate.omisiones import persistir_omisiones
+
+            db = SessionLocal()
+            try:
+                persistir_omisiones(db, run_report, corrida_id=ruta.stem)
+            finally:
+                db.close()
+        except Exception as exc:
+            run_report.warn(
+                "omisiones",
+                None,
+                None,
+                f"no se persistieron las omisiones de la corrida: {type(exc).__name__}: {exc}",
+            )
     print(f"Archivos escritos: {ruta.name}")
     errores = run_report.count(LEVEL_ERROR)
     print(f"Resumen: {len(run_report.entradas)} entradas, {errores} errores")

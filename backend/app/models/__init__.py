@@ -3,6 +3,7 @@ from app.models.clientes import Cliente
 from app.models.refresh_token import RefreshToken
 from app.models.finanzas import MovimientoFinanciero, SociosConfiguracion
 from app.models.insumos import CategoriaInsumo, CompraInsumo, Insumo
+from app.models.migracion import MigracionOmision
 from app.models.productos import (
     BomInsumo,
     BomProducto,
@@ -34,4 +35,5 @@ __all__ = [
     "DevolucionItem",
     "SociosConfiguracion",
     "MovimientoFinanciero",
+    "MigracionOmision",
 ]
