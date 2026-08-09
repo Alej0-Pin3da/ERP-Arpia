@@ -79,9 +79,13 @@ const savingSocio = ref(false)
 
 const liquidacionRows = ref<LiquidacionRow[]>([])
 const editingSocio = ref<SocioConfiguracionRead | null>(null)
-/** T9: the movimiento being edited (create form swaps to the prefilled edit
- *  form while set; success clears it, an error keeps it open). */
+/** T9: the movimiento being edited (the dialog opens in edit mode while set;
+ *  success clears it, an error keeps it open). */
 const editingMovimiento = ref<MovimientoRead | null>(null)
+
+/** T8/FE-DLG-1: the movimientos + socios forms live in el-dialog at the usage site. */
+const movimientoDialogVisible = ref(false)
+const socioDialogVisible = ref(false)
 
 async function load(): Promise<void> {
   loading.value = true
@@ -141,6 +145,7 @@ async function onCreateMovimiento(payload: MovimientoCreate): Promise<void> {
   try {
     await finanzasApi.createMovimiento(payload)
     ElMessage.success('Movimiento registrado correctamente')
+    movimientoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo registrar el movimiento. Verifica los datos e inténtalo de nuevo.')
@@ -189,22 +194,39 @@ async function onCreateLiquidacion(payload: LiquidacionCreate): Promise<void> {
  *  the current page state to prefill the edit form. */
 function onEditMovimiento(row: MovimientoRow): void {
   editingMovimiento.value = movimientos.value.find((m) => m.id === row.id) ?? null
+  movimientoDialogVisible.value = true
 }
 
-function cancelEditMovimiento(): void {
+/** FE-DLG-1: the toolbar button opens the dialog in create mode. */
+function openCreateMovimiento(): void {
+  editingMovimiento.value = null
+  movimientoDialogVisible.value = true
+}
+
+/** FE-DLG-2/3: closing without saving discards the edit prefill. */
+function resetMovimientoDialog(): void {
   editingMovimiento.value = null
 }
 
-/** T9: PATCH the movement. Success closes the edit form and refreshes; an
+/** T8: one @submit entry — route create vs edit by the dialog mode. */
+function submitMovimiento(payload: MovimientoCreate | MovimientoUpdate): void {
+  if (editingMovimiento.value === null) {
+    void onCreateMovimiento(payload as MovimientoCreate)
+  } else {
+    void onUpdateMovimiento(payload as MovimientoUpdate)
+  }
+}
+
+/** T9: PATCH the movement. Success closes the dialog and refreshes; an
  *  error (e.g. the FIN-2 422 on liquidacion rows) shows the message and keeps
- *  the edit form open. */
+ *  the dialog open. */
 async function onUpdateMovimiento(payload: MovimientoUpdate): Promise<void> {
   if (editingMovimiento.value === null) return
   savingMovimiento.value = true
   try {
     await finanzasApi.updateMovimiento({ movimiento_id: editingMovimiento.value.id }, payload)
     ElMessage.success('Movimiento actualizado correctamente')
-    editingMovimiento.value = null
+    movimientoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el movimiento. Verifica los datos e inténtalo de nuevo.')
@@ -218,6 +240,7 @@ async function onCreateSocio(payload: SocioConfiguracionCreate): Promise<void> {
   try {
     await finanzasApi.createSocio(payload)
     ElMessage.success('Socio creado correctamente')
+    socioDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo crear el socio.')
@@ -228,10 +251,27 @@ async function onCreateSocio(payload: SocioConfiguracionCreate): Promise<void> {
 
 function onEditSocio(row: SocioConfiguracionRead): void {
   editingSocio.value = row
+  socioDialogVisible.value = true
 }
 
-function cancelEditSocio(): void {
+/** FE-DLG-1: the toolbar button opens the dialog in create mode. */
+function openCreateSocio(): void {
   editingSocio.value = null
+  socioDialogVisible.value = true
+}
+
+/** FE-DLG-2/3: closing without saving discards the edit prefill. */
+function resetSocioDialog(): void {
+  editingSocio.value = null
+}
+
+/** T8: one @submit entry — route create vs edit by the dialog mode. */
+function submitSocio(payload: SocioConfiguracionCreate | SocioConfiguracionUpdate): void {
+  if (editingSocio.value === null) {
+    void onCreateSocio(payload as SocioConfiguracionCreate)
+  } else {
+    void onUpdateSocio(payload as SocioConfiguracionUpdate)
+  }
 }
 
 /** MOD-3: PATCH the percentage (name is not updatable server-side). */
@@ -241,7 +281,7 @@ async function onUpdateSocio(payload: SocioConfiguracionUpdate): Promise<void> {
   try {
     await finanzasApi.updateSocio({ socio_id: editingSocio.value.id }, payload)
     ElMessage.success('Socio actualizado correctamente')
-    editingSocio.value = null
+    socioDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el socio.')
@@ -303,31 +343,10 @@ onMounted(load)
             <el-option label="Inversión" value="Inversion" />
             <el-option label="Retiro" value="Retiro" />
           </el-select>
+          <el-button v-if="canRegister" type="primary" data-test="nuevo-movimiento" @click="openCreateMovimiento">
+            Nuevo movimiento
+          </el-button>
         </div>
-        <template v-if="canRegister">
-          <MovimientosForm
-            v-if="editingMovimiento === null"
-            mode="create"
-            :socios="sociosLookup"
-            :saving="savingMovimiento"
-            class="finanzas-form-section"
-            @submit="onCreateMovimiento"
-          />
-          <div v-else class="movimiento-edit-section">
-            <h3>Editar movimiento</h3>
-            <MovimientosForm
-              mode="edit"
-              :initial="editingMovimiento"
-              :socios="sociosLookup"
-              :saving="savingMovimiento"
-              class="finanzas-form-section"
-              @submit="onUpdateMovimiento"
-            />
-            <el-button size="small" data-test="cancel-edit-movimiento" @click="cancelEditMovimiento">
-              Cancelar edición
-            </el-button>
-          </div>
-        </template>
         <MovimientosTable
           :rows="movimientoRows"
           :loading="loading"
@@ -345,6 +364,25 @@ onMounted(load)
           :current-page="movimientosPage"
           @current-change="(p: number) => { movimientosPage = p; load() }"
         />
+
+        <el-dialog
+          v-model="movimientoDialogVisible"
+          :title="editingMovimiento === null ? 'Registrar movimiento' : 'Editar movimiento'"
+          :close-on-click-modal="false"
+          :close-on-press-escape="!savingMovimiento"
+          :show-close="!savingMovimiento"
+          width="720px"
+          @closed="resetMovimientoDialog"
+        >
+          <MovimientosForm
+            v-if="movimientoDialogVisible"
+            :mode="editingMovimiento === null ? 'create' : 'edit'"
+            :initial="editingMovimiento"
+            :socios="sociosLookup"
+            :saving="savingMovimiento"
+            @submit="submitMovimiento"
+          />
+        </el-dialog>
       </el-tab-pane>
 
       <el-tab-pane v-if="canRegister" label="Liquidaciones" name="liquidaciones">
@@ -362,6 +400,11 @@ onMounted(load)
       </el-tab-pane>
 
       <el-tab-pane label="Socios" name="socios">
+        <div class="socios-toolbar">
+          <el-button v-if="canRegister" type="primary" data-test="nuevo-socio" @click="openCreateSocio">
+            Nuevo socio
+          </el-button>
+        </div>
         <SociosTable
           :rows="socios"
           :loading="loading"
@@ -379,24 +422,23 @@ onMounted(load)
           @current-change="(p: number) => { sociosPage = p; load() }"
         />
 
-        <div v-if="canRegister" class="socios-form-section">
-          <template v-if="editingSocio === null">
-            <h3>Crear socio</h3>
-            <SociosForm mode="create" :saving="savingSocio" @submit="onCreateSocio" />
-          </template>
-          <template v-else>
-            <h3>Editar socio</h3>
-            <SociosForm
-              mode="edit"
-              :initial="editingSocio"
-              :saving="savingSocio"
-              @submit="onUpdateSocio"
-            />
-            <el-button size="small" data-test="cancel-edit-socio" @click="cancelEditSocio">
-              Cancelar edición
-            </el-button>
-          </template>
-        </div>
+        <el-dialog
+          v-model="socioDialogVisible"
+          :title="editingSocio === null ? 'Crear socio' : 'Editar socio'"
+          :close-on-click-modal="false"
+          :close-on-press-escape="!savingSocio"
+          :show-close="!savingSocio"
+          width="560px"
+          @closed="resetSocioDialog"
+        >
+          <SociosForm
+            v-if="socioDialogVisible"
+            :mode="editingSocio === null ? 'create' : 'edit'"
+            :initial="editingSocio"
+            :saving="savingSocio"
+            @submit="submitSocio"
+          />
+        </el-dialog>
       </el-tab-pane>
     </el-tabs>
   </section>
@@ -418,26 +460,19 @@ onMounted(load)
   margin-bottom: 1rem;
 }
 
-.finanzas-form-section {
-  margin-bottom: 1rem;
-}
-
-.movimiento-edit-section {
-  max-width: 56rem;
-  margin-bottom: 1rem;
-}
-
-.movimiento-edit-section h3 {
-  margin: 0 0 0.5rem;
-}
-
 .finanzas-toolbar {
+  display: flex;
+  gap: 0.75rem;
   max-width: 42rem;
   margin-bottom: 1rem;
 }
 
 .finanzas-toolbar .el-select {
   width: 12rem;
+}
+
+.socios-toolbar {
+  margin-bottom: 1rem;
 }
 
 .tabla-paginacion {
@@ -451,15 +486,6 @@ onMounted(load)
 }
 
 .liquidacion-result h3 {
-  margin: 0 0 0.5rem;
-}
-
-.socios-form-section {
-  margin-top: 1.5rem;
-  max-width: 40rem;
-}
-
-.socios-form-section h3 {
   margin: 0 0 0.5rem;
 }
 </style>

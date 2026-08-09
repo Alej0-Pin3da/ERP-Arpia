@@ -74,6 +74,10 @@ const savingCompra = ref(false)
 const savingInsumo = ref(false)
 const editingInsumo = ref<InsumoRead | null>(null)
 
+/** T8/FE-DLG-1: the forms live in el-dialog at the usage site. */
+const insumoDialogVisible = ref(false)
+const comprasDialogVisible = ref(false)
+
 async function load(): Promise<void> {
   loading.value = true
   error.value = null
@@ -157,6 +161,7 @@ async function onCreateCompra(payload: CompraInsumoCreate): Promise<void> {
   try {
     await comprasApi.create(payload)
     ElMessage.success('Compra registrada correctamente')
+    comprasDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo registrar la compra. Verifica los datos e inténtalo de nuevo.')
@@ -171,6 +176,7 @@ async function onCreateInsumo(payload: InsumoCreate): Promise<void> {
   try {
     await insumosApi.create(payload)
     ElMessage.success('Insumo creado correctamente')
+    insumoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo crear el insumo.')
@@ -181,9 +187,31 @@ async function onCreateInsumo(payload: InsumoCreate): Promise<void> {
 
 function onEditInsumo(row: InsumoRead): void {
   editingInsumo.value = row
+  insumoDialogVisible.value = true
 }
 
-function cancelEditInsumo(): void {
+/** T8: one @submit entry — route create vs edit by the dialog mode. */
+function submitInsumo(payload: InsumoCreate | InsumoUpdate): void {
+  if (editingInsumo.value === null) {
+    void onCreateInsumo(payload as InsumoCreate)
+  } else {
+    void onUpdateInsumo(payload as InsumoUpdate)
+  }
+}
+
+/** FE-DLG-1: the toolbar button opens the dialog in create mode. */
+function openCreateInsumo(): void {
+  editingInsumo.value = null
+  insumoDialogVisible.value = true
+}
+
+/** FE-DLG-1: the toolbar button opens the compras dialog in create mode. */
+function openCreateCompra(): void {
+  comprasDialogVisible.value = true
+}
+
+/** FE-DLG-2/3: closing without saving discards the edit prefill. */
+function resetInsumoDialog(): void {
   editingInsumo.value = null
 }
 
@@ -194,7 +222,7 @@ async function onUpdateInsumo(payload: InsumoUpdate): Promise<void> {
   try {
     await insumosApi.update({ insumo_id: editingInsumo.value.id }, payload)
     ElMessage.success('Insumo actualizado correctamente')
-    editingInsumo.value = null
+    insumoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el insumo.')
@@ -264,26 +292,9 @@ onMounted(load)
           >
             <el-option v-for="c in categorias" :key="c.id" :label="c.nombre" :value="c.id" />
           </el-select>
-        </div>
-
-        <div v-if="canManage" class="insumo-form-section">
-          <template v-if="editingInsumo === null">
-            <h3>Crear insumo</h3>
-            <InsumoForm mode="create" :categorias="categorias" :saving="savingInsumo" @submit="onCreateInsumo" />
-          </template>
-          <template v-else>
-            <h3>Editar insumo</h3>
-            <InsumoForm
-              mode="edit"
-              :initial="editingInsumo"
-              :categorias="categorias"
-              :saving="savingInsumo"
-              @submit="onUpdateInsumo"
-            />
-            <el-button size="small" data-test="cancel-edit-insumo" @click="cancelEditInsumo">
-              Cancelar edición
-            </el-button>
-          </template>
+          <el-button v-if="canManage" type="primary" data-test="nuevo-insumo" @click="openCreateInsumo">
+            Nuevo insumo
+          </el-button>
         </div>
 
         <InsumosTable :rows="insumos" :loading="loading" :can-edit="canManage" @edit="onEditInsumo" @delete="onDeleteInsumo" />
@@ -296,6 +307,25 @@ onMounted(load)
           :current-page="insumosPage"
           @current-change="(p: number) => { insumosPage = p; load() }"
         />
+
+        <el-dialog
+          v-model="insumoDialogVisible"
+          :title="editingInsumo === null ? 'Crear insumo' : 'Editar insumo'"
+          :close-on-click-modal="false"
+          :close-on-press-escape="!savingInsumo"
+          :show-close="!savingInsumo"
+          width="720px"
+          @closed="resetInsumoDialog"
+        >
+          <InsumoForm
+            v-if="insumoDialogVisible"
+            :mode="editingInsumo === null ? 'create' : 'edit'"
+            :initial="editingInsumo"
+            :categorias="categorias"
+            :saving="savingInsumo"
+            @submit="submitInsumo"
+          />
+        </el-dialog>
       </el-tab-pane>
 
       <el-tab-pane label="Compras" name="compras">
@@ -327,15 +357,11 @@ onMounted(load)
             data-test="compra-proveedor-filter"
             @change="onComprasFilterChange"
           />
+          <el-button v-if="canRegister" type="primary" data-test="nueva-compra" @click="openCreateCompra">
+            Nueva compra
+          </el-button>
         </div>
 
-        <ComprasForm
-          v-if="canRegister"
-          :insumos="insumosLookup"
-          :saving="savingCompra"
-          class="compra-form-section"
-          @submit="onCreateCompra"
-        />
         <ComprasTable :rows="compraRows" :loading="loading" />
         <el-pagination
           class="tabla-paginacion"
@@ -346,6 +372,22 @@ onMounted(load)
           :current-page="comprasPage"
           @current-change="(p: number) => { comprasPage = p; load() }"
         />
+
+        <el-dialog
+          v-model="comprasDialogVisible"
+          title="Nueva compra"
+          :close-on-click-modal="false"
+          :close-on-press-escape="!savingCompra"
+          :show-close="!savingCompra"
+          width="720px"
+        >
+          <ComprasForm
+            v-if="comprasDialogVisible"
+            :insumos="insumosLookup"
+            :saving="savingCompra"
+            @submit="onCreateCompra"
+          />
+        </el-dialog>
       </el-tab-pane>
     </el-tabs>
   </section>
@@ -367,15 +409,6 @@ onMounted(load)
   margin-bottom: 1rem;
 }
 
-.insumo-form-section {
-  margin-bottom: 1rem;
-  max-width: 56rem;
-}
-
-.insumo-form-section h3 {
-  margin: 0 0 0.5rem;
-}
-
 .insumo-toolbar,
 .compras-filtro {
   display: flex;
@@ -391,10 +424,6 @@ onMounted(load)
 
 .compras-filtro .el-select {
   width: 12rem;
-}
-
-.compra-form-section {
-  margin-bottom: 1rem;
 }
 
 .tabla-paginacion {

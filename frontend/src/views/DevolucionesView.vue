@@ -37,6 +37,9 @@ const page = ref(1)
 const pageSize = 20
 const productos = ref<ProductoRead[]>([])
 
+/** T8/FE-DLG-1: the register form lives in an el-dialog opened from the toolbar. */
+const devolucionDialogVisible = ref(false)
+
 /** List filters (MOD-2: venta_id, fecha_desde, fecha_hasta). */
 const filtros = reactive({ venta_id: null as number | null, fecha_desde: '', fecha_hasta: '' })
 
@@ -103,12 +106,18 @@ function serverDetail(err: unknown): string | null {
   return null
 }
 
+/** FE-DLG-1: the toolbar button opens the register dialog in create mode. */
+function openCreateDevolucion(): void {
+  devolucionDialogVisible.value = true
+}
+
 /** MOD-2: POST the DevolucionCreate payload, confirm and refresh the list. */
 async function onSubmit(payload: DevolucionCreate): Promise<void> {
   saving.value = true
   try {
     await devolucionesApi.create(payload)
     ElMessage.success('Devolución registrada correctamente')
+    devolucionDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo registrar la devolución. Verifica los datos e inténtalo de nuevo.')
@@ -164,6 +173,9 @@ onMounted(load)
       />
       <el-button type="primary" plain data-test="apply-filters" @click="applyFilters">Filtrar</el-button>
       <el-button data-test="clear-filters" @click="clearFilters">Limpiar</el-button>
+      <el-button v-if="canRegister" type="primary" data-test="nueva-devolucion" @click="openCreateDevolucion">
+        Nueva devolución
+      </el-button>
     </div>
 
     <el-tabs v-model="activeTab">
@@ -179,16 +191,24 @@ onMounted(load)
           @current-change="(p: number) => { page = p; load() }"
         />
       </el-tab-pane>
-
-      <el-tab-pane v-if="canRegister" label="Registrar devolución" name="registrar">
-        <DevolucionesForm
-          :productos="productos"
-          :load-variantes="loadVariantes"
-          :saving="saving"
-          @submit="onSubmit"
-        />
-      </el-tab-pane>
     </el-tabs>
+
+    <el-dialog
+      v-model="devolucionDialogVisible"
+      title="Nueva devolución"
+      :close-on-click-modal="false"
+      :close-on-press-escape="!saving"
+      :show-close="!saving"
+      width="640px"
+    >
+      <DevolucionesForm
+        v-if="devolucionDialogVisible"
+        :productos="productos"
+        :load-variantes="loadVariantes"
+        :saving="saving"
+        @submit="onSubmit"
+      />
+    </el-dialog>
   </section>
 </template>
 

@@ -42,6 +42,9 @@ const filterRol = ref<'admin' | 'operador' | 'consulta' | null>(null)
 const saving = ref(false)
 const editing = ref<UsuarioRead | null>(null)
 
+/** T8/FE-DLG-1: the form lives in an el-dialog opened from the toolbar button. */
+const usuarioDialogVisible = ref(false)
+
 async function load(): Promise<void> {
   loading.value = true
   error.value = null
@@ -96,6 +99,7 @@ async function onCreate(payload: UsuarioCreate): Promise<void> {
   try {
     await usuariosApi.create(payload)
     ElMessage.success('Usuario creado correctamente')
+    usuarioDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo crear el usuario.')
@@ -104,11 +108,28 @@ async function onCreate(payload: UsuarioCreate): Promise<void> {
   }
 }
 
-function onEdit(row: UsuarioRead): void {
-  editing.value = row
+/** T8: one @submit entry — route create vs edit by the dialog mode. */
+function submitUsuario(payload: UsuarioCreate | UsuarioUpdate): void {
+  if (editing.value === null) {
+    void onCreate(payload as UsuarioCreate)
+  } else {
+    void onUpdate(payload as UsuarioUpdate)
+  }
 }
 
-function cancelEdit(): void {
+function onEdit(row: UsuarioRead): void {
+  editing.value = row
+  usuarioDialogVisible.value = true
+}
+
+/** FE-DLG-1: the toolbar button opens the dialog in create mode. */
+function openCreateUsuario(): void {
+  editing.value = null
+  usuarioDialogVisible.value = true
+}
+
+/** FE-DLG-2/3: closing without saving discards the edit prefill. */
+function resetUsuarioDialog(): void {
   editing.value = null
 }
 
@@ -119,7 +140,7 @@ async function onUpdate(payload: UsuarioUpdate): Promise<void> {
   try {
     await usuariosApi.update({ usuario_id: editing.value.id }, payload)
     ElMessage.success('Usuario actualizado correctamente')
-    editing.value = null
+    usuarioDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el usuario.')
@@ -188,17 +209,8 @@ onMounted(load)
         <el-option label="Operador" value="operador" />
         <el-option label="Consulta" value="consulta" />
       </el-select>
-    </div>
-
-    <div v-if="editing === null" class="usuario-form-section">
-      <h3>Crear usuario</h3>
-      <UsuarioForm mode="create" :saving="saving" @submit="onCreate" />
-    </div>
-    <div v-else class="usuario-form-section">
-      <h3>Editar usuario</h3>
-      <UsuarioForm mode="edit" :initial="editing" :saving="saving" @submit="onUpdate" />
-      <el-button size="small" data-test="cancel-edit-usuario" @click="cancelEdit">
-        Cancelar edición
+      <el-button type="primary" data-test="nuevo-usuario" @click="openCreateUsuario">
+        Nuevo usuario
       </el-button>
     </div>
 
@@ -218,6 +230,24 @@ onMounted(load)
       :current-page="page"
       @current-change="(p: number) => { page = p; load() }"
     />
+
+    <el-dialog
+      v-model="usuarioDialogVisible"
+      :title="editing === null ? 'Crear usuario' : 'Editar usuario'"
+      :close-on-click-modal="false"
+      :close-on-press-escape="!saving"
+      :show-close="!saving"
+      width="560px"
+      @closed="resetUsuarioDialog"
+    >
+      <UsuarioForm
+        v-if="usuarioDialogVisible"
+        :mode="editing === null ? 'create' : 'edit'"
+        :initial="editing"
+        :saving="saving"
+        @submit="submitUsuario"
+      />
+    </el-dialog>
   </section>
 </template>
 
@@ -235,15 +265,6 @@ onMounted(load)
 
 .usuarios-error {
   margin-bottom: 1rem;
-}
-
-.usuario-form-section {
-  margin-bottom: 1rem;
-  max-width: 56rem;
-}
-
-.usuario-form-section h3 {
-  margin: 0 0 0.5rem;
 }
 
 .usuario-toolbar {

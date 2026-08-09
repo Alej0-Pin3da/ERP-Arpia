@@ -95,6 +95,13 @@ const saving = ref<Record<EntityKey, boolean>>({
   'tipos-producto': false,
   'categorias-insumos': false,
 })
+/** T8/FE-DLG-1: one el-dialog per entity, opened from the toolbar button. */
+const dialogVisible = ref<Record<EntityKey, boolean>>({
+  clientes: false,
+  proveedores: false,
+  'tipos-producto': false,
+  'categorias-insumos': false,
+})
 
 /** URL id param key per entity (backend path params). */
 const ID_KEYS: Record<EntityKey, string> = {
@@ -204,6 +211,7 @@ async function onCreate(entityKey: EntityKey, values: Record<string, string>): P
   try {
     await crudApis[entityKey].create(BUILDERS[entityKey].create(values))
     ElMessage.success(`Se creó ${singularOf(entityKey)} correctamente`)
+    dialogVisible.value[entityKey] = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? `No se pudo crear ${singularOf(entityKey).toLowerCase()}.`)
@@ -212,11 +220,28 @@ async function onCreate(entityKey: EntityKey, values: Record<string, string>): P
   }
 }
 
-function onEdit(entityKey: EntityKey, row: MaestroRow): void {
-  editing.value[entityKey] = row
+/** T8: one @submit entry — route create vs edit by the dialog mode. */
+function submitEntity(entityKey: EntityKey, values: Record<string, string>): void {
+  if (editing.value[entityKey] === null) {
+    void onCreate(entityKey, values)
+  } else {
+    void onUpdate(entityKey, values)
+  }
 }
 
-function cancelEdit(entityKey: EntityKey): void {
+function onEdit(entityKey: EntityKey, row: MaestroRow): void {
+  editing.value[entityKey] = row
+  dialogVisible.value[entityKey] = true
+}
+
+/** FE-DLG-1: the toolbar button opens the dialog in create mode. */
+function openCreate(entityKey: EntityKey): void {
+  editing.value[entityKey] = null
+  dialogVisible.value[entityKey] = true
+}
+
+/** FE-DLG-2/3: closing without saving discards the edit prefill. */
+function resetDialog(entityKey: EntityKey): void {
   editing.value[entityKey] = null
 }
 
@@ -228,7 +253,7 @@ async function onUpdate(entityKey: EntityKey, values: Record<string, string>): P
   try {
     await crudApis[entityKey].update({ [ID_KEYS[entityKey]]: row.id }, BUILDERS[entityKey].update(values))
     ElMessage.success(`Se actualizó ${singularOf(entityKey)} correctamente`)
-    editing.value[entityKey] = null
+    dialogVisible.value[entityKey] = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? `No se pudo actualizar ${singularOf(entityKey).toLowerCase()}.`)
@@ -293,33 +318,14 @@ onMounted(load)
             @keyup.enter="onSearch(entity.key)"
             @clear="onSearch(entity.key)"
           />
-        </div>
-
-        <div v-if="canManage" class="maestro-form-section">
-          <template v-if="editing[entity.key] === null">
-            <h3>Crear {{ entity.singular }}</h3>
-            <MaestroForm
-              mode="create"
-              :fields="entity.fields"
-              :singular="entity.singular"
-              :saving="saving[entity.key]"
-              @submit="(values) => onCreate(entity.key, values)"
-            />
-          </template>
-          <template v-else>
-            <h3>Editar {{ entity.singular }}</h3>
-            <MaestroForm
-              mode="edit"
-              :fields="entity.fields"
-              :singular="entity.singular"
-              :initial="editing[entity.key]"
-              :saving="saving[entity.key]"
-              @submit="(values) => onUpdate(entity.key, values)"
-            />
-            <el-button size="small" :data-test="`cancel-edit-${entity.key}`" @click="cancelEdit(entity.key)">
-              Cancelar edición
-            </el-button>
-          </template>
+          <el-button
+            v-if="canManage"
+            type="primary"
+            :data-test="`nuevo-${entity.key}`"
+            @click="openCreate(entity.key)"
+          >
+            Nuevo {{ entity.singular }}
+          </el-button>
         </div>
 
         <MaestrosTable
@@ -340,6 +346,26 @@ onMounted(load)
           :current-page="pages[entity.key]"
           @current-change="(p: number) => { pages[entity.key] = p; load() }"
         />
+
+        <el-dialog
+          v-model="dialogVisible[entity.key]"
+          :title="editing[entity.key] === null ? `Crear ${entity.singular}` : `Editar ${entity.singular}`"
+          :close-on-click-modal="false"
+          :close-on-press-escape="!saving[entity.key]"
+          :show-close="!saving[entity.key]"
+          width="560px"
+          @closed="resetDialog(entity.key)"
+        >
+          <MaestroForm
+            v-if="dialogVisible[entity.key]"
+            :mode="editing[entity.key] === null ? 'create' : 'edit'"
+            :fields="entity.fields"
+            :singular="entity.singular"
+            :initial="editing[entity.key]"
+            :saving="saving[entity.key]"
+            @submit="(values) => submitEntity(entity.key, values)"
+          />
+        </el-dialog>
       </el-tab-pane>
     </el-tabs>
   </section>
@@ -361,16 +387,9 @@ onMounted(load)
   margin-bottom: 1rem;
 }
 
-.maestro-form-section {
-  margin-bottom: 1rem;
-  max-width: 56rem;
-}
-
-.maestro-form-section h3 {
-  margin: 0 0 0.5rem;
-}
-
 .maestro-toolbar {
+  display: flex;
+  gap: 0.75rem;
   max-width: 42rem;
   margin-bottom: 1rem;
 }

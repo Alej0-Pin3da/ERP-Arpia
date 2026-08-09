@@ -48,6 +48,9 @@ const filterEstado = ref<'completada' | 'anulada' | null>(null)
 const productos = ref<ProductoRead[]>([])
 const clientes = ref<ClienteRead[]>([])
 
+/** T8/FE-DLG-1: the register form lives in an el-dialog opened from the toolbar. */
+const ventaDialogVisible = ref(false)
+
 /** Variante fetcher handed to the form (productosApi.listVariantes). */
 async function loadVariantes(productoId: number): Promise<VarianteProductoRead[]> {
   return productosApi.listVariantes({ producto_id: productoId })
@@ -112,12 +115,18 @@ function serverDetail(err: unknown): string | null {
   return null
 }
 
+/** FE-DLG-1: the toolbar button opens the register dialog in create mode. */
+function openCreateVenta(): void {
+  ventaDialogVisible.value = true
+}
+
 /** MOD-1: POST the VentaCreate payload, confirm and refresh the list. */
 async function onSubmit(payload: VentaCreate): Promise<void> {
   saving.value = true
   try {
     await ventasApi.create(payload)
     ElMessage.success('Venta registrada correctamente')
+    ventaDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo registrar la venta. Verifica los datos e inténtalo de nuevo.')
@@ -170,6 +179,9 @@ onMounted(load)
             <el-option label="Completada" value="completada" />
             <el-option label="Anulada" value="anulada" />
           </el-select>
+          <el-button v-if="canRegister" type="primary" data-test="nueva-venta" @click="openCreateVenta">
+            Nueva venta
+          </el-button>
         </div>
         <VentasTable :rows="rows" :loading="loading" />
         <el-pagination
@@ -181,16 +193,24 @@ onMounted(load)
           :current-page="page"
           @current-change="(p: number) => { page = p; load() }"
         />
-      </el-tab-pane>
 
-      <el-tab-pane v-if="canRegister" label="Registrar venta" name="registrar">
-        <VentasForm
-          :productos="productos"
-          :clientes="clientes"
-          :load-variantes="loadVariantes"
-          :saving="saving"
-          @submit="onSubmit"
-        />
+        <el-dialog
+          v-model="ventaDialogVisible"
+          title="Nueva venta"
+          :close-on-click-modal="false"
+          :close-on-press-escape="!saving"
+          :show-close="!saving"
+          width="640px"
+        >
+          <VentasForm
+            v-if="ventaDialogVisible"
+            :productos="productos"
+            :clientes="clientes"
+            :load-variantes="loadVariantes"
+            :saving="saving"
+            @submit="onSubmit"
+          />
+        </el-dialog>
       </el-tab-pane>
     </el-tabs>
   </section>

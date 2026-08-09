@@ -101,6 +101,12 @@ const savingBomProducto = ref(false)
 const editingBomInsumo = ref<BomInsumoRow | null>(null)
 const editingBomProducto = ref<BomProductoRow | null>(null)
 
+/** T8/FE-DLG-1: the four forms live in el-dialog at the usage site. */
+const productoDialogVisible = ref(false)
+const varianteDialogVisible = ref(false)
+const bomInsumoDialogVisible = ref(false)
+const bomProductoDialogVisible = ref(false)
+
 // Costo tab.
 const costoProductoId = ref<number | null>(null)
 const costoVarianteId = ref<number | null>(null)
@@ -175,6 +181,7 @@ async function onCreateProducto(payload: ProductoPayloadInput): Promise<void> {
   try {
     await productosApi.create(payload)
     ElMessage.success('Producto creado correctamente')
+    productoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo crear el producto.')
@@ -183,12 +190,29 @@ async function onCreateProducto(payload: ProductoPayloadInput): Promise<void> {
   }
 }
 
+/** T8: one @submit entry — route create vs edit by the dialog mode. */
+function submitProducto(payload: ProductoPayloadInput): void {
+  if (editingProducto.value === null) {
+    void onCreateProducto(payload)
+  } else {
+    void onUpdateProducto(payload)
+  }
+}
+
 function onEditProducto(row: ProductoRow): void {
   const producto = productos.value.find((p) => p.id === row.id)
   if (producto) editingProducto.value = producto
+  productoDialogVisible.value = true
 }
 
-function cancelEditProducto(): void {
+/** FE-DLG-1: the toolbar button opens the dialog in create mode. */
+function openCreateProducto(): void {
+  editingProducto.value = null
+  productoDialogVisible.value = true
+}
+
+/** FE-DLG-2/3: closing without saving discards the edit prefill. */
+function resetProductoDialog(): void {
   editingProducto.value = null
 }
 
@@ -198,7 +222,7 @@ async function onUpdateProducto(payload: ProductoPayloadInput): Promise<void> {
   try {
     await productosApi.update({ producto_id: editingProducto.value.id }, payload)
     ElMessage.success('Producto actualizado correctamente')
-    editingProducto.value = null
+    productoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el producto.')
@@ -250,9 +274,17 @@ async function loadVariantes(productoId: number): Promise<void> {
 
 function onEditVariante(variante: VarianteProductoRead): void {
   editingVariante.value = variante
+  varianteDialogVisible.value = true
 }
 
-function cancelEditVariante(): void {
+/** FE-DLG-1: the section button opens the variante dialog in create mode. */
+function openCreateVariante(): void {
+  editingVariante.value = null
+  varianteDialogVisible.value = true
+}
+
+/** FE-DLG-2/3: closing without saving discards the edit prefill. */
+function resetVarianteDialog(): void {
   editingVariante.value = null
 }
 
@@ -271,6 +303,7 @@ async function onSubmitVariante(payload: VariantePayloadInput): Promise<void> {
       await productosApi.createVariante({ producto_id: selectedProducto.value.id }, payload)
       ElMessage.success('Variante creada correctamente')
     }
+    varianteDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await loadVariantes(selectedProducto.value.id)
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo guardar la variante.')
@@ -328,9 +361,17 @@ async function loadBom(productoId: number): Promise<void> {
 
 function onEditBomInsumo(row: BomInsumoRow): void {
   editingBomInsumo.value = row
+  bomInsumoDialogVisible.value = true
 }
 
-function cancelEditBomInsumo(): void {
+/** FE-DLG-1: the section button opens the BOM insumo dialog in create mode. */
+function openCreateBomInsumo(): void {
+  editingBomInsumo.value = null
+  bomInsumoDialogVisible.value = true
+}
+
+/** FE-DLG-2/3: closing without saving discards the edit prefill. */
+function resetBomInsumoDialog(): void {
   editingBomInsumo.value = null
 }
 
@@ -350,6 +391,7 @@ async function onSubmitBomInsumo(payload: BomInsumoPayloadInput): Promise<void> 
       await productosApi.createBomInsumo({ producto_id: bomProductoId.value }, payload)
       ElMessage.success('Línea de BOM agregada correctamente')
     }
+    bomInsumoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await loadBom(bomProductoId.value)
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo guardar la línea de BOM.')
@@ -380,9 +422,17 @@ async function onDeleteBomInsumo(row: BomInsumoRow): Promise<void> {
 
 function onEditBomProducto(row: BomProductoRow): void {
   editingBomProducto.value = row
+  bomProductoDialogVisible.value = true
 }
 
-function cancelEditBomProducto(): void {
+/** FE-DLG-1: the section button opens the BOM combo dialog in create mode. */
+function openCreateBomProducto(): void {
+  editingBomProducto.value = null
+  bomProductoDialogVisible.value = true
+}
+
+/** FE-DLG-2/3: closing without saving discards the edit prefill. */
+function resetBomProductoDialog(): void {
   editingBomProducto.value = null
 }
 
@@ -401,6 +451,7 @@ async function onSubmitBomProducto(payload: BomProductoPayloadInput): Promise<vo
       await productosApi.createBomProducto({ producto_id: bomProductoId.value }, payload)
       ElMessage.success('Línea de combo agregada correctamente')
     }
+    bomProductoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await loadBom(bomProductoId.value)
   } catch (err) {
     ElMessage.error(serverDetail(err) ?? 'No se pudo guardar la línea de combo.')
@@ -512,26 +563,9 @@ onMounted(load)
           >
             <el-option v-for="t in tipos" :key="t.id" :label="t.nombre" :value="t.id" />
           </el-select>
-        </div>
-
-        <div v-if="canManage" class="producto-form-section">
-          <template v-if="editingProducto === null">
-            <h3>Crear producto</h3>
-            <ProductoForm mode="create" :tipos="tipos" :saving="savingProducto" @submit="onCreateProducto" />
-          </template>
-          <template v-else>
-            <h3>Editar producto</h3>
-            <ProductoForm
-              mode="edit"
-              :initial="editingProducto"
-              :tipos="tipos"
-              :saving="savingProducto"
-              @submit="onUpdateProducto"
-            />
-            <el-button size="small" data-test="cancel-edit-producto" @click="cancelEditProducto">
-              Cancelar edición
-            </el-button>
-          </template>
+          <el-button v-if="canManage" type="primary" data-test="nuevo-producto" @click="openCreateProducto">
+            Nuevo producto
+          </el-button>
         </div>
 
         <ProductosTable
@@ -552,31 +586,37 @@ onMounted(load)
           @current-change="(p: number) => { productosPage = p; load() }"
         />
 
+        <el-dialog
+          v-model="productoDialogVisible"
+          :title="editingProducto === null ? 'Crear producto' : 'Editar producto'"
+          :close-on-click-modal="false"
+          :close-on-press-escape="!savingProducto"
+          :show-close="!savingProducto"
+          width="560px"
+          @closed="resetProductoDialog"
+        >
+          <ProductoForm
+            v-if="productoDialogVisible"
+            :mode="editingProducto === null ? 'create' : 'edit'"
+            :initial="editingProducto"
+            :tipos="tipos"
+            :saving="savingProducto"
+            @submit="submitProducto"
+          />
+        </el-dialog>
+
         <div v-if="selectedProducto !== null" class="variantes-section" data-test="variantes-section">
           <header class="variantes-header">
             <h3>Variantes de {{ selectedProducto.nombre }}</h3>
-            <el-button size="small" data-test="close-variantes" @click="selectedProducto = null">
-              Cerrar
-            </el-button>
-          </header>
-
-          <template v-if="canManage">
-            <template v-if="editingVariante === null">
-              <VarianteForm mode="create" :saving="savingVariante" class="variante-form" @submit="onSubmitVariante" />
-            </template>
-            <template v-else>
-              <VarianteForm
-                mode="edit"
-                :initial="editingVariante"
-                :saving="savingVariante"
-                class="variante-form"
-                @submit="onSubmitVariante"
-              />
-              <el-button size="small" data-test="cancel-edit-variante" @click="cancelEditVariante">
-                Cancelar edición
+            <div class="variantes-actions">
+              <el-button v-if="canManage" size="small" type="primary" data-test="nueva-variante" @click="openCreateVariante">
+                Nueva variante
               </el-button>
-            </template>
-          </template>
+              <el-button size="small" data-test="close-variantes" @click="selectedProducto = null">
+                Cerrar
+              </el-button>
+            </div>
+          </header>
 
           <VariantesTable
             :variantes="variantes"
@@ -585,6 +625,24 @@ onMounted(load)
             @edit="onEditVariante"
             @delete="onDeleteVariante"
           />
+
+          <el-dialog
+            v-model="varianteDialogVisible"
+            :title="editingVariante === null ? 'Nueva variante' : 'Editar variante'"
+            :close-on-click-modal="false"
+            :close-on-press-escape="!savingVariante"
+            :show-close="!savingVariante"
+            width="480px"
+            @closed="resetVarianteDialog"
+          >
+            <VarianteForm
+              v-if="varianteDialogVisible"
+              :mode="editingVariante === null ? 'create' : 'edit'"
+              :initial="editingVariante"
+              :saving="savingVariante"
+              @submit="onSubmitVariante"
+            />
+          </el-dialog>
         </div>
       </el-tab-pane>
 
@@ -607,31 +665,16 @@ onMounted(load)
           <section class="bom-subsection">
             <header class="bom-subsection-header">
               <h3>Insumos</h3>
+              <el-button
+                v-if="canManage"
+                size="small"
+                type="primary"
+                data-test="nueva-linea-insumo"
+                @click="openCreateBomInsumo"
+              >
+                Nueva línea
+              </el-button>
             </header>
-            <template v-if="canManage">
-              <template v-if="editingBomInsumo === null">
-                <BomInsumoForm
-                  mode="create"
-                  :insumos="insumos"
-                  :saving="savingBomInsumo"
-                  class="bom-form"
-                  @submit="onSubmitBomInsumo"
-                />
-              </template>
-              <template v-else>
-                <BomInsumoForm
-                  mode="edit"
-                  :initial="editingBomInsumo"
-                  :insumos="insumos"
-                  :saving="savingBomInsumo"
-                  class="bom-form"
-                  @submit="onSubmitBomInsumo"
-                />
-                <el-button size="small" data-test="cancel-edit-bom-insumo" @click="cancelEditBomInsumo">
-                  Cancelar edición
-                </el-button>
-              </template>
-            </template>
             <BomInsumosTable
               :rows="bomInsumoRows"
               :loading="bomLoading"
@@ -639,36 +682,40 @@ onMounted(load)
               @edit="onEditBomInsumo"
               @delete="onDeleteBomInsumo"
             />
+
+            <el-dialog
+              v-model="bomInsumoDialogVisible"
+              :title="editingBomInsumo === null ? 'Nueva línea de insumo' : 'Editar línea de insumo'"
+              :close-on-click-modal="false"
+              :close-on-press-escape="!savingBomInsumo"
+              :show-close="!savingBomInsumo"
+              width="480px"
+              @closed="resetBomInsumoDialog"
+            >
+              <BomInsumoForm
+                v-if="bomInsumoDialogVisible"
+                :mode="editingBomInsumo === null ? 'create' : 'edit'"
+                :initial="editingBomInsumo"
+                :insumos="insumos"
+                :saving="savingBomInsumo"
+                @submit="onSubmitBomInsumo"
+              />
+            </el-dialog>
           </section>
 
           <section class="bom-subsection">
             <header class="bom-subsection-header">
               <h3>Productos del combo</h3>
+              <el-button
+                v-if="canManage"
+                size="small"
+                type="primary"
+                data-test="nueva-linea-combo"
+                @click="openCreateBomProducto"
+              >
+                Nueva línea
+              </el-button>
             </header>
-            <template v-if="canManage">
-              <template v-if="editingBomProducto === null">
-                <BomProductoForm
-                  mode="create"
-                  :productos="productosLookup"
-                  :saving="savingBomProducto"
-                  class="bom-form"
-                  @submit="onSubmitBomProducto"
-                />
-              </template>
-              <template v-else>
-                <BomProductoForm
-                  mode="edit"
-                  :initial="editingBomProducto"
-                  :productos="productosLookup"
-                  :saving="savingBomProducto"
-                  class="bom-form"
-                  @submit="onSubmitBomProducto"
-                />
-                <el-button size="small" data-test="cancel-edit-bom-producto" @click="cancelEditBomProducto">
-                  Cancelar edición
-                </el-button>
-              </template>
-            </template>
             <BomProductosTable
               :rows="bomProductoRows"
               :loading="bomLoading"
@@ -676,6 +723,25 @@ onMounted(load)
               @edit="onEditBomProducto"
               @delete="onDeleteBomProducto"
             />
+
+            <el-dialog
+              v-model="bomProductoDialogVisible"
+              :title="editingBomProducto === null ? 'Nueva línea de combo' : 'Editar línea de combo'"
+              :close-on-click-modal="false"
+              :close-on-press-escape="!savingBomProducto"
+              :show-close="!savingBomProducto"
+              width="480px"
+              @closed="resetBomProductoDialog"
+            >
+              <BomProductoForm
+                v-if="bomProductoDialogVisible"
+                :mode="editingBomProducto === null ? 'create' : 'edit'"
+                :initial="editingBomProducto"
+                :productos="productosLookup"
+                :saving="savingBomProducto"
+                @submit="onSubmitBomProducto"
+              />
+            </el-dialog>
           </section>
         </template>
       </el-tab-pane>
@@ -728,15 +794,6 @@ onMounted(load)
   margin-bottom: 1rem;
 }
 
-.producto-form-section {
-  margin-bottom: 1rem;
-  max-width: 56rem;
-}
-
-.producto-form-section h3 {
-  margin: 0 0 0.5rem;
-}
-
 .producto-toolbar {
   display: flex;
   gap: 0.75rem;
@@ -775,6 +832,11 @@ onMounted(load)
   margin: 0;
 }
 
+.variantes-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .bom-select {
   max-width: 24rem;
   margin-bottom: 1rem;
@@ -784,13 +846,15 @@ onMounted(load)
   margin-bottom: 1.5rem;
 }
 
-.bom-subsection-header h3 {
-  margin: 0 0 0.75rem;
+.bom-subsection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
 }
 
-.bom-form {
-  margin-bottom: 0.75rem;
-  max-width: 40rem;
+.bom-subsection-header h3 {
+  margin: 0;
 }
 
 .costo-selects {
