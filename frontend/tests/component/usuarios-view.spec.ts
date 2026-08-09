@@ -62,10 +62,10 @@ async function mountView(): Promise<VueWrapper> {
   return wrapper
 }
 
-describe('UsuariosView (MOD-5 usuarios)', () => {
+describe('UsuariosView (MOD-5 usuarios + T6)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    apiMocks.list.mockResolvedValue(USUARIOS)
+    apiMocks.list.mockResolvedValue({ items: USUARIOS, total: 3 })
     apiMocks.create.mockResolvedValue(USUARIOS[0])
     apiMocks.update.mockResolvedValue({ ...USUARIOS[2], rol: 'consulta' })
     apiMocks.delete.mockResolvedValue(undefined)
@@ -76,7 +76,7 @@ describe('UsuariosView (MOD-5 usuarios)', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders the user list with es-CO rol labels and requests limit 1000', async () => {
+  it('renders the user list with es-CO rol labels and requests the paged list', async () => {
     const wrapper = await mountView()
 
     const text = wrapper.text()
@@ -87,7 +87,43 @@ describe('UsuariosView (MOD-5 usuarios)', () => {
     expect(text).toContain('Consulta')
 
     expect(apiMocks.list).toHaveBeenCalledTimes(1)
-    expect(apiMocks.list).toHaveBeenCalledWith({ limit: 1000 })
+    expect(apiMocks.list).toHaveBeenCalledWith({ limit: 20, offset: 0 })
+  })
+
+  it('renders el-pagination and pages with the new offset', async () => {
+    const wrapper = await mountView()
+    expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(true)
+    expect(apiMocks.list).toHaveBeenCalledWith({ limit: 20, offset: 0 })
+
+    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    await flushPromises()
+    expect(apiMocks.list).toHaveBeenCalledWith({ limit: 20, offset: 20 })
+  })
+
+  it('global q and rol filter reset to page 1 and refetch with the params', async () => {
+    const wrapper = await mountView()
+
+    const input = wrapper.find('[data-test="usuario-search"]')
+    await input.setValue('ana')
+    await input.trigger('keyup.enter')
+    await flushPromises()
+    expect(apiMocks.list).toHaveBeenCalledWith({ limit: 20, offset: 0, q: 'ana' })
+
+    // Clear the q (clear icon) so the rol filter call is isolated.
+    await input.setValue('')
+    await input.trigger('keyup.enter')
+    await flushPromises()
+
+    const select = wrapper.find('[data-test="usuario-rol-filter"]')
+    await select.trigger('click')
+    await nextTick()
+    const option = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
+      (el) => el.textContent?.trim() === 'Operador',
+    )
+    expect(option).toBeDefined()
+    option!.click()
+    await flushPromises()
+    expect(apiMocks.list).toHaveBeenLastCalledWith({ limit: 20, offset: 0, rol: 'operador' })
   })
 
   it('hides the delete action on the self row but keeps edit', async () => {

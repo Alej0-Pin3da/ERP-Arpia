@@ -32,6 +32,7 @@ import {
 import MaestroForm from '@/components/maestros/MaestroForm.vue'
 import MaestrosTable from '@/components/maestros/MaestrosTable.vue'
 import { useAuthStore } from '@/stores/auth'
+import { buildListParams } from '@/utils/pagination'
 import {
   buildCategoriaInsumoPayload,
   buildCategoriaInsumoUpdatePayload,
@@ -62,6 +63,26 @@ const rows = ref<Record<EntityKey, MaestroRow[]>>({
   'tipos-producto': [],
   'categorias-insumos': [],
 })
+/** Server totals per entity (FE-1: total comes from the API). */
+const totals = ref<Record<EntityKey, number>>({
+  clientes: 0,
+  proveedores: 0,
+  'tipos-producto': 0,
+  'categorias-insumos': 0,
+})
+const pages = ref<Record<EntityKey, number>>({
+  clientes: 1,
+  proveedores: 1,
+  'tipos-producto': 1,
+  'categorias-insumos': 1,
+})
+const pageSize = 20
+const searchQ = ref<Record<EntityKey, string>>({
+  clientes: '',
+  proveedores: '',
+  'tipos-producto': '',
+  'categorias-insumos': '',
+})
 const editing = ref<Record<EntityKey, MaestroRow | null>>({
   clientes: null,
   proveedores: null,
@@ -90,7 +111,7 @@ const ID_KEYS: Record<EntityKey, string> = {
  * (all optionals are `string | null`), so the handlers stay generic.
  */
 interface EntityCrud {
-  list: (params?: { limit?: number }) => Promise<MaestroRow[]>
+  list: (params?: Record<string, unknown>) => Promise<{ items: MaestroRow[]; total: number }>
   create: (body: Record<string, string | null>) => Promise<MaestroRow>
   update: (params: Record<string, number>, body: Record<string, string | null>) => Promise<MaestroRow>
   delete: (params: Record<string, number>) => Promise<void>
@@ -120,21 +141,45 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = null
   try {
+    const requests: Record<EntityKey, ReturnType<EntityCrud['list']>> = {
+      clientes: clientesApi.list(
+        buildListParams({ page: pages.value.clientes, pageSize, q: searchQ.value.clientes }),
+      ),
+      proveedores: proveedoresApi.list(
+        buildListParams({ page: pages.value.proveedores, pageSize, q: searchQ.value.proveedores }),
+      ),
+      'tipos-producto': tiposProductoApi.list(
+        buildListParams({ page: pages.value['tipos-producto'], pageSize, q: searchQ.value['tipos-producto'] }),
+      ),
+      'categorias-insumos': categoriasInsumosApi.list(
+        buildListParams({ page: pages.value['categorias-insumos'], pageSize, q: searchQ.value['categorias-insumos'] }),
+      ),
+    }
     const [clientes, proveedores, tipos, categorias] = await Promise.all([
-      clientesApi.list({ limit: 1000 }), // backend GET /clientes defaults to limit=50
-      proveedoresApi.list({ limit: 1000 }),
-      tiposProductoApi.list({ limit: 1000 }),
-      categoriasInsumosApi.list({ limit: 1000 }),
+      requests.clientes,
+      requests.proveedores,
+      requests['tipos-producto'],
+      requests['categorias-insumos'],
     ])
-    rows.value.clientes = clientes
-    rows.value.proveedores = proveedores
-    rows.value['tipos-producto'] = tipos
-    rows.value['categorias-insumos'] = categorias
+    rows.value.clientes = clientes.items
+    rows.value.proveedores = proveedores.items
+    rows.value['tipos-producto'] = tipos.items
+    rows.value['categorias-insumos'] = categorias.items
+    totals.value.clientes = clientes.total
+    totals.value.proveedores = proveedores.total
+    totals.value['tipos-producto'] = tipos.total
+    totals.value['categorias-insumos'] = categorias.total
   } catch {
     error.value = 'No se pudo cargar la información de maestros. Verifica la conexión con el servidor.'
   } finally {
     loading.value = false
   }
+}
+
+/** FE-2: a busqueda change resets that entity's table to page 1 and refetches. */
+function onSearch(entityKey: EntityKey): void {
+  pages.value[entityKey] = 1
+  load()
 }
 
 /** Surface the server validation detail (400/404/409) when present. */
@@ -238,6 +283,18 @@ onMounted(load)
 
     <el-tabs v-model="activeTab">
       <el-tab-pane v-for="entity in MAESTRO_ENTITIES" :key="entity.key" :label="entity.title" :name="entity.key">
+        <div class="maestro-toolbar">
+          <el-input
+            v-model="searchQ[entity.key]"
+            clearable
+            :placeholder="`Buscar ${entity.singular.toLowerCase()}…`"
+            :data-test="`maestro-search-${entity.key}`"
+            class="maestro-search"
+            @keyup.enter="onSearch(entity.key)"
+            @clear="onSearch(entity.key)"
+          />
+        </div>
+
         <div v-if="canManage" class="maestro-form-section">
           <template v-if="editing[entity.key] === null">
             <h3>Crear {{ entity.singular }}</h3>
@@ -274,6 +331,15 @@ onMounted(load)
           @edit="(row) => onEdit(entity.key, row)"
           @delete="(row) => onDelete(entity.key, row)"
         />
+        <el-pagination
+          class="tabla-paginacion"
+          background
+          layout="total, prev, pager, next"
+          :total="totals[entity.key]"
+          :page-size="pageSize"
+          :current-page="pages[entity.key]"
+          @current-change="(p: number) => { pages[entity.key] = p; load() }"
+        />
       </el-tab-pane>
     </el-tabs>
   </section>
@@ -302,5 +368,19 @@ onMounted(load)
 
 .maestro-form-section h3 {
   margin: 0 0 0.5rem;
+}
+
+.maestro-toolbar {
+  max-width: 42rem;
+  margin-bottom: 1rem;
+}
+
+.maestro-search {
+  width: 14rem;
+}
+
+.tabla-paginacion {
+  margin-top: 1rem;
+  justify-content: flex-end;
 }
 </style>

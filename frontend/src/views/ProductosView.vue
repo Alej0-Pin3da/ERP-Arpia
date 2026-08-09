@@ -23,6 +23,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { insumosApi, productosApi, tiposProductoApi } from '@/api/endpoints'
+import { buildListParams } from '@/utils/pagination'
 import BomInsumoForm from '@/components/productos/BomInsumoForm.vue'
 import BomInsumosTable from '@/components/productos/BomInsumosTable.vue'
 import BomProductoForm from '@/components/productos/BomProductoForm.vue'
@@ -63,7 +64,16 @@ const activeTab = ref('productos')
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+// --- productos table: server-side pagination + filters ----------------------
 const productos = ref<ProductoRead[]>([])
+const productosTotal = ref(0)
+const productosPage = ref(1)
+const productosPageSize = ref(20)
+const productoQ = ref('')
+const filterTipoProductoId = ref<number | null>(null)
+
+// --- lookups (full sets, limit:1000 — design D3) ---------------------------
+const productosLookup = ref<ProductoRead[]>([])
 const tipos = ref<TipoProductoRead[]>([])
 const insumos = ref<InsumoRead[]>([])
 
@@ -84,7 +94,7 @@ const bomProductoId = ref<number | null>(null)
 const bomInsumos = ref<BomInsumoRead[]>([])
 const bomProductos = ref<BomProductoRead[]>([])
 const bomInsumoRows = computed(() => buildBomInsumoRows(bomInsumos.value, insumos.value))
-const bomProductoRows = computed(() => buildBomProductoRows(bomProductos.value, productos.value))
+const bomProductoRows = computed(() => buildBomProductoRows(bomProductos.value, productosLookup.value))
 const bomLoading = ref(false)
 const savingBomInsumo = ref(false)
 const savingBomProducto = ref(false)
@@ -102,19 +112,42 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    const [productosList, tiposList, insumosList] = await Promise.all([
-      productosApi.list({ limit: 1000 }), // backend GET /productos defaults to limit=50
+    const [productosList, tiposList, insumosList, productosLookup_] = await Promise.all([
+      // Table page: real server-side pagination + filters (T6).
+      productosApi.list(
+        buildListParams({
+          page: productosPage.value,
+          pageSize: productosPageSize.value,
+          filtros: { tipo_producto_id: filterTipoProductoId.value },
+          q: productoQ.value,
+        }),
+      ),
       tiposProductoApi.list({ limit: 1000 }), // tipo label join + form options
       insumosApi.list({ limit: 1000 }), // BOM insumo name/unidad join + form options
+      // D3: join fetches keep the full set (BOM/Costo selects, combo names).
+      productosApi.list({ limit: 1000 }),
     ])
-    productos.value = productosList
-    tipos.value = tiposList
-    insumos.value = insumosList
+    productos.value = productosList.items
+    productosTotal.value = productosList.total
+    tipos.value = tiposList.items
+    insumos.value = insumosList.items
+    productosLookup.value = productosLookup_.items
   } catch {
     error.value = 'No se pudo cargar la información de productos. Verifica la conexión con el servidor.'
   } finally {
     loading.value = false
   }
+}
+
+/** FE-2: filter/busqueda changes reset to page 1 and refetch. */
+function onProductosSearch(): void {
+  productosPage.value = 1
+  load()
+}
+
+function onProductosFilterChange(): void {
+  productosPage.value = 1
+  load()
 }
 
 /** Surface the server validation detail (400/404/409) when present. */
@@ -459,6 +492,28 @@ onMounted(load)
 
     <el-tabs v-model="activeTab">
       <el-tab-pane label="Productos" name="productos">
+        <div class="producto-toolbar">
+          <el-input
+            v-model="productoQ"
+            clearable
+            placeholder="Buscar producto…"
+            data-test="producto-search"
+            class="producto-search"
+            @keyup.enter="onProductosSearch"
+            @clear="onProductosSearch"
+          />
+          <el-select
+            v-model="filterTipoProductoId"
+            clearable
+            filterable
+            placeholder="Filtrar por tipo"
+            data-test="producto-tipo-filter"
+            @change="onProductosFilterChange"
+          >
+            <el-option v-for="t in tipos" :key="t.id" :label="t.nombre" :value="t.id" />
+          </el-select>
+        </div>
+
         <div v-if="canManage" class="producto-form-section">
           <template v-if="editingProducto === null">
             <h3>Crear producto</h3>
@@ -486,6 +541,15 @@ onMounted(load)
           @edit="onEditProducto"
           @delete="onDeleteProducto"
           @select-variantes="onSelectVariantes"
+        />
+        <el-pagination
+          class="tabla-paginacion"
+          background
+          layout="total, prev, pager, next"
+          :total="productosTotal"
+          :page-size="productosPageSize"
+          :current-page="productosPage"
+          @current-change="(p: number) => { productosPage = p; load() }"
         />
 
         <div v-if="selectedProducto !== null" class="variantes-section" data-test="variantes-section">
@@ -535,7 +599,7 @@ onMounted(load)
             style="width: 100%"
             @change="onSelectBomProducto"
           >
-            <el-option v-for="p in productos" :key="p.id" :label="p.nombre" :value="p.id" />
+            <el-option v-for="p in productosLookup" :key="p.id" :label="p.nombre" :value="p.id" />
           </el-select>
         </div>
 
@@ -585,7 +649,7 @@ onMounted(load)
               <template v-if="editingBomProducto === null">
                 <BomProductoForm
                   mode="create"
-                  :productos="productos"
+                  :productos="productosLookup"
                   :saving="savingBomProducto"
                   class="bom-form"
                   @submit="onSubmitBomProducto"
@@ -595,7 +659,7 @@ onMounted(load)
                 <BomProductoForm
                   mode="edit"
                   :initial="editingBomProducto"
-                  :productos="productos"
+                  :productos="productosLookup"
                   :saving="savingBomProducto"
                   class="bom-form"
                   @submit="onSubmitBomProducto"
@@ -627,7 +691,7 @@ onMounted(load)
             style="width: 100%"
             @change="onSelectCostoProducto"
           >
-            <el-option v-for="p in productos" :key="p.id" :label="p.nombre" :value="p.id" />
+            <el-option v-for="p in productosLookup" :key="p.id" :label="p.nombre" :value="p.id" />
           </el-select>
           <el-select
             v-model="costoVarianteId"
@@ -671,6 +735,26 @@ onMounted(load)
 
 .producto-form-section h3 {
   margin: 0 0 0.5rem;
+}
+
+.producto-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  max-width: 42rem;
+  margin-bottom: 1rem;
+}
+
+.producto-search {
+  width: 14rem;
+}
+
+.producto-toolbar .el-select {
+  width: 12rem;
+}
+
+.tabla-paginacion {
+  margin-top: 1rem;
+  justify-content: flex-end;
 }
 
 .variantes-section {

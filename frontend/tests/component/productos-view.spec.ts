@@ -1,17 +1,14 @@
 /**
- * ProductosView integration tests (PR10, spec MOD-5).
+ * ProductosView integration tests (PR10 MOD-5 + ui-mantenimiento PR1 T6).
  *
  * Mounts the REAL ProductosView + all productos components against mocked
  * productosApi/tiposProductoApi/insumosApi: the three tabs (Productos / BOM /
- * Costo), the client-joined productos list, role visibility (ALL product,
- * variante and BOM writes are require_admin server-side — operador/consulta
- * see read-only lists, admin owns every form/action), the nested variantes
- * lazy flow (click "Variantes" -> GET /productos/{id}/variantes), the
- * productos create/edit/delete flows (delete expects 204, 409 "in use"
- * surfaced), the BOM tab (select product -> both line lists; admin add with
- * the exact BomInsumoCreate payload; a duplicate line's 409 surfaced) and the
- * Costo tab (select product -> GET /productos/{id}/costo -> grouped tree +
- * grand total; optional variante select adds ?variante_id).
+ * Costo), the client-joined productos list with server-side pagination
+ * ({items,total} + el-pagination + q/tipo filters), role visibility (ALL
+ * product, variante and BOM writes are require_admin server-side), the nested
+ * variantes lazy flow, the productos create/edit/delete flows, the BOM tab and
+ * the Costo tab. Lookup joins (BOM/Costo selects, tipo/insumo labels) keep
+ * limit:1000 against `.items` (design D3).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -141,6 +138,9 @@ const COSTO: CostoProduccionRead = {
   ],
 }
 
+/** Table page default (page 1, pageSize 20). */
+const PAGE1 = { limit: 20, offset: 0 }
+
 async function mountView(rol: string): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -182,12 +182,13 @@ async function pickOption(popperClass: string, label: string): Promise<void> {
   await flushPromises()
 }
 
-describe('ProductosView (MOD-5)', () => {
+describe('ProductosView (MOD-5 + T6)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    apiMocks.listProductos.mockResolvedValue(PRODUCTOS)
-    apiMocks.listTipos.mockResolvedValue(TIPOS)
-    apiMocks.listInsumos.mockResolvedValue(INSUMOS)
+    // Table page uses the {items,total} contract; lookups keep limit:1000.
+    apiMocks.listProductos.mockResolvedValue({ items: PRODUCTOS, total: 2 })
+    apiMocks.listTipos.mockResolvedValue({ items: TIPOS, total: 1 })
+    apiMocks.listInsumos.mockResolvedValue({ items: INSUMOS, total: 1 })
     apiMocks.listVariantes.mockResolvedValue(VARIANTES)
     apiMocks.listBomInsumos.mockResolvedValue(BOM_INSUMOS)
     apiMocks.listBomProductos.mockResolvedValue(BOM_PRODUCTOS)
@@ -224,9 +225,31 @@ describe('ProductosView (MOD-5)', () => {
     expect(text).toContain('Tipo #99') // fallback
     expect(text).toContain('$12.000,00') // precio_venta_sugerido es-CO
 
-    expect(apiMocks.listProductos).toHaveBeenCalledTimes(1)
+    // Table fetch pages; the lookup join keeps limit:1000.
+    expect(apiMocks.listProductos).toHaveBeenCalledWith(PAGE1)
     expect(apiMocks.listProductos).toHaveBeenCalledWith({ limit: 1000 })
     expect(apiMocks.listTipos).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders el-pagination on the productos tab and pages with offset', async () => {
+    const wrapper = await mountView('operador')
+    expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(true)
+    expect(apiMocks.listProductos).toHaveBeenCalledWith(PAGE1)
+
+    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    await flushPromises()
+    expect(apiMocks.listProductos).toHaveBeenCalledWith({ limit: 20, offset: 20 })
+  })
+
+  it('global q on the productos tab resets to page 1 and refetches with q', async () => {
+    const wrapper = await mountView('operador')
+
+    const input = wrapper.find('[data-test="producto-search"]')
+    await input.setValue('arepa')
+    await input.trigger('keyup.enter')
+    await flushPromises()
+
+    expect(apiMocks.listProductos).toHaveBeenCalledWith({ ...PAGE1, q: 'arepa' })
   })
 
   it('operador sees read-only lists — no product form, no edit/delete/variantes actions', async () => {
@@ -260,7 +283,7 @@ describe('ProductosView (MOD-5)', () => {
 
   it('creates a product with the exact payload and refreshes the list', async () => {
     const wrapper = await mountView('admin')
-    expect(apiMocks.listProductos).toHaveBeenCalledTimes(1)
+    expect(apiMocks.listProductos).toHaveBeenCalledTimes(2) // table page + lookup
 
     wrapper.findComponent({ name: 'ProductoForm' }).vm.$emit('submit', {
       tipo_producto_id: 1,
@@ -280,7 +303,7 @@ describe('ProductosView (MOD-5)', () => {
       precio_venta_sugerido: 12000,
     })
     expect(document.body.textContent).toContain('Producto creado correctamente')
-    expect(apiMocks.listProductos).toHaveBeenCalledTimes(2)
+    expect(apiMocks.listProductos).toHaveBeenCalledTimes(4)
   })
 
   it('edits a product via the inline edit form and returns to the create form', async () => {
@@ -312,13 +335,13 @@ describe('ProductosView (MOD-5)', () => {
     )
     expect(document.body.textContent).toContain('Producto actualizado correctamente')
     expect(wrapper.text()).toContain('Crear producto') // back to create form
-    expect(apiMocks.listProductos).toHaveBeenCalledTimes(2)
+    expect(apiMocks.listProductos).toHaveBeenCalledTimes(4)
   })
 
   it('deletes a product after the confirm dialog (204) and refreshes', async () => {
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
     const wrapper = await mountView('admin')
-    expect(apiMocks.listProductos).toHaveBeenCalledTimes(1)
+    expect(apiMocks.listProductos).toHaveBeenCalledTimes(2)
 
     await wrapper.findAll('[data-test="delete-producto"]')[0].trigger('click')
     await flushPromises()
@@ -326,7 +349,7 @@ describe('ProductosView (MOD-5)', () => {
     expect(apiMocks.deleteProducto).toHaveBeenCalledTimes(1)
     expect(apiMocks.deleteProducto).toHaveBeenCalledWith({ producto_id: 1 })
     expect(document.body.textContent).toContain('Producto eliminado correctamente')
-    expect(apiMocks.listProductos).toHaveBeenCalledTimes(2)
+    expect(apiMocks.listProductos).toHaveBeenCalledTimes(4)
   })
 
   it('surfaces the 409 when deleting a product that is in use', async () => {
@@ -340,7 +363,7 @@ describe('ProductosView (MOD-5)', () => {
     await flushPromises()
 
     expect(document.body.textContent).toContain('Producto is in use and cannot be deleted')
-    expect(apiMocks.listProductos).toHaveBeenCalledTimes(1) // no refresh after failure
+    expect(apiMocks.listProductos).toHaveBeenCalledTimes(2) // no refresh after failure
   })
 
   it('lazily loads the nested variantes and adds one with the exact payload', async () => {

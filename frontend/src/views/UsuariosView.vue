@@ -22,6 +22,7 @@ import { usuariosApi } from '@/api/endpoints'
 import UsuarioForm from '@/components/usuarios/UsuarioForm.vue'
 import UsuariosTable from '@/components/usuarios/UsuariosTable.vue'
 import { useAuthStore } from '@/stores/auth'
+import { buildListParams } from '@/utils/pagination'
 import type { UsuarioCreate, UsuarioRead, UsuarioUpdate } from '@/types/api.d'
 
 const auth = useAuthStore()
@@ -33,6 +34,11 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 
 const usuarios = ref<UsuarioRead[]>([])
+const total = ref(0)
+const page = ref(1)
+const pageSize = 20
+const searchQ = ref('')
+const filterRol = ref<'admin' | 'operador' | 'consulta' | null>(null)
 const saving = ref(false)
 const editing = ref<UsuarioRead | null>(null)
 
@@ -40,12 +46,32 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    usuarios.value = await usuariosApi.list({ limit: 1000 }) // backend GET /usuarios defaults to limit=50
+    const result = await usuariosApi.list(
+      buildListParams({
+        page: page.value,
+        pageSize,
+        filtros: { rol: filterRol.value },
+        q: searchQ.value,
+      }),
+    )
+    usuarios.value = result.items
+    total.value = result.total
   } catch {
     error.value = 'No se pudieron cargar los usuarios. Verifica la conexión con el servidor.'
   } finally {
     loading.value = false
   }
+}
+
+/** FE-2: filter/busqueda changes reset to page 1 and refetch. */
+function onSearch(): void {
+  page.value = 1
+  load()
+}
+
+function onFilterChange(): void {
+  page.value = 1
+  load()
 }
 
 /** Surface the server validation detail (400/404) when present. */
@@ -141,6 +167,29 @@ onMounted(load)
       class="usuarios-error"
     />
 
+    <div class="usuario-toolbar">
+      <el-input
+        v-model="searchQ"
+        clearable
+        placeholder="Buscar usuario…"
+        data-test="usuario-search"
+        class="usuario-search"
+        @keyup.enter="onSearch"
+        @clear="onSearch"
+      />
+      <el-select
+        v-model="filterRol"
+        clearable
+        placeholder="Filtrar por rol"
+        data-test="usuario-rol-filter"
+        @change="onFilterChange"
+      >
+        <el-option label="Admin" value="admin" />
+        <el-option label="Operador" value="operador" />
+        <el-option label="Consulta" value="consulta" />
+      </el-select>
+    </div>
+
     <div v-if="editing === null" class="usuario-form-section">
       <h3>Crear usuario</h3>
       <UsuarioForm mode="create" :saving="saving" @submit="onCreate" />
@@ -159,6 +208,15 @@ onMounted(load)
       :current-user-id="currentUserId"
       @edit="onEdit"
       @delete="onDelete"
+    />
+    <el-pagination
+      class="tabla-paginacion"
+      background
+      layout="total, prev, pager, next"
+      :total="total"
+      :page-size="pageSize"
+      :current-page="page"
+      @current-change="(p: number) => { page = p; load() }"
     />
   </section>
 </template>
@@ -186,5 +244,25 @@ onMounted(load)
 
 .usuario-form-section h3 {
   margin: 0 0 0.5rem;
+}
+
+.usuario-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  max-width: 42rem;
+  margin-bottom: 1rem;
+}
+
+.usuario-search {
+  width: 14rem;
+}
+
+.usuario-toolbar .el-select {
+  width: 12rem;
+}
+
+.tabla-paginacion {
+  margin-top: 1rem;
+  justify-content: flex-end;
 }
 </style>

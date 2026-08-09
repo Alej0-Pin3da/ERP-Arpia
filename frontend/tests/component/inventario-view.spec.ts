@@ -1,15 +1,14 @@
 /**
- * InventarioView integration tests (PR9, spec MOD-4).
+ * InventarioView integration tests (PR9 MOD-4 + ui-mantenimiento PR1 T6).
  *
  * Mounts the REAL InventarioView + all inventario components against mocked
  * insumosApi/comprasApi/categoriasInsumosApi: the two tabs (Insumos /
- * Compras), the server-joined insumos list rendered as-is (nombre_categoria
- * comes from GET /insumos — no client join), below-minimum row highlighting,
- * role visibility (admin owns the insumo master form + edit/delete actions;
- * operador registers compras but sees NO admin actions; consulta is
- * read-only), the compras register flow (exact CompraInsumoCreate payload →
- * WAC runs server-side → BOTH lists refresh so the stock change shows), the
- * optional insumo_id filter, and the admin insumo create/edit/delete flows.
+ * Compras), server-side pagination ({items,total} + el-pagination driving
+ * limit/offset refetches), toolbar filters (q + categoria_id insumos,
+ * proveedor_id compras) that reset to page 1, the server-joined insumos list,
+ * below-minimum row highlighting, role visibility, the compras register flow
+ * and the admin insumo create/edit/delete flows. Lookup joins keep limit:1000
+ * against `.items` (design D3).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -101,6 +100,9 @@ const CATEGORIAS: CategoriaInsumoRead[] = [
   { id: 2, nombre: 'Abarrotes' },
 ]
 
+/** Page default for the table fetch (page 1, pageSize 20). */
+const PAGE1 = { limit: 20, offset: 0 }
+
 async function mountView(rol: string): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -126,12 +128,13 @@ async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
   await flushPromises()
 }
 
-describe('InventarioView (MOD-4)', () => {
+describe('InventarioView (MOD-4 + T6)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    apiMocks.listInsumos.mockResolvedValue(INSUMOS)
-    apiMocks.listCompras.mockResolvedValue(COMPRAS)
-    apiMocks.listCategorias.mockResolvedValue(CATEGORIAS)
+    // Table fetches use the page contract; lookups keep limit:1000 with `.items`.
+    apiMocks.listInsumos.mockResolvedValue({ items: INSUMOS, total: 3 })
+    apiMocks.listCompras.mockResolvedValue({ items: COMPRAS, total: 1 })
+    apiMocks.listCategorias.mockResolvedValue({ items: CATEGORIAS, total: 2 })
     apiMocks.createInsumo.mockResolvedValue(INSUMOS[0])
     apiMocks.updateInsumo.mockResolvedValue({ ...INSUMOS[0], nombre: 'Harina premium' })
     apiMocks.deleteInsumo.mockResolvedValue(undefined)
@@ -150,19 +153,24 @@ describe('InventarioView (MOD-4)', () => {
     expect(text).toContain('Insumos')
     expect(text).toContain('Compras')
 
-    // The insumos list renders GET /insumos rows as-is — the category join is
-    // server-side (nombre_categoria), no client join needed; a missing name
-    // renders an em dash.
     expect(text).toContain('Harina de maíz')
     expect(text).toContain('Granos')
     expect(text).toContain('Sal')
     expect(text).toContain('—')
     expect(text).toContain('$2.500,00') // costo_promedio_actual es-CO
 
-    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(1)
+    // Table fetch pages; the lookup join keeps limit:1000.
+    expect(apiMocks.listInsumos).toHaveBeenCalledWith(PAGE1)
     expect(apiMocks.listInsumos).toHaveBeenCalledWith({ limit: 1000 })
-    expect(apiMocks.listCompras).toHaveBeenCalledTimes(1)
-    expect(apiMocks.listCompras).toHaveBeenCalledWith({})
+    expect(apiMocks.listCompras).toHaveBeenCalledWith(PAGE1)
+  })
+
+  it('renders el-pagination with the server total on the insumos tab', async () => {
+    const wrapper = await mountView('operador')
+    // Element Plus pagination renders a page-size selector and page buttons;
+    // the total comes from the API (3), not a local guess.
+    expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(true)
+    expect(apiMocks.listInsumos).toHaveBeenCalledWith(PAGE1)
   })
 
   it('highlights rows below their minimum with a severity tag', async () => {
@@ -173,13 +181,11 @@ describe('InventarioView (MOD-4)', () => {
   it('operador registers compras but sees NO admin insumo actions', async () => {
     const wrapper = await mountView('operador')
 
-    // No admin master form and no edit/delete actions for operador.
     expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(false)
     expect(wrapper.findAll('[data-test="edit-insumo"]')).toHaveLength(0)
     expect(wrapper.findAll('[data-test="delete-insumo"]')).toHaveLength(0)
     expect(apiMocks.listCategorias).not.toHaveBeenCalled() // categorias only for admin form
 
-    // But the compras register form IS available (operador+).
     await activateTab(wrapper, 'Compras')
     expect(wrapper.findComponent({ name: 'ComprasForm' }).exists()).toBe(true)
     expect(wrapper.text()).toContain('Registrar compra')
@@ -210,7 +216,7 @@ describe('InventarioView (MOD-4)', () => {
 
   it('registers a compra with the exact payload and refreshes BOTH tabs (WAC stock change)', async () => {
     const wrapper = await mountView('operador')
-    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(1)
+    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(2) // table page + lookup
     await activateTab(wrapper, 'Compras')
 
     wrapper.findComponent({ name: 'ComprasForm' }).vm.$emit('submit', {
@@ -228,16 +234,15 @@ describe('InventarioView (MOD-4)', () => {
     })
     expect(document.body.textContent).toContain('Compra registrada correctamente')
 
-    // WAC ran server-side: the insumos list (stock/cost changed) AND the
-    // compras list (new row) both refresh.
-    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(2)
+    // WAC ran server-side: BOTH lists refresh (2 calls per load = 4 total).
+    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(4)
     expect(apiMocks.listCompras).toHaveBeenCalledTimes(2)
   })
 
   it('filters compras by insumo via the optional insumo_id filter', async () => {
     const wrapper = await mountView('operador')
     await activateTab(wrapper, 'Compras')
-    expect(apiMocks.listCompras).toHaveBeenCalledWith({})
+    expect(apiMocks.listCompras).toHaveBeenCalledWith(PAGE1)
 
     // Pick 'Aceite' (id 2) from the filter select -> reload with the filter.
     const select = wrapper.find('[data-test="compra-filter-select"]')
@@ -251,12 +256,35 @@ describe('InventarioView (MOD-4)', () => {
     await flushPromises()
 
     expect(apiMocks.listCompras).toHaveBeenCalledTimes(2)
-    expect(apiMocks.listCompras).toHaveBeenLastCalledWith({ insumo_id: 2 })
+    expect(apiMocks.listCompras).toHaveBeenLastCalledWith({ ...PAGE1, insumo_id: 2 })
+  })
+
+  it('paging the insumos table refetches with the new offset', async () => {
+    const wrapper = await mountView('operador')
+    expect(apiMocks.listInsumos).toHaveBeenCalledWith(PAGE1)
+
+    // Emit the page-change event from el-pagination -> page 2 -> offset 20.
+    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    await flushPromises()
+
+    expect(apiMocks.listInsumos).toHaveBeenCalledWith({ limit: 20, offset: 20 })
+  })
+
+  it('global q on the insumos tab resets to page 1 and refetches with q', async () => {
+    const wrapper = await mountView('operador')
+    expect(apiMocks.listInsumos).toHaveBeenCalledWith(PAGE1)
+
+    const input = wrapper.find('[data-test="insumo-search"]')
+    await input.setValue('harina')
+    await input.trigger('keyup.enter')
+    await flushPromises()
+
+    expect(apiMocks.listInsumos).toHaveBeenCalledWith({ ...PAGE1, q: 'harina' })
   })
 
   it('creates an insumo as admin and refreshes the list', async () => {
     const wrapper = await mountView('admin')
-    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(1)
+    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(2)
 
     wrapper.findComponent({ name: 'InsumoForm' }).vm.$emit('submit', {
       categoria_id: 1,
@@ -278,7 +306,7 @@ describe('InventarioView (MOD-4)', () => {
       costo_promedio_actual: 3200,
     })
     expect(document.body.textContent).toContain('Insumo creado correctamente')
-    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(2)
+    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(4)
   })
 
   it('edits an insumo via the inline edit form and returns to the create form', async () => {
@@ -312,13 +340,13 @@ describe('InventarioView (MOD-4)', () => {
     )
     expect(document.body.textContent).toContain('Insumo actualizado correctamente')
     expect(wrapper.text()).toContain('Crear insumo') // back to the create form
-    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(2)
+    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(4)
   })
 
   it('deletes an insumo after the confirm dialog and refreshes', async () => {
     vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
     const wrapper = await mountView('admin')
-    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(1)
+    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(2)
 
     await wrapper.findAll('[data-test="delete-insumo"]')[0].trigger('click')
     await flushPromises()
@@ -326,6 +354,6 @@ describe('InventarioView (MOD-4)', () => {
     expect(apiMocks.deleteInsumo).toHaveBeenCalledTimes(1)
     expect(apiMocks.deleteInsumo).toHaveBeenCalledWith({ insumo_id: 1 })
     expect(document.body.textContent).toContain('Insumo eliminado correctamente')
-    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(2)
+    expect(apiMocks.listInsumos).toHaveBeenCalledTimes(4)
   })
 })

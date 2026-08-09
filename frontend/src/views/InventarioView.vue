@@ -1,21 +1,20 @@
 <script setup lang="ts">
 /**
- * Inventario view (PR9, spec MOD-4).
+ * Inventario view (PR9, spec MOD-4 + ui-mantenimiento PR1 T6).
  *
  * Two tabs:
- *  - Insumos: the master list from GET /insumos — `nombre_categoria` is
+ *  - Insumos: server-side paginated GET /insumos — `nombre_categoria` is
  *    JOINED SERVER-SIDE (no client join), quantities/costs render es-CO and
  *    rows below their minimum are highlighted (stockSeverity, dashboard
- *    pattern). The create/edit form + Editar/Eliminar actions are ADMIN ONLY
- *    (backend require_admin); operador/consulta never see them.
- *  - Compras: GET /compras-insumos with an optional insumo_id filter, the
- *    register form (operador+) and the list. POST /compras-insumos runs the
- *    WAC service server-side (updates stock_actual and costo_promedio_actual),
- *    so a successful compra refreshes BOTH tabs — the insumos list shows the
- *    stock/cost change immediately.
+ *    pattern). Toolbar: global q + categoria_id filter (server-side, reset to
+ *    page 1). The create/edit form + Editar/Eliminar actions are ADMIN ONLY.
+ *  - Compras: server-side paginated GET /compras-insumos with q +
+ *    proveedor_id + insumo_id filters. POST runs the WAC service server-side
+ *    (updates stock/cost), so a successful compra refreshes BOTH tabs.
  *
- * Writes: compras operador+ (canRegister); insumo master admin only
- * (canManage). Consulta is read-only everywhere.
+ * Lookup joins (ComprasForm options, filter select, compra name join) fetch
+ * the full insumos set with limit:1000 against `.items` (design D3) — table
+ * views use real pagination, join fetches keep the lookup hack.
  */
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -26,6 +25,7 @@ import ComprasTable from '@/components/inventario/ComprasTable.vue'
 import InsumoForm from '@/components/inventario/InsumoForm.vue'
 import InsumosTable from '@/components/inventario/InsumosTable.vue'
 import { useAuthStore } from '@/stores/auth'
+import { buildListParams } from '@/utils/pagination'
 import {
   buildCompraRows,
   buildComprasListParams,
@@ -45,15 +45,30 @@ const activeTab = ref('insumos')
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+// --- insumos table: server-side pagination + filters -----------------------
 const insumos = ref<InsumoRead[]>([])
-const compras = ref<CompraInsumoRead[]>([])
-const categorias = ref<CategoriaInsumoRead[]>([])
+const insumosTotal = ref(0)
+const insumosPage = ref(1)
+const insumosPageSize = ref(20)
+const insumoQ = ref('')
+const filterCategoriaId = ref<number | null>(null)
 
+// --- compras table: server-side pagination + filters -----------------------
+const compras = ref<CompraInsumoRead[]>([])
+const comprasTotal = ref(0)
+const comprasPage = ref(1)
+const comprasPageSize = ref(20)
+const compraQ = ref('')
 /** Optional GET /compras-insumos?insumo_id filter (clearable select). */
 const filterInsumoId = ref<number | null>(null)
+const filterProveedorId = ref<number | null>(null)
+
+// --- lookups (full sets, limit:1000 — design D3) ---------------------------
+const insumosLookup = ref<InsumoRead[]>([])
+const categorias = ref<CategoriaInsumoRead[]>([])
 
 /** Joined compra rows: insumo name + client-computed costo_total, newest first. */
-const compraRows = computed(() => buildCompraRows(compras.value, insumos.value))
+const compraRows = computed(() => buildCompraRows(compras.value, insumosLookup.value))
 
 const savingCompra = ref(false)
 const savingInsumo = ref(false)
@@ -63,15 +78,34 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    const [insumosList, comprasList, categoriasList] = await Promise.all([
-      insumosApi.list({ limit: 1000 }), // backend GET /insumos defaults to limit=50
-      comprasApi.list(buildComprasListParams({ insumo_id: filterInsumoId.value })),
+    const [insumosPage_, comprasPage_, categoriasList, insumosLookup_] = await Promise.all([
+      insumosApi.list(
+        buildListParams({
+          page: insumosPage.value,
+          pageSize: insumosPageSize.value,
+          filtros: { categoria_id: filterCategoriaId.value },
+          q: insumoQ.value,
+        }),
+      ),
+      comprasApi.list(
+        buildListParams({
+          page: comprasPage.value,
+          pageSize: comprasPageSize.value,
+          filtros: { insumo_id: filterInsumoId.value, proveedor_id: filterProveedorId.value },
+          q: compraQ.value,
+        }),
+      ),
       // Categoria options only feed the admin-only form — skip for other roles.
-      canManage.value ? categoriasInsumosApi.list() : Promise.resolve([]),
+      canManage.value ? categoriasInsumosApi.list() : Promise.resolve({ items: [] as CategoriaInsumoRead[], total: 0 }),
+      // D3: join fetches keep the full set (no pagination on lookups).
+      insumosApi.list({ limit: 1000 }),
     ])
-    insumos.value = insumosList
-    compras.value = comprasList
-    categorias.value = categoriasList
+    insumos.value = insumosPage_.items
+    insumosTotal.value = insumosPage_.total
+    compras.value = comprasPage_.items
+    comprasTotal.value = comprasPage_.total
+    categorias.value = categoriasList.items
+    insumosLookup.value = insumosLookup_.items
   } catch {
     error.value = 'No se pudo cargar la información del inventario. Verifica la conexión con el servidor.'
   } finally {
@@ -93,6 +127,27 @@ function serverDetail(err: unknown): string | null {
     }
   }
   return null
+}
+
+/** FE-2: every filter/busqueda change resets to page 1 and refetches. */
+function onInsumosSearch(): void {
+  insumosPage.value = 1
+  load()
+}
+
+function onInsumosFilterChange(): void {
+  insumosPage.value = 1
+  load()
+}
+
+function onComprasSearch(): void {
+  comprasPage.value = 1
+  load()
+}
+
+function onComprasFilterChange(): void {
+  comprasPage.value = 1
+  load()
 }
 
 /** MOD-4: POST the compra — the WAC service updates stock/cost server-side,
@@ -189,6 +244,28 @@ onMounted(load)
 
     <el-tabs v-model="activeTab">
       <el-tab-pane label="Insumos" name="insumos">
+        <div class="insumo-toolbar">
+          <el-input
+            v-model="insumoQ"
+            clearable
+            placeholder="Buscar insumo…"
+            data-test="insumo-search"
+            class="insumo-search"
+            @keyup.enter="onInsumosSearch"
+            @clear="onInsumosSearch"
+          />
+          <el-select
+            v-model="filterCategoriaId"
+            clearable
+            filterable
+            placeholder="Filtrar por categoría"
+            data-test="insumo-categoria-filter"
+            @change="onInsumosFilterChange"
+          >
+            <el-option v-for="c in categorias" :key="c.id" :label="c.nombre" :value="c.id" />
+          </el-select>
+        </div>
+
         <div v-if="canManage" class="insumo-form-section">
           <template v-if="editingInsumo === null">
             <h3>Crear insumo</h3>
@@ -210,30 +287,65 @@ onMounted(load)
         </div>
 
         <InsumosTable :rows="insumos" :loading="loading" :can-edit="canManage" @edit="onEditInsumo" @delete="onDeleteInsumo" />
+        <el-pagination
+          class="tabla-paginacion"
+          background
+          layout="total, prev, pager, next"
+          :total="insumosTotal"
+          :page-size="insumosPageSize"
+          :current-page="insumosPage"
+          @current-change="(p: number) => { insumosPage = p; load() }"
+        />
       </el-tab-pane>
 
       <el-tab-pane label="Compras" name="compras">
         <div class="compras-filtro">
+          <el-input
+            v-model="compraQ"
+            clearable
+            placeholder="Buscar por insumo…"
+            data-test="compra-search"
+            class="compra-search"
+            @keyup.enter="onComprasSearch"
+            @clear="onComprasSearch"
+          />
           <el-select
             v-model="filterInsumoId"
             clearable
             filterable
             placeholder="Filtrar por insumo"
             data-test="compra-filter-select"
-            @change="load"
+            @change="onComprasFilterChange"
           >
-            <el-option v-for="i in insumos" :key="i.id" :label="i.nombre" :value="i.id" />
+            <el-option v-for="i in insumosLookup" :key="i.id" :label="i.nombre" :value="i.id" />
           </el-select>
+          <el-select
+            v-model="filterProveedorId"
+            clearable
+            filterable
+            placeholder="Filtrar por proveedor"
+            data-test="compra-proveedor-filter"
+            @change="onComprasFilterChange"
+          />
         </div>
 
         <ComprasForm
           v-if="canRegister"
-          :insumos="insumos"
+          :insumos="insumosLookup"
           :saving="savingCompra"
           class="compra-form-section"
           @submit="onCreateCompra"
         />
         <ComprasTable :rows="compraRows" :loading="loading" />
+        <el-pagination
+          class="tabla-paginacion"
+          background
+          layout="total, prev, pager, next"
+          :total="comprasTotal"
+          :page-size="comprasPageSize"
+          :current-page="comprasPage"
+          @current-change="(p: number) => { comprasPage = p; load() }"
+        />
       </el-tab-pane>
     </el-tabs>
   </section>
@@ -264,16 +376,29 @@ onMounted(load)
   margin: 0 0 0.5rem;
 }
 
+.insumo-toolbar,
 .compras-filtro {
-  max-width: 20rem;
+  display: flex;
+  gap: 0.75rem;
+  max-width: 42rem;
   margin-bottom: 1rem;
 }
 
+.insumo-search,
+.compra-search {
+  width: 14rem;
+}
+
 .compras-filtro .el-select {
-  width: 100%;
+  width: 12rem;
 }
 
 .compra-form-section {
   margin-bottom: 1rem;
+}
+
+.tabla-paginacion {
+  margin-top: 1rem;
+  justify-content: flex-end;
 }
 </style>

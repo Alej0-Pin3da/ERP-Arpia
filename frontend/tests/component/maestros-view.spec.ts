@@ -112,13 +112,14 @@ function editForm(wrapper: VueWrapper): VueWrapper {
   return form
 }
 
-describe('MaestrosView (MOD-5)', () => {
+describe('MaestrosView (MOD-5 + T6)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    apiMocks.listClientes.mockResolvedValue(CLIENTES)
-    apiMocks.listProveedores.mockResolvedValue(PROVEEDORES)
-    apiMocks.listTipos.mockResolvedValue(TIPOS)
-    apiMocks.listCategorias.mockResolvedValue(CATEGORIAS)
+    // Every list uses the {items,total} contract now.
+    apiMocks.listClientes.mockResolvedValue({ items: CLIENTES, total: 2 })
+    apiMocks.listProveedores.mockResolvedValue({ items: PROVEEDORES, total: 2 })
+    apiMocks.listTipos.mockResolvedValue({ items: TIPOS, total: 1 })
+    apiMocks.listCategorias.mockResolvedValue({ items: CATEGORIAS, total: 1 })
     apiMocks.createCliente.mockResolvedValue(CLIENTES[0])
     apiMocks.updateCliente.mockResolvedValue(CLIENTES[0])
     apiMocks.deleteCliente.mockResolvedValue(undefined)
@@ -138,7 +139,7 @@ describe('MaestrosView (MOD-5)', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders the four tabs and loads all four lists (limit 1000) for an operador', async () => {
+  it('renders the four tabs and loads all four lists (paged) for an operador', async () => {
     const wrapper = await mountView('operador')
 
     const text = wrapper.text()
@@ -153,17 +154,39 @@ describe('MaestrosView (MOD-5)', () => {
     expect(text).toContain('Alimentos')
     expect(text).toContain('Granos')
 
+    // Each entity list fetches its page (page 1, pageSize 20).
+    const PAGE1 = { limit: 20, offset: 0 }
     expect(apiMocks.listClientes).toHaveBeenCalledTimes(1)
-    expect(apiMocks.listClientes).toHaveBeenCalledWith({ limit: 1000 })
-    expect(apiMocks.listProveedores).toHaveBeenCalledWith({ limit: 1000 })
-    expect(apiMocks.listTipos).toHaveBeenCalledWith({ limit: 1000 })
-    expect(apiMocks.listCategorias).toHaveBeenCalledWith({ limit: 1000 })
+    expect(apiMocks.listClientes).toHaveBeenCalledWith(PAGE1)
+    expect(apiMocks.listProveedores).toHaveBeenCalledWith(PAGE1)
+    expect(apiMocks.listTipos).toHaveBeenCalledWith(PAGE1)
+    expect(apiMocks.listCategorias).toHaveBeenCalledWith(PAGE1)
   })
 
   it('renders an em dash for empty optional fields', async () => {
     const wrapper = await mountView('operador')
 
     expect(wrapper.text()).toContain('—')
+  })
+
+  it('pages a maestro table and refetches with the new offset', async () => {
+    const wrapper = await mountView('operador')
+    expect(apiMocks.listClientes).toHaveBeenCalledWith({ limit: 20, offset: 0 })
+
+    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    await flushPromises()
+    expect(apiMocks.listClientes).toHaveBeenCalledWith({ limit: 20, offset: 20 })
+  })
+
+  it('global q on a maestro tab resets to page 1 and refetches with q', async () => {
+    const wrapper = await mountView('operador')
+
+    const input = wrapper.find('[data-test="maestro-search-clientes"]')
+    await input.setValue('ana')
+    await input.trigger('keyup.enter')
+    await flushPromises()
+
+    expect(apiMocks.listClientes).toHaveBeenCalledWith({ limit: 20, offset: 0, q: 'ana' })
   })
 
   it('operador and consulta see read-only lists — no forms, no actions', async () => {
