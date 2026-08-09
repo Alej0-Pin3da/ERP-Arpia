@@ -54,6 +54,7 @@ def registrar_fase(fase_id: str, runner: Callable[[MigrationContext], object]) -
 def _registrar_runners() -> None:
     from migrate.bom import cargar_bom
     from migrate.catalog import bootstrap_catalog_phase, catalogar
+    from migrate.finanzas import cargar_finanzas
     from migrate.purchases import cargar_compras
     from migrate.sales import cargar_ventas
     from migrate.stock import cargar_stock
@@ -64,6 +65,7 @@ def _registrar_runners() -> None:
     registrar_fase("F3", cargar_bom)
     registrar_fase("F4", cargar_stock)
     registrar_fase("F5", cargar_ventas)
+    registrar_fase("F6", cargar_finanzas)
 
 
 _registrar_runners()
@@ -78,7 +80,7 @@ def get_fase(fase_id: str) -> Fase:
 
 
 # Fases whose business logic is already implemented (status reporting).
-FASES_IMPLEMENTADAS: tuple[str, ...] = ("F0", "F1", "F2", "F3", "F4", "F5")
+FASES_IMPLEMENTADAS: tuple[str, ...] = ("F0", "F1", "F2", "F3", "F4", "F5", "F6")
 
 
 __all__ = [
