@@ -56,6 +56,8 @@ class Report:
     def tiene_errores(self) -> bool:
         return self.count(LEVEL_ERROR) > 0
 
+    tenga_errores = tiene_errores  # alias (contract tests use the subjunctive form)
+
     def resumen_lineas(self) -> list[str]:
         """Compact stdout summary: one line per entry, plus totals."""
         lines = [f"--- Reporte migracion [{self.modo}] fase {self.fase} ---"]
