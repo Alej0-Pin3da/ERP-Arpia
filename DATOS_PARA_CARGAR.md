@@ -10,7 +10,7 @@
 3. No ejecutar dos veces (duplica).
 4. Fechas formato 'YYYY-MM-DD HH:MM:SS+00'.
 
-## 1. TABLA Proveedores (27) — SQL
+## 1. TABLA Proveedores (34) — SQL
 
 ```sql
 INSERT INTO "Proveedores" (nombre) VALUES ('Atenea bordados y encajes');
@@ -26,18 +26,25 @@ INSERT INTO "Proveedores" (nombre) VALUES ('Hilos y suministros Ltda');
 INSERT INTO "Proveedores" (nombre) VALUES ('HomeCenter');
 INSERT INTO "Proveedores" (nombre) VALUES ('ICOLTEX');
 INSERT INTO "Proveedores" (nombre) VALUES ('Kilotelas');
+INSERT INTO "Proveedores" (nombre) VALUES ('La guillotina');
 INSERT INTO "Proveedores" (nombre) VALUES ('Las 3BBB premium');
 INSERT INTO "Proveedores" (nombre) VALUES ('MercadoLibre');
 INSERT INTO "Proveedores" (nombre) VALUES ('Mil Adornos');
 INSERT INTO "Proveedores" (nombre) VALUES ('Mil Telas');
 INSERT INTO "Proveedores" (nombre) VALUES ('SINGER');
+INSERT INTO "Proveedores" (nombre) VALUES ('Teks');
 INSERT INTO "Proveedores" (nombre) VALUES ('Textiles F&M');
 INSERT INTO "Proveedores" (nombre) VALUES ('The lingerie Formula');
 INSERT INTO "Proveedores" (nombre) VALUES ('almacen de la 6ta');
 INSERT INTO "Proveedores" (nombre) VALUES ('amazon');
+INSERT INTO "Proveedores" (nombre) VALUES ('auratex');
 INSERT INTO "Proveedores" (nombre) VALUES ('brother');
+INSERT INTO "Proveedores" (nombre) VALUES ('corsetería');
 INSERT INTO "Proveedores" (nombre) VALUES ('facol');
 INSERT INTO "Proveedores" (nombre) VALUES ('grupo textil moda');
+INSERT INTO "Proveedores" (nombre) VALUES ('las 3 b');
+INSERT INTO "Proveedores" (nombre) VALUES ('sesgocolor');
+INSERT INTO "Proveedores" (nombre) VALUES ('telas Medellín');
 INSERT INTO "Proveedores" (nombre) VALUES ('temu');
 INSERT INTO "Proveedores" (nombre) VALUES ('zuretex');
 ```
@@ -69,13 +76,14 @@ INSERT INTO "Socios_Configuracion" (nombre, porcentaje_participacion) VALUES ('M
 INSERT INTO "Socios_Configuracion" (nombre, porcentaje_participacion) VALUES ('ARPIA', 30);
 ```
 
-## 5. TABLA Clientes (11) — SQL
+## 5. TABLA Clientes (12) — SQL
 
 ```sql
 INSERT INTO "Clientes" (nombre) VALUES ('Camila');
 INSERT INTO "Clientes" (nombre) VALUES ('Juan jose');
 INSERT INTO "Clientes" (nombre) VALUES ('Maira *Comic');
 INSERT INTO "Clientes" (nombre) VALUES ('Maria caja cumple');
+INSERT INTO "Clientes" (nombre) VALUES ('Olga');
 INSERT INTO "Clientes" (nombre) VALUES ('Valentina hermana ale');
 INSERT INTO "Clientes" (nombre) VALUES ('Valeria Amiga gaby');
 INSERT INTO "Clientes" (nombre) VALUES ('Valqui');
@@ -85,7 +93,7 @@ INSERT INTO "Clientes" (nombre) VALUES ('evento nana');
 INSERT INTO "Clientes" (nombre) VALUES ('gaby');
 ```
 
-## 6. TABLA Insumos (107) — SQL
+## 6. TABLA Insumos (135) — SQL
 
 > stock_actual del INVENTARIO OCT25 cuando existe, si no 0.
 
@@ -95,11 +103,16 @@ INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Agujas punta de bola Fill', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Agujas punta de bola Plana', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Alfileres', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'ARCO METALICO 2001 30', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'ARCO METALICO 2001 32', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'ARCO METALICO 2001 34', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'ARCO METALICO 2001 36', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Argolla numero 10 mm', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Argolla numero 8 mm', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Barilla poliester corset negro 8mm', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Empaques' LIMIT 1), 'Bolsa de seguridad negra 25 x 35', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Empaques' LIMIT 1), 'Bolsa de seguridad rosa 25 x 35', 'un', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Empaques' LIMIT 1), 'bolsas tul 12 x 17', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Boton Aro para las faldas', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Cadena gris delgada totebag', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Cadena plateada gruesa totebag', 'un', 0, 0, 0);
@@ -119,6 +132,9 @@ INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Encaje 6 cm calidad blanco 8 mts', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Encaje 6 cm calidad negro 8 mts', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'encaje bicolor', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'encaje blanco', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Encaje Blanco y negro para bicolor', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Encaje bordado blanco y negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Encaje de ramitas', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Encaje Elastico 19 cm blanco 10 mts', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Encaje Elastico 19 cm negro 10 mts', 'm', 0, 0, 0);
@@ -136,12 +152,17 @@ INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Folder sesgo para plana', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'forro varilla negro', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'forro varilla piel', 'un', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'FRAMILON', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Framilon blanco y negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Framilon elastico plano 20 mts', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Franela color negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Franela color piel', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Franela lycra 1 mt (blanco y negro)', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Gabardina Ultra Poliester', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'gafete 3x2 blanco', 'un', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'gafete 3x2 negro', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Gafetes', 'un', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'gafetes +arandelas', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Herrajes / gafetes / copas prehormadas', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'herrajes en forma 8 / G', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Hilaza negra', 'm', 0, 0, 0);
@@ -149,26 +170,37 @@ INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Hilaza venus 150 gms negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Hilaza venus negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Hilaza venus piel', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'HILAZAS cono amarillo', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Hilo poliester venus negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Hilo poliester venus piel', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Hilos + Hilazas', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'licras lencería', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Lino vertigo', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'malla piel', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'malla piel negro', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Mallatex blnaco y negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'mallatex negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'mallatex rosa', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'mallatex vino', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'marquillas en satin', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'ojales metalicos 3/8 (grandes)', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Piel de durazno + tejido de punto', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'planchuela fileteadora', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Powernet negro delgado', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Ref 100 24 cm tul bordado negro', 'm', 39, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Ref 159 24 cm tul bordado rojo pastel', 'm', 21, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Rosas tejidas para totebag', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Satin elastico negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Satin elastico rosa', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Sellos Arpia', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'sesgo 2 cm negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'sesgo 2 cm piel', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'SESGO ELASTICO', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Sesgo Elastico 2 10 mts', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Sesgo Elastico blanco 1,5 10 mts', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Sesgo elastico negro 2cm brillante', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'sesgo lorex blanco', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'sesgo lorex negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Sesgo rigido para ojales corset', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Sesgo satin brillante', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Sublimacion de la tela maya', 'm', 0, 0, 0);
@@ -176,6 +208,7 @@ INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Super Brioni', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Tapavarilla negro 10 mts', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Tejido plano sim popelina (a cuadros bn)', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Tela control blanca', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Tela noche de viena negra', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'telas + sesgos + tira +gafetes', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Telas algodon jersey retazos blanco', 'm', 0, 0, 0);
@@ -183,14 +216,17 @@ INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Tensor 8 numero 10', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'terminal metalico para cintas', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Terminales de cordon', 'un', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Tira brasier blanco', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'tira brasier negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'tira brasier piel', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Tira de Brasier blanco 10 mts', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Tira de brasier negro', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Tira de Brasier negro 10 mts', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Tira de poliester para las totebag', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Tull bordado blanco', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Tull bordado cafe', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'Tull bordado piel', 'm', 0, 0, 0);
+INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'varilla plastica cortada 18 cm', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Herrajes' LIMIT 1), 'Varillas media copa', 'un', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Telas' LIMIT 1), 'varios retazos', 'm', 0, 0, 0);
 INSERT INTO "Insumos" (categoria_id, nombre, unidad_medida, stock_actual, stock_minimo, costo_promedio_actual) VALUES ((SELECT id FROM "Categorias_Insumos" WHERE nombre = 'Empaques' LIMIT 1), 'velo estrella (papel empaque)', 'un', 0, 0, 0);
@@ -226,7 +262,7 @@ INSERT INTO "Productos" (tipo_producto_id, nombre, requiere_fabricacion, costos_
 INSERT INTO "Productos" (tipo_producto_id, nombre, requiere_fabricacion, costos_operativos_fijos, precio_venta_sugerido) VALUES ((SELECT id FROM "Tipos_Producto" WHERE nombre = 'Lencería' LIMIT 1), 'Vela', true, 0, 0);
 ```
 
-## 8. TABLA Compras_Insumos (113) — SQL
+## 8. TABLA Compras_Insumos (144) — SQL
 
 ```sql
 INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Cinta Térmica X 5' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'MercadoLibre' LIMIT 1), '2023-07-31 00:00:00+00', 1, 43830.0000);
@@ -275,6 +311,12 @@ INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_c
 INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Velo surcido negro' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'Las 3BBB premium' LIMIT 1), '2024-02-17 00:00:00+00', 4, 1500.0000);
 INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Zeta numero 10' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'Gerrajes' LIMIT 1), '2024-02-17 00:00:00+00', 12, 166.6667);
 INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Zeta numero 2 CM' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'Gerrajes' LIMIT 1), '2024-02-17 00:00:00+00', 4, 600.0000);
+-- [cantidad no numérica: None] cantidad=1, precio=costo_total — revisar
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'licras lencería' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'telas Medellín' LIMIT 1), '2024-06-04 00:00:00+00', 1, 30100.0000);
+-- [cantidad no numérica: None] cantidad=1, precio=costo_total — revisar
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'mallatex vino' LIMIT 1), NULL, '2024-06-04 00:00:00+00', 1, 12000.0000);
+-- [cantidad no numérica: None] cantidad=1, precio=costo_total — revisar
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'planchuela fileteadora' LIMIT 1), NULL, '2024-06-04 00:00:00+00', 1, 25000.0000);
 -- [cantidad no numérica: None] cantidad=1, precio=costo_total — revisar
 INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Elasticos cosrseteria etc' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'Kilotelas' LIMIT 1), '2024-06-29 00:00:00+00', 1, 76000.0000);
 -- [cantidad no numérica: None] cantidad=1, precio=costo_total — revisar
@@ -336,6 +378,39 @@ INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_c
 -- [cantidad no numérica: None] cantidad=1, precio=costo_total — revisar
 INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Encaje 6 cm calidad negro 8 mts' LIMIT 1), NULL, '2024-09-16 00:00:00+00', 1, 22400.0000);
 INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'marquillas en satin' LIMIT 1), NULL, '2024-10-03 00:00:00+00', 100, 660.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'encaje blanco' LIMIT 1), NULL, '2024-10-08 00:00:00+00', 10, 2700.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Encaje negro' LIMIT 1), NULL, '2024-10-08 00:00:00+00', 10, 2700.0000);
+-- [cantidad no numérica: None] cantidad=1, precio=costo_total — revisar
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Hilos + Hilazas' LIMIT 1), NULL, '2024-10-08 00:00:00+00', 1, 62500.0000);
+-- [cantidad no numérica: None] cantidad=1, precio=costo_total — revisar
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Sellos Arpia' LIMIT 1), NULL, '2024-10-08 00:00:00+00', 1, 154000.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Tira brasier blanco' LIMIT 1), NULL, '2024-10-08 00:00:00+00', 10, 600.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Tira brasier negro' LIMIT 1), NULL, '2024-10-08 00:00:00+00', 10, 600.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'gafete 3x2 blanco' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'sesgocolor' LIMIT 1), '2024-10-17 00:00:00+00', 127, 358.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'gafete 3x2 negro' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'sesgocolor' LIMIT 1), '2024-10-17 00:00:00+00', 100, 358.0000);
+-- [cantidad no numérica: None] cantidad=1, precio=costo_total — revisar
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Alfileres' LIMIT 1), NULL, '2024-10-23 00:00:00+00', 1, 6000.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'ARCO METALICO 2001 30' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'auratex' LIMIT 1), '2024-10-23 00:00:00+00', 50, 247.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'ARCO METALICO 2001 32' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'auratex' LIMIT 1), '2024-10-23 00:00:00+00', 50, 247.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'ARCO METALICO 2001 34' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'auratex' LIMIT 1), '2024-10-23 00:00:00+00', 50, 247.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'ARCO METALICO 2001 36' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'auratex' LIMIT 1), '2024-10-23 00:00:00+00', 50, 247.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'bolsas tul 12 x 17' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'las 3 b' LIMIT 1), '2024-10-23 00:00:00+00', 12, 850.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Encaje Blanco y negro para bicolor' LIMIT 1), NULL, '2024-10-23 00:00:00+00', 20, 4000.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Encaje bordado blanco y negro' LIMIT 1), NULL, '2024-10-23 00:00:00+00', 2, 15000.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'FRAMILON' LIMIT 1), NULL, '2024-10-23 00:00:00+00', 1, 5500.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Framilon blanco y negro' LIMIT 1), NULL, '2024-10-23 00:00:00+00', 10, 7500.0000);
+-- [cantidad no numérica: None] cantidad=1, precio=costo_total — revisar
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'gafetes +arandelas' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'gerrajes' LIMIT 1), '2024-10-23 00:00:00+00', 1, 21350.0000);
+-- [cantidad no numérica: None] cantidad=1, precio=costo_total — revisar
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'HILAZAS cono amarillo' LIMIT 1), NULL, '2024-10-23 00:00:00+00', 1, 15000.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'malla piel negro' LIMIT 1), NULL, '2024-10-23 00:00:00+00', 3, 12500.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Mallatex blnaco y negro' LIMIT 1), NULL, '2024-10-23 00:00:00+00', 6, 12500.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'SESGO ELASTICO' LIMIT 1), NULL, '2024-10-23 00:00:00+00', 10, 450.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'sesgo lorex blanco' LIMIT 1), NULL, '2024-10-23 00:00:00+00', 10, 950.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'sesgo lorex negro' LIMIT 1), NULL, '2024-10-23 00:00:00+00', 10, 950.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Tela control blanca' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'Teks' LIMIT 1), '2024-10-23 00:00:00+00', 5, 51160.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Tira de brasier negro' LIMIT 1), NULL, '2024-10-23 00:00:00+00', 10, 320.0000);
+INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'varilla plastica cortada 18 cm' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'auratex' LIMIT 1), '2024-10-23 00:00:00+00', 200, 144.0000);
 INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Cajas negras de 30 x 20 x7' LIMIT 1), NULL, '2025-10-25 00:00:00+00', 20, 9135.0000);
 INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Cajas negras de 30 x 20 x7' LIMIT 1), NULL, '2025-10-25 00:00:00+00', 20, 9135.0000);
 -- [cantidad no numérica: None] cantidad=1, precio=costo_total — revisar
@@ -381,7 +456,7 @@ INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_c
 INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'terminal metalico para cintas' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'gerrajes' LIMIT 1), '2026-07-18 00:00:00+00', 12, 200.0000);
 ```
 
-## 9. TABLA Movimientos_Financieros (29) — SQL
+## 9. TABLA Movimientos_Financieros (59) — SQL
 
 ```sql
 INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2023-03-17 00:00:00+00', 'Inversion', 'Termofijadora', 960000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'Valqui' LIMIT 1));
@@ -413,69 +488,104 @@ INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id
 INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-07-13 00:00:00+00', 'Inversion', 'papeleria + oraganizacion', 100000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'Valqui' LIMIT 1));
 INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-07-22 00:00:00+00', 'Inversion', 'maniqui', 150000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'Valqui' LIMIT 1));
 INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2025-01-16 00:00:00+00', 'Inversion', 'Maquina Zigsiadora Industrial', 2200000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'Valqui' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-06-04 00:00:00+00', 'Inversion', 'kit cortadores rotativos', 131150.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'Valqui' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-06-04 00:00:00+00', 'Inversion', 'silla cajero', 300000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'Valqui' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-06-04 00:00:00+00', 'Inversion', 'patron brasier', 36000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'Valqui' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-06-04 00:00:00+00', 'Inversion', 'curso lenceria', 326730.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'Valqui' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-06-04 00:00:00+00', 'Inversion', 'impresion patrones', 150000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'Valqui' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-06-04 00:00:00+00', 'Inversion', 'insumos curso lencería', 170000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'Valqui' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-06-04 00:00:00+00', 'Inversion', 'insumos curso lencería', 63300.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'Valqui' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-06-04 00:00:00+00', 'Inversion', 'accesorios maquinas', 153000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'Valqui' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-10-23 00:00:00+00', 'Gasto', 'envio', 16500.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-10-23 00:00:00+00', 'Gasto', 'envio', 16500.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-10-23 00:00:00+00', 'Gasto', 'iva', 14858.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-10-23 00:00:00+00', 'Gasto', 'fragancia', 12000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2025-02-02 00:00:00+00', 'Gasto', 'HOSTING ARPIA', 382360.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2025-01-05 00:00:00+00', 'Gasto', 'Decoracion fotos Arpia', 108000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-10-23 00:00:00+00', 'Gasto', 'Bono celeste trabajo', 200000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-10-23 00:00:00+00', 'Gasto', 'Bono margara trabajo', 400000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-10-23 00:00:00+00', 'Gasto', 'herrajes', 20000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-10-23 00:00:00+00', 'Gasto', 'Refri', 15000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-10-23 00:00:00+00', 'Gasto', 'Revision maquina', 50000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2024-10-23 00:00:00+00', 'Gasto', 'prestamo margara', 150000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2025-12-31 00:00:00+00', 'Gasto', 'MATERIALES SURTIDOS', 21000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2025-12-31 00:00:00+00', 'Gasto', 'DOMICILIO CAJA SACA LAS GARRAS', 10000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2025-12-31 00:00:00+00', 'Gasto', 'ENVIO TELA ENCAJE ROJO', 20300.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2025-12-31 00:00:00+00', 'Gasto', 'AYUDANTE CORTE PIEZAS', 10000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2025-12-31 00:00:00+00', 'Gasto', 'PUBLICIDAD EN META ADS', 13288.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2026-01-31 00:00:00+00', 'Gasto', 'SESGO ELASTICO NEGRO BRILLANTE 30 MTS', 28500.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2026-02-28 00:00:00+00', 'Gasto', 'Telas lona / cremallera', 70000.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2026-02-28 00:00:00+00', 'Gasto', 'Temu ojaletes / troqueles / cintas', 62807.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2026-02-28 00:00:00+00', 'Gasto', 'Varillas 22 cm Aretex 200 uni', 47200.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
+INSERT INTO "Movimientos_Financieros" (fecha, tipo, descripcion, monto, socio_id) VALUES ('2026-02-28 00:00:00+00', 'Gasto', 'varilla propileno 8 mm 50 yardas', 33475.00, (SELECT id FROM "Socios_Configuracion" WHERE nombre = 'ARPIA' LIMIT 1));
 ```
 
-## 10. TABLA Ventas + Detalle_Ventas (18) — SQL
+## 10. TABLA Ventas + Detalle_Ventas (21) — SQL
 
 ```sql
--- [SIN PRECIO en el Excel fila 2] completar G antes de insertar: CAJA SACA LAS GARRAS S 2025-12-13
--- Venta 1: CAJA SACA LAS GARRAS S 2025-12-13 $None cliente gaby
-INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2025-12-13 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'gaby' LIMIT 1), 0, 'completada', 0.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'CAJA SACA LAS GARRAS' LIMIT 1), NULL, 1, 0.00, 0.00);
+-- Venta 1: CAJA SACA LAS GARRAS S 2025-12-13 $295000.0 cliente gaby
+INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2025-12-13 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'gaby' LIMIT 1), 0, 'completada', 295000.00, 'feria');
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'CAJA SACA LAS GARRAS' LIMIT 1), NULL, 1, 295000.00, 129388.00);
 -- Venta 2: SET AELO S 2025-12-13 $80000.0 cliente celes
 INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2025-12-13 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'celes' LIMIT 1), 0, 'completada', 80000.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'SET AELO' LIMIT 1), NULL, 1, 80000.00, 0.00);
--- [SIN PRECIO en el Excel fila 4] completar G antes de insertar: BLUSA ARPIA MANGA LARGA M 2026-01-05
--- Venta 3: BLUSA ARPIA MANGA LARGA M 2026-01-05 $None cliente Maira *Comic
-INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-01-05 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Maira *Comic' LIMIT 1), 0, 'completada', 0.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'BLUSA ARPIA MANGA LARGA' LIMIT 1), NULL, 1, 0.00, 0.00);
--- Venta 4: SET OCIPETE S 2026-03-20 $71250.0 cliente gaby
-INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-03-20 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'gaby' LIMIT 1), 0, 'completada', 71250.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'SET OCIPETE' LIMIT 1), NULL, 1, 71250.00, 0.00);
--- Venta 5: SET OCIPETE  2026-03-28 $71250.0 cliente Valeria Amiga gaby
-INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-03-28 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Valeria Amiga gaby' LIMIT 1), 0, 'completada', 71250.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'SET OCIPETE' LIMIT 1), NULL, 1, 71250.00, 0.00);
--- Venta 6: SET AELO XS 2026-03-29 $82500.0 cliente Juan jose
-INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-03-29 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Juan jose' LIMIT 1), 0, 'completada', 82500.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'SET AELO' LIMIT 1), NULL, 1, 82500.00, 0.00);
--- Venta 7: SET AELO S 2026-03-31 $82500.0 cliente Valentina hermana ale
-INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-03-31 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Valentina hermana ale' LIMIT 1), 0, 'completada', 82500.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'SET AELO' LIMIT 1), NULL, 1, 82500.00, 0.00);
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'SET AELO' LIMIT 1), NULL, 1, 80000.00, 38805.00);
+-- Venta 3: BLUSA ARPIA MANGA LARGA M 2026-01-05 $90000.0 cliente Maira *Comic
+INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-01-05 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Maira *Comic' LIMIT 1), 0, 'completada', 90000.00, 'feria');
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'BLUSA ARPIA MANGA LARGA' LIMIT 1), NULL, 1, 90000.00, 21561.00);
+-- Venta 4: SET OCIPETE S 2026-03-20 $71250.0 DESC 25% cliente gaby
+INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-03-20 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'gaby' LIMIT 1), 25, 'completada', 71250.00, 'feria');
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'SET OCIPETE' LIMIT 1), NULL, 1, 71250.00, 26109.00);
+-- Venta 5: SET OCIPETE vino 2026-03-28 $71250.0 DESC 25% cliente Valeria Amiga gaby
+INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-03-28 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Valeria Amiga gaby' LIMIT 1), 25, 'completada', 71250.00, 'feria');
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'SET OCIPETE' LIMIT 1), NULL, 1, 71250.00, 26109.00);
+-- Venta 6: SET AELO XS 2026-03-29 $82500.0 DESC 25% cliente Juan jose
+INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-03-29 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Juan jose' LIMIT 1), 25, 'completada', 82500.00, 'feria');
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'SET AELO' LIMIT 1), NULL, 1, 82500.00, 38805.00);
+-- Venta 7: SET AELO S 2026-03-31 $82500.0 DESC 25% cliente Valentina hermana ale
+INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-03-31 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Valentina hermana ale' LIMIT 1), 25, 'completada', 82500.00, 'feria');
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'SET AELO' LIMIT 1), NULL, 1, 82500.00, 38805.00);
 -- Venta 8: TOTEBAG  2026-03-31 $45000.0 cliente Valentina hermana ale
 INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-03-31 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Valentina hermana ale' LIMIT 1), 0, 'completada', 45000.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 0.00);
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 25765.00);
 -- Venta 9: TOTEBAG  2026-03-31 $45000.0 cliente Camila
 INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-03-31 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Camila' LIMIT 1), 0, 'completada', 45000.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 0.00);
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 25765.00);
 -- Venta 10: TOTEBAG  2026-04-24 $45000.0 cliente celeste
 INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-04-24 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'celeste' LIMIT 1), 0, 'completada', 45000.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 0.00);
--- Venta 11: TOTEBAG  2026-04-29 $45000.0 cliente Valqui
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 25765.00);
+-- Venta 11: CORSET GARRAS  2026-05-09 $95000.0 cliente Camila
+INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-05-09 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Camila' LIMIT 1), 0, 'completada', 95000.00, 'feria');
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'CORSET GARRAS' LIMIT 1), NULL, 1, 95000.00, 29826.00);
+-- Venta 12: CORSET GARRAS  2026-05-09 $95000.0 cliente Olga
+INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-05-09 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Olga' LIMIT 1), 0, 'completada', 95000.00, 'feria');
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'CORSET GARRAS' LIMIT 1), NULL, 1, 95000.00, 29826.00);
+-- Venta 13: CORSET GARRAS  2026-05-10 $60500.0 cliente Gaby
+INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-05-10 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'gaby' LIMIT 1), 0, 'completada', 60500.00, 'feria');
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'CORSET GARRAS' LIMIT 1), NULL, 1, 60500.00, 29826.00);
+-- Venta 14: TOTEBAG  2026-04-29 $45000.0 cliente Valqui
 INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-04-29 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Valqui' LIMIT 1), 0, 'completada', 45000.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 0.00);
--- Venta 12: TOTEBAG  2026-05-19 $45000.0 cliente Maira *Comic
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 25765.00);
+-- Venta 15: TOTEBAG  2026-05-19 $45000.0 cliente Maira *Comic
 INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-05-19 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Maira *Comic' LIMIT 1), 0, 'completada', 45000.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 0.00);
--- Venta 13: TOTEBAG  2026-05-19 $45000.0 cliente Maira *Comic
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 25765.00);
+-- Venta 16: TOTEBAG  2026-05-19 $45000.0 cliente Maira *Comic
 INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-05-19 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Maira *Comic' LIMIT 1), 0, 'completada', 45000.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 0.00);
--- Venta 14: TOTEBAG  2026-07-25 $45000.0 cliente evento nana
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 25765.00);
+-- Venta 17: TOTEBAG  2026-07-25 $45000.0 cliente evento nana
 INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-07-25 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'evento nana' LIMIT 1), 0, 'completada', 45000.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 0.00);
--- Venta 15: CORSET GARRAS  2026-07-25 $80750.0 cliente evento nana
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 25765.00);
+-- Venta 18: CORSET GARRAS corset garras 2026-07-25 $80750.0 cliente evento nana
 INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-07-25 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'evento nana' LIMIT 1), 0, 'completada', 80750.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'CORSET GARRAS' LIMIT 1), NULL, 1, 80750.00, 0.00);
--- [SIN PRECIO en el Excel fila 20] completar G antes de insertar: TOTEBAG  2026-07-25
--- Venta 16: TOTEBAG  2026-07-25 $None cliente evento nana
-INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-07-25 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'evento nana' LIMIT 1), 0, 'completada', 0.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 0.00, 0.00);
--- [SIN PRECIO en el Excel fila 21] completar G antes de insertar: BLUSA ARPIA MANGA LARGA  2026-08-05
--- Venta 17: BLUSA ARPIA MANGA LARGA  2026-08-05 $None cliente Maria caja cumple
-INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-08-05 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Maria caja cumple' LIMIT 1), 0, 'completada', 0.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'BLUSA ARPIA MANGA LARGA' LIMIT 1), NULL, 1, 0.00, 0.00);
--- Venta 18: FALDA EMILY  2026-08-01 $80000.0 cliente gaby
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'CORSET GARRAS' LIMIT 1), NULL, 1, 80750.00, 33581.00);
+-- Venta 19: TOTEBAG sorteo 2026-07-25 $45000.0 cliente evento nana
+INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-07-25 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'evento nana' LIMIT 1), 0, 'completada', 45000.00, 'feria');
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'TOTEBAG' LIMIT 1), NULL, 1, 45000.00, 25765.00);
+-- Venta 20: BLUSA ARPIA MANGA LARGA  2026-08-05 $90000.0 cliente Maria caja cumple
+INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-08-05 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'Maria caja cumple' LIMIT 1), 0, 'completada', 90000.00, 'feria');
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'BLUSA ARPIA MANGA LARGA' LIMIT 1), NULL, 1, 90000.00, 21561.00);
+-- Venta 21: FALDA EMILY falda emily negra 2026-08-01 $80000.0 cliente gaby
 INSERT INTO "Ventas" (fecha, cliente_id, descuento_porcentaje, estado, total_venta, canal_venta) VALUES ('2026-08-01 00:00:00+00', (SELECT id FROM "Clientes" WHERE nombre = 'gaby' LIMIT 1), 0, 'completada', 80000.00, 'feria');
-INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'FALDA EMILY' LIMIT 1), NULL, 1, 80000.00, 0.00);
+INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, precio_unitario_aplicado, costo_unitario_aplicado) VALUES ((SELECT max(id) FROM "Ventas"), (SELECT id FROM "Productos" WHERE nombre = 'FALDA EMILY' LIMIT 1), NULL, 1, 80000.00, 23465.00);
 ```
 
 ## 11. Ajuste de stock tras ventas históricas
@@ -484,7 +594,7 @@ INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, prec
 
 ## ANEXO A — Referencia
 
-### Proveedores (27)
+### Proveedores (34)
 - Atenea bordados y encajes
 - Boutique de los empaques
 - C+basics
@@ -498,22 +608,29 @@ INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, prec
 - HomeCenter
 - ICOLTEX
 - Kilotelas
+- La guillotina
 - Las 3BBB premium
 - MercadoLibre
 - Mil Adornos
 - Mil Telas
 - SINGER
+- Teks
 - Textiles F&M
 - The lingerie Formula
 - almacen de la 6ta
 - amazon
+- auratex
 - brother
+- corsetería
 - facol
 - grupo textil moda
+- las 3 b
+- sesgocolor
+- telas Medellín
 - temu
 - zuretex
 
-### Insumos (107)
+### Insumos (135)
 
 | nombre | categoria | unidad |
 |---|---|---|
@@ -522,11 +639,16 @@ INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, prec
 | Agujas punta de bola Fill | Telas | m |
 | Agujas punta de bola Plana | Telas | m |
 | Alfileres | Telas | m |
+| ARCO METALICO 2001 30 | Telas | m |
+| ARCO METALICO 2001 32 | Telas | m |
+| ARCO METALICO 2001 34 | Telas | m |
+| ARCO METALICO 2001 36 | Telas | m |
 | Argolla numero 10 mm | Herrajes | un |
 | Argolla numero 8 mm | Herrajes | un |
 | Barilla poliester corset negro 8mm | Herrajes | un |
 | Bolsa de seguridad negra 25 x 35 | Empaques | un |
 | Bolsa de seguridad rosa 25 x 35 | Empaques | un |
+| bolsas tul 12 x 17 | Empaques | un |
 | Boton Aro para las faldas | Herrajes | un |
 | Cadena gris delgada totebag | Herrajes | un |
 | Cadena plateada gruesa totebag | Herrajes | un |
@@ -546,6 +668,9 @@ INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, prec
 | Encaje 6 cm calidad blanco 8 mts | Telas | m |
 | Encaje 6 cm calidad negro 8 mts | Telas | m |
 | encaje bicolor | Telas | m |
+| encaje blanco | Telas | m |
+| Encaje Blanco y negro para bicolor | Telas | m |
+| Encaje bordado blanco y negro | Telas | m |
 | Encaje de ramitas | Telas | m |
 | Encaje Elastico 19 cm blanco 10 mts | Telas | m |
 | Encaje Elastico 19 cm negro 10 mts | Telas | m |
@@ -563,12 +688,17 @@ INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, prec
 | Folder sesgo para plana | Telas | m |
 | forro varilla negro | Herrajes | un |
 | forro varilla piel | Herrajes | un |
+| FRAMILON | Telas | m |
+| Framilon blanco y negro | Telas | m |
 | Framilon elastico plano 20 mts | Telas | m |
 | Franela color negro | Telas | m |
 | Franela color piel | Telas | m |
 | Franela lycra 1 mt (blanco y negro) | Telas | m |
 | Gabardina Ultra Poliester | Telas | m |
+| gafete 3x2 blanco | Herrajes | un |
+| gafete 3x2 negro | Herrajes | un |
 | Gafetes | Herrajes | un |
+| gafetes +arandelas | Herrajes | un |
 | Herrajes / gafetes / copas prehormadas | Herrajes | un |
 | herrajes en forma 8 / G | Telas | m |
 | Hilaza negra | Telas | m |
@@ -576,26 +706,37 @@ INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, prec
 | Hilaza venus 150 gms negro | Telas | m |
 | Hilaza venus negro | Telas | m |
 | Hilaza venus piel | Telas | m |
+| HILAZAS cono amarillo | Telas | m |
 | Hilo poliester venus negro | Telas | m |
 | Hilo poliester venus piel | Telas | m |
+| Hilos + Hilazas | Telas | m |
+| licras lencería | Telas | m |
 | Lino vertigo | Telas | m |
 | malla piel | Telas | m |
+| malla piel negro | Telas | m |
+| Mallatex blnaco y negro | Telas | m |
 | mallatex negro | Telas | m |
 | mallatex rosa | Telas | m |
+| mallatex vino | Telas | m |
 | marquillas en satin | Telas | m |
 | ojales metalicos 3/8 (grandes) | Herrajes | un |
 | Piel de durazno + tejido de punto | Telas | m |
+| planchuela fileteadora | Telas | m |
 | Powernet negro delgado | Telas | m |
 | Ref 100 24 cm tul bordado negro | Telas | m |
 | Ref 159 24 cm tul bordado rojo pastel | Telas | m |
 | Rosas tejidas para totebag | Telas | m |
 | Satin elastico negro | Telas | m |
 | Satin elastico rosa | Telas | m |
+| Sellos Arpia | Telas | m |
 | sesgo 2 cm negro | Telas | m |
 | sesgo 2 cm piel | Telas | m |
+| SESGO ELASTICO | Telas | m |
 | Sesgo Elastico 2 10 mts | Telas | m |
 | Sesgo Elastico blanco 1,5 10 mts | Telas | m |
 | Sesgo elastico negro 2cm brillante | Telas | m |
+| sesgo lorex blanco | Telas | m |
+| sesgo lorex negro | Telas | m |
 | Sesgo rigido para ojales corset | Herrajes | un |
 | Sesgo satin brillante | Telas | m |
 | Sublimacion de la tela maya | Telas | m |
@@ -603,6 +744,7 @@ INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, prec
 | Super Brioni | Telas | m |
 | Tapavarilla negro 10 mts | Herrajes | un |
 | Tejido plano sim popelina (a cuadros bn) | Telas | m |
+| Tela control blanca | Telas | m |
 | Tela noche de viena negra | Telas | m |
 | telas + sesgos + tira +gafetes | Herrajes | un |
 | Telas algodon jersey retazos blanco | Telas | m |
@@ -610,14 +752,17 @@ INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, prec
 | Tensor 8 numero 10 | Herrajes | un |
 | terminal metalico para cintas | Telas | m |
 | Terminales de cordon | Herrajes | un |
+| Tira brasier blanco | Telas | m |
 | tira brasier negro | Telas | m |
 | tira brasier piel | Telas | m |
 | Tira de Brasier blanco 10 mts | Telas | m |
+| Tira de brasier negro | Telas | m |
 | Tira de Brasier negro 10 mts | Telas | m |
 | Tira de poliester para las totebag | Telas | m |
 | Tull bordado blanco | Telas | m |
 | Tull bordado cafe | Telas | m |
 | Tull bordado piel | Telas | m |
+| varilla plastica cortada 18 cm | Herrajes | un |
 | Varillas media copa | Herrajes | un |
 | varios retazos | Telas | m |
 | velo estrella (papel empaque) | Empaques | un |
