@@ -8,12 +8,53 @@
  * product/variant snapshot. Missing products degrade to "Producto #{id}".
  */
 import { formatDateTime, formatMoney, formatQty } from '@/utils/format'
-import { canalLabel, estadoLabel, type VentaRow } from '@/utils/ventas'
+import { parseColumnFilter } from '@/utils/table-filters'
+import {
+  CANAL_VENTAS,
+  canalLabel,
+  estadoLabel,
+  type VentaRow,
+} from '@/utils/ventas'
 
 defineProps<{
   rows: VentaRow[]
   loading?: boolean
 }>()
+
+const emit = defineEmits<{
+  'filter-change': [filters: { canal_venta?: string | null; estado?: string | null }]
+  'sort-change': [sort: { prop: string; order: 'asc' | 'desc' | null }]
+}>()
+
+/** Header funnel options per column: labels via canalLabel/estadoLabel. */
+const canalFilters = CANAL_VENTAS.map((c) => ({ text: canalLabel(c), value: c }))
+const estadoFilters = (['completada', 'anulada'] as const).map((e) => ({
+  text: estadoLabel(e),
+  value: e,
+}))
+
+/** Normalize el-table's filter-change into a typed single-value emit. */
+function onColumnFilterChange(elFilters: Record<string, unknown[]>): void {
+  const canal_venta = parseColumnFilter(elFilters.canal_venta)
+  const estado = parseColumnFilter(elFilters.estado)
+  emit('filter-change', {
+    canal_venta: canal_venta === null ? null : String(canal_venta),
+    estado: estado === null ? null : String(estado),
+  })
+}
+
+/** Normalize el-table's sort-change into a typed {prop, order} emit. */
+function onSortChange(s: {
+  column: { key?: string; property?: string }
+  prop: string
+  order: 'ascending' | 'descending' | null
+}): void {
+  const prop = s.column.key ?? s.column.property ?? s.prop
+  emit('sort-change', {
+    prop,
+    order: s.order === 'ascending' ? 'asc' : s.order === 'descending' ? 'desc' : null,
+  })
+}
 
 /** el-tag type per estado: completada success, anulada danger, rest info. */
 function estadoTagType(estado: string): 'success' | 'danger' | 'info' {
@@ -29,7 +70,7 @@ function productSummary(row: VentaRow): string {
 </script>
 
 <template>
-  <el-table :data="rows" v-loading="loading">
+  <el-table :data="rows" v-loading="loading" @filter-change="onColumnFilterChange" @sort-change="onSortChange">
     <el-table-column type="expand">
       <template #default="{ row }">
         <el-table :data="row.detalles" size="small" class="venta-detail-table">
@@ -45,14 +86,14 @@ function productSummary(row: VentaRow): string {
       </template>
     </el-table-column>
 
-    <el-table-column prop="id" label="#" width="70" />
-    <el-table-column label="Fecha" width="110">
+    <el-table-column prop="id" label="#" column-key="id" sortable width="70" />
+    <el-table-column label="Fecha" column-key="fecha" sortable width="110">
       <template #default="{ row }">{{ formatDateTime(row.fecha) }}</template>
     </el-table-column>
-    <el-table-column label="Canal" width="110">
+    <el-table-column label="Canal" column-key="canal_venta" :filters="canalFilters" sortable width="110">
       <template #default="{ row }">{{ canalLabel(row.canal_venta) }}</template>
     </el-table-column>
-    <el-table-column label="Estado" width="120">
+    <el-table-column label="Estado" column-key="estado" :filters="estadoFilters" sortable width="120">
       <template #default="{ row }">
         <el-tag :type="estadoTagType(row.estado)" size="small">{{ estadoLabel(row.estado) }}</el-tag>
       </template>
@@ -60,9 +101,9 @@ function productSummary(row: VentaRow): string {
     <el-table-column label="Productos" min-width="220">
       <template #default="{ row }">{{ productSummary(row) }}</template>
     </el-table-column>
-    <el-table-column prop="cliente" label="Cliente" min-width="150" />
+    <el-table-column prop="cliente" label="Cliente" column-key="cliente" sortable min-width="150" />
     <el-table-column prop="detalle_count" label="Detalles" width="90" align="right" />
-    <el-table-column label="Total" width="130" align="right">
+    <el-table-column label="Total" column-key="total_venta" sortable width="130" align="right">
       <template #default="{ row }">{{ formatMoney(row.total_venta) }}</template>
     </el-table-column>
 

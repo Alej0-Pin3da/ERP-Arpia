@@ -60,6 +60,11 @@ async function mountTable(rows: InsumoRead[], canEdit = true): Promise<VueWrappe
   return wrapper
 }
 
+const CATEGORIAS = [
+  { id: 1, nombre: 'Granos' },
+  { id: 2, nombre: 'Abarrotes' },
+]
+
 describe('InsumosTable (MOD-4)', () => {
   it('renders the master rows with the server join and es-CO quantities and costs', async () => {
     const wrapper = await mountTable(INSUMOS)
@@ -119,5 +124,62 @@ describe('InsumosTable (MOD-4)', () => {
   it('shows an empty state when there are no insumos', async () => {
     const wrapper = await mountTable([])
     expect(wrapper.text()).toContain('Sin insumos registrados')
+  })
+
+  it('builds the categoria header funnel from the categorias prop', async () => {
+    const wrapper = mount(InsumosTable, {
+      props: { rows: INSUMOS, categorias: CATEGORIAS },
+      global: { plugins: [ElementPlus] },
+    })
+    await nextTick()
+
+    const categoriaColumn = wrapper
+      .findAllComponents({ name: 'ElTableColumn' })
+      .find((c) => c.props('columnKey') === 'categoria')
+
+    expect(categoriaColumn!.props('filters')).toEqual([
+      { text: 'Granos', value: 1 },
+      { text: 'Abarrotes', value: 2 },
+    ])
+  })
+
+  it('renders no funnel when no categorias are passed (empty filters)', async () => {
+    const wrapper = await mountTable(INSUMOS)
+
+    const categoriaColumn = wrapper
+      .findAllComponents({ name: 'ElTableColumn' })
+      .find((c) => c.props('columnKey') === 'categoria')
+
+    expect(categoriaColumn!.props('filters')).toEqual([])
+  })
+
+  it('normalizes an el-table filter-change on categoria into a typed emit', async () => {
+    const wrapper = await mountTable(INSUMOS)
+
+    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { categoria: [2] })
+    await nextTick()
+
+    expect(wrapper.emitted('filter-change')).toBeDefined()
+    expect(wrapper.emitted('filter-change')![0][0]).toEqual({ categoria_id: 2 })
+  })
+
+  it('emits null when the categoria column filter is cleared', async () => {
+    const wrapper = await mountTable(INSUMOS)
+
+    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { categoria: [] })
+    await nextTick()
+
+    expect(wrapper.emitted('filter-change')![0][0]).toEqual({ categoria_id: null })
+  })
+
+  it('maps an el-table sort-change into a typed {prop, order} emit', async () => {
+    const wrapper = await mountTable(INSUMOS)
+
+    wrapper
+      .findComponent({ name: 'ElTable' })
+      .vm.$emit('sort-change', { column: { key: 'stock_actual' }, order: 'descending' })
+    await nextTick()
+
+    expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'stock_actual', order: 'desc' })
   })
 })

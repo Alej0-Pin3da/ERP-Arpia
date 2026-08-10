@@ -61,12 +61,16 @@ const movimientosTotal = ref(0)
 const movimientosPage = ref(1)
 const movimientosPageSize = 20
 const filterTipo = ref<'Gasto' | 'Inversion' | 'Retiro' | null>(null)
+const movimientosSortBy = ref<string | null>(null)
+const movimientosSortOrder = ref<'asc' | 'desc' | null>(null)
 
 // --- socios table + lookup --------------------------------------------------
 const socios = ref<SocioConfiguracionRead[]>([])
 const sociosTotal = ref(0)
 const sociosPage = ref(1)
 const sociosPageSize = 20
+const sociosSortBy = ref<string | null>(null)
+const sociosSortOrder = ref<'asc' | 'desc' | null>(null)
 /** Full partner set for the socio name join + the socio select (design D3). */
 const sociosLookup = ref<SocioConfiguracionRead[]>([])
 
@@ -97,10 +101,17 @@ async function load(): Promise<void> {
           page: movimientosPage.value,
           pageSize: movimientosPageSize,
           filtros: { tipo: filterTipo.value },
+          sortBy: movimientosSortBy.value ?? undefined,
+          sortOrder: movimientosSortOrder.value ?? undefined,
         }),
       ),
       finanzasApi.listSocios(
-        buildListParams({ page: sociosPage.value, pageSize: sociosPageSize }),
+        buildListParams({
+          page: sociosPage.value,
+          pageSize: sociosPageSize,
+          sortBy: sociosSortBy.value ?? undefined,
+          sortOrder: sociosSortOrder.value ?? undefined,
+        }),
       ),
       // D3: the socio select + name join need the full set.
       finanzasApi.listSocios({ limit: 1000 }),
@@ -120,6 +131,29 @@ async function load(): Promise<void> {
 /** FE-2: the tipo filter resets the movimientos page to 1 and refetches. */
 function onMovimientoFilterChange(): void {
   movimientosPage.value = 1
+  load()
+}
+
+/** Header column filter (MovimientosTable) drives the same ref as the toolbar. */
+function onMovimientoTableFilterChange(filters: {
+  tipo?: 'Gasto' | 'Inversion' | 'Retiro' | null
+}): void {
+  filterTipo.value = filters.tipo ?? null
+  onMovimientoFilterChange()
+}
+
+/** Server-side column sort: reset to page 1; a null order clears the sort. */
+function onMovimientoTableSortChange(sort: { prop: string; order: 'asc' | 'desc' | null }): void {
+  movimientosSortBy.value = sort.order === null ? null : sort.prop
+  movimientosSortOrder.value = sort.order
+  onMovimientoFilterChange()
+}
+
+/** Server-side column sort for the socios table (no toolbar filters). */
+function onSociosTableSortChange(sort: { prop: string; order: 'asc' | 'desc' | null }): void {
+  sociosSortBy.value = sort.order === null ? null : sort.prop
+  sociosSortOrder.value = sort.order
+  sociosPage.value = 1
   load()
 }
 
@@ -354,6 +388,8 @@ onMounted(load)
           :can-edit="canRegister"
           @delete="onDeleteMovimiento"
           @edit="onEditMovimiento"
+          @filter-change="onMovimientoTableFilterChange"
+          @sort-change="onMovimientoTableSortChange"
         />
         <el-pagination
           class="tabla-paginacion"
@@ -411,6 +447,7 @@ onMounted(load)
           :can-edit="canRegister"
           @edit="onEditSocio"
           @delete="onDeleteSocio"
+          @sort-change="onSociosTableSortChange"
         />
         <el-pagination
           class="tabla-paginacion"

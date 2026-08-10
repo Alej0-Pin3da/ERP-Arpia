@@ -13,6 +13,7 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
+import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import ProductosTable from '@/components/productos/ProductosTable.vue'
@@ -104,5 +105,25 @@ describe('ProductosTable (MOD-5)', () => {
   it('renders the empty state when there are no products', async () => {
     const wrapper = await mountTable(true, [])
     expect(wrapper.text()).toContain('Sin productos registrados')
+  })
+
+  it('maps an el-table sort-change into a typed {prop, order} emit', async () => {
+    const wrapper = await mountTable()
+
+    wrapper
+      .findComponent({ name: 'ElTable' })
+      .vm.$emit('sort-change', { column: { key: 'precio_venta_sugerido' }, order: 'descending' })
+    await nextTick()
+
+    expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'precio_venta_sugerido', order: 'desc' })
+  })
+
+  it('maps a cleared sort (null order) for the nombre column', async () => {
+    const wrapper = await mountTable()
+
+    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('sort-change', { column: { key: 'nombre' }, order: null })
+    await nextTick()
+
+    expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'nombre', order: null })
   })
 })

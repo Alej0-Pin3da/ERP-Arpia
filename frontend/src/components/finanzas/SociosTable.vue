@@ -25,10 +25,27 @@ const props = defineProps<{
   canEdit?: boolean
 }>()
 
-const emit = defineEmits<{ edit: [row: SocioConfiguracionRead]; delete: [row: SocioConfiguracionRead] }>()
+const emit = defineEmits<{
+  edit: [row: SocioConfiguracionRead]
+  delete: [row: SocioConfiguracionRead]
+  'sort-change': [sort: { prop: string; order: 'asc' | 'desc' | null }]
+}>()
 
 /** Sum-to-100 progress: current participation vs the 100 target. */
 const sum = computed(() => sumaParticipacion(props.rows))
+
+/** Normalize el-table's sort-change into a typed {prop, order} emit. */
+function onSortChange(s: {
+  column: { key?: string; property?: string }
+  prop: string
+  order: 'ascending' | 'descending' | null
+}): void {
+  const prop = s.column.key ?? s.column.property ?? s.prop
+  emit('sort-change', {
+    prop,
+    order: s.order === 'ascending' ? 'asc' : s.order === 'descending' ? 'desc' : null,
+  })
+}
 </script>
 
 <template>
@@ -45,10 +62,10 @@ const sum = computed(() => sumaParticipacion(props.rows))
       />
     </div>
 
-    <el-table :data="rows" v-loading="loading">
-      <el-table-column prop="id" label="#" width="70" />
-      <el-table-column prop="nombre" label="Nombre" min-width="220" />
-      <el-table-column label="Participación" width="160" align="right">
+    <el-table :data="rows" v-loading="loading" @sort-change="onSortChange">
+      <el-table-column prop="id" label="#" column-key="id" sortable width="70" />
+      <el-table-column prop="nombre" label="Nombre" column-key="nombre" sortable min-width="220" />
+      <el-table-column label="Participación" column-key="porcentaje_participacion" sortable width="160" align="right">
         <template #default="{ row }">{{ formatQty(row.porcentaje_participacion) }}%</template>
       </el-table-column>
       <el-table-column v-if="canEdit" label="Acciones" width="160" align="center">

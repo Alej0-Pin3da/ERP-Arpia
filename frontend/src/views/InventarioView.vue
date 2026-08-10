@@ -19,7 +19,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { categoriasInsumosApi, comprasApi, insumosApi } from '@/api/endpoints'
+import { categoriasInsumosApi, comprasApi, insumosApi, proveedoresApi } from '@/api/endpoints'
 import ComprasForm from '@/components/inventario/ComprasForm.vue'
 import ComprasTable from '@/components/inventario/ComprasTable.vue'
 import InsumoForm from '@/components/inventario/InsumoForm.vue'
@@ -28,7 +28,6 @@ import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
 import {
   buildCompraRows,
-  buildComprasListParams,
   type CompraInsumoCreate,
   type InsumoCreate,
   type InsumoUpdate,
@@ -52,6 +51,8 @@ const insumosPage = ref(1)
 const insumosPageSize = ref(20)
 const insumoQ = ref('')
 const filterCategoriaId = ref<number | null>(null)
+const insumosSortBy = ref<string | null>(null)
+const insumosSortOrder = ref<'asc' | 'desc' | null>(null)
 
 // --- compras table: server-side pagination + filters -----------------------
 const compras = ref<CompraInsumoRead[]>([])
@@ -62,10 +63,14 @@ const compraQ = ref('')
 /** Optional GET /compras-insumos?insumo_id filter (clearable select). */
 const filterInsumoId = ref<number | null>(null)
 const filterProveedorId = ref<number | null>(null)
+const comprasSortBy = ref<string | null>(null)
+const comprasSortOrder = ref<'asc' | 'desc' | null>(null)
 
 // --- lookups (full sets, limit:1000 — design D3) ---------------------------
 const insumosLookup = ref<InsumoRead[]>([])
 const categorias = ref<CategoriaInsumoRead[]>([])
+/** Full proveedor set for the compras table funnel + the form options. */
+const proveedores = ref<{ id: number; nombre: string }[]>([])
 
 /** Joined compra rows: insumo name + client-computed costo_total, newest first. */
 const compraRows = computed(() => buildCompraRows(compras.value, insumosLookup.value))
@@ -82,13 +87,15 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    const [insumosPage_, comprasPage_, categoriasList, insumosLookup_] = await Promise.all([
+    const [insumosPage_, comprasPage_, categoriasList, insumosLookup_, proveedoresList] = await Promise.all([
       insumosApi.list(
         buildListParams({
           page: insumosPage.value,
           pageSize: insumosPageSize.value,
           filtros: { categoria_id: filterCategoriaId.value },
           q: insumoQ.value,
+          sortBy: insumosSortBy.value ?? undefined,
+          sortOrder: insumosSortOrder.value ?? undefined,
         }),
       ),
       comprasApi.list(
@@ -97,12 +104,16 @@ async function load(): Promise<void> {
           pageSize: comprasPageSize.value,
           filtros: { insumo_id: filterInsumoId.value, proveedor_id: filterProveedorId.value },
           q: compraQ.value,
+          sortBy: comprasSortBy.value ?? undefined,
+          sortOrder: comprasSortOrder.value ?? undefined,
         }),
       ),
       // Categoria options only feed the admin-only form — skip for other roles.
       canManage.value ? categoriasInsumosApi.list() : Promise.resolve({ items: [] as CategoriaInsumoRead[], total: 0 }),
       // D3: join fetches keep the full set (no pagination on lookups).
       insumosApi.list({ limit: 1000 }),
+      // D3: proveedores options for the compras table funnel (full set).
+      proveedoresApi.list({ limit: 1000 }),
     ])
     insumos.value = insumosPage_.items
     insumosTotal.value = insumosPage_.total
@@ -110,6 +121,7 @@ async function load(): Promise<void> {
     comprasTotal.value = comprasPage_.total
     categorias.value = categoriasList.items
     insumosLookup.value = insumosLookup_.items
+    proveedores.value = proveedoresList.items.map((p) => ({ id: p.id, nombre: p.nombre }))
   } catch {
     error.value = 'No se pudo cargar la información del inventario. Verifica la conexión con el servidor.'
   } finally {
@@ -152,6 +164,33 @@ function onComprasSearch(): void {
 function onComprasFilterChange(): void {
   comprasPage.value = 1
   load()
+}
+
+/** Header column filter (InsumosTable) maps into the categoria_id ref. */
+function onInsumosTableFilterChange(filters: { categoria_id?: number | null }): void {
+  filterCategoriaId.value = filters.categoria_id ?? null
+  onInsumosFilterChange()
+}
+
+/** Header column filter (ComprasTable) maps into the insumo/proveedor refs. */
+function onComprasTableFilterChange(filters: { insumo_id?: number | null; proveedor_id?: number | null }): void {
+  filterInsumoId.value = filters.insumo_id ?? null
+  filterProveedorId.value = filters.proveedor_id ?? null
+  onComprasFilterChange()
+}
+
+/** Server-side column sort (insumos): reset to page 1; null clears the sort. */
+function onInsumosTableSortChange(sort: { prop: string; order: 'asc' | 'desc' | null }): void {
+  insumosSortBy.value = sort.order === null ? null : sort.prop
+  insumosSortOrder.value = sort.order
+  onInsumosFilterChange()
+}
+
+/** Server-side column sort (compras): reset to page 1; null clears the sort. */
+function onComprasTableSortChange(sort: { prop: string; order: 'asc' | 'desc' | null }): void {
+  comprasSortBy.value = sort.order === null ? null : sort.prop
+  comprasSortOrder.value = sort.order
+  onComprasFilterChange()
 }
 
 /** MOD-4: POST the compra — the WAC service updates stock/cost server-side,
@@ -297,7 +336,16 @@ onMounted(load)
           </el-button>
         </div>
 
-        <InsumosTable :rows="insumos" :loading="loading" :can-edit="canManage" @edit="onEditInsumo" @delete="onDeleteInsumo" />
+        <InsumosTable
+          :rows="insumos"
+          :loading="loading"
+          :categorias="categorias"
+          :can-edit="canManage"
+          @edit="onEditInsumo"
+          @delete="onDeleteInsumo"
+          @filter-change="onInsumosTableFilterChange"
+          @sort-change="onInsumosTableSortChange"
+        />
         <el-pagination
           class="tabla-paginacion"
           background
@@ -362,7 +410,14 @@ onMounted(load)
           </el-button>
         </div>
 
-        <ComprasTable :rows="compraRows" :loading="loading" />
+        <ComprasTable
+          :rows="compraRows"
+          :loading="loading"
+          :insumos="insumosLookup"
+          :proveedores="proveedores"
+          @filter-change="onComprasTableFilterChange"
+          @sort-change="onComprasTableSortChange"
+        />
         <el-pagination
           class="tabla-paginacion"
           background

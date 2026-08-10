@@ -112,4 +112,59 @@ describe('MovimientosTable (MOD-3)', () => {
 
     expect(wrapper.text()).toContain('Sin movimientos registrados')
   })
+
+  it('declares a header funnel filter on the tipo column with labeled options', async () => {
+    const wrapper = await mountTable(ROWS)
+
+    const tipoColumn = wrapper
+      .findAllComponents({ name: 'ElTableColumn' })
+      .find((c) => c.props('columnKey') === 'tipo')
+
+    expect(tipoColumn!.props('filters')).toEqual([
+      { text: 'Gasto', value: 'Gasto' },
+      { text: 'Inversión', value: 'Inversion' },
+      { text: 'Retiro', value: 'Retiro' },
+    ])
+  })
+
+  it('normalizes an el-table filter-change on tipo into a typed emit', async () => {
+    const wrapper = await mountTable(ROWS)
+
+    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { tipo: ['Gasto'] })
+    await nextTick()
+
+    expect(wrapper.emitted('filter-change')).toBeDefined()
+    expect(wrapper.emitted('filter-change')![0][0]).toEqual({ tipo: 'Gasto' })
+  })
+
+  it('emits null when the tipo column filter is cleared', async () => {
+    const wrapper = await mountTable(ROWS)
+
+    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { tipo: [] })
+    await nextTick()
+
+    expect(wrapper.emitted('filter-change')![0][0]).toEqual({ tipo: null })
+  })
+
+  it('maps an el-table sort-change into a typed {prop, order} emit', async () => {
+    const wrapper = await mountTable(ROWS)
+
+    wrapper
+      .findComponent({ name: 'ElTable' })
+      .vm.$emit('sort-change', { column: { key: 'monto' }, order: 'descending' })
+    await nextTick()
+
+    expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'monto', order: 'desc' })
+  })
+
+  it('maps a cleared sort (null order) for a prop column', async () => {
+    const wrapper = await mountTable(ROWS)
+
+    wrapper
+      .findComponent({ name: 'ElTable' })
+      .vm.$emit('sort-change', { column: { property: 'socio' }, order: null })
+    await nextTick()
+
+    expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'socio', order: null })
+  })
 })

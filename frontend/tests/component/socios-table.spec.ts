@@ -81,4 +81,27 @@ describe('SociosTable (MOD-3)', () => {
     expect(wrapper.findAll('[data-test="edit-socio"]')).toHaveLength(0)
     expect(wrapper.findAll('[data-test="delete-socio"]')).toHaveLength(0)
   })
+
+  it('maps an el-table sort-change into a typed {prop, order} emit', async () => {
+    const wrapper = await mountTable(SOCIOS)
+
+    wrapper
+      .findComponent({ name: 'ElTable' })
+      .vm.$emit('sort-change', { column: { key: 'porcentaje_participacion' }, order: 'ascending' })
+    await nextTick()
+
+    expect(wrapper.emitted('sort-change')![0][0]).toEqual({
+      prop: 'porcentaje_participacion',
+      order: 'asc',
+    })
+  })
+
+  it('maps a cleared sort (null order) for the nombre column', async () => {
+    const wrapper = await mountTable(SOCIOS)
+
+    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('sort-change', { column: { key: 'nombre' }, order: null })
+    await nextTick()
+
+    expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'nombre', order: null })
+  })
 })

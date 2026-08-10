@@ -64,8 +64,8 @@ export const authApi = {
 // --- ventas -----------------------------------------------------------------
 
 export const ventasApi = {
-  list(): Promise<Res<'/api/v1/ventas', 'get'>> {
-    return client.get('/ventas').then((r) => r.data)
+  list(params?: Query<'/api/v1/ventas', 'get'>): Promise<Res<'/api/v1/ventas', 'get'>> {
+    return client.get('/ventas', { params }).then((r) => r.data)
   },
   create(body: ReqBody<'/api/v1/ventas', 'post'>): Promise<Res<'/api/v1/ventas', 'post'>> {
     return client.post('/ventas', body).then((r) => r.data)
@@ -90,8 +90,8 @@ export const devolucionesApi = {
 // --- finanzas ---------------------------------------------------------------
 
 export const finanzasApi = {
-  listMovimientos(): Promise<Res<'/api/v1/finanzas/movimientos', 'get'>> {
-    return client.get('/finanzas/movimientos').then((r) => r.data)
+  listMovimientos(params?: Query<'/api/v1/finanzas/movimientos', 'get'>): Promise<Res<'/api/v1/finanzas/movimientos', 'get'>> {
+    return client.get('/finanzas/movimientos', { params }).then((r) => r.data)
   },
   createMovimiento(
     body: ReqBody<'/api/v1/finanzas/movimientos', 'post'>,
@@ -112,8 +112,8 @@ export const finanzasApi = {
   ): Promise<Res<'/api/v1/finanzas/movimientos/{movimiento_id}', 'patch'>> {
     return client.patch(`/finanzas/movimientos/${params.movimiento_id}`, body).then((r) => r.data)
   },
-  listSocios(): Promise<Res<'/api/v1/finanzas/socios', 'get'>> {
-    return client.get('/finanzas/socios').then((r) => r.data)
+  listSocios(params?: Query<'/api/v1/finanzas/socios', 'get'>): Promise<Res<'/api/v1/finanzas/socios', 'get'>> {
+    return client.get('/finanzas/socios', { params }).then((r) => r.data)
   },
   createSocio(
     body: ReqBody<'/api/v1/finanzas/socios', 'post'>,

@@ -45,6 +45,8 @@ const page = ref(1)
 const pageSize = 20
 const filterCanal = ref<'web' | 'whatsapp' | 'instagram' | 'feria' | null>(null)
 const filterEstado = ref<'completada' | 'anulada' | null>(null)
+const sortBy = ref<string | null>(null)
+const sortOrder = ref<'asc' | 'desc' | null>(null)
 const productos = ref<ProductoRead[]>([])
 const clientes = ref<ClienteRead[]>([])
 
@@ -74,6 +76,8 @@ async function load(): Promise<void> {
           page: page.value,
           pageSize,
           filtros: { canal_venta: filterCanal.value, estado: filterEstado.value },
+          sortBy: sortBy.value ?? undefined,
+          sortOrder: sortOrder.value ?? undefined,
         }),
       ),
       productosApi.list({ limit: 1000 }), // D3: lookup join keeps the full set
@@ -97,6 +101,20 @@ async function load(): Promise<void> {
 function onFilterChange(): void {
   page.value = 1
   load()
+}
+
+/** Header column filters (VentasTable) drive the same refs as the toolbar. */
+function onTableFilterChange(filters: { canal_venta?: string | null; estado?: string | null }): void {
+  filterCanal.value = (filters.canal_venta ?? null) as typeof filterCanal.value
+  filterEstado.value = (filters.estado ?? null) as typeof filterEstado.value
+  onFilterChange()
+}
+
+/** Server-side column sort: reset to page 1; a null order clears the sort. */
+function onTableSortChange(sort: { prop: string; order: 'asc' | 'desc' | null }): void {
+  sortBy.value = sort.order === null ? null : sort.prop
+  sortOrder.value = sort.order
+  onFilterChange()
 }
 
 /** Surface the server validation detail (422 etc.) when present. */
@@ -183,7 +201,7 @@ onMounted(load)
             Nueva venta
           </el-button>
         </div>
-        <VentasTable :rows="rows" :loading="loading" />
+        <VentasTable :rows="rows" :loading="loading" @filter-change="onTableFilterChange" @sort-change="onTableSortChange" />
         <el-pagination
           class="tabla-paginacion"
           background

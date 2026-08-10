@@ -54,4 +54,34 @@ describe('buildListParams', () => {
     })
     expect(params).toEqual({ limit: 30, offset: 30, rol: 'operador', q: 'juan' })
   })
+
+  it('adds sort_by/order only when BOTH are set', () => {
+    expect(
+      buildListParams({
+        page: 1,
+        pageSize: 20,
+        sortBy: 'stock_actual',
+        sortOrder: 'desc',
+      }),
+    ).toEqual({ limit: 20, offset: 0, sort_by: 'stock_actual', order: 'desc' })
+  })
+
+  it('omits sort params when sortBy or sortOrder is missing', () => {
+    expect(buildListParams({ page: 1, pageSize: 20, sortBy: 'fecha' })).toEqual({
+      limit: 20,
+      offset: 0,
+    })
+    expect(buildListParams({ page: 1, pageSize: 20, sortOrder: 'asc' })).toEqual({
+      limit: 20,
+      offset: 0,
+    })
+    expect(buildListParams({ page: 1, pageSize: 20, sortBy: '', sortOrder: 'asc' })).toEqual({
+      limit: 20,
+      offset: 0,
+    })
+    expect(buildListParams({ page: 1, pageSize: 20, sortBy: 'fecha', sortOrder: null })).toEqual({
+      limit: 20,
+      offset: 0,
+    })
+  })
 })

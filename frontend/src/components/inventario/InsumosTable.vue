@@ -12,18 +12,53 @@
  * when shown they emit `edit`/`delete` with the row — the parent owns the
  * create/edit forms, the confirm dialog and the API calls.
  */
+import { computed } from 'vue'
 import { formatMoney, formatQty } from '@/utils/format'
+import { parseColumnFilter } from '@/utils/table-filters'
 import { stockSeverity, type StockSeverity } from '@/utils/dashboard'
 import type { InsumoRead } from '@/types/api.d'
 
-defineProps<{
+const props = defineProps<{
   rows: InsumoRead[]
   loading?: boolean
+  /** Categoria options for the header funnel filter (lookup set, design D3). */
+  categorias?: { id: number; nombre: string }[]
   /** False for operador/consulta — hides the admin Editar/Eliminar actions. */
   canEdit?: boolean
 }>()
 
-const emit = defineEmits<{ edit: [row: InsumoRead]; delete: [row: InsumoRead] }>()
+const emit = defineEmits<{
+  edit: [row: InsumoRead]
+  delete: [row: InsumoRead]
+  'filter-change': [filters: { categoria_id?: number | null }]
+  'sort-change': [sort: { prop: string; order: 'asc' | 'desc' | null }]
+}>()
+
+/** Header funnel options for the Categoría column; empty array -> no funnel. */
+const categoriaFilters = computed(() =>
+  (props.categorias ?? []).map((c) => ({ text: c.nombre, value: c.id })),
+)
+
+/** Normalize el-table's filter-change into a typed single-value emit. */
+function onColumnFilterChange(elFilters: Record<string, unknown[]>): void {
+  const categoria_id = parseColumnFilter(elFilters.categoria)
+  emit('filter-change', {
+    categoria_id: typeof categoria_id === 'number' ? categoria_id : null,
+  })
+}
+
+/** Normalize el-table's sort-change into a typed {prop, order} emit. */
+function onSortChange(s: {
+  column: { key?: string; property?: string }
+  prop: string
+  order: 'ascending' | 'descending' | null
+}): void {
+  const prop = s.column.key ?? s.column.property ?? s.prop
+  emit('sort-change', {
+    prop,
+    order: s.order === 'ascending' ? 'asc' : s.order === 'descending' ? 'desc' : null,
+  })
+}
 
 type BelowMin = Exclude<StockSeverity, 'ok'>
 
@@ -48,19 +83,19 @@ function rowClass({ row }: { row: InsumoRead }): string {
 </script>
 
 <template>
-  <el-table :data="rows" :row-class-name="rowClass" v-loading="loading">
-    <el-table-column prop="nombre" label="Insumo" min-width="180" />
-    <el-table-column label="Categoría" min-width="140">
+  <el-table :data="rows" :row-class-name="rowClass" v-loading="loading" @filter-change="onColumnFilterChange" @sort-change="onSortChange">
+    <el-table-column prop="nombre" label="Insumo" column-key="nombre" sortable min-width="180" />
+    <el-table-column label="Categoría" column-key="categoria" :filters="categoriaFilters" sortable min-width="140" sort-orders="['ascending', 'descending']">
       <template #default="{ row }">{{ row.nombre_categoria ?? '—' }}</template>
     </el-table-column>
-    <el-table-column prop="unidad_medida" label="Unidad" width="100" />
-    <el-table-column label="Stock actual" width="130" align="right">
+    <el-table-column prop="unidad_medida" label="Unidad" column-key="unidad_medida" sortable width="100" />
+    <el-table-column label="Stock actual" column-key="stock_actual" sortable width="130" align="right">
       <template #default="{ row }">{{ formatQty(row.stock_actual) }}</template>
     </el-table-column>
-    <el-table-column label="Stock mínimo" width="130" align="right">
+    <el-table-column label="Stock mínimo" column-key="stock_minimo" sortable width="130" align="right">
       <template #default="{ row }">{{ formatQty(row.stock_minimo) }}</template>
     </el-table-column>
-    <el-table-column label="Costo promedio" width="160" align="right">
+    <el-table-column label="Costo promedio" column-key="costo_promedio_actual" sortable width="160" align="right">
       <template #default="{ row }">{{ formatMoney(row.costo_promedio_actual) }}</template>
     </el-table-column>
     <el-table-column label="Estado" width="100" align="center">

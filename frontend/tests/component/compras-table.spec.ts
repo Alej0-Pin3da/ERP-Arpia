@@ -18,6 +18,7 @@ const ROWS: CompraRow[] = [
     id: 2,
     fecha: '2026-08-03T10:30:00Z',
     insumo: 'Harina de maíz',
+    proveedor: 'Distribuidora El Trébol',
     cantidad: '3.00',
     precio_unitario: '2500.00',
     costo_total: 7500,
@@ -26,6 +27,7 @@ const ROWS: CompraRow[] = [
     id: 1,
     fecha: '2026-08-01T09:00:00Z',
     insumo: 'Insumo #99',
+    proveedor: '—',
     cantidad: '2.50',
     precio_unitario: '1200.00',
     costo_total: 3000,
@@ -48,6 +50,8 @@ describe('ComprasTable (MOD-4)', () => {
     const text = wrapper.text()
     expect(text).toContain('Harina de maíz')
     expect(text).toContain('Insumo #99') // graceful join fallback
+    expect(text).toContain('Distribuidora El Trébol') // proveedor name
+    expect(text).toContain('—') // proveedor fallback
     expect(text).toContain('03/08/2026') // fecha_compra es-CO
     expect(text).toContain('3') // cantidad formatQty
     expect(text).toContain('$2.500,00') // precio_unitario
@@ -59,5 +63,87 @@ describe('ComprasTable (MOD-4)', () => {
   it('shows an empty state when there are no compras', async () => {
     const wrapper = await mountTable([])
     expect(wrapper.text()).toContain('Sin compras registradas')
+  })
+
+  it('builds the insumo and proveedor header funnels from the props', async () => {
+    const wrapper = mount(ComprasTable, {
+      props: {
+        rows: ROWS,
+        insumos: [
+          { id: 1, nombre: 'Harina de maíz' },
+          { id: 2, nombre: 'Aceite' },
+        ],
+        proveedores: [
+          { id: 7, nombre: 'Distribuidora El Trébol' },
+          { id: 8, nombre: 'Granos Andinos' },
+        ],
+      },
+      global: { plugins: [ElementPlus] },
+    })
+    await nextTick()
+
+    const columns = wrapper.findAllComponents({ name: 'ElTableColumn' })
+
+    const insumoColumn = columns.find((c) => c.props('columnKey') === 'insumo')
+    expect(insumoColumn!.props('filters')).toEqual([
+      { text: 'Harina de maíz', value: 1 },
+      { text: 'Aceite', value: 2 },
+    ])
+
+    const proveedorColumn = columns.find((c) => c.props('columnKey') === 'proveedor')
+    expect(proveedorColumn!.props('filters')).toEqual([
+      { text: 'Distribuidora El Trébol', value: 7 },
+      { text: 'Granos Andinos', value: 8 },
+    ])
+  })
+
+  it('renders no funnel when no lookups are passed (empty filters)', async () => {
+    const wrapper = await mountTable(ROWS)
+
+    const columns = wrapper.findAllComponents({ name: 'ElTableColumn' })
+    const insumoColumn = columns.find((c) => c.props('columnKey') === 'insumo')
+    const proveedorColumn = columns.find((c) => c.props('columnKey') === 'proveedor')
+
+    expect(insumoColumn!.props('filters')).toEqual([])
+    expect(proveedorColumn!.props('filters')).toEqual([])
+  })
+
+  it('normalizes an el-table filter-change on insumo into a typed emit', async () => {
+    const wrapper = await mountTable(ROWS)
+
+    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { insumo: [1] })
+    await nextTick()
+
+    expect(wrapper.emitted('filter-change')).toBeDefined()
+    expect(wrapper.emitted('filter-change')![0][0]).toEqual({ insumo_id: 1, proveedor_id: null })
+  })
+
+  it('emits null when the column filters are cleared', async () => {
+    const wrapper = await mountTable(ROWS)
+
+    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { insumo: [], proveedor: [] })
+    await nextTick()
+
+    expect(wrapper.emitted('filter-change')![0][0]).toEqual({ insumo_id: null, proveedor_id: null })
+  })
+
+  it('normalizes a proveedor filter into the proveedor_id emit', async () => {
+    const wrapper = await mountTable(ROWS)
+
+    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { proveedor: [7] })
+    await nextTick()
+
+    expect(wrapper.emitted('filter-change')![0][0]).toEqual({ insumo_id: null, proveedor_id: 7 })
+  })
+
+  it('maps an el-table sort-change into a typed {prop, order} emit', async () => {
+    const wrapper = await mountTable(ROWS)
+
+    wrapper
+      .findComponent({ name: 'ElTable' })
+      .vm.$emit('sort-change', { column: { key: 'precio_unitario_compra' }, order: 'descending' })
+    await nextTick()
+
+    expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'precio_unitario_compra', order: 'desc' })
   })
 })

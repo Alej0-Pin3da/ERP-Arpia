@@ -199,6 +199,55 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     })
   })
 
+  it('wires the header column filter on the movimientos table into the tipo ref', async () => {
+    const wrapper = await mountView('operador')
+
+    const table = wrapper.findComponent({ name: 'MovimientosTable' })
+    table.vm.$emit('filter-change', { tipo: 'Retiro' })
+    await flushPromises()
+
+    expect(apiMocks.listMovimientos).toHaveBeenLastCalledWith({
+      limit: 20,
+      offset: 0,
+      tipo: 'Retiro',
+    })
+  })
+
+  it('wires the movimientos table sort-change into server-side sort params', async () => {
+    const wrapper = await mountView('operador')
+    expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(1)
+
+    wrapper.findComponent({ name: 'MovimientosTable' }).vm.$emit('sort-change', { prop: 'monto', order: 'desc' })
+    await flushPromises()
+
+    expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(2)
+    expect(apiMocks.listMovimientos).toHaveBeenLastCalledWith({
+      limit: 20,
+      offset: 0,
+      sort_by: 'monto',
+      order: 'desc',
+    })
+  })
+
+  it('wires the socios table sort-change into server-side sort params', async () => {
+    const wrapper = await mountView('operador')
+    await activateTab(wrapper, 'Socios')
+    expect(apiMocks.listSocios).toHaveBeenCalledWith({ limit: 20, offset: 0 })
+
+    wrapper.findComponent({ name: 'SociosTable' }).vm.$emit('sort-change', { prop: 'nombre', order: 'asc' })
+    await flushPromises()
+
+    // socios is fetched twice per load: the table page (with sort) + the lookup.
+    expect(apiMocks.listSocios).toHaveBeenCalledWith({ limit: 20, offset: 0 })
+    expect(apiMocks.listSocios).toHaveBeenCalledWith({
+      limit: 20,
+      offset: 0,
+      sort_by: 'nombre',
+      order: 'asc',
+    })
+    expect(apiMocks.listSocios).toHaveBeenCalledWith({ limit: 1000 })
+  })
+
   it('consulta sees read-only lists only — no write actions, no Liquidaciones tab', async () => {
     const wrapper = await mountView('consulta')
 

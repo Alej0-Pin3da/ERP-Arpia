@@ -113,4 +113,73 @@ describe('VentasTable (MOD-1 list)', () => {
 
     expect(wrapper.text()).toContain('Sin ventas registradas')
   })
+
+  it('declares header funnel filters on the canal/estado columns with labeled options', async () => {
+    const wrapper = await mountTable([ROW])
+
+    const canalColumn = wrapper
+      .findAllComponents({ name: 'ElTableColumn' })
+      .find((c) => c.props('columnKey') === 'canal_venta')
+    const estadoColumn = wrapper
+      .findAllComponents({ name: 'ElTableColumn' })
+      .find((c) => c.props('columnKey') === 'estado')
+
+    expect(canalColumn!.props('filters')).toEqual([
+      { text: 'Web', value: 'web' },
+      { text: 'WhatsApp', value: 'whatsapp' },
+      { text: 'Instagram', value: 'instagram' },
+      { text: 'Feria', value: 'feria' },
+    ])
+    expect(estadoColumn!.props('filters')).toEqual([
+      { text: 'Completada', value: 'completada' },
+      { text: 'Anulada', value: 'anulada' },
+    ])
+  })
+
+  it('normalizes an el-table filter-change into a typed single-value emit', async () => {
+    const wrapper = await mountTable([ROW])
+
+    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', {
+      canal_venta: ['feria'],
+      estado: ['anulada'],
+    })
+    await nextTick()
+
+    expect(wrapper.emitted('filter-change')).toBeDefined()
+    expect(wrapper.emitted('filter-change')![0][0]).toEqual({ canal_venta: 'feria', estado: 'anulada' })
+  })
+
+  it('emits nulls when a column filter is cleared (empty selection)', async () => {
+    const wrapper = await mountTable([ROW])
+
+    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', {
+      canal_venta: [],
+      estado: [],
+    })
+    await nextTick()
+
+    expect(wrapper.emitted('filter-change')![0][0]).toEqual({ canal_venta: null, estado: null })
+  })
+
+  it('maps an el-table sort-change into a typed {prop, order} emit', async () => {
+    const wrapper = await mountTable([ROW])
+
+    wrapper
+      .findComponent({ name: 'ElTable' })
+      .vm.$emit('sort-change', { column: { key: 'total_venta' }, order: 'ascending' })
+    await nextTick()
+
+    expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'total_venta', order: 'asc' })
+  })
+
+  it('maps a cleared sort (null order) for the same column', async () => {
+    const wrapper = await mountTable([ROW])
+
+    wrapper
+      .findComponent({ name: 'ElTable' })
+      .vm.$emit('sort-change', { column: { key: 'cliente' }, order: null })
+    await nextTick()
+
+    expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'cliente', order: null })
+  })
 })

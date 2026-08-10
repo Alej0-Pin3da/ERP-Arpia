@@ -9,7 +9,7 @@
  */
 import type { OmisionRead } from '@/types/api.d'
 
-const props = defineProps<{
+defineProps<{
   rows: OmisionRead[]
   loading?: boolean
   /** Admin-only: render the marcar-resuelta action column (D9). */

@@ -922,6 +922,8 @@ export interface components {
             cantidad_comprada: string;
             /** Precio Unitario Compra */
             precio_unitario_compra: string;
+            /** Nombre Proveedor */
+            nombre_proveedor?: string | null;
         };
         /** CostoLineaRead */
         CostoLineaRead: {
@@ -1738,6 +1740,8 @@ export interface operations {
                 limit?: number;
                 offset?: number;
                 q?: string | null;
+                sort_by?: string | null;
+                order?: "asc" | "desc";
             };
             header?: never;
             path?: never;
@@ -2061,6 +2065,8 @@ export interface operations {
                 offset?: number;
                 q?: string | null;
                 categoria_id?: number | null;
+                sort_by?: string | null;
+                order?: "asc" | "desc";
             };
             header?: never;
             path?: never;
@@ -2224,6 +2230,8 @@ export interface operations {
                 insumo_id?: number | null;
                 proveedor_id?: number | null;
                 q?: string | null;
+                sort_by?: string | null;
+                order?: "asc" | "desc";
             };
             header?: never;
             path?: never;
@@ -2290,6 +2298,8 @@ export interface operations {
                 limit?: number;
                 offset?: number;
                 q?: string | null;
+                sort_by?: string | null;
+                order?: "asc" | "desc";
             };
             header?: never;
             path?: never;
@@ -2452,6 +2462,8 @@ export interface operations {
                 q?: string | null;
                 limit?: number;
                 offset?: number;
+                sort_by?: string | null;
+                order?: "asc" | "desc";
             };
             header?: never;
             path?: never;
@@ -3366,6 +3378,8 @@ export interface operations {
                 offset?: number;
                 canal_venta?: ("web" | "whatsapp" | "instagram" | "feria") | null;
                 estado?: ("completada" | "anulada") | null;
+                sort_by?: string | null;
+                order?: "asc" | "desc";
             };
             header?: never;
             path?: never;
@@ -3501,6 +3515,8 @@ export interface operations {
                 limit?: number;
                 offset?: number;
                 tipo?: ("Gasto" | "Inversion" | "Retiro") | null;
+                sort_by?: string | null;
+                order?: "asc" | "desc";
             };
             header?: never;
             path?: never;
@@ -3666,6 +3682,8 @@ export interface operations {
                 limit?: number;
                 offset?: number;
                 q?: string | null;
+                sort_by?: string | null;
+                order?: "asc" | "desc";
             };
             header?: never;
             path?: never;

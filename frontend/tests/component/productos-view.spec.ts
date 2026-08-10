@@ -260,6 +260,24 @@ describe('ProductosView (MOD-5 + T6)', () => {
     expect(apiMocks.listProductos).toHaveBeenCalledWith({ ...PAGE1, q: 'arepa' })
   })
 
+  it('wires the productos table sort-change into server-side sort params', async () => {
+    const wrapper = await mountView('operador')
+    expect(apiMocks.listProductos).toHaveBeenCalledWith(PAGE1)
+
+    wrapper
+      .findComponent({ name: 'ProductosTable' })
+      .vm.$emit('sort-change', { prop: 'precio_venta_sugerido', order: 'desc' })
+    await flushPromises()
+
+    // productos is fetched twice per load (table page + lookup): 2 + 2.
+    expect(apiMocks.listProductos).toHaveBeenCalledTimes(4)
+    expect(apiMocks.listProductos).toHaveBeenCalledWith({
+      ...PAGE1,
+      sort_by: 'precio_venta_sugerido',
+      order: 'desc',
+    })
+  })
+
   it('operador sees read-only lists — no product form, no edit/delete/variantes actions', async () => {
     const wrapper = await mountView('operador')
 

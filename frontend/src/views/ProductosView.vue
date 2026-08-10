@@ -71,6 +71,8 @@ const productosPage = ref(1)
 const productosPageSize = ref(20)
 const productoQ = ref('')
 const filterTipoProductoId = ref<number | null>(null)
+const productosSortBy = ref<string | null>(null)
+const productosSortOrder = ref<'asc' | 'desc' | null>(null)
 
 // --- lookups (full sets, limit:1000 — design D3) ---------------------------
 const productosLookup = ref<ProductoRead[]>([])
@@ -126,6 +128,8 @@ async function load(): Promise<void> {
           pageSize: productosPageSize.value,
           filtros: { tipo_producto_id: filterTipoProductoId.value },
           q: productoQ.value,
+          sortBy: productosSortBy.value ?? undefined,
+          sortOrder: productosSortOrder.value ?? undefined,
         }),
       ),
       tiposProductoApi.list({ limit: 1000 }), // tipo label join + form options
@@ -154,6 +158,13 @@ function onProductosSearch(): void {
 function onProductosFilterChange(): void {
   productosPage.value = 1
   load()
+}
+
+/** Server-side column sort: reset to page 1; a null order clears the sort. */
+function onProductosTableSortChange(sort: { prop: string; order: 'asc' | 'desc' | null }): void {
+  productosSortBy.value = sort.order === null ? null : sort.prop
+  productosSortOrder.value = sort.order
+  onProductosFilterChange()
 }
 
 /** Surface the server validation detail (400/404/409) when present. */
@@ -575,6 +586,7 @@ onMounted(load)
           @edit="onEditProducto"
           @delete="onDeleteProducto"
           @select-variantes="onSelectVariantes"
+          @sort-change="onProductosTableSortChange"
         />
         <el-pagination
           class="tabla-paginacion"

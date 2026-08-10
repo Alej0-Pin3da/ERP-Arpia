@@ -19,29 +19,43 @@ defineProps<{
   canEdit: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   edit: [row: ProductoRow]
   delete: [row: ProductoRow]
   'select-variantes': [row: ProductoRow]
+  'sort-change': [sort: { prop: string; order: 'asc' | 'desc' | null }]
 }>()
+
+/** Normalize el-table's sort-change into a typed {prop, order} emit. */
+function onSortChange(s: {
+  column: { key?: string; property?: string }
+  prop: string
+  order: 'ascending' | 'descending' | null
+}): void {
+  const prop = s.column.key ?? s.column.property ?? s.prop
+  emit('sort-change', {
+    prop,
+    order: s.order === 'ascending' ? 'asc' : s.order === 'descending' ? 'desc' : null,
+  })
+}
 </script>
 
 <template>
-  <el-table :data="rows" v-loading="loading">
-    <el-table-column prop="id" label="#" width="60" />
+  <el-table :data="rows" v-loading="loading" @sort-change="onSortChange">
+    <el-table-column prop="id" label="#" column-key="id" sortable width="60" />
     <el-table-column prop="tipo" label="Tipo" min-width="120" />
-    <el-table-column prop="nombre" label="Nombre" min-width="180" />
-    <el-table-column label="Requiere fabricación" width="160">
+    <el-table-column prop="nombre" label="Nombre" column-key="nombre" sortable min-width="180" />
+    <el-table-column label="Requiere fabricación" column-key="requiere_fabricacion" sortable width="160">
       <template #default="{ row }">
         <el-tag :type="row.requiere_fabricacion ? 'primary' : 'info'">
           {{ row.requiere_fabricacion ? 'Sí' : 'No' }}
         </el-tag>
       </template>
     </el-table-column>
-    <el-table-column label="Precio venta sugerido" width="170" align="right">
+    <el-table-column label="Precio venta sugerido" column-key="precio_venta_sugerido" sortable width="170" align="right">
       <template #default="{ row }">{{ formatMoney(row.precio_venta_sugerido) }}</template>
     </el-table-column>
-    <el-table-column label="Costos operativos fijos" width="180" align="right">
+    <el-table-column label="Costos operativos fijos" column-key="costos_operativos_fijos" sortable width="180" align="right">
       <template #default="{ row }">{{ formatMoney(row.costos_operativos_fijos) }}</template>
     </el-table-column>
     <el-table-column v-if="canEdit" label="Acciones" width="240" fixed="right">

@@ -19,9 +19,13 @@ export interface BuildListParamsOptions {
   filtros?: ListFilters
   /** Global search term (undefined omits `q`). */
   q?: string
+  /** Server-side sort column key (backend whitelist); only sent with sortOrder. */
+  sortBy?: string
+  /** Server-side sort direction; only sent with sortBy. */
+  sortOrder?: 'asc' | 'desc'
 }
 
-/** Build `{limit, offset, ...filtros, q?}` from the view's pagination state. */
+/** Build `{limit, offset, ...filtros, q?, sort_by?, order?}` from the view's state. */
 export function buildListParams(options: BuildListParamsOptions = {}): Record<string, unknown> {
   const page = options.page ?? 1
   const pageSize = options.pageSize ?? 50
@@ -36,6 +40,15 @@ export function buildListParams(options: BuildListParamsOptions = {}): Record<st
   }
   if (options.q !== undefined && options.q !== null && options.q !== '') {
     params.q = options.q
+  }
+  if (
+    options.sortBy !== undefined &&
+    options.sortBy !== '' &&
+    options.sortOrder !== undefined &&
+    options.sortOrder !== null
+  ) {
+    params.sort_by = options.sortBy
+    params.order = options.sortOrder
   }
   return params
 }

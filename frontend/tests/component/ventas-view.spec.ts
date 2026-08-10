@@ -188,6 +188,43 @@ describe('VentasView (MOD-1 + T7)', () => {
     expect(apiMocks.listVentas).toHaveBeenLastCalledWith({ ...PAGE1, canal_venta: 'feria' })
   })
 
+  it('wires the header column filters into the same server-side filter refs', async () => {
+    const wrapper = await mountView('operador')
+
+    const table = wrapper.findComponent({ name: 'VentasTable' })
+    table.vm.$emit('filter-change', { canal_venta: 'feria', estado: 'anulada' })
+    await flushPromises()
+
+    expect(apiMocks.listVentas).toHaveBeenLastCalledWith({ ...PAGE1, canal_venta: 'feria', estado: 'anulada' })
+  })
+
+  it('wires the header column sort into server-side sort params and resets the page', async () => {
+    const wrapper = await mountView('operador')
+    expect(apiMocks.listVentas).toHaveBeenCalledTimes(1)
+
+    wrapper
+      .findComponent({ name: 'VentasTable' })
+      .vm.$emit('sort-change', { prop: 'total_venta', order: 'desc' })
+    await flushPromises()
+
+    expect(apiMocks.listVentas).toHaveBeenCalledTimes(2)
+    expect(apiMocks.listVentas).toHaveBeenLastCalledWith({ ...PAGE1, sort_by: 'total_venta', order: 'desc' })
+  })
+
+  it('clears the server-side sort when the column order is null', async () => {
+    const wrapper = await mountView('operador')
+
+    wrapper
+      .findComponent({ name: 'VentasTable' })
+      .vm.$emit('sort-change', { prop: 'total_venta', order: 'desc' })
+    await flushPromises()
+    expect(apiMocks.listVentas).toHaveBeenLastCalledWith({ ...PAGE1, sort_by: 'total_venta', order: 'desc' })
+
+    wrapper.findComponent({ name: 'VentasTable' }).vm.$emit('sort-change', { prop: 'total_venta', order: null })
+    await flushPromises()
+    expect(apiMocks.listVentas).toHaveBeenLastCalledWith(PAGE1)
+  })
+
   it('hides the register button for a consulta (read-only list)', async () => {
     const wrapper = await mountView('consulta')
 

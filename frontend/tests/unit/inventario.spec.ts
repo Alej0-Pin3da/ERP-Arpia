@@ -64,6 +64,7 @@ const COMPRAS: CompraInsumoRead[] = [
     id: 1,
     insumo_id: 2,
     proveedor_id: null,
+    nombre_proveedor: null,
     fecha_compra: '2026-08-01T09:00:00Z',
     cantidad_comprada: '3.00',
     precio_unitario_compra: '2500.00',
@@ -71,7 +72,8 @@ const COMPRAS: CompraInsumoRead[] = [
   {
     id: 2,
     insumo_id: 99, // no longer in the insumos catalog
-    proveedor_id: null,
+    proveedor_id: 7,
+    nombre_proveedor: 'Distribuidora El Trébol',
     fecha_compra: '2026-08-03T10:30:00Z',
     cantidad_comprada: '2.50',
     precio_unitario_compra: '1200.00',
@@ -102,7 +104,7 @@ describe('inventario mappers (MOD-4)', () => {
     expect(compraCostoTotal('3.00', 'xyz')).toBeNull()
   })
 
-  it('buildCompraRows joins insumo names, computes costo_total and sorts newest first', () => {
+  it('buildCompraRows joins insumo and proveedor names, computes costo_total and sorts newest first', () => {
     const rows = buildCompraRows(COMPRAS, INSUMOS)
 
     expect(rows).toHaveLength(2)
@@ -110,6 +112,7 @@ describe('inventario mappers (MOD-4)', () => {
       id: 2,
       fecha: '2026-08-03T10:30:00Z',
       insumo: 'Insumo #99', // missing insumo -> graceful fallback
+      proveedor: 'Distribuidora El Trébol',
       cantidad: '2.50',
       precio_unitario: '1200.00',
       costo_total: 3000,
@@ -118,6 +121,7 @@ describe('inventario mappers (MOD-4)', () => {
       id: 1,
       fecha: '2026-08-01T09:00:00Z',
       insumo: 'Harina de maíz',
+      proveedor: '—', // nombre_proveedor null -> em dash
       cantidad: '3.00',
       precio_unitario: '2500.00',
       costo_total: 7500,

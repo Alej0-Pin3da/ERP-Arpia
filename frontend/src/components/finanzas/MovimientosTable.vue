@@ -13,7 +13,13 @@
  * resolves the full MovimientoRead and opens the prefilled edit form.
  */
 import { formatDateTime, formatMoney } from '@/utils/format'
-import { tipoMovimientoLabel, tipoMovimientoTagType, type MovimientoRow } from '@/utils/finanzas'
+import { parseColumnFilter } from '@/utils/table-filters'
+import {
+  TIPO_MOVIMIENTO,
+  tipoMovimientoLabel,
+  tipoMovimientoTagType,
+  type MovimientoRow,
+} from '@/utils/finanzas'
 
 defineProps<{
   rows: MovimientoRow[]
@@ -24,23 +30,54 @@ defineProps<{
   canEdit?: boolean
 }>()
 
-const emit = defineEmits<{ delete: [row: MovimientoRow]; edit: [row: MovimientoRow] }>()
+type MovimientoTipoFilter = 'Gasto' | 'Inversion' | 'Retiro'
+
+const emit = defineEmits<{
+  delete: [row: MovimientoRow]
+  edit: [row: MovimientoRow]
+  'filter-change': [filters: { tipo?: MovimientoTipoFilter | null }]
+  'sort-change': [sort: { prop: string; order: 'asc' | 'desc' | null }]
+}>()
+
+/** Header funnel options for the Tipo column (labels via tipoMovimientoLabel). */
+const tipoFilters = TIPO_MOVIMIENTO.map((t) => ({ text: tipoMovimientoLabel(t), value: t }))
+
+/** Normalize el-table's filter-change into a typed single-value emit. */
+function onColumnFilterChange(elFilters: Record<string, unknown[]>): void {
+  const tipo = parseColumnFilter(elFilters.tipo)
+  emit('filter-change', {
+    tipo: (tipo === null ? null : String(tipo)) as MovimientoTipoFilter | null,
+  })
+}
+
+/** Normalize el-table's sort-change into a typed {prop, order} emit. */
+function onSortChange(s: {
+  column: { key?: string; property?: string }
+  prop: string
+  order: 'ascending' | 'descending' | null
+}): void {
+  const prop = s.column.key ?? s.column.property ?? s.prop
+  emit('sort-change', {
+    prop,
+    order: s.order === 'ascending' ? 'asc' : s.order === 'descending' ? 'desc' : null,
+  })
+}
 </script>
 
 <template>
-  <el-table :data="rows" v-loading="loading">
-    <el-table-column prop="id" label="#" width="70" />
-    <el-table-column label="Fecha" width="110">
+  <el-table :data="rows" v-loading="loading" @filter-change="onColumnFilterChange" @sort-change="onSortChange">
+    <el-table-column prop="id" label="#" column-key="id" sortable width="70" />
+    <el-table-column label="Fecha" column-key="fecha" sortable width="110">
       <template #default="{ row }">{{ formatDateTime(row.fecha) }}</template>
     </el-table-column>
-    <el-table-column label="Tipo" width="120">
+    <el-table-column label="Tipo" column-key="tipo" :filters="tipoFilters" sortable width="120">
       <template #default="{ row }">
         <el-tag :type="tipoMovimientoTagType(row.tipo)" size="small">{{ tipoMovimientoLabel(row.tipo) }}</el-tag>
       </template>
     </el-table-column>
-    <el-table-column prop="descripcion" label="Descripción" min-width="220" />
-    <el-table-column prop="socio" label="Socio" min-width="140" />
-    <el-table-column label="Monto" width="160" align="right">
+    <el-table-column prop="descripcion" label="Descripción" column-key="descripcion" sortable min-width="220" />
+    <el-table-column prop="socio" label="Socio" column-key="socio" sortable min-width="140" />
+    <el-table-column label="Monto" column-key="monto" sortable width="160" align="right">
       <template #default="{ row }">{{ formatMoney(row.monto) }}</template>
     </el-table-column>
     <el-table-column label="Liquidación" width="110">
