@@ -1,13 +1,74 @@
+"""Pytest fixtures — isolated test database.
+
+The test suite runs against a DEDICATED database (`arpia_test`) so it never
+touches the development/production data. `DATABASE_URL` is set BEFORE the app
+modules are imported (pydantic-settings gives real env vars priority over the
+`.env` file), so every `SessionLocal`/`engine` in the process points at the
+test database. The schema is rebuilt from alembic (same shape as production)
+and the base seed (admin + categories) runs once per session.
+"""
+
+import os
+from pathlib import Path
+
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL",
+    "postgresql+psycopg://arpia:arpia_secret@localhost:5433/arpia_test",
+)
+
+# Must be set before importing any app module.
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
 
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.main import app
 from app.models import CategoriaInsumo, Usuario
+from app.seeder import seed_categorias, seed_usuarios
 
 ADMIN_EMAIL = "admin@arpia.com"
 ADMIN_PASSWORD = "Admin123!"
+
+
+def _crear_bd_test_si_no_existe() -> None:
+    """Create `arpia_test` on the same server (idempotent)."""
+    server_url = TEST_DATABASE_URL.rsplit("/", 1)[0] + "/postgres"
+    engine = create_engine(server_url, isolation_level="AUTOCOMMIT")
+    nombre_bd = TEST_DATABASE_URL.rsplit("/", 1)[1]
+    try:
+        with engine.connect() as conn:
+            exists = conn.execute(
+                text("SELECT 1 FROM pg_database WHERE datname = :nombre"),
+                {"nombre": nombre_bd},
+            ).scalar()
+            if not exists:
+                conn.execute(text(f'CREATE DATABASE "{nombre_bd}"'))
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _bd_test_lista():
+    """(session, autouse) Rebuild the test schema exactly like production and
+    apply the base seed (admin + categories) once per test session."""
+    _crear_bd_test_si_no_existe()
+
+    from alembic import command as alembic_command
+    from alembic.config import Config as AlembicConfig
+
+    alembic_ini = Path(__file__).resolve().parents[1] / "alembic.ini"
+    cfg = AlembicConfig(str(alembic_ini))
+    alembic_command.downgrade(cfg, "base")
+    alembic_command.upgrade(cfg, "head")
+
+    with SessionLocal() as db:
+        seed_usuarios(db)
+        seed_categorias(db)
+
+    yield
 
 
 @pytest.fixture(scope="session")
