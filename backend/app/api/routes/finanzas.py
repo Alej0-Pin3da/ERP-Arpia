@@ -13,7 +13,7 @@ Mutations require admin|operador; lists are audited (admin|operador|consulta).
 from typing import Literal
 
 from fastapi import APIRouter, Depends, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_roles
@@ -38,12 +38,29 @@ from app.services.finanzas import (
     eliminar_socio_configuracion,
     settle_liquidacion,
 )
-from app.services.paginacion import paginar
+from app.services.paginacion import aplicar_orden, paginar
 
 router = APIRouter(prefix="/finanzas", tags=["finanzas"])
 
 mutation_user = require_roles("admin", "operador")
 audited_user = require_roles("admin", "operador", "consulta")
+
+# Whitelisted server-side sort keys; socio is the COALESCE'd joined partner
+# name (outer join — socio_id is nullable).
+_SORTABLE_MOVIMIENTOS = {
+    "id": MovimientoFinanciero.id,
+    "fecha": MovimientoFinanciero.fecha,
+    "tipo": MovimientoFinanciero.tipo,
+    "monto": MovimientoFinanciero.monto,
+    "descripcion": MovimientoFinanciero.descripcion,
+    "socio": func.coalesce(SociosConfiguracion.nombre, ""),
+}
+
+_SORTABLE_SOCIOS = {
+    "id": SociosConfiguracion.id,
+    "nombre": SociosConfiguracion.nombre,
+    "porcentaje_participacion": SociosConfiguracion.porcentaje_participacion,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -70,17 +87,22 @@ def list_movimientos_route(
     limit: int = 50,
     offset: int = 0,
     tipo: Literal["Gasto", "Inversion", "Retiro"] | None = None,
+    sort_by: str | None = None,
+    order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
     _: Usuario = Depends(audited_user),
 ):
     """List active movements (soft-deleted rows are excluded), paginated with
     {items, total} and an optional tipo filter (API-1/API-3)."""
-    stmt = select(MovimientoFinanciero).where(
+    # Socio joined once up-front so the socio sort key works; outer join since
+    # socio_id is nullable.
+    stmt = select(MovimientoFinanciero).outerjoin(MovimientoFinanciero.socio).where(
         MovimientoFinanciero.estado == "activo"
     )
     if tipo is not None:
         stmt = stmt.where(MovimientoFinanciero.tipo == tipo)
     stmt = stmt.order_by(MovimientoFinanciero.id)
+    stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_MOVIMIENTOS)
     rows, total = paginar(db, stmt, limit, offset)
     return Paginated[MovimientoRead](items=list(rows), total=total)
 
@@ -140,6 +162,8 @@ def list_socios(
     limit: int = 50,
     offset: int = 0,
     q: str | None = None,
+    sort_by: str | None = None,
+    order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
     _: Usuario = Depends(audited_user),
 ):
@@ -149,6 +173,7 @@ def list_socios(
     if q is not None:
         stmt = stmt.where(SociosConfiguracion.nombre.ilike(f"%{q}%"))
     stmt = stmt.order_by(SociosConfiguracion.id)
+    stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_SOCIOS)
     rows, total = paginar(db, stmt, limit, offset)
     return Paginated[SocioConfiguracionRead](items=list(rows), total=total)
 

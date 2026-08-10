@@ -267,6 +267,90 @@ def test_settle_liquidacion_consulta_forbidden(client, consulta_token):
     assert resp.status_code == 403
 
 
+def test_get_movimientos_sort_server_side(client, admin_token):
+    """sort_by=id|monto with order asc/desc reorders the list server-side; the
+    joined socio key works; unknown keys fall back to the id-asc default."""
+    try:
+        for monto in ("5", "20", "10"):
+            resp = client.post(
+                "/api/v1/finanzas/movimientos",
+                json=_movimiento_payload(tipo="Gasto", monto=monto),
+                headers=_auth(admin_token),
+            )
+            assert resp.status_code == 201
+
+        resp = client.get(
+            "/api/v1/finanzas/movimientos",
+            params={"sort_by": "monto", "order": "desc"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200
+        montos = [Decimal(m["monto"]) for m in resp.json()["items"]]
+        assert montos == sorted(montos, reverse=True)
+
+        resp = client.get(
+            "/api/v1/finanzas/movimientos",
+            params={"sort_by": "monto", "order": "asc"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200
+        montos_asc = [Decimal(m["monto"]) for m in resp.json()["items"]]
+        assert montos_asc == sorted(montos_asc)
+
+        resp = client.get(
+            "/api/v1/finanzas/movimientos",
+            params={"sort_by": "socio", "order": "asc"},
+            headers=_auth(admin_token),
+        )
+        # Joined column sorts without error; NULL socio sorts first (coalesce '').
+        assert resp.status_code == 200
+
+        resp = client.get(
+            "/api/v1/finanzas/movimientos",
+            params={"sort_by": "zzz_inexistente", "order": "desc"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200
+        ids = [m["id"] for m in resp.json()["items"]]
+        assert ids == sorted(ids)  # default id-asc preserved
+    finally:
+        _cleanup_all()
+
+
+def test_get_socios_sort_server_side(client, admin_token):
+    """Socios sort by porcentaje_participacion desc; unknown keys default."""
+    try:
+        a_id = _crear_socio(client, admin_token, "100")
+        _actualizar_socio(client, admin_token, a_id, "60")
+        b_id = _crear_socio(client, admin_token, "40")
+        # Interim rebalance keeps the sum <= 100 (60 + 30 = 90 allowed).
+        _actualizar_socio(client, admin_token, b_id, "30")
+
+        resp = client.get(
+            "/api/v1/finanzas/socios",
+            params={"sort_by": "porcentaje_participacion", "order": "desc"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200
+        porcentajes = [
+            Decimal(s["porcentaje_participacion"]) for s in resp.json()["items"]
+        ]
+        assert porcentajes == sorted(porcentajes, reverse=True)
+        assert porcentajes[:2] == [Decimal("60.0000"), Decimal("30.0000")]
+        assert {s["id"] for s in resp.json()["items"][:2]} == {a_id, b_id}
+
+        resp = client.get(
+            "/api/v1/finanzas/socios",
+            params={"sort_by": "zzz_inexistente"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200
+        ids = [s["id"] for s in resp.json()["items"]]
+        assert ids == sorted(ids)
+    finally:
+        _cleanup_all()
+
+
 # ---------------------------------------------------------------------------
 # FIN-2: SociosConfiguracion — sum-to-100
 # ---------------------------------------------------------------------------

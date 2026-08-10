@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -6,11 +8,17 @@ from app.core.deps import get_db, require_admin, require_roles
 from app.models.clientes import Cliente
 from app.schemas.cliente import ClienteCreate, ClienteRead, ClienteUpdate
 from app.schemas.common import Paginated
-from app.services.paginacion import paginar
+from app.services.paginacion import aplicar_orden, paginar
 
 router = APIRouter(prefix="/clientes", tags=["clientes"])
 
 audited_user = require_roles("admin", "operador", "consulta")
+
+# Whitelisted server-side sort keys (plain columns on Cliente).
+_SORTABLE_CLIENTES = {
+    "id": Cliente.id,
+    "nombre": Cliente.nombre,
+}
 
 
 @router.get("", response_model=Paginated[ClienteRead])
@@ -18,6 +26,8 @@ def list_clientes(
     limit: int = 50,
     offset: int = 0,
     q: str | None = None,
+    sort_by: str | None = None,
+    order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
     _: Cliente = Depends(audited_user),
 ):
@@ -31,6 +41,7 @@ def list_clientes(
                 Cliente.telefono.ilike(f"%{q}%"),
             )
         )
+    stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_CLIENTES)
     rows, total = paginar(db, stmt, limit, offset)
     return Paginated[ClienteRead](items=list(rows), total=total)
 

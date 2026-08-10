@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -6,11 +8,19 @@ from app.core.deps import get_db, require_admin, require_roles
 from app.models.proveedores import Proveedor
 from app.schemas.common import Paginated
 from app.schemas.proveedor import ProveedorCreate, ProveedorRead, ProveedorUpdate
-from app.services.paginacion import paginar
+from app.services.paginacion import aplicar_orden, paginar
 
 router = APIRouter(prefix="/proveedores", tags=["proveedores"])
 
 audited_user = require_roles("admin", "operador", "consulta")
+
+# Whitelisted server-side sort keys (all plain columns on Proveedor).
+_SORTABLE_PROVEEDORES = {
+    "id": Proveedor.id,
+    "nombre": Proveedor.nombre,
+    "ubicacion": Proveedor.ubicacion,
+    "contacto": Proveedor.contacto,
+}
 
 
 @router.get("", response_model=Paginated[ProveedorRead])
@@ -18,6 +28,8 @@ def list_proveedores(
     limit: int = 50,
     offset: int = 0,
     q: str | None = None,
+    sort_by: str | None = None,
+    order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
     _: Proveedor = Depends(audited_user),
 ):
@@ -30,6 +42,7 @@ def list_proveedores(
                 Proveedor.contacto.ilike(f"%{q}%"),
             )
         )
+    stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_PROVEEDORES)
     rows, total = paginar(db, stmt, limit, offset)
     return Paginated[ProveedorRead](items=list(rows), total=total)
 

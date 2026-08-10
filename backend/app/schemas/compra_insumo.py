@@ -20,3 +20,6 @@ class CompraInsumoRead(BaseModel):
     fecha_compra: datetime
     cantidad_comprada: Decimal
     precio_unitario_compra: Decimal
+    # Not an ORM attribute: populated by the route from the eager-loaded
+    # proveedor relationship (None when proveedor_id is NULL).
+    nombre_proveedor: str | None = None

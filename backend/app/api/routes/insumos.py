@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -6,11 +8,23 @@ from app.core.deps import get_db, require_admin, require_roles
 from app.models.insumos import CategoriaInsumo, Insumo
 from app.schemas.common import Paginated
 from app.schemas.insumo import InsumoCreate, InsumoRead, InsumoUpdate
-from app.services.paginacion import paginar
+from app.services.paginacion import aplicar_orden, paginar
 
 router = APIRouter(prefix="/insumos", tags=["insumos"])
 
 audited_user = require_roles("admin", "operador", "consulta")
+
+# Whitelisted server-side sort keys; categoria is the joined category name
+# (inner join — categoria_id is NOT NULL).
+_SORTABLE_INSUMOS = {
+    "id": Insumo.id,
+    "nombre": Insumo.nombre,
+    "unidad_medida": Insumo.unidad_medida,
+    "stock_actual": Insumo.stock_actual,
+    "stock_minimo": Insumo.stock_minimo,
+    "costo_promedio_actual": Insumo.costo_promedio_actual,
+    "categoria": CategoriaInsumo.nombre,
+}
 
 
 def _to_read(insumo: Insumo) -> InsumoRead:
@@ -27,10 +41,19 @@ def list_insumos(
     offset: int = 0,
     q: str | None = None,
     categoria_id: int | None = None,
+    sort_by: str | None = None,
+    order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
     _: Insumo = Depends(audited_user),
 ):
-    stmt = select(Insumo).options(selectinload(Insumo.categoria)).order_by(Insumo.id)
+    # Categoria joined once up-front so the categoria sort key works without
+    # adding joins later (categoria_id is NOT NULL, so the inner join is safe).
+    stmt = (
+        select(Insumo)
+        .join(Insumo.categoria)
+        .options(selectinload(Insumo.categoria))
+        .order_by(Insumo.id)
+    )
     if q is not None:
         stmt = stmt.where(
             or_(
@@ -40,6 +63,7 @@ def list_insumos(
         )
     if categoria_id is not None:
         stmt = stmt.where(Insumo.categoria_id == categoria_id)
+    stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_INSUMOS)
     rows, total = paginar(db, stmt, limit, offset)
     return Paginated[InsumoRead](items=[_to_read(i) for i in rows], total=total)
 

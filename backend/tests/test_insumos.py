@@ -111,3 +111,78 @@ def test_list_insumos_tipo_invalido_422(client, admin_token):
 def test_list_insumos_requires_auth(client):
     resp = client.get("/api/v1/insumos")
     assert resp.status_code == 401
+
+
+def test_list_insumos_sort_by_nombre(client, admin_token, categoria_fixture):
+    """Server-side ordering: nombre asc/desc reorders created rows; a joined
+    sort key (categoria) also works; unknown keys fall back to id-asc."""
+    from decimal import Decimal
+
+    from app.db.session import SessionLocal
+    from app.models import Insumo
+
+    prefix = f"Insumo Sort {id(object())}"
+    ids = []
+
+    db = SessionLocal()
+    try:
+        for idx, nombre in enumerate([f"{prefix} Zeta", f"{prefix} Alfa"]):
+            ins = Insumo(
+                categoria_id=categoria_fixture["id"],
+                nombre=nombre,
+                unidad_medida="metro",
+                stock_actual=Decimal("0"),
+                stock_minimo=Decimal("0"),
+                costo_promedio_actual=Decimal("0"),
+            )
+            db.add(ins)
+            db.commit()
+            db.refresh(ins)
+            ids.append(ins.id)
+    finally:
+        db.close()
+
+    try:
+        resp = client.get(
+            "/api/v1/insumos",
+            params={"q": prefix, "sort_by": "nombre", "order": "asc"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        rows = resp.json()["items"]
+        assert [i["id"] for i in rows] == [ids[1], ids[0]]  # Alfa then Zeta
+
+        resp = client.get(
+            "/api/v1/insumos",
+            params={"q": prefix, "sort_by": "nombre", "order": "desc"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        rows = resp.json()["items"]
+        assert [i["id"] for i in rows] == [ids[0], ids[1]]
+
+        resp = client.get(
+            "/api/v1/insumos",
+            params={"q": prefix, "sort_by": "categoria", "order": "asc"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert {i["id"] for i in resp.json()["items"]} == set(ids)
+
+        resp = client.get(
+            "/api/v1/insumos",
+            params={"q": prefix, "sort_by": "zzz_inexistente", "order": "desc"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        got_ids = [i["id"] for i in resp.json()["items"]]
+        assert got_ids == sorted(got_ids)  # default id-asc preserved
+    finally:
+        db = SessionLocal()
+        try:
+            db.query(Insumo).filter(Insumo.id.in_(ids)).delete(
+                synchronize_session=False
+            )
+            db.commit()
+        finally:
+            db.close()

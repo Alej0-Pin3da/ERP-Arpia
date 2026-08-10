@@ -474,6 +474,56 @@ def test_update_variante_returns_200(client, admin_token):
 # ---------------------------------------------------------------------------
 
 
+def test_list_productos_sort_by_tipo_y_nombre(client, admin_token):
+    """sort_by accepts joined (tipo) and plain (nombre) columns; unknown keys
+    fall back to the id-asc default."""
+    prefix = f"Prod Sort {_unique()}"
+    tipo_id = _make_tipo()
+    p1 = _make_producto(tipo_id, nombre=f"{prefix} Zeta")
+    p2 = _make_producto(tipo_id, nombre=f"{prefix} Alfa")
+    try:
+        resp = client.get(
+            "/api/v1/productos",
+            params={"q": prefix, "sort_by": "nombre", "order": "asc"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        rows = resp.json()["items"]
+        assert rows[0]["id"] == p2  # "Alfa" < "Zeta"
+        assert rows[1]["id"] == p1
+
+        resp = client.get(
+            "/api/v1/productos",
+            params={"q": prefix, "sort_by": "nombre", "order": "desc"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        rows = resp.json()["items"]
+        assert rows[0]["id"] == p1
+        assert rows[1]["id"] == p2
+
+        resp = client.get(
+            "/api/v1/productos",
+            params={"q": prefix, "sort_by": "tipo", "order": "desc"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert {r["id"] for r in resp.json()["items"]} == {p1, p2}
+
+        resp = client.get(
+            "/api/v1/productos",
+            params={"q": prefix, "sort_by": "zzz_inexistente", "order": "desc"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        ids = [r["id"] for r in resp.json()["items"]]
+        assert ids == sorted(ids)
+    finally:
+        _cleanup_producto(p1)
+        _cleanup_producto(p2)
+        _cleanup_tipo(tipo_id)
+
+
 def test_create_tipo_requires_auth(client):
     resp = client.post("/api/v1/tipos-producto", json={"nombre": "Sin Token"})
     assert resp.status_code == 401

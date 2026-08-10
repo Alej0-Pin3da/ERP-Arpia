@@ -315,6 +315,96 @@ def test_list_proveedor_id_422(client, operador_token):
 
 
 # ---------------------------------------------------------------------------
+# Server-side sorting (sort_by/order)
+# ---------------------------------------------------------------------------
+
+
+def test_list_sorted_by_price_desc(client, operador_token, categoria_fixture):
+    """sort_by=precio_unitario_compra&order=desc -> non-increasing prices; the
+    joined insumo/proveedor sort keys are also accepted."""
+    insumo_id = _make_insumo(categoria_fixture["id"])
+    try:
+        for precio in ("5", "3", "9"):
+            resp = client.post(
+                URL,
+                json=_valid_payload(insumo_id, precio_unitario_compra=precio),
+                headers=_auth(operador_token),
+            )
+            assert resp.status_code == 201
+
+        resp = client.get(
+            URL,
+            params={
+                "insumo_id": insumo_id,
+                "sort_by": "precio_unitario_compra",
+                "order": "desc",
+            },
+            headers=_auth(operador_token),
+        )
+        assert resp.status_code == 200
+        rows = resp.json()["items"]
+        assert [Decimal(r["precio_unitario_compra"]) for r in rows] == [
+            Decimal("9"),
+            Decimal("5"),
+            Decimal("3"),
+        ]
+
+        # Joined-column sort key: insumo (Insumo.nombre).
+        resp = client.get(
+            URL,
+            params={"insumo_id": insumo_id, "sort_by": "insumo", "order": "asc"},
+            headers=_auth(operador_token),
+        )
+        assert resp.status_code == 200
+        assert all(r["insumo_id"] == insumo_id for r in resp.json()["items"])
+
+        # Unknown key -> 200, default id-asc preserved.
+        resp = client.get(
+            URL,
+            params={"insumo_id": insumo_id, "sort_by": "x; DROP TABLE", "order": "desc"},
+            headers=_auth(operador_token),
+        )
+        assert resp.status_code == 200
+        ids = [r["id"] for r in resp.json()["items"]]
+        assert ids == sorted(ids)
+    finally:
+        _cleanup_insumo(insumo_id)
+
+
+def test_list_nombre_proveedor_poblado(client, operador_token, categoria_fixture, proveedor_fixture):
+    """GET list rows carry nombre_proveedor from the eager-loaded relationship
+    (None when proveedor_id is NULL, name otherwise)."""
+    insumo_id = _make_insumo(categoria_fixture["id"])
+    try:
+        with_prov = client.post(
+            URL,
+            json=_valid_payload(insumo_id, proveedor_id=proveedor_fixture),
+            headers=_auth(operador_token),
+        )
+        assert with_prov.status_code == 201
+        assert with_prov.json()["nombre_proveedor"] is None  # POST: no ORM attr
+
+        without_prov = client.post(
+            URL,
+            json=_valid_payload(insumo_id),
+            headers=_auth(operador_token),
+        )
+        assert without_prov.status_code == 201
+
+        resp = client.get(
+            URL,
+            params={"insumo_id": insumo_id},
+            headers=_auth(operador_token),
+        )
+        assert resp.status_code == 200
+        by_id = {r["id"]: r for r in resp.json()["items"]}
+        assert by_id[with_prov.json()["id"]]["nombre_proveedor"] == "Proveedor Compras de Pruebas"
+        assert by_id[without_prov.json()["id"]]["nombre_proveedor"] is None
+    finally:
+        _cleanup_insumo(insumo_id)
+
+
+# ---------------------------------------------------------------------------
 # Requirement: Response shape completeness
 # ---------------------------------------------------------------------------
 

@@ -345,6 +345,64 @@ def test_get_ventas_paginado_filtros(client, operador_token):
 # ---------------------------------------------------------------------------
 
 
+def _is_non_decreasing(values) -> bool:
+    return all(a <= b for a, b in zip(values, values[1:]))
+
+
+def test_list_ventas_sort_server_side(client, operador_token):
+    """sort_by/order are honored server-side: total_venta asc is non-decreasing,
+    desc non-increasing; unknown sort keys fall back to the id-asc default."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="100")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        for cantidad in ("1", "2", "3"):
+            resp = client.post(
+                "/api/v1/ventas",
+                json=_venta_payload(prod_id, cantidad=cantidad),
+                headers={"Authorization": f"Bearer {operador_token}"},
+            )
+            assert resp.status_code == 201
+
+        params = {"sort_by": "total_venta", "order": "asc", "limit": 2000}
+        resp = client.get(
+            "/api/v1/ventas",
+            params=params,
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        asc_totals = [Decimal(v["total_venta"]) for v in resp.json()["items"]]
+        assert _is_non_decreasing(asc_totals)
+
+        params["order"] = "desc"
+        resp = client.get(
+            "/api/v1/ventas",
+            params=params,
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        desc_totals = [Decimal(v["total_venta"]) for v in resp.json()["items"]]
+        assert _is_non_decreasing(desc_totals[::-1])
+
+        # Unknown sort key -> 200 with default id-asc ordering (whitelist no-op).
+        resp = client.get(
+            "/api/v1/ventas",
+            params={"sort_by": "sql_injection", "order": "desc"},
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        ids = [v["id"] for v in resp.json()["items"]]
+        assert _is_non_decreasing(ids)
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
 def test_post_venta_operador_201(client, operador_token):
     """operador CAN create (roles admin|operador) -> 201 (triangulation)."""
     cat_id = _make_categoria()

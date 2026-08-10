@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
@@ -14,11 +16,22 @@ from app.schemas.producto import (
     VarianteProductoRead,
     VarianteProductoUpdate,
 )
-from app.services.paginacion import paginar
+from app.services.paginacion import aplicar_orden, paginar
 
 router = APIRouter(prefix="/productos", tags=["productos"])
 
 audited_user = require_roles("admin", "operador", "consulta")
+
+# Whitelisted server-side sort keys; tipo is the joined type name (inner join
+# — tipo_producto_id is NOT NULL). Mirrors the columns the frontend table shows.
+_SORTABLE_PRODUCTOS = {
+    "id": Producto.id,
+    "nombre": Producto.nombre,
+    "tipo": TipoProducto.nombre,
+    "requiere_fabricacion": Producto.requiere_fabricacion,
+    "precio_venta_sugerido": Producto.precio_venta_sugerido,
+    "costos_operativos_fijos": Producto.costos_operativos_fijos,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -32,10 +45,14 @@ def list_productos(
     q: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    sort_by: str | None = None,
+    order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
     _: Producto = Depends(audited_user),
 ):
-    stmt = select(Producto).order_by(Producto.id)
+    # Tipo joined once up-front so the tipo sort key works (used by the q
+    # search too).
+    stmt = select(Producto).join(Producto.tipo_producto).order_by(Producto.id)
     if tipo_producto_id is not None:
         stmt = stmt.where(Producto.tipo_producto_id == tipo_producto_id)
     if q is not None:
@@ -44,7 +61,8 @@ def list_productos(
                 Producto.nombre.ilike(f"%{q}%"),
                 TipoProducto.nombre.ilike(f"%{q}%"),
             )
-        ).join(TipoProducto)
+        )
+    stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_PRODUCTOS)
     rows, total = paginar(db, stmt, limit, offset)
     return Paginated[ProductoRead](items=list(rows), total=total)
 
