@@ -57,7 +57,7 @@ from migrate.normalize import normalizar_decimal
 # right CACHETERRO block is a re-run of the dedicated 'Noche y Dia CACHETERO'
 # sheet, so it is skipped to avoid dual-inventory of Cachetero.
 BLOQUES_BOM: dict[str, tuple[str, str | None]] = {
-    "Braleth diseño 1": ("Braleth diseño 1", None),
+      "Braleth diseño 1": ("Bralete", None),
     "Noche y Dia CACHETERO": ("Cachetero", None),
     "Noche y Dia": ("Bralete", None),
     "CORSET": ("Corset", None),
@@ -66,7 +66,7 @@ BLOQUES_BOM: dict[str, tuple[str, str | None]] = {
     "FALDA EMILY": ("Falda Emily", None),
     "Corset Hypatia": ("Corset Hypatia", None),
     "BUSTIER": ("Bustier", None),
-    "BLUSAS": ("Blusa Manga Larga", "Blusa Manga Corta"),
+      "BLUSAS": ("Blusa Manga Larga", "Blusa Arpia"),
     "TOTEBAG": ("Tote Bag Arpia", None),
 }
 
@@ -88,6 +88,28 @@ _COLS_COMBOS: tuple[tuple[str, str, str], ...] = (
 _EMPAQUES_COMBO = frozenset(
     {"caja", "vela", "papel", "envio", "bolsa", "etiqueta", "tarjeta"}
 )
+
+# Recipe-sheet material names that do NOT match the F1 catalog 1:1 (key
+# normalizada -> canonical catalog name). The recipe Excel uses short or
+# divergent names vs the catalog loaded from investments (e.g. "Argolla 10 mm"
+# vs catalog "Argolla numero 10 mm"); everything else resolves by exact match.
+# These aliases never create insumos: the orchestrator creates the missing ones
+# in the real DB with the exact canonical name, so an alias line is still
+# omitted until that insumo exists (intended behavior).
+ALIASES_BOM_A_CATALOGO: dict[str, str] = {
+    "argolla 10 mm": "Argolla numero 10 mm",
+    "argolla 8 mm": "Argolla numero 8 mm",
+    "tensor 8 de 10mm": "Tensor 8 numero 10",
+    "zeta de 10 mm": "Zeta numero 10",
+    "tira de brasier": "Tira de Brasier negro 10 mts",
+    "franela lycra": "Franela lycra 1 mt (blanco y negro)",
+    "tela a cuadros": "Tejido plano sim popelina (a cuadros bn)",
+    "powernet negro delgado (corsets)": "Powernet negro delgado",
+    "tela maya ilustrada": "Tela Maya Ilustrada",
+    "sesgo elastico 10 mts": "Sesgo Elastico 10 mts",
+    "aro copa brasier": "Aro Copa Brasier",
+    "rosa tejida gris": "Rosa tejida gris",
+}
 
 # Fabric width hint inside a material name: "Ref 159 24 cm tul bordado" ->
 # 24 cm (roll width used to convert cm2 -> meters; default 100 cm + WARN).
@@ -352,6 +374,8 @@ def _producto_por_nombre(db, nombre: str):
 
 
 def _insumo_por_nombre(db, nombre: str):
+    """Insumo del catalogo por nombre canonico (alias primero, luego exacto)."""
+    nombre = ALIASES_BOM_A_CATALOGO.get(clave_normalizada(nombre), nombre)
     return db.scalar(select(Insumo).where(Insumo.nombre == nombre))
 
 

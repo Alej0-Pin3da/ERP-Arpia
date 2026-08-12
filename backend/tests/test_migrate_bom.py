@@ -48,6 +48,14 @@ P_BLUSA_ML = f"{P} BOM Blusa ML"
 P_BLUSA_MC = f"{P} BOM Blusa MC"
 P_COMBO = f"{P} BOM Combo"
 
+# Canonical catalog insumos that recipe names resolve to via ALIASES_BOM_A_CATALOGO
+# (the orchestrator creates these in the real DB; tests create them in the fixture).
+P_ALIAS_ARG = "Argolla numero 10 mm"
+P_ALIAS_TIRA = "Tira de Brasier negro 10 mts"
+P_ALIAS_POWERNET = "Powernet negro delgado"
+# Recipe material with neither alias nor catalog match -> omitted.
+P_FANTASMA = f"{P} BOM Material Fantasma"
+
 
 # --------------------------------------------------------------------------- #
 # Mini workbook builders
@@ -100,6 +108,28 @@ def mini_bom(tmp_path) -> Path:
     return path
 
 
+def _mini_workbook_aliases(path: Path) -> None:
+    """Mini workbook: CORSET with recipe names that resolve via aliases plus one
+    phantom material (no alias, no catalog match) that must be omitted."""
+    wb = openpyxl.Workbook()
+    corset = wb.active
+    corset.title = "CORSET"
+    corset.append(["CORSET", None, None, None, None, None, None, None, "TANGA"])
+    corset.append(["Producto", "Ancho", "Alto", "cantidad Cms", "valor metro", "valor total"])
+    corset.append(["Argolla 10 mm", 2, 1, 2, 72, None])
+    corset.append(["Tira de brasier", 1, 1, 1, 3000, None])
+    corset.append(["Powernet negro delgado (corsets)", 1, 1, 1, 12000, None])
+    corset.append([P_FANTASMA, 1, 1, 1, 999, None])
+    wb.save(path)
+
+
+@pytest.fixture
+def mini_bom_aliases(tmp_path) -> Path:
+    path = tmp_path / "mini-bom-aliases.xlsx"
+    _mini_workbook_aliases(path)
+    return path
+
+
 # --------------------------------------------------------------------------- #
 # Module-level DB cleanup (canonical tipos + test rows)
 # --------------------------------------------------------------------------- #
@@ -107,14 +137,13 @@ def mini_bom(tmp_path) -> Path:
 
 def _borrar_filas_test(db) -> None:
     """Remove rows this test module injected (exact-name matches only)."""
-    insumos = db.query(Insumo).filter(
-        Insumo.nombre.in_([P_TELA, P_ARG, P_TUL])
-    ).all()
+    insumo_nombres = [P_TELA, P_ARG, P_TUL, P_ALIAS_ARG, P_ALIAS_TIRA, P_ALIAS_POWERNET]
+    insumos = db.query(Insumo).filter(Insumo.nombre.in_(insumo_nombres)).all()
     for insumo in insumos:
         db.query(BomInsumo).filter(BomInsumo.insumo_id == insumo.id).delete(
             synchronize_session=False
         )
-    db.query(Insumo).filter(Insumo.nombre.in_([P_TELA, P_ARG, P_TUL])).delete(
+    db.query(Insumo).filter(Insumo.nombre.in_(insumo_nombres)).delete(
         synchronize_session=False
     )
     productos = db.query(Producto).filter(
@@ -177,6 +206,25 @@ def _preparar_catalogo(db) -> dict[str, int]:
     ids[P_BLUSA_ML] = upsert_producto(db, P_BLUSA_ML, tipo="Blusa").id
     ids[P_BLUSA_MC] = upsert_producto(db, P_BLUSA_MC, tipo="Blusa").id
     ids[P_COMBO] = upsert_producto(db, P_COMBO, tipo="Combo").id
+    db.commit()
+    return ids
+
+
+def _preparar_catalogo_aliases(db) -> dict[str, int]:
+    """Like _preparar_catalogo plus the canonical catalog insumos that the
+    recipe alias names (Argolla 10 mm, ...) resolve to in F3 apply."""
+    ids = _preparar_catalogo(db)
+    from migrate.catalog import upsert_insumo
+
+    ids[P_ALIAS_ARG] = upsert_insumo(
+        db, P_ALIAS_ARG, categoria_nombre="Herrajes"
+    ).id
+    ids[P_ALIAS_TIRA] = upsert_insumo(
+        db, P_ALIAS_TIRA, categoria_nombre="Telas"
+    ).id
+    ids[P_ALIAS_POWERNET] = upsert_insumo(
+        db, P_ALIAS_POWERNET, categoria_nombre="Telas"
+    ).id
     db.commit()
     return ids
 
@@ -362,6 +410,51 @@ def test_aplicar_bom_combo_idempotente(db, mini_bom):
 
     combo = db.query(Producto).filter(Producto.nombre == P_COMBO).one()
     assert db.query(BomProducto).filter(BomProducto.combo_id == combo.id).count() == 2
+
+
+def test_aplicar_bom_alias_resuelve_insumos_canonicos(db, mini_bom_aliases):
+    """Nombres cortos de receta -> insumo canonico del catalogo (ALIASES_BOM)."""
+    from migrate.bom import aplicar_bom, plan_bom
+
+    ids = _preparar_catalogo_aliases(db)
+    with LibroMigracion(mini_bom_aliases) as libro:
+        plan = plan_bom(libro, bloques=_bloques_mini())
+    aplicar_bom(db, plan)
+    db.commit()
+
+    corset = db.query(Producto).filter(Producto.nombre == P_CORSET).one()
+    por = {
+        l.insumo.nombre: l
+        for l in db.query(BomInsumo).filter(BomInsumo.producto_id == corset.id).all()
+    }
+    # 'Argolla 10 mm' -> 'Argolla numero 10 mm' (insumo canonico del fixture)
+    assert P_ALIAS_ARG in por and por[P_ALIAS_ARG].insumo_id == ids[P_ALIAS_ARG]
+    # 'Tira de brasier' -> 'Tira de Brasier negro 10 mts'
+    assert P_ALIAS_TIRA in por and por[P_ALIAS_TIRA].insumo_id == ids[P_ALIAS_TIRA]
+    # 'Powernet negro delgado (corsets)' -> 'Powernet negro delgado'
+    assert (
+        P_ALIAS_POWERNET in por
+        and por[P_ALIAS_POWERNET].insumo_id == ids[P_ALIAS_POWERNET]
+    )
+
+
+def test_aplicar_bom_sin_alias_ni_match_exacto_omite(db, mini_bom_aliases):
+    """Material sin alias y sin match exacto sigue omitiendose (comport. actual)."""
+    from migrate.bom import aplicar_bom, plan_bom
+
+    _preparar_catalogo_aliases(db)
+    with LibroMigracion(mini_bom_aliases) as libro:
+        plan = plan_bom(libro, bloques=_bloques_mini())
+    res = aplicar_bom(db, plan)
+    db.commit()
+
+    assert res["omitidos"] == 1  # solo el material fantasma
+    corset = db.query(Producto).filter(Producto.nombre == P_CORSET).one()
+    nombres = {
+        l.insumo.nombre
+        for l in db.query(BomInsumo).filter(BomInsumo.producto_id == corset.id).all()
+    }
+    assert P_FANTASMA not in nombres
 
 
 # --------------------------------------------------------------------------- #
