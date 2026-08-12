@@ -116,18 +116,25 @@ function productSummary(row: VentaRow): string {
         </span>
       </template>
     </el-table-column>
-    <el-table-column v-if="canMarkRegalo" label="Acciones" width="170" align="center">
+    <el-table-column v-if="canMarkRegalo" label="Acciones" width="80" align="center">
       <template #default="{ row }">
-        <el-button
+        <el-tooltip
           v-if="!row.es_regalo"
-          size="small"
-          plain
-          type="warning"
-          data-test="marcar-regalo"
-          @click="emit('marcar-regalo', row.id)"
+          content="Marcar como regalo"
+          placement="top"
         >
-          Marcar como regalo
-        </el-button>
+          <el-button
+            size="small"
+            circle
+            plain
+            type="warning"
+            aria-label="Marcar como regalo"
+            data-test="marcar-regalo"
+            @click="emit('marcar-regalo', row.id)"
+          >
+            🎁
+          </el-button>
+        </el-tooltip>
       </template>
     </el-table-column>
 
