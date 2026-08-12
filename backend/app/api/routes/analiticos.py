@@ -1,4 +1,4 @@
-"""Analiticos API routes — three read-only aggregation endpoints (ANA-1..3).
+"""Analiticos API routes — six read-only aggregation endpoints (ANA-1..6).
 
 All queries run against snapshot data only:
 - ventas-mensuales: SUM(total_venta) + count per month, EXCLUDING anuladas.
@@ -6,20 +6,33 @@ All queries run against snapshot data only:
 - margen-por-producto: SUM/AVG(precio - costo_unitario_aplicado) per
   (producto, variante) from the Detalle_Ventas snapshot — NEVER the current
   WAC — excluding anulada lines.
+- top-productos: SUM(cantidad) + SUM(cantidad * precio_unitario_aplicado) per
+  product from the Detalle_Ventas snapshot, excluding anulada lines.
+- top-insumos: SUM(cantidad_comprada) per insumo from Compras_Insumos (the
+  DB has no production/consumption ledger, so purchases are the real proxy).
+- finanzas-mensuales: per-month SUM(total_venta) as ingresos vs SUM(monto) of
+  ACTIVE Gasto|Inversion Movimientos_Financieros as gastos.
 
 Read-only + audited: admin|operador|consulta. No commits, no locks.
 """
+
+from datetime import date
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import Numeric, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_roles
-from app.models.insumos import Insumo
+from app.models.finanzas import MovimientoFinanciero
+from app.models.insumos import CompraInsumo, Insumo
 from app.models.ventas import DetalleVenta, Venta
 from app.schemas.analiticos import (
+    FinanzasMensualesRead,
     InsumoBajoStockRead,
     MargenProductoRead,
+    TopInsumoRead,
+    TopProductoRead,
     VentasMensualesRead,
 )
 
@@ -110,4 +123,121 @@ def margen_por_producto(
             margen_promedio=r.margen_promedio,
         )
         for r in rows
+    ]
+
+
+@router.get("/top-productos", response_model=list[TopProductoRead])
+def top_productos(
+    db: Session = Depends(get_db),
+    _=Depends(audited_user),
+):
+    """Top products by units sold: SUM(cantidad) and SUM(cantidad *
+    precio_unitario_aplicado) per product from the Detalle_Ventas SNAPSHOT,
+    excluding anulada lines — ordered by units desc (ANA-4)."""
+    # One expression object reused in SELECT/ORDER BY so SQLAlchemy binds the
+    # aggregate identically in every occurrence.
+    unidades_total = func.sum(DetalleVenta.cantidad)
+    ingresos_total = func.sum(
+        DetalleVenta.cantidad * DetalleVenta.precio_unitario_aplicado
+    )
+    rows = db.execute(
+        select(
+            DetalleVenta.producto_id,
+            cast(unidades_total, Numeric(15, 4)).label("unidades"),
+            cast(ingresos_total, Numeric(15, 4)).label("ingresos"),
+        )
+        .join(Venta, DetalleVenta.venta_id == Venta.id)
+        .where(Venta.estado != "anulada")
+        .group_by(DetalleVenta.producto_id)
+        .order_by(unidades_total.desc(), DetalleVenta.producto_id)
+    ).all()
+    return [
+        TopProductoRead(
+            producto_id=r.producto_id,
+            unidades=r.unidades,
+            ingresos=r.ingresos,
+        )
+        for r in rows
+    ]
+
+
+@router.get("/top-insumos", response_model=list[TopInsumoRead])
+def top_insumos(
+    db: Session = Depends(get_db),
+    _=Depends(audited_user),
+):
+    """Insumos by total quantity purchased: SUM(cantidad_comprada) per insumo
+    from Compras_Insumos, with the joined name and unit of measure — ordered
+    by quantity desc (ANA-5). Compras_Insumos is the real consumption proxy;
+    the DB has no production/consumption ledger."""
+    cantidad_total = func.sum(CompraInsumo.cantidad_comprada)
+    rows = db.execute(
+        select(
+            CompraInsumo.insumo_id,
+            Insumo.nombre,
+            Insumo.unidad_medida,
+            cast(cantidad_total, Numeric(15, 4)).label("cantidad"),
+        )
+        .join(Insumo, CompraInsumo.insumo_id == Insumo.id)
+        .group_by(CompraInsumo.insumo_id, Insumo.nombre, Insumo.unidad_medida)
+        .order_by(cantidad_total.desc(), CompraInsumo.insumo_id)
+    ).all()
+    return [
+        TopInsumoRead(
+            insumo_id=r.insumo_id,
+            nombre=r.nombre,
+            unidad_medida=r.unidad_medida,
+            cantidad=r.cantidad,
+        )
+        for r in rows
+    ]
+
+
+@router.get("/finanzas-mensuales", response_model=list[FinanzasMensualesRead])
+def finanzas_mensuales(
+    db: Session = Depends(get_db),
+    _=Depends(audited_user),
+):
+    """Monthly Ingresos (SUM of non-anulada Ventas.total_venta) vs Gastos
+    (SUM of monto for ACTIVE Gasto|Inversion Movimientos_Financieros — Retiros
+    and soft-deleted rows are excluded). One row per calendar month that has
+    either side present; the missing side is zero-filled (ANA-6)."""
+    mes_ventas = func.date_trunc("month", Venta.fecha)
+    mes_movimientos = func.date_trunc("month", MovimientoFinanciero.fecha)
+
+    ventas_rows = db.execute(
+        select(
+            mes_ventas.label("mes"),
+            func.coalesce(func.sum(Venta.total_venta), 0).label("ingresos"),
+        )
+        .where(Venta.estado != "anulada")
+        .group_by(mes_ventas)
+    ).all()
+    movimientos_rows = db.execute(
+        select(
+            mes_movimientos.label("mes"),
+            func.coalesce(func.sum(MovimientoFinanciero.monto), 0).label("gastos"),
+        )
+        .where(
+            MovimientoFinanciero.tipo.in_(("Gasto", "Inversion")),
+            MovimientoFinanciero.estado == "activo",
+        )
+        .group_by(mes_movimientos)
+    ).all()
+
+    por_mes: dict[date, dict[str, date | Decimal]] = {}
+    for r in ventas_rows:
+        por_mes.setdefault(
+            r.mes.date(),
+            {"mes": r.mes.date(), "ingresos": Decimal("0"), "gastos": Decimal("0")},
+        )["ingresos"] = r.ingresos
+    for r in movimientos_rows:
+        por_mes.setdefault(
+            r.mes.date(),
+            {"mes": r.mes.date(), "ingresos": Decimal("0"), "gastos": Decimal("0")},
+        )["gastos"] = r.gastos
+
+    return [
+        FinanzasMensualesRead(**por_mes[mes])
+        for mes in sorted(por_mes)
     ]
