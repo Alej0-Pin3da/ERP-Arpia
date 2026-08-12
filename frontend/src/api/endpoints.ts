@@ -35,6 +35,9 @@ type PathParams<Path extends keyof paths, Method extends HttpMethod> =
 type VentasMensualesRow = components['schemas']['VentasMensualesRead']
 type InsumoBajoStock = components['schemas']['InsumoBajoStockRead']
 type MargenProducto = components['schemas']['MargenProductoRead']
+type TopProducto = components['schemas']['TopProductoRead']
+type TopInsumo = components['schemas']['TopInsumoRead']
+type FinanzasMensualesRow = components['schemas']['FinanzasMensualesRead']
 type CostoProduccion = components['schemas']['CostoProduccionRead']
 
 // --- auth -------------------------------------------------------------------
@@ -149,6 +152,15 @@ export const analiticosApi = {
   },
   margenPorProducto(): Promise<MargenProducto[]> {
     return client.get('/analiticos/margen-por-producto').then((r) => r.data)
+  },
+  topProductos(): Promise<TopProducto[]> {
+    return client.get('/analiticos/top-productos').then((r) => r.data)
+  },
+  topInsumos(): Promise<TopInsumo[]> {
+    return client.get('/analiticos/top-insumos').then((r) => r.data)
+  },
+  finanzasMensuales(): Promise<FinanzasMensualesRow[]> {
+    return client.get('/analiticos/finanzas-mensuales').then((r) => r.data)
   },
 }
 

@@ -83,11 +83,12 @@ describe('AppLayout (spec SHELL-5)', () => {
     const { wrapper } = await mountLayout('admin')
 
     const labels = sidebarLabels(wrapper)
-    expect(labels).toHaveLength(9)
+    expect(labels).toHaveLength(10)
     expect(labels).toContain('Usuarios')
     expect(labels).toContain('Omisiones')
     expect(labels).toEqual([
       'Dashboard',
+      'Análisis',
       'Ventas',
       'Devoluciones',
       'Finanzas',
@@ -103,10 +104,11 @@ describe('AppLayout (spec SHELL-5)', () => {
     const { wrapper } = await mountLayout('operador')
 
     const labels = sidebarLabels(wrapper)
-    expect(labels).toHaveLength(8)
+    expect(labels).toHaveLength(9)
     expect(labels).not.toContain('Usuarios')
     expect(labels).toContain('Ventas')
     expect(labels).toContain('Dashboard')
+    expect(labels).toContain('Análisis')
     expect(labels).toContain('Omisiones')
   })
 
@@ -114,8 +116,9 @@ describe('AppLayout (spec SHELL-5)', () => {
     const { wrapper } = await mountLayout('consulta')
 
     const labels = sidebarLabels(wrapper)
-    expect(labels).toHaveLength(8)
+    expect(labels).toHaveLength(9)
     expect(labels).not.toContain('Usuarios')
+    expect(labels).toContain('Análisis')
     expect(labels).toContain('Omisiones')
   })
 

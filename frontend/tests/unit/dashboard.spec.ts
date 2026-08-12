@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest'
 import type { components } from '@/types/api.d'
 import {
   buildMargenRows,
+  fillFinanzasMonths,
   fillMissingMonths,
   lastMonthSummary,
   stockSeverity,
@@ -20,6 +21,7 @@ import {
 type VentasMensualesRead = components['schemas']['VentasMensualesRead']
 type InsumoBajoStockRead = components['schemas']['InsumoBajoStockRead']
 type MargenProductoRead = components['schemas']['MargenProductoRead']
+type FinanzasMensualesRead = components['schemas']['FinanzasMensualesRead']
 type ProductoRead = components['schemas']['ProductoRead']
 type VarianteProductoRead = components['schemas']['VarianteProductoRead']
 
@@ -80,6 +82,46 @@ describe('lastMonthSummary (DASH-1 KPI source)', () => {
 
   it('returns null when there are no rows (KPI shows "$0,00")', () => {
     expect(lastMonthSummary([])).toBeNull()
+  })
+})
+
+describe('fillFinanzasMonths (ANA-6 gap fill)', () => {
+  const FIN = (mes: string, ingresos: string, gastos: string): FinanzasMensualesRead => ({
+    mes,
+    ingresos,
+    gastos,
+  })
+
+  it('fills a gap between the first and last month with zeroes per side', () => {
+    const rows = [FIN('2026-01-01', '1000.00', '400.00'), FIN('2026-03-01', '0', '300.00')]
+
+    const filled = fillFinanzasMonths(rows)
+
+    expect(filled).toHaveLength(3)
+    expect(filled[0]).toMatchObject({ mes: '2026-01', ingresos: 1000, gastos: 400 })
+    // February has no API row — both series must be zeroed, not skipped.
+    expect(filled[1]).toMatchObject({ mes: '2026-02', ingresos: 0, gastos: 0 })
+    expect(filled[2]).toMatchObject({ mes: '2026-03', ingresos: 0, gastos: 300 })
+  })
+
+  it('sorts unsorted input ascending by month before filling', () => {
+    const rows = [FIN('2026-03-01', '3000', '100'), FIN('2026-01-01', '1000', '50')]
+
+    const filled = fillFinanzasMonths(rows)
+
+    expect(filled.map((r) => r.mes)).toEqual(['2026-01', '2026-02', '2026-03'])
+    expect(filled[1].ingresos).toBe(0)
+    expect(filled[1].gastos).toBe(0)
+  })
+
+  it('returns an empty list for an empty analytics response', () => {
+    expect(fillFinanzasMonths([])).toEqual([])
+  })
+
+  it('produces es-CO short month labels (ene 2026)', () => {
+    const filled = fillFinanzasMonths([FIN('2026-01-01', '1000', '200')])
+
+    expect(filled[0].label).toBe('ene 2026')
   })
 })
 

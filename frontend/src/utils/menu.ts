@@ -23,6 +23,7 @@ export interface MenuItem {
 
 export const MENU_ITEMS: MenuItem[] = [
   { name: 'dashboard', path: '/dashboard', label: 'Dashboard', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'analisis', path: '/analisis', label: 'Análisis', roles: ['admin', 'operador', 'consulta'] },
   { name: 'ventas', path: '/ventas', label: 'Ventas', roles: ['admin', 'operador', 'consulta'] },
   { name: 'devoluciones', path: '/devoluciones', label: 'Devoluciones', roles: ['admin', 'operador', 'consulta'] },
   { name: 'finanzas', path: '/finanzas', label: 'Finanzas', roles: ['admin', 'operador', 'consulta'] },

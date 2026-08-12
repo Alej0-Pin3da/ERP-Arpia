@@ -16,6 +16,7 @@ import { parseDecimal } from './format'
 
 type VentasMensualesRead = components['schemas']['VentasMensualesRead']
 type MargenProductoRead = components['schemas']['MargenProductoRead']
+type FinanzasMensualesRead = components['schemas']['FinanzasMensualesRead']
 type ProductoRead = components['schemas']['ProductoRead']
 type VarianteProductoRead = components['schemas']['VarianteProductoRead']
 
@@ -124,6 +125,50 @@ export function lastMonthSummary(rows: VentasMensualesRead[]): MonthSummary | nu
 
   const latest = keyed.reduce((a, b) => (monthNumber(b.key) > monthNumber(a.key) ? b : a))
   return { mes: latest.key, total: latest.row.total, cantidad: latest.row.cantidad }
+}
+
+/** One finanzas chart bar: a calendar month, both series zero-filled. */
+export interface FinanzasMonthRow {
+  /** 'YYYY-MM' month key (sortable). */
+  mes: string
+  /** es-CO short label, e.g. 'ene 2026'. */
+  label: string
+  /** Parsed Decimal ingresos for the month (0 when the API had no row). */
+  ingresos: number
+  /** Parsed Decimal gastos for the month (0 when the API had no row). */
+  gastos: number
+}
+
+/**
+ * ANA-6: fill the gap between the first and last month with zero rows so the
+ * chart axis is continuous for both series (ingresos vs gastos). Input is
+ * sorted ascending server-side; rows with an unparseable `mes` are ignored.
+ * Empty input stays empty.
+ */
+export function fillFinanzasMonths(rows: FinanzasMensualesRead[]): FinanzasMonthRow[] {
+  const keyed = rows
+    .map((row) => ({ row, key: monthKey(row.mes) }))
+    .filter((entry): entry is { row: FinanzasMensualesRead; key: string } => entry.key !== null)
+    .sort((a, b) => monthNumber(a.key) - monthNumber(b.key))
+
+  if (keyed.length === 0) return []
+
+  const start = monthNumber(keyed[0].key)
+  const end = monthNumber(keyed[keyed.length - 1].key)
+  const byKey = new Map(keyed.map((entry) => [entry.key, entry.row]))
+
+  const filled: FinanzasMonthRow[] = []
+  for (let n = start; n <= end; n++) {
+    const key = `${Math.floor(n / 12)}-${String((n % 12) + 1).padStart(2, '0')}`
+    const row = byKey.get(key)
+    filled.push({
+      mes: key,
+      label: monthLabel(key),
+      ingresos: row ? (parseDecimal(row.ingresos) ?? 0) : 0,
+      gastos: row ? (parseDecimal(row.gastos) ?? 0) : 0,
+    })
+  }
+  return filled
 }
 
 /**

@@ -12,12 +12,13 @@ import { MENU_ITEMS, RoleMenuFilter, roleLabel, type MenuItem } from '@/utils/me
 
 describe('RoleMenuFilter (spec SHELL-4)', () => {
   it('exposes the full menu with the admin-only Usuarios item flagged', () => {
-    // 9 sections: Dashboard, Ventas, Devoluciones, Finanzas, Inventario,
-    // Productos, Maestros, Omisiones, Usuarios.
-    expect(MENU_ITEMS).toHaveLength(9)
+    // 10 sections: Dashboard, Análisis, Ventas, Devoluciones, Finanzas,
+    // Inventario, Productos, Maestros, Omisiones, Usuarios.
+    expect(MENU_ITEMS).toHaveLength(10)
     const labels = MENU_ITEMS.map((item) => item.label)
     expect(labels).toEqual([
       'Dashboard',
+      'Análisis',
       'Ventas',
       'Devoluciones',
       'Finanzas',
@@ -38,7 +39,7 @@ describe('RoleMenuFilter (spec SHELL-4)', () => {
   it('gives an admin every menu item, including Usuarios', () => {
     const items = RoleMenuFilter('admin')
 
-    expect(items).toHaveLength(9)
+    expect(items).toHaveLength(10)
     expect(items.map((item) => item.label)).toContain('Usuarios')
     expect(items.map((item) => item.label)).toContain('Omisiones')
   })
@@ -46,19 +47,21 @@ describe('RoleMenuFilter (spec SHELL-4)', () => {
   it('hides the admin-only Usuarios item from an operador', () => {
     const items = RoleMenuFilter('operador')
 
-    expect(items).toHaveLength(8)
+    expect(items).toHaveLength(9)
     const labels = items.map((item) => item.label)
     expect(labels).not.toContain('Usuarios')
     expect(labels).toContain('Ventas')
     expect(labels).toContain('Dashboard')
+    expect(labels).toContain('Análisis')
     expect(labels).toContain('Omisiones')
   })
 
   it('hides the admin-only Usuarios item from a consulta', () => {
     const items = RoleMenuFilter('consulta')
 
-    expect(items).toHaveLength(8)
+    expect(items).toHaveLength(9)
     expect(items.map((item) => item.label)).not.toContain('Usuarios')
+    expect(items.map((item) => item.label)).toContain('Análisis')
     expect(items.map((item) => item.label)).toContain('Omisiones')
   })
 

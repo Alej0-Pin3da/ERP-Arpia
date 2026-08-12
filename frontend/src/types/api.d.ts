@@ -707,6 +707,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analiticos/top-productos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Top Productos
+         * @description Top products by units sold: SUM(cantidad) and SUM(cantidad *
+         *     precio_unitario_aplicado) per product from the Detalle_Ventas SNAPSHOT,
+         *     excluding anulada lines — ordered by units desc (ANA-4).
+         */
+        get: operations["top_productos_api_v1_analiticos_top_productos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analiticos/top-insumos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Top Insumos
+         * @description Insumos by total quantity purchased: SUM(cantidad_comprada) per insumo
+         *     from Compras_Insumos, with the joined name and unit of measure — ordered
+         *     by quantity desc (ANA-5). Compras_Insumos is the real consumption proxy;
+         *     the DB has no production/consumption ledger.
+         */
+        get: operations["top_insumos_api_v1_analiticos_top_insumos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analiticos/finanzas-mensuales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Finanzas Mensuales
+         * @description Monthly Ingresos (SUM of non-anulada Ventas.total_venta) vs Gastos
+         *     (SUM of monto for ACTIVE Gasto|Inversion Movimientos_Financieros — Retiros
+         *     and soft-deleted rows are excluded). One row per calendar month that has
+         *     either side present; the missing side is zero-filled (ANA-6).
+         */
+        get: operations["finanzas_mensuales_api_v1_analiticos_finanzas_mensuales_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/omisiones": {
         parameters: {
             query?: never;
@@ -1034,6 +1102,18 @@ export interface components {
             usuario_id: number | null;
             /** Items */
             items: components["schemas"]["DevolucionItemRead"][];
+        };
+        /** FinanzasMensualesRead */
+        FinanzasMensualesRead: {
+            /**
+             * Mes
+             * Format: date
+             */
+            mes: string;
+            /** Ingresos */
+            ingresos: string;
+            /** Gastos */
+            gastos: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1477,6 +1557,26 @@ export interface components {
             token_type: string;
             /** Rol */
             rol: string;
+        };
+        /** TopInsumoRead */
+        TopInsumoRead: {
+            /** Insumo Id */
+            insumo_id: number;
+            /** Nombre */
+            nombre: string;
+            /** Unidad Medida */
+            unidad_medida: string;
+            /** Cantidad */
+            cantidad: string;
+        };
+        /** TopProductoRead */
+        TopProductoRead: {
+            /** Producto Id */
+            producto_id: number;
+            /** Unidades */
+            unidades: string;
+            /** Ingresos */
+            ingresos: string;
         };
         /** UsuarioCreate */
         UsuarioCreate: {
@@ -3864,6 +3964,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MargenProductoRead"][];
+                };
+            };
+        };
+    };
+    top_productos_api_v1_analiticos_top_productos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopProductoRead"][];
+                };
+            };
+        };
+    };
+    top_insumos_api_v1_analiticos_top_insumos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopInsumoRead"][];
+                };
+            };
+        };
+    };
+    finanzas_mensuales_api_v1_analiticos_finanzas_mensuales_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinanzasMensualesRead"][];
                 };
             };
         };
