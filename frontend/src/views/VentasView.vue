@@ -45,6 +45,7 @@ const page = ref(1)
 const pageSize = 20
 const filterCanal = ref<'web' | 'whatsapp' | 'instagram' | 'feria' | null>(null)
 const filterEstado = ref<'completada' | 'anulada' | null>(null)
+const filterProductoId = ref<number | null>(null)
 const sortBy = ref<string | null>(null)
 const sortOrder = ref<'asc' | 'desc' | null>(null)
 const productos = ref<ProductoRead[]>([])
@@ -75,7 +76,11 @@ async function load(): Promise<void> {
         buildListParams({
           page: page.value,
           pageSize,
-          filtros: { canal_venta: filterCanal.value, estado: filterEstado.value },
+          filtros: {
+            canal_venta: filterCanal.value,
+            estado: filterEstado.value,
+            producto_id: filterProductoId.value,
+          },
           sortBy: sortBy.value ?? undefined,
           sortOrder: sortOrder.value ?? undefined,
         }),
@@ -197,6 +202,21 @@ onMounted(load)
             <el-option label="Completada" value="completada" />
             <el-option label="Anulada" value="anulada" />
           </el-select>
+          <el-select
+            v-model="filterProductoId"
+            clearable
+            filterable
+            placeholder="Producto"
+            data-test="venta-producto-filter"
+            @change="onFilterChange"
+          >
+            <el-option
+              v-for="producto in productos"
+              :key="producto.id"
+              :label="producto.nombre"
+              :value="producto.id"
+            />
+          </el-select>
           <el-button v-if="canRegister" type="primary" data-test="nueva-venta" @click="openCreateVenta">
             Nueva venta
           </el-button>
@@ -252,8 +272,9 @@ onMounted(load)
 
 .venta-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
-  max-width: 42rem;
+  max-width: 55rem;
   margin-bottom: 1rem;
 }
 

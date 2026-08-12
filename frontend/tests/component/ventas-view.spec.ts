@@ -188,6 +188,22 @@ describe('VentasView (MOD-1 + T7)', () => {
     expect(apiMocks.listVentas).toHaveBeenLastCalledWith({ ...PAGE1, canal_venta: 'feria' })
   })
 
+  it('product filter sends producto_id and resets to page 1', async () => {
+    const wrapper = await mountView('operador')
+
+    const select = wrapper.find('[data-test="venta-producto-filter"]')
+    await select.trigger('click')
+    await nextTick()
+    const option = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
+      (el) => el.textContent?.trim() === 'Jugo de naranja',
+    )
+    expect(option).toBeDefined()
+    option!.click()
+    await flushPromises()
+
+    expect(apiMocks.listVentas).toHaveBeenLastCalledWith({ ...PAGE1, producto_id: 2 })
+  })
+
   it('wires the header column filters into the same server-side filter refs', async () => {
     const wrapper = await mountView('operador')
 
