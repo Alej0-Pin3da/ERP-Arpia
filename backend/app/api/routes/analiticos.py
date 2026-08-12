@@ -58,7 +58,7 @@ def ventas_mensuales(
             func.coalesce(func.sum(Venta.total_venta), 0).label("total"),
             func.count(Venta.id).label("cantidad"),
         )
-        .where(Venta.estado != "anulada")
+        .where(Venta.estado != "anulada", Venta.es_regalo == False)
         .group_by(mes)
         .order_by(mes)
     ).all()
@@ -111,7 +111,7 @@ def margen_por_producto(
             cast(func.avg(margen), Numeric(15, 4)).label("margen_promedio"),
         )
         .join(Venta, DetalleVenta.venta_id == Venta.id)
-        .where(Venta.estado != "anulada")
+        .where(Venta.estado != "anulada", Venta.es_regalo == False)
         .group_by(DetalleVenta.producto_id, DetalleVenta.variante_id)
         .order_by(DetalleVenta.producto_id)
     ).all()
@@ -147,7 +147,7 @@ def top_productos(
             cast(ingresos_total, Numeric(15, 4)).label("ingresos"),
         )
         .join(Venta, DetalleVenta.venta_id == Venta.id)
-        .where(Venta.estado != "anulada")
+        .where(Venta.estado != "anulada", Venta.es_regalo == False)
         .group_by(DetalleVenta.producto_id)
         .order_by(unidades_total.desc(), DetalleVenta.producto_id)
     ).all()
@@ -210,7 +210,7 @@ def finanzas_mensuales(
             mes_ventas.label("mes"),
             func.coalesce(func.sum(Venta.total_venta), 0).label("ingresos"),
         )
-        .where(Venta.estado != "anulada")
+        .where(Venta.estado != "anulada", Venta.es_regalo == False)
         .group_by(mes_ventas)
     ).all()
     movimientos_rows = db.execute(

@@ -16,7 +16,12 @@ class VentaCreate(BaseModel):
     cliente_id: int | None = None
     canal_venta: Literal["web", "whatsapp", "instagram", "feria"]
     descuento_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
+    es_regalo: bool = False
     detalles: list[DetalleVentaCreate] = Field(min_length=1)
+
+
+class VentaUpdate(BaseModel):
+    es_regalo: bool
 
 
 class DetalleVentaRead(BaseModel):
@@ -40,4 +45,5 @@ class VentaRead(BaseModel):
     descuento_porcentaje: Decimal
     estado: str
     total_venta: Decimal
+    es_regalo: bool
     detalles: list[DetalleVentaRead]

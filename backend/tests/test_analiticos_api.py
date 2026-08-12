@@ -132,6 +132,7 @@ def _insertar_venta(
     precio: str = "0",
     costo: str = "0",
     cantidad: str = "1",
+    es_regalo: bool = False,
 ) -> int:
     """Insert a Venta + one DetalleVenta directly with a fixed fecha."""
     db = SessionLocal()
@@ -142,6 +143,7 @@ def _insertar_venta(
             descuento_porcentaje=Decimal("0"),
             estado=estado,
             total_venta=Decimal(total),
+            es_regalo=es_regalo,
         )
         db.add(venta)
         db.flush()
@@ -642,6 +644,97 @@ def test_finanzas_mensuales_mezcla_ingresos_y_gastos(client, admin_token):
     finally:
         _cleanup_ventas(v_ids)
         _cleanup_movimientos(mov_ids)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+# ---------------------------------------------------------------------------
+# es_regalo: gift sales are excluded from every money aggregation
+# ---------------------------------------------------------------------------
+
+
+def test_ventas_mensuales_excluye_regalos(client, admin_token):
+    """A sale marked es_regalo is EXCLUDED from the monthly SUM and count
+    (design confirmed 2026-08-12): same month, normal 100 + gift 9999."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id)
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id)
+    try:
+        v_ids = [
+            _insertar_venta(prod_id, datetime(2026, 7, 5, 12, 0, 0), "100", precio="100"),
+            _insertar_venta(
+                prod_id, datetime(2026, 7, 8, 12, 0, 0), "9999", precio="100", es_regalo=True
+            ),
+        ]
+        resp = client.get(
+            "/api/v1/analiticos/ventas-mensuales", headers=_auth(admin_token)
+        )
+        assert resp.status_code == 200
+        julio = {r["mes"]: r for r in resp.json()}["2026-07-01"]
+        assert Decimal(julio["total"]) == Decimal("100.0000")  # gift EXCLUDED
+        assert julio["cantidad"] == 1
+    finally:
+        _cleanup_ventas(v_ids)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_top_productos_excluye_regalos(client, admin_token):
+    """Gift lines are EXCLUDED from top-productos: neither their units nor
+    their money count (design confirmed 2026-08-12)."""
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    try:
+        v_ids = [
+            _insertar_venta(prod_id, datetime(2026, 7, 5, 12, 0, 0), "200", precio="100", cantidad="2"),
+            _insertar_venta(
+                prod_id, datetime(2026, 7, 8, 12, 0, 0), "0", precio="100", cantidad="8", es_regalo=True
+            ),
+        ]
+        resp = client.get(
+            "/api/v1/analiticos/top-productos", headers=_auth(admin_token)
+        )
+        assert resp.status_code == 200
+        por_producto = {r["producto_id"]: r for r in resp.json()}
+        prod = por_producto[prod_id]
+        assert Decimal(prod["unidades"]) == Decimal("2.0000")  # gift 8 EXCLUDED
+        assert Decimal(prod["ingresos"]) == Decimal("200.0000")
+    finally:
+        _cleanup_ventas(v_ids)
+        _cleanup_producto(prod_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_finanzas_mensuales_excluye_regalos(client, admin_token):
+    """Gift sales are EXCLUDED from the monthly ingresos (design confirmed
+    2026-08-12): normal 100 + gift 9999 in the same month -> ingresos 100."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id)
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id)
+    try:
+        v_ids = [
+            _insertar_venta(prod_id, datetime(2026, 8, 5, 12, 0, 0), "100", precio="100"),
+            _insertar_venta(
+                prod_id, datetime(2026, 8, 8, 12, 0, 0), "9999", precio="100", es_regalo=True
+            ),
+        ]
+        resp = client.get(
+            "/api/v1/analiticos/finanzas-mensuales", headers=_auth(admin_token)
+        )
+        assert resp.status_code == 200
+        agosto = {r["mes"]: r for r in resp.json()}["2026-08-01"]
+        assert Decimal(agosto["ingresos"]) == Decimal("100.0000")  # gift EXCLUDED
+        assert Decimal(agosto["gastos"]) == Decimal("0.0000")
+    finally:
+        _cleanup_ventas(v_ids)
         _cleanup_producto(prod_id)
         _cleanup_insumo(ins_id)
         _cleanup_categoria(cat_id)

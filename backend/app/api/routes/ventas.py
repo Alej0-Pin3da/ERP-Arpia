@@ -1,6 +1,6 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -8,7 +8,7 @@ from app.core.deps import get_db, require_roles
 from app.models.clientes import Cliente
 from app.models.ventas import DetalleVenta, Venta
 from app.schemas.common import Paginated
-from app.schemas.venta import VentaCreate, VentaRead
+from app.schemas.venta import VentaCreate, VentaRead, VentaUpdate
 from app.services.inventory import registrar_venta
 from app.services.paginacion import aplicar_orden, paginar
 
@@ -65,3 +65,25 @@ def list_ventas(
     stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_VENTAS)
     rows, total = paginar(db, stmt, limit, offset)
     return Paginated[VentaRead](items=list(rows), total=total)
+
+
+@router.patch("/{venta_id}", response_model=VentaRead)
+def update_venta_es_regalo(
+    venta_id: int,
+    payload: VentaUpdate,
+    db: Session = Depends(get_db),
+    _: Venta = Depends(mutation_user),
+):
+    """Mark/unmark a venta as a gift (es_regalo).
+
+    Only ``es_regalo`` is updatable for now. ``total_venta`` is NEVER changed
+    here: the historical price is kept as a reference and money reports
+    exclude gifts via the flag. 404 when the venta does not exist.
+    """
+    venta = db.get(Venta, venta_id)
+    if venta is None:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    venta.es_regalo = payload.es_regalo
+    db.commit()
+    db.refresh(venta)
+    return venta

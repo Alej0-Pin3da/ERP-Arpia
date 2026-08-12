@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, CheckConstraint, func, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, CheckConstraint, func, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -41,6 +41,9 @@ class Venta(Base):
     )
     total_venta: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
+    )
+    es_regalo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
     )
 
     cliente: Mapped[Cliente | None] = relationship(lazy="selectin")

@@ -204,11 +204,15 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
     descontar_stock(db, explosiones)
 
     total_venta = Decimal(sum(lineas_subtotal)) * descuento_factor
+    es_regalo = bool(payload.get("es_regalo", False))
+    if es_regalo:
+        total_venta = Decimal("0")
     venta = Venta(
         cliente_id=cliente_id,
         canal_venta=canal_venta,
         descuento_porcentaje=descuento,
         total_venta=total_venta,
+        es_regalo=es_regalo,
     )
     db.add(venta)
     for i, detalle in enumerate(detalles):

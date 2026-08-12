@@ -705,3 +705,117 @@ def test_create_venta_invalid_quantity_422(client, admin_token):
         _cleanup_insumo(ins_id)
         _cleanup_categoria(cat_id)
         _cleanup_tipo(tipo_id)
+
+
+# ---------------------------------------------------------------------------
+# es_regalo: gift sales (design confirmed 2026-08-12)
+# ---------------------------------------------------------------------------
+
+
+def test_post_venta_normal_total_mayor_cero(client, operador_token):
+    """A normal sale (es_regalo=false) keeps its real total > 0."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        resp = client.post(
+            "/api/v1/ventas",
+            json={**_venta_payload(prod_id, precio="10"), "es_regalo": False},
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["es_regalo"] is False
+        assert Decimal(body["total_venta"]) == Decimal("10.0000")
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_post_venta_es_regalo_total_cero_y_stock_descontado(client, operador_token):
+    """es_regalo=true -> total_venta is 0 BUT the material explosion still
+    deducts stock (the gift still consumes insumos)."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        resp = client.post(
+            "/api/v1/ventas",
+            json={**_venta_payload(prod_id, precio="10"), "es_regalo": True},
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["es_regalo"] is True
+        assert Decimal(body["total_venta"]) == Decimal("0.0000")
+        assert _read_stock(ins_id) == Decimal("9")  # stock STILL deducted
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_patch_venta_marcar_regalo(client, operador_token):
+    """PATCH /ventas/{id} {es_regalo: true} marks the gift flag and returns the
+    updated venta; total_venta is NOT touched (historical price kept)."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id, precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_id = resp.json()["id"]
+        assert resp.json()["es_regalo"] is False
+
+        resp = client.patch(
+            f"/api/v1/ventas/{venta_id}",
+            json={"es_regalo": True},
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["id"] == venta_id
+        assert body["es_regalo"] is True
+        assert Decimal(body["total_venta"]) == Decimal("10.0000")  # unchanged
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_patch_venta_marcar_regalo_404(client, operador_token):
+    """PATCH on a nonexistent venta -> 404 "Venta no encontrada"."""
+    resp = client.patch(
+        "/api/v1/ventas/99999999",
+        json={"es_regalo": True},
+        headers={"Authorization": f"Bearer {operador_token}"},
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Venta no encontrada"
+
+
+def test_patch_venta_marcar_regalo_consulta_forbidden(client, consulta_token):
+    """consulta is read-only -> 403 on PATCH /ventas/{id}."""
+    resp = client.patch(
+        "/api/v1/ventas/1",
+        json={"es_regalo": True},
+        headers={"Authorization": f"Bearer {consulta_token}"},
+    )
+    assert resp.status_code == 403
