@@ -21,6 +21,7 @@ import type { components } from '@/types/api.d'
 type ClienteRead = components['schemas']['ClienteRead']
 type ProductoRead = components['schemas']['ProductoRead']
 type VarianteProductoRead = components['schemas']['VarianteProductoRead']
+type VentaRead = components['schemas']['VentaRead']
 
 const PRODUCTOS: ProductoRead[] = [
   {
@@ -58,12 +59,51 @@ const VARIANTES: VarianteProductoRead[] = [
 
 const loadVariantes = vi.fn().mockResolvedValue(VARIANTES)
 
+/** A completed venta used as the `initial` prefill for edit mode. */
+const VENTA_EDIT: VentaRead = {
+  id: 10,
+  fecha: '2026-08-01T10:30:00Z',
+  cliente_id: 7,
+  canal_venta: 'whatsapp',
+  descuento_porcentaje: '5',
+  estado: 'completada',
+  es_regalo: false,
+  total_venta: '9500.00',
+  detalles: [
+    {
+      id: 1,
+      producto_id: 1,
+      variante_id: 5,
+      cantidad: '2',
+      precio_unitario_aplicado: '5000.00',
+      costo_unitario_aplicado: '2000.00',
+    },
+  ],
+}
+
 async function mountForm(saving = false): Promise<VueWrapper> {
   const wrapper = mount(VentasForm, {
     props: { productos: PRODUCTOS, clientes: CLIENTES, loadVariantes, saving },
     global: { plugins: [ElementPlus] },
   })
   await nextTick()
+  return wrapper
+}
+
+async function mountEditForm(initial: VentaRead = VENTA_EDIT): Promise<VueWrapper> {
+  const wrapper = mount(VentasForm, {
+    props: {
+      productos: PRODUCTOS,
+      clientes: CLIENTES,
+      loadVariantes,
+      mode: 'edit',
+      initial,
+      saving: false,
+    },
+    global: { plugins: [ElementPlus] },
+  })
+  await nextTick()
+  await flushPromises()
   return wrapper
 }
 
@@ -193,6 +233,55 @@ describe('VentasForm (MOD-1 register)', () => {
       descuento_porcentaje: 0,
       es_regalo: true,
       detalles: [{ producto_id: 1, cantidad: 1, precio_unitario: 5000 }],
+    })
+  })
+
+  it('prefills every editable field from `initial` in edit mode', async () => {
+    const wrapper = await mountEditForm()
+
+    expect(wrapper.find('[data-test="cliente-select"]').text()).toContain('Juan Pérez')
+    expect(wrapper.find('[data-test="canal-select"]').text()).toContain('WhatsApp')
+    expect((wrapper.find('[data-test="descuento-input"] input').element as HTMLInputElement).value).toBe('5')
+    expect((wrapper.find('[data-test="cantidad-input"] input').element as HTMLInputElement).value).toBe('2')
+    expect((wrapper.find('[data-test="precio-input"] input').element as HTMLInputElement).value).toBe('5000')
+    // The prefilled variant renders its label once variantes are loaded.
+    expect(wrapper.find('[data-test="variante-select"]').text()).toContain('Grande')
+    expect(loadVariantes).toHaveBeenCalledWith(1)
+    expect(wrapper.find('[data-test="submit-venta"]').text()).toContain('Guardar cambios')
+  })
+
+  it('emits the same VentaCreate payload when submitting in edit mode', async () => {
+    const wrapper = await mountEditForm()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const emitted = wrapper.emitted('submit')
+    expect(emitted).toBeDefined()
+    expect(emitted![0][0]).toEqual({
+      cliente_id: 7,
+      canal_venta: 'whatsapp',
+      descuento_porcentaje: 5,
+      es_regalo: false,
+      detalles: [{ producto_id: 1, variante_id: 5, cantidad: 2, precio_unitario: 5000 }],
+    })
+  })
+
+  it('prefills es_regalo=true and zeroes the preview in edit mode', async () => {
+    const wrapper = await mountEditForm({ ...VENTA_EDIT, es_regalo: true, total_venta: '0.00' })
+
+    expect(wrapper.find('[data-test="es-regalo-toggle"]').classes()).toContain('is-checked')
+    expect(wrapper.find('[data-test="total-preview"]').text()).toContain('$0,00')
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    const emitted = wrapper.emitted('submit')
+    expect(emitted![0][0]).toEqual({
+      cliente_id: 7,
+      canal_venta: 'whatsapp',
+      descuento_porcentaje: 5,
+      es_regalo: true,
+      detalles: [{ producto_id: 1, variante_id: 5, cantidad: 2, precio_unitario: 5000 }],
     })
   })
 })

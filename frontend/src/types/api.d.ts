@@ -500,9 +500,11 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /** Update Venta */
+        put: operations["update_venta_api_v1_ventas__venta_id__put"];
         post?: never;
-        delete?: never;
+        /** Anular Venta */
+        delete: operations["anular_venta_api_v1_ventas__venta_id__delete"];
         options?: never;
         head?: never;
         /**
@@ -3585,6 +3587,72 @@ export interface operations {
                 "application/json": components["schemas"]["VentaUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VentaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_venta_api_v1_ventas__venta_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                venta_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VentaCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VentaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    anular_venta_api_v1_ventas__venta_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                venta_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

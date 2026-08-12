@@ -80,6 +80,21 @@ export const ventasApi = {
   ): Promise<Res<'/api/v1/ventas/{venta_id}', 'patch'>> {
     return client.patch(`/ventas/${params.venta_id}`, body).then((r) => r.data)
   },
+  /** PUT /ventas/{id} — full edit; the SAME body as create (VentaCreate).
+   *  The backend recalcs the total and rebalances stock atomically. */
+  update(
+    params: PathParams<'/api/v1/ventas/{venta_id}', 'put'>,
+    body: ReqBody<'/api/v1/ventas/{venta_id}', 'put'>,
+  ): Promise<Res<'/api/v1/ventas/{venta_id}', 'put'>> {
+    return client.put(`/ventas/${params.venta_id}`, body).then((r) => r.data)
+  },
+  /** DELETE /ventas/{id} — ANULAR (soft-cancel): estado='anulada' + stock
+   *  restored. NOT a physical delete; returns the anulada VentaRead. */
+  anular(
+    params: PathParams<'/api/v1/ventas/{venta_id}', 'delete'>,
+  ): Promise<Res<'/api/v1/ventas/{venta_id}', 'delete'>> {
+    return client.delete(`/ventas/${params.venta_id}`).then((r) => r.data)
+  },
 }
 
 // --- devoluciones -----------------------------------------------------------

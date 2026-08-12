@@ -25,6 +25,8 @@ const { apiMocks } = vi.hoisted(() => ({
     listVentas: vi.fn(),
     createVenta: vi.fn(),
     updateEsRegalo: vi.fn(),
+    updateVenta: vi.fn(),
+    anularVenta: vi.fn(),
     listProductos: vi.fn(),
     listVariantes: vi.fn(),
     listClientes: vi.fn(),
@@ -35,6 +37,8 @@ vi.mock('@/api/endpoints', () => ({
     list: apiMocks.listVentas,
     create: apiMocks.createVenta,
     updateEsRegalo: apiMocks.updateEsRegalo,
+    update: apiMocks.updateVenta,
+    anular: apiMocks.anularVenta,
   },
   productosApi: { list: apiMocks.listProductos, listVariantes: apiMocks.listVariantes },
   clientesApi: { list: apiMocks.listClientes },
@@ -145,6 +149,8 @@ describe('VentasView (MOD-1 + T7)', () => {
     apiMocks.listVariantes.mockResolvedValue([])
     apiMocks.createVenta.mockResolvedValue(VENTAS[0])
     apiMocks.updateEsRegalo.mockResolvedValue({ ...VENTAS[0], es_regalo: true })
+    apiMocks.updateVenta.mockResolvedValue(VENTAS[0])
+    apiMocks.anularVenta.mockResolvedValue({ ...VENTAS[0], estado: 'anulada' })
   })
 
   afterEach(() => {
@@ -353,5 +359,68 @@ describe('VentasView (MOD-1 + T7)', () => {
     const wrapper = await mountView('consulta')
 
     expect(wrapper.find('[data-test="marcar-regalo"]').exists()).toBe(false)
+  })
+
+  it('edits a venta: Editar opens the dialog in edit mode, PUTs the payload, closes and refreshes', async () => {
+    const wrapper = await mountView('operador')
+    expect(apiMocks.listVentas).toHaveBeenCalledTimes(1)
+
+    await wrapper.find('[data-test="editar-venta"]').trigger('click')
+    await nextTick()
+    await flushPromises()
+
+    const form = wrapper.findComponent({ name: 'VentasForm' })
+    expect(form.exists()).toBe(true)
+    expect(form.props('mode')).toBe('edit')
+    expect((form.props('initial') as VentaRead).id).toBe(10)
+
+    form.vm.$emit('submit', PAYLOAD)
+    await flushPromises()
+
+    expect(apiMocks.updateVenta).toHaveBeenCalledTimes(1)
+    expect(apiMocks.updateVenta).toHaveBeenCalledWith({ venta_id: 10 }, PAYLOAD)
+    expect(document.body.textContent).toContain('Venta actualizada correctamente')
+    expect(apiMocks.listVentas).toHaveBeenCalledTimes(2) // refreshed after PUT
+    expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(false)
+  })
+
+  it('keeps the dialog open and shows the error when the edit save fails', async () => {
+    apiMocks.updateVenta.mockRejectedValue({ response: { data: { detail: 'Stock insuficiente' } } })
+    const wrapper = await mountView('operador')
+
+    await wrapper.find('[data-test="editar-venta"]').trigger('click')
+    await nextTick()
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'VentasForm' }).vm.$emit('submit', PAYLOAD)
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('Stock insuficiente')
+    expect(apiMocks.listVentas).toHaveBeenCalledTimes(1) // no refresh on failure
+    expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(true)
+  })
+
+  it('anula a venta after confirming (DELETE + refresh)', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    const wrapper = await mountView('operador')
+    expect(apiMocks.listVentas).toHaveBeenCalledTimes(1)
+
+    await wrapper.find('[data-test="anular-venta"]').trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.anularVenta).toHaveBeenCalledWith({ venta_id: 10 })
+    expect(document.body.textContent).toContain('Venta anulada correctamente')
+    expect(apiMocks.listVentas).toHaveBeenCalledTimes(2) // refreshed after DELETE
+  })
+
+  it('does not DELETE when the anular confirmation is cancelled', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel')
+    const wrapper = await mountView('operador')
+
+    await wrapper.find('[data-test="anular-venta"]').trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.anularVenta).not.toHaveBeenCalled()
+    expect(apiMocks.listVentas).toHaveBeenCalledTimes(1) // no refresh
   })
 })

@@ -27,6 +27,8 @@ const emit = defineEmits<{
   'filter-change': [filters: { canal_venta?: string | null; estado?: string | null }]
   'sort-change': [sort: { prop: string; order: 'asc' | 'desc' | null }]
   'marcar-regalo': [ventaId: number]
+  'editar': [row: VentaRow]
+  'anular': [ventaId: number]
 }>()
 
 /** Header funnel options per column: labels via canalLabel/estadoLabel. */
@@ -116,7 +118,7 @@ function productSummary(row: VentaRow): string {
         </span>
       </template>
     </el-table-column>
-    <el-table-column v-if="canMarkRegalo" label="Acciones" width="80" align="center">
+    <el-table-column v-if="canMarkRegalo" label="Acciones" width="210" align="center">
       <template #default="{ row }">
         <el-tooltip
           v-if="!row.es_regalo"
@@ -135,6 +137,26 @@ function productSummary(row: VentaRow): string {
             🎁
           </el-button>
         </el-tooltip>
+        <el-button
+          v-if="row.estado !== 'anulada'"
+          link
+          type="primary"
+          size="small"
+          data-test="editar-venta"
+          @click="emit('editar', row)"
+        >
+          Editar
+        </el-button>
+        <el-button
+          v-if="!row.es_regalo && row.estado !== 'anulada'"
+          link
+          type="danger"
+          size="small"
+          data-test="anular-venta"
+          @click="emit('anular', row.id)"
+        >
+          Anular
+        </el-button>
       </template>
     </el-table-column>
 

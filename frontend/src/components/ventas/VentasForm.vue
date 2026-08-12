@@ -10,7 +10,7 @@
  * message and the list refresh. The total preview mirrors the server
  * calculation: subtotal * (1 - descuento/100).
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import { formatMoney, parseDecimal } from '@/utils/format'
@@ -25,16 +25,23 @@ import {
   type VentaCreate,
   type VentasFormDetalle,
 } from '@/utils/ventas'
-import type { ClienteRead, ProductoRead, VarianteProductoRead } from '@/types/api.d'
+import type { ClienteRead, ProductoRead, VarianteProductoRead, VentaRead } from '@/types/api.d'
 
-const props = defineProps<{
-  productos: ProductoRead[]
-  clientes: ClienteRead[]
-  /** Variante fetcher injected by the view (productosApi.listVariantes). */
-  loadVariantes: (productoId: number) => Promise<VarianteProductoRead[]>
-  /** True while the parent is POSTing — disables the submit button. */
-  saving?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    productos: ProductoRead[]
+    clientes: ClienteRead[]
+    /** Variante fetcher injected by the view (productosApi.listVariantes). */
+    loadVariantes: (productoId: number) => Promise<VarianteProductoRead[]>
+    /** 'create' POSTs; 'edit' PUTs with `initial` as the prefill. */
+    mode?: 'create' | 'edit'
+    /** The venta being edited (prefills every editable field in edit mode). */
+    initial?: VentaRead | null
+    /** True while the parent is POSTing — disables the submit button. */
+    saving?: boolean
+  }>(),
+  { mode: 'create', initial: null, saving: false },
+)
 
 const emit = defineEmits<{ submit: [payload: VentaCreate] }>()
 
@@ -55,6 +62,13 @@ function variantesDe(row: VentasFormDetalle): VarianteProductoRead[] {
   return row.producto_id === null ? [] : (variantesPorProducto.value[row.producto_id] ?? [])
 }
 
+/** Lazy-load (and cache) the variantes of a product. */
+async function loadVariantesFor(productoId: number): Promise<void> {
+  if (variantesPorProducto.value[productoId] !== undefined) return
+  const variantes = await props.loadVariantes(productoId)
+  variantesPorProducto.value = { ...variantesPorProducto.value, [productoId]: variantes }
+}
+
 /**
  * On product selection: reset the variante, default the unit price from the
  * product's suggested price, and lazily load the product's variantes.
@@ -68,11 +82,31 @@ async function onProductoChange(row: VentasFormDetalle): Promise<void> {
     row.precio_unitario = parseDecimal(producto.precio_venta_sugerido) ?? 0
   }
 
-  if (variantesPorProducto.value[row.producto_id] === undefined) {
-    const variantes = await props.loadVariantes(row.producto_id)
-    variantesPorProducto.value = { ...variantesPorProducto.value, [row.producto_id]: variantes }
-  }
+  await loadVariantesFor(row.producto_id)
 }
+
+/** Edit mode: prefill every field from the `initial` venta (T9 pattern). */
+watch(
+  () => props.initial,
+  async (venta) => {
+    if (!venta) return
+    clienteId.value = venta.cliente_id
+    canalVenta.value = venta.canal_venta as CanalVenta
+    descuento.value = Number.parseFloat(venta.descuento_porcentaje)
+    esRegalo.value = venta.es_regalo
+    detalles.value = venta.detalles.map((d) => ({
+      producto_id: d.producto_id,
+      variante_id: d.variante_id,
+      cantidad: Number.parseFloat(d.cantidad),
+      precio_unitario: Number.parseFloat(d.precio_unitario_aplicado),
+    }))
+    // Preload the variantes of the prefilled products so the variant selects
+    // render their labels immediately.
+    const ids = [...new Set(venta.detalles.map((d) => d.producto_id))]
+    await Promise.all(ids.map(loadVariantesFor))
+  },
+  { immediate: true },
+)
 
 function addRow(): void {
   detalles.value.push(createDetalleRow())
@@ -206,7 +240,7 @@ function submit(): void {
     <div class="form-footer">
       <span class="total-preview" data-test="total-preview">Total: {{ formatMoney(totalPreview) }}</span>
       <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-venta">
-        Registrar venta
+        {{ mode === 'edit' ? 'Guardar cambios' : 'Registrar venta' }}
       </el-button>
     </div>
   </el-form>

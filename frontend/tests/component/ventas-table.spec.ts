@@ -234,4 +234,37 @@ describe('VentasTable (MOD-1 list)', () => {
     expect(wrapper.emitted('marcar-regalo')).toBeDefined()
     expect(wrapper.emitted('marcar-regalo')![0][0]).toBe(10)
   })
+
+  it('shows Editar for every non-anulada row and Anular only for normal rows', async () => {
+    // ROW (normal) -> Editar + Anular; ROW_REGALO -> Editar (regalos are
+    // editable) but NO Anular; ROW_ANULADA -> neither.
+    const wrapper = await mountTable([ROW, ROW_REGALO, ROW_ANULADA], false, true)
+
+    const editButtons = wrapper.findAll('[data-test="editar-venta"]')
+    const anularButtons = wrapper.findAll('[data-test="anular-venta"]')
+    expect(editButtons).toHaveLength(2)
+    expect(anularButtons).toHaveLength(1)
+  })
+
+  it('hides the whole actions column without canMarkRegalo', async () => {
+    const wrapper = await mountTable([ROW])
+
+    expect(wrapper.find('[data-test="editar-venta"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="anular-venta"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="marcar-regalo"]').exists()).toBe(false)
+  })
+
+  it('emits editar with the row and anular with the venta id', async () => {
+    const wrapper = await mountTable([ROW], false, true)
+
+    await wrapper.find('[data-test="editar-venta"]').trigger('click')
+    await nextTick()
+    expect(wrapper.emitted('editar')).toBeDefined()
+    expect(wrapper.emitted('editar')![0][0]).toEqual(ROW)
+
+    await wrapper.find('[data-test="anular-venta"]').trigger('click')
+    await nextTick()
+    expect(wrapper.emitted('anular')).toBeDefined()
+    expect(wrapper.emitted('anular')![0][0]).toBe(10)
+  })
 })

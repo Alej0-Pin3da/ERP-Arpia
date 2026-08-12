@@ -28,6 +28,7 @@ import type {
   ClienteRead,
   ProductoRead,
   VarianteProductoRead,
+  VentaRead,
 } from '@/types/api.d'
 
 const auth = useAuthStore()
@@ -53,6 +54,10 @@ const clientes = ref<ClienteRead[]>([])
 
 /** T8/FE-DLG-1: the register form lives in an el-dialog opened from the toolbar. */
 const ventaDialogVisible = ref(false)
+/** The venta being edited; null = create mode (the dialog routes PUT vs POST). */
+const editingVenta = ref<VentaRead | null>(null)
+/** Raw page items (VentaRead) so edit resolves the full record from the row. */
+const rawVentas = ref<VentaRead[]>([])
 
 /** Variante fetcher handed to the form (productosApi.listVariantes). */
 async function loadVariantes(productoId: number): Promise<VarianteProductoRead[]> {
@@ -91,6 +96,7 @@ async function load(): Promise<void> {
     productos.value = productosList.items
     clientes.value = clientesList.items
     total.value = ventasPage.total
+    rawVentas.value = ventasPage.items
     const variantes = await fetchVariantesForVentas(
       buildVentaRows(ventasPage.items, productos.value, [], clientes.value),
     )
@@ -140,7 +146,20 @@ function serverDetail(err: unknown): string | null {
 
 /** FE-DLG-1: the toolbar button opens the register dialog in create mode. */
 function openCreateVenta(): void {
+  editingVenta.value = null
   ventaDialogVisible.value = true
+}
+
+/** Editar: resolve the full VentaRead from the current page and open the
+ *  dialog in edit mode (prefill lives in VentasForm via `initial`). */
+function openEditVenta(row: VentaRow): void {
+  editingVenta.value = rawVentas.value.find((v) => v.id === row.id) ?? null
+  ventaDialogVisible.value = true
+}
+
+/** FE-DLG-2/3: closing without saving discards the edit prefill. */
+function resetVentaDialog(): void {
+  editingVenta.value = null
 }
 
 /** MOD-1: POST the VentaCreate payload, confirm and refresh the list. */
@@ -155,6 +174,57 @@ async function onSubmit(payload: VentaCreate): Promise<void> {
     ElMessage.error(serverDetail(err) ?? 'No se pudo registrar la venta. Verifica los datos e inténtalo de nuevo.')
   } finally {
     saving.value = false
+  }
+}
+
+/** T9: one @submit entry — route create vs edit by the dialog mode. */
+function submitVenta(payload: VentaCreate): void {
+  if (editingVenta.value === null) {
+    void onSubmit(payload)
+  } else {
+    void onSubmitEdit(payload)
+  }
+}
+
+/** PUT the VentaCreate payload (the edit body equals the create body); the
+ *  backend recalcs the total and rebalances stock. */
+async function onSubmitEdit(payload: VentaCreate): Promise<void> {
+  if (editingVenta.value === null) return
+  saving.value = true
+  try {
+    await ventasApi.update({ venta_id: editingVenta.value.id }, payload)
+    ElMessage.success('Venta actualizada correctamente')
+    ventaDialogVisible.value = false
+    await load()
+  } catch (err) {
+    ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar la venta. Verifica los datos e inténtalo de nuevo.')
+  } finally {
+    saving.value = false
+  }
+}
+
+/** Anular (soft-cancel): confirm first, then DELETE; success restores stock
+ *  server-side and refreshes the list. */
+async function onAnular(ventaId: number): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      `¿Anular la venta #${ventaId}? Se restaurará el stock de los insumos.`,
+      'Anular venta',
+      {
+        type: 'warning',
+        confirmButtonText: 'Sí, anular',
+        cancelButtonText: 'Cancelar',
+      },
+    )
+  } catch {
+    return // user cancelled
+  }
+  try {
+    await ventasApi.anular({ venta_id: ventaId })
+    ElMessage.success('Venta anulada correctamente')
+    await load()
+  } catch (err) {
+    ElMessage.error(serverDetail(err) ?? 'No se pudo anular la venta.')
   }
 }
 
@@ -252,6 +322,8 @@ onMounted(load)
           @filter-change="onTableFilterChange"
           @sort-change="onTableSortChange"
           @marcar-regalo="onMarcarRegalo"
+          @editar="openEditVenta"
+          @anular="onAnular"
         />
         <el-pagination
           class="tabla-paginacion"
@@ -265,19 +337,22 @@ onMounted(load)
 
         <el-dialog
           v-model="ventaDialogVisible"
-          title="Nueva venta"
+          :title="editingVenta === null ? 'Nueva venta' : 'Editar venta'"
           :close-on-click-modal="false"
           :close-on-press-escape="!saving"
           :show-close="!saving"
           width="640px"
+          @closed="resetVentaDialog"
         >
           <VentasForm
             v-if="ventaDialogVisible"
             :productos="productos"
             :clientes="clientes"
             :load-variantes="loadVariantes"
+            :mode="editingVenta === null ? 'create' : 'edit'"
+            :initial="editingVenta"
             :saving="saving"
-            @submit="onSubmit"
+            @submit="submitVenta"
           />
         </el-dialog>
       </el-tab-pane>
