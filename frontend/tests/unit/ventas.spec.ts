@@ -73,6 +73,7 @@ const venta = (overrides: Partial<VentaRead> = {}): VentaRead => ({
   canal_venta: 'web',
   descuento_porcentaje: '0',
   estado: 'completada',
+  es_regalo: false,
   total_venta: '10000.00',
   detalles: [],
   ...overrides,
@@ -259,6 +260,7 @@ describe('buildVentaPayload (MOD-1 POST /ventas body)', () => {
       cliente_id: 7,
       canal_venta: 'whatsapp' as const,
       descuento_porcentaje: 5,
+      es_regalo: false,
       detalles: [
         detalleRow({ producto_id: 1, variante_id: 5, cantidad: 2, precio_unitario: 5000 }),
         detalleRow({ producto_id: 2, variante_id: null, cantidad: 1, precio_unitario: 8000 }),
@@ -271,6 +273,7 @@ describe('buildVentaPayload (MOD-1 POST /ventas body)', () => {
       cliente_id: 7,
       canal_venta: 'whatsapp',
       descuento_porcentaje: 5,
+      es_regalo: false,
       detalles: [
         { producto_id: 1, variante_id: 5, cantidad: 2, precio_unitario: 5000 },
         { producto_id: 2, cantidad: 1, precio_unitario: 8000 },
@@ -285,6 +288,7 @@ describe('buildVentaPayload (MOD-1 POST /ventas body)', () => {
       cliente_id: null,
       canal_venta: 'feria' as const,
       descuento_porcentaje: 0,
+      es_regalo: false,
       detalles: [
         detalleRow({ producto_id: null, cantidad: 1, precio_unitario: 5000 }),
         detalleRow({ producto_id: 3, cantidad: 2, precio_unitario: 6000 }),
@@ -302,6 +306,7 @@ describe('buildVentaPayload (MOD-1 POST /ventas body)', () => {
       cliente_id: null,
       canal_venta: 'web' as const,
       descuento_porcentaje: 0,
+      es_regalo: false,
       detalles: [detalleRow({ producto_id: 1, cantidad: 2, precio_unitario: 5000 })],
     }
 

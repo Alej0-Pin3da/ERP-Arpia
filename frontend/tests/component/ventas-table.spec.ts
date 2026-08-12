@@ -18,6 +18,7 @@ const ROW: VentaRow = {
   fecha: '2026-08-01T10:30:00Z',
   canal_venta: 'whatsapp',
   estado: 'completada',
+  es_regalo: false,
   total_venta: '15000.00',
   cliente: 'Juan Pérez',
   detalle_count: 2,
@@ -59,9 +60,29 @@ const ROW_ANULADA: VentaRow = {
   ],
 }
 
-async function mountTable(rows: VentaRow[], loading = false): Promise<VueWrapper> {
+const ROW_REGALO: VentaRow = {
+  ...ROW,
+  id: 8,
+  estado: 'completada',
+  es_regalo: true,
+  total_venta: '10000.00', // historical reference price (never reported)
+  cliente: '—',
+  detalle_count: 1,
+  detalles: [
+    {
+      producto_id: 1,
+      variante_id: null,
+      nombre: 'Arepa de huevo',
+      variante: '(base)',
+      cantidad: '1',
+      precio_unitario_aplicado: '10000.00',
+    },
+  ],
+}
+
+async function mountTable(rows: VentaRow[], loading = false, canMarkRegalo = false): Promise<VueWrapper> {
   const wrapper = mount(VentasTable, {
-    props: { rows, loading },
+    props: { rows, loading, canMarkRegalo },
     global: { plugins: [ElementPlus] },
   })
   // el-table paints its body one tick after mount (ResizeObserver layout).
@@ -181,5 +202,36 @@ describe('VentasTable (MOD-1 list)', () => {
     await nextTick()
 
     expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'cliente', order: null })
+  })
+
+  it('renders a gift row with a Regalo tag and a $0 total (es_regalo)', async () => {
+    const wrapper = await mountTable([ROW_REGALO])
+
+    const text = wrapper.text()
+    expect(wrapper.find('[data-test="tag-regalo"]').exists()).toBe(true)
+    expect(text).toContain('Regalo')
+    expect(text).toContain('$0,00') // gift total is always $0 in the list
+    expect(text).not.toContain('$10.000,00') // reference price never shown as total
+  })
+
+  it('hides the marcar-regalo action for gift rows and hides it without canMarkRegalo', async () => {
+    // No prop -> no actions column at all.
+    const wrapperNoProp = await mountTable([ROW])
+    expect(wrapperNoProp.find('[data-test="marcar-regalo"]').exists()).toBe(false)
+
+    // canMarkRegalo -> button only for non-gift rows.
+    const wrapper = await mountTable([ROW, ROW_REGALO], false, true)
+    const buttons = wrapper.findAll('[data-test="marcar-regalo"]')
+    expect(buttons).toHaveLength(1) // ROW has it, ROW_REGALO does not
+  })
+
+  it('emits marcar-regalo with the venta id when the action is clicked', async () => {
+    const wrapper = await mountTable([ROW], false, true)
+
+    await wrapper.find('[data-test="marcar-regalo"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.emitted('marcar-regalo')).toBeDefined()
+    expect(wrapper.emitted('marcar-regalo')![0][0]).toBe(10)
   })
 })

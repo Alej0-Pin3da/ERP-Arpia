@@ -12,7 +12,7 @@
  *    consulta (read-only role — MOD-1 "consulta sees a read-only list").
  */
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { clientesApi, productosApi, ventasApi } from '@/api/endpoints'
 import VentasForm from '@/components/ventas/VentasForm.vue'
@@ -158,6 +158,30 @@ async function onSubmit(payload: VentaCreate): Promise<void> {
   }
 }
 
+/** Marcar una venta como regalo tras confirmar; recarga la lista al éxito. */
+async function onMarcarRegalo(ventaId: number): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      `¿Marcar la venta #${ventaId} como regalo? Se conservará el precio como referencia pero no contará como ingreso.`,
+      'Marcar como regalo',
+      {
+        type: 'warning',
+        confirmButtonText: 'Sí, marcar',
+        cancelButtonText: 'Cancelar',
+      },
+    )
+  } catch {
+    return // user cancelled
+  }
+  try {
+    await ventasApi.updateEsRegalo({ venta_id: ventaId }, { es_regalo: true })
+    ElMessage.success('Venta marcada como regalo')
+    await load()
+  } catch (err) {
+    ElMessage.error(serverDetail(err) ?? 'No se pudo marcar la venta como regalo.')
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -221,7 +245,14 @@ onMounted(load)
             Nueva venta
           </el-button>
         </div>
-        <VentasTable :rows="rows" :loading="loading" @filter-change="onTableFilterChange" @sort-change="onTableSortChange" />
+        <VentasTable
+          :rows="rows"
+          :loading="loading"
+          :can-mark-regalo="canRegister"
+          @filter-change="onTableFilterChange"
+          @sort-change="onTableSortChange"
+          @marcar-regalo="onMarcarRegalo"
+        />
         <el-pagination
           class="tabla-paginacion"
           background

@@ -73,6 +73,13 @@ export const ventasApi = {
   create(body: ReqBody<'/api/v1/ventas', 'post'>): Promise<Res<'/api/v1/ventas', 'post'>> {
     return client.post('/ventas', body).then((r) => r.data)
   },
+  /** PATCH /ventas/{id} — mark/unmark a venta as a gift (es_regalo). */
+  updateEsRegalo(
+    params: PathParams<'/api/v1/ventas/{venta_id}', 'patch'>,
+    body: ReqBody<'/api/v1/ventas/{venta_id}', 'patch'>,
+  ): Promise<Res<'/api/v1/ventas/{venta_id}', 'patch'>> {
+    return client.patch(`/ventas/${params.venta_id}`, body).then((r) => r.data)
+  },
 }
 
 // --- devoluciones -----------------------------------------------------------

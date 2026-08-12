@@ -10,7 +10,7 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage } from 'element-plus'
+import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -24,13 +24,18 @@ const { apiMocks } = vi.hoisted(() => ({
   apiMocks: {
     listVentas: vi.fn(),
     createVenta: vi.fn(),
+    updateEsRegalo: vi.fn(),
     listProductos: vi.fn(),
     listVariantes: vi.fn(),
     listClientes: vi.fn(),
   },
 }))
 vi.mock('@/api/endpoints', () => ({
-  ventasApi: { list: apiMocks.listVentas, create: apiMocks.createVenta },
+  ventasApi: {
+    list: apiMocks.listVentas,
+    create: apiMocks.createVenta,
+    updateEsRegalo: apiMocks.updateEsRegalo,
+  },
   productosApi: { list: apiMocks.listProductos, listVariantes: apiMocks.listVariantes },
   clientesApi: { list: apiMocks.listClientes },
 }))
@@ -43,6 +48,7 @@ const VENTAS: VentaRead[] = [
     canal_venta: 'whatsapp',
     descuento_porcentaje: '0',
     estado: 'completada',
+    es_regalo: false,
     total_venta: '15000.00',
     detalles: [
       {
@@ -99,6 +105,7 @@ const PAYLOAD = {
   cliente_id: null,
   canal_venta: 'web' as const,
   descuento_porcentaje: 0,
+  es_regalo: false,
   detalles: [{ producto_id: 1, cantidad: 2, precio_unitario: 5000 }],
 }
 
@@ -137,6 +144,7 @@ describe('VentasView (MOD-1 + T7)', () => {
     apiMocks.listClientes.mockResolvedValue({ items: CLIENTES, total: 1 })
     apiMocks.listVariantes.mockResolvedValue([])
     apiMocks.createVenta.mockResolvedValue(VENTAS[0])
+    apiMocks.updateEsRegalo.mockResolvedValue({ ...VENTAS[0], es_regalo: true })
   })
 
   afterEach(() => {
@@ -314,5 +322,36 @@ describe('VentasView (MOD-1 + T7)', () => {
     expect(document.body.textContent).toContain('Stock insuficiente')
     expect(apiMocks.listVentas).toHaveBeenCalledTimes(1) // no refresh on failure
     expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(true)
+  })
+
+  it('marks a venta as regalo after confirming (PATCH + refresh)', async () => {
+    const confirmSpy = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    const wrapper = await mountView('operador')
+    expect(apiMocks.listVentas).toHaveBeenCalledTimes(1)
+
+    await wrapper.find('[data-test="marcar-regalo"]').trigger('click')
+    await flushPromises()
+
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(apiMocks.updateEsRegalo).toHaveBeenCalledWith({ venta_id: 10 }, { es_regalo: true })
+    expect(document.body.textContent).toContain('Venta marcada como regalo')
+    expect(apiMocks.listVentas).toHaveBeenCalledTimes(2) // refreshed after PATCH
+  })
+
+  it('does not PATCH when the user cancels the confirmation', async () => {
+    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel')
+    const wrapper = await mountView('operador')
+
+    await wrapper.find('[data-test="marcar-regalo"]').trigger('click')
+    await flushPromises()
+
+    expect(apiMocks.updateEsRegalo).not.toHaveBeenCalled()
+    expect(apiMocks.listVentas).toHaveBeenCalledTimes(1) // no refresh
+  })
+
+  it('hides the marcar-regalo action for a consulta (read-only list)', async () => {
+    const wrapper = await mountView('consulta')
+
+    expect(wrapper.find('[data-test="marcar-regalo"]').exists()).toBe(false)
   })
 })

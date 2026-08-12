@@ -19,11 +19,14 @@ import {
 defineProps<{
   rows: VentaRow[]
   loading?: boolean
+  /** Show the per-row "Marcar como regalo" action (admin/operador only). */
+  canMarkRegalo?: boolean
 }>()
 
 const emit = defineEmits<{
   'filter-change': [filters: { canal_venta?: string | null; estado?: string | null }]
   'sort-change': [sort: { prop: string; order: 'asc' | 'desc' | null }]
+  'marcar-regalo': [ventaId: number]
 }>()
 
 /** Header funnel options per column: labels via canalLabel/estadoLabel. */
@@ -93,9 +96,12 @@ function productSummary(row: VentaRow): string {
     <el-table-column label="Canal" column-key="canal_venta" :filters="canalFilters" sortable width="110">
       <template #default="{ row }">{{ canalLabel(row.canal_venta) }}</template>
     </el-table-column>
-    <el-table-column label="Estado" column-key="estado" :filters="estadoFilters" sortable width="120">
+    <el-table-column label="Estado" column-key="estado" :filters="estadoFilters" sortable width="150">
       <template #default="{ row }">
-        <el-tag :type="estadoTagType(row.estado)" size="small">{{ estadoLabel(row.estado) }}</el-tag>
+        <div class="venta-estado-cell">
+          <el-tag :type="estadoTagType(row.estado)" size="small">{{ estadoLabel(row.estado) }}</el-tag>
+          <el-tag v-if="row.es_regalo" type="warning" size="small" data-test="tag-regalo">Regalo</el-tag>
+        </div>
       </template>
     </el-table-column>
     <el-table-column label="Productos" min-width="220">
@@ -104,7 +110,25 @@ function productSummary(row: VentaRow): string {
     <el-table-column prop="cliente" label="Cliente" column-key="cliente" sortable min-width="150" />
     <el-table-column prop="detalle_count" label="Detalles" width="90" align="right" />
     <el-table-column label="Total" column-key="total_venta" sortable width="130" align="right">
-      <template #default="{ row }">{{ formatMoney(row.total_venta) }}</template>
+      <template #default="{ row }">
+        <span :class="{ 'total-regalo': row.es_regalo }">
+          {{ formatMoney(row.es_regalo ? 0 : row.total_venta) }}
+        </span>
+      </template>
+    </el-table-column>
+    <el-table-column v-if="canMarkRegalo" label="Acciones" width="170" align="center">
+      <template #default="{ row }">
+        <el-button
+          v-if="!row.es_regalo"
+          size="small"
+          plain
+          type="warning"
+          data-test="marcar-regalo"
+          @click="emit('marcar-regalo', row.id)"
+        >
+          Marcar como regalo
+        </el-button>
+      </template>
     </el-table-column>
 
     <template #empty>
@@ -117,5 +141,16 @@ function productSummary(row: VentaRow): string {
 .venta-detail-table {
   padding: 0 1rem 0.5rem 3rem;
   background: var(--el-fill-color-lighter);
+}
+
+.venta-estado-cell {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.total-regalo {
+  color: var(--el-text-color-secondary);
+  font-style: italic;
 }
 </style>

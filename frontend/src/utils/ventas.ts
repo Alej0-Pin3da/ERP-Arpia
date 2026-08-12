@@ -74,6 +74,8 @@ export interface VentaRow {
   fecha: string
   canal_venta: string
   estado: string
+  /** True when the sale was a gift (total kept as reference, excluded from reports). */
+  es_regalo: boolean
   /** Raw Decimal-as-string total (formatted at render time). */
   total_venta: string
   /** Cliente name, or an em dash when the venta has no cliente. */
@@ -95,6 +97,7 @@ export interface VentasFormModel {
   cliente_id: number | null
   canal_venta: CanalVenta
   descuento_porcentaje: number
+  es_regalo: boolean
   detalles: VentasFormDetalle[]
 }
 
@@ -146,6 +149,7 @@ export function buildVentaRows(
       fecha: v.fecha,
       canal_venta: v.canal_venta,
       estado: v.estado,
+      es_regalo: v.es_regalo,
       total_venta: v.total_venta,
       cliente: cliente ? cliente.nombre : '—',
       detalle_count: detalles.length,
@@ -203,6 +207,7 @@ export function buildVentaPayload(form: VentasFormModel): VentaCreate {
     ...(form.cliente_id !== null ? { cliente_id: form.cliente_id } : {}),
     canal_venta: form.canal_venta,
     descuento_porcentaje: form.descuento_porcentaje,
+    es_regalo: form.es_regalo,
     detalles,
   }
 }

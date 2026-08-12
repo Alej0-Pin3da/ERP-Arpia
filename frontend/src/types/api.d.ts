@@ -492,6 +492,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ventas/{venta_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Venta Es Regalo
+         * @description Mark/unmark a venta as a gift (es_regalo). Only es_regalo is
+         *     updatable; total_venta is never changed here (the historical price is kept
+         *     as a reference and reports exclude gifts via the flag). 404 when missing.
+         */
+        patch: operations["update_venta_es_regalo_api_v1_ventas__venta_id__patch"];
+        trace?: never;
+    };
     "/api/v1/devoluciones": {
         parameters: {
             query?: never;
@@ -1671,6 +1693,8 @@ export interface components {
              * @default 0
              */
             descuento_porcentaje: number | string;
+            /** Es Regalo */
+            es_regalo: boolean;
             /** Detalles */
             detalles: components["schemas"]["DetalleVentaCreate"][];
         };
@@ -1693,8 +1717,15 @@ export interface components {
             estado: string;
             /** Total Venta */
             total_venta: string;
+            /** Es Regalo */
+            es_regalo: boolean;
             /** Detalles */
             detalles: components["schemas"]["DetalleVentaRead"][];
+        };
+        /** VentaUpdate */
+        VentaUpdate: {
+            /** Es Regalo */
+            es_regalo: boolean;
         };
         /** VentasMensualesRead */
         VentasMensualesRead: {
@@ -3522,6 +3553,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VentaRead"];
+                };
+            };
+             /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_venta_es_regalo_api_v1_ventas__venta_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                venta_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VentaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

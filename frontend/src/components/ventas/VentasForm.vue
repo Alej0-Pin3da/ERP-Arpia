@@ -41,11 +41,14 @@ const emit = defineEmits<{ submit: [payload: VentaCreate] }>()
 const clienteId = ref<number | null>(null)
 const canalVenta = ref<CanalVenta>('web')
 const descuento = ref(0)
+const esRegalo = ref(false)
 const detalles = ref<VentasFormDetalle[]>([createDetalleRow()])
 /** Variantes cached per product (lazy — only fetched for chosen products). */
 const variantesPorProducto = ref<Record<number, VarianteProductoRead[]>>({})
 
-const totalPreview = computed(() => computeTotalPreview(detalles.value, descuento.value))
+const totalPreview = computed(() =>
+  esRegalo.value ? 0 : computeTotalPreview(detalles.value, descuento.value),
+)
 
 /** Variantes available for a row's currently selected product. */
 function variantesDe(row: VentasFormDetalle): VarianteProductoRead[] {
@@ -89,6 +92,7 @@ function submit(): void {
     cliente_id: clienteId.value,
     canal_venta: canalVenta.value,
     descuento_porcentaje: descuento.value,
+    es_regalo: esRegalo.value,
     detalles: detalles.value,
   }))
 }
@@ -132,6 +136,17 @@ function submit(): void {
             :step="1"
             class="venta-field"
             data-test="descuento-input"
+          />
+        </el-form-item>
+      </el-col>
+      <el-col :xs="24" :md="7">
+        <el-form-item label="Es regalo" data-test="es-regalo-field">
+          <el-switch
+            v-model="esRegalo"
+            data-test="es-regalo-toggle"
+            inline-prompt
+            active-text="Sí"
+            inactive-text="No"
           />
         </el-form-item>
       </el-col>

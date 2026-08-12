@@ -159,6 +159,7 @@ describe('VentasForm (MOD-1 register)', () => {
       cliente_id: 7,
       canal_venta: 'whatsapp',
       descuento_porcentaje: 5,
+      es_regalo: false,
       detalles: [{ producto_id: 1, variante_id: 5, cantidad: 2, precio_unitario: 5000 }],
     })
   })
@@ -171,5 +172,27 @@ describe('VentasForm (MOD-1 register)', () => {
     await wrapper.find('[data-test="descuento-input"] input').setValue('10') // -10% -> 9000
 
     expect(wrapper.find('[data-test="total-preview"]').text()).toContain('$9.000,00')
+  })
+
+  it('sends es_regalo=true and zeroes the preview when the gift switch is on', async () => {
+    const wrapper = await mountForm()
+
+    await pickOption(wrapper.find('[data-test="producto-select"]'), 'Arepa de huevo') // 5000
+    await wrapper.find('[data-test="es-regalo-toggle"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('[data-test="total-preview"]').text()).toContain('$0,00') // gift -> $0
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const emitted = wrapper.emitted('submit')
+    expect(emitted).toBeDefined()
+    expect(emitted![0][0]).toEqual({
+      canal_venta: 'web',
+      descuento_porcentaje: 0,
+      es_regalo: true,
+      detalles: [{ producto_id: 1, cantidad: 1, precio_unitario: 5000 }],
+    })
   })
 })
