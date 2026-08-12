@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_roles
 from app.models.clientes import Cliente
-from app.models.ventas import Venta
+from app.models.ventas import DetalleVenta, Venta
 from app.schemas.common import Paginated
 from app.schemas.venta import VentaCreate, VentaRead
 from app.services.inventory import registrar_venta
@@ -49,6 +49,7 @@ def list_ventas(
     offset: int = 0,
     canal_venta: Literal["web", "whatsapp", "instagram", "feria"] | None = None,
     estado: Literal["completada", "anulada"] | None = None,
+    producto_id: int | None = None,
     sort_by: str | None = None,
     order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
@@ -59,6 +60,8 @@ def list_ventas(
         stmt = stmt.where(Venta.canal_venta == canal_venta)
     if estado is not None:
         stmt = stmt.where(Venta.estado == estado)
+    if producto_id is not None:
+        stmt = stmt.where(Venta.detalles.any(DetalleVenta.producto_id == producto_id))
     stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_VENTAS)
     rows, total = paginar(db, stmt, limit, offset)
     return Paginated[VentaRead](items=list(rows), total=total)

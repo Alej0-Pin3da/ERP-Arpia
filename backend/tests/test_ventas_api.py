@@ -340,6 +340,105 @@ def test_get_ventas_paginado_filtros(client, operador_token):
         _cleanup_tipo(tipo_id)
 
 
+def test_get_ventas_filtro_producto(client, operador_token):
+    """?producto_id=X returns only ventas that include product X in ANY detalle
+    (multi-producto ventas match too); ventas without X are excluded."""
+    cat_a = _make_categoria()
+    cat_b = _make_categoria()
+    ins_a = _make_insumo(cat_a, stock="10")
+    ins_b = _make_insumo(cat_b, stock="10")
+    tipo_id = _make_tipo()
+    prod_a = _make_producto(tipo_id)
+    prod_b = _make_producto(tipo_id)
+    _make_linea_insumo(prod_a, ins_a, cantidad="1")
+    _make_linea_insumo(prod_b, ins_b, cantidad="1")
+    try:
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_a),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_a = resp.json()["id"]
+
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_b),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_b = resp.json()["id"]
+
+        # A sale spanning both products (multi-line detalle).
+        resp = client.post(
+            "/api/v1/ventas",
+            json={
+                "cliente_id": None,
+                "canal_venta": "web",
+                "descuento_porcentaje": "0",
+                "detalles": [
+                    {
+                        "producto_id": prod_a,
+                        "variante_id": None,
+                        "cantidad": "1",
+                        "precio_unitario": "10",
+                    },
+                    {
+                        "producto_id": prod_b,
+                        "variante_id": None,
+                        "cantidad": "1",
+                        "precio_unitario": "10",
+                    },
+                ],
+            },
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_ab = resp.json()["id"]
+
+        # producto_id=prod_a -> venta_a + venta_ab, never venta_b.
+        resp = client.get(
+            "/api/v1/ventas",
+            params={"producto_id": prod_a},
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        ids = {v["id"] for v in body["items"]}
+        assert ids == {venta_a, venta_ab}
+        assert body["total"] == 2
+
+        # producto_id=prod_b -> venta_b + venta_ab, never venta_a.
+        resp = client.get(
+            "/api/v1/ventas",
+            params={"producto_id": prod_b},
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        ids = {v["id"] for v in body["items"]}
+        assert ids == {venta_b, venta_ab}
+        assert body["total"] == 2
+
+        # No filter -> all three.
+        resp = client.get(
+            "/api/v1/ventas",
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 3
+    finally:
+        _cleanup_ventas_for_producto(prod_a)
+        _cleanup_ventas_for_producto(prod_b)
+        _cleanup_producto(prod_a)
+        _cleanup_producto(prod_b)
+        _cleanup_insumo(ins_a)
+        _cleanup_insumo(ins_b)
+        _cleanup_categoria(cat_a)
+        _cleanup_categoria(cat_b)
+        _cleanup_tipo(tipo_id)
+
+
 # ---------------------------------------------------------------------------
 # 4.2 HAPPY PATH + SNAPSHOT (RED -> GREEN)
 # ---------------------------------------------------------------------------
