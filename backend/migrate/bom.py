@@ -19,12 +19,12 @@ mode, applies it inside a single ``session_scope`` (EXM-4):
   its rows are BOM_Productos (productos con su propio BOM -> multinivel real)
   when the name is a product, or BOM_Insumos (empaques Caja/Vela/Papel/Envio)
   when it is packaging that touches the order (design D4 / F1 catalog).
-- The quantity of a recipe row is the Excel area cell ("cantidad Cms" = cm2:
-  Ancho x Alto). It is converted to the insumo canonical unit (design D4):
-  Telas -> metros via the fabric WIDTH in the material name (regex, default
-  NOTA 100 cm + WARN when absent); Herrajes 'un' -> piece count as-is; 'cm2'
-  (herrajes priced by cm2) -> as-is. Uninterpretable amounts (None, '#DIV/0!',
-  cero, no-numeric) are reported and excluded, never inferred (EXM-2).
+- The quantity of a recipe row is the Excel "cantidad Cms" cell. It is
+  converted to the insumo canonical unit: Telas -> metros via LINEAR cm of
+  consumption per garment (metros = cm / 100; the material width does NOT
+  participate); Herrajes 'un' -> piece count as-is; 'cm2' (herrajes priced by
+  cm2) -> as-is. Uninterpretable amounts (None, '#DIV/0!', cero, no-numeric)
+  are reported and excluded, never inferred (EXM-2).
 
 Idempotencia (NFR-1/EXM-3): PG UNIQUE does not apply over NULLs, and the app
 model has no UNIQUE over (producto, insumo, variante), so BomInsumo dedup is
@@ -111,10 +111,6 @@ ALIASES_BOM_A_CATALOGO: dict[str, str] = {
     "rosa tejida gris": "Rosa tejida gris",
 }
 
-# Fabric width hint inside a material name: "Ref 159 24 cm tul bordado" ->
-# 24 cm (roll width used to convert cm2 -> meters; default 100 cm + WARN).
-_ANCHO_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:cm|cms?)\b")
-
 
 @dataclass(frozen=True)
 class BomLinea:
@@ -157,7 +153,6 @@ class BomPlan:
     combos: list[ComboLinea] = field(default_factory=list)
     combos_insumos: list[ComboInsumoLinea] = field(default_factory=list)
     sin_cantidad: int = 0   # EXM-2: amount not interpretable -> excluded
-    sin_ancho: int = 0      # D4: fabric row without width -> default 100cm
 
     @property
     def conteo_insumos(self) -> int:
@@ -169,17 +164,8 @@ class BomPlan:
 
 
 # --------------------------------------------------------------------------- #
-# Pure quantity conversion (D4, TDD-friendly)
+# Pure quantity conversion (TDD-friendly)
 # --------------------------------------------------------------------------- #
-
-
-def _ancho_en_nombre(nombre: object) -> Decimal | None:
-    """Ancho de la tela declarado en el nombre (solo cm; p.ej. '24 cm')."""
-    m = _ANCHO_RE.search(str(nombre or ""))
-    if m is None:
-        return None
-    valor = Decimal(m.group(1).replace(",", "."))
-    return valor if valor > 0 else None
 
 
 def convertir_cantidad_bom(
@@ -187,12 +173,13 @@ def convertir_cantidad_bom(
     nombre_insumo: object,
     unidad: str,
 ) -> Decimal | None:
-    """Celda 'cantidad Cms' (cm2) -> cantidad en la unidad canonica del insumo.
+    """Celda 'cantidad Cms' (cm lineales de consumo) -> cantidad en la unidad
+    canonica del insumo.
 
     - numero (int/float/Decimal): parseado; 0, negativo o None -> None (cero
       no es consumo; nunca se infiere, EXM-2). Texto '#DIV/0!' -> None.
-    - Telas (m): cm2 -> metros via el ancho del NOMBRE (regex, default 100cm).
-      metros = cm2 / (ancho_cm x 100).
+    - Telas (m): 'cantidad Cms' son CENTIMETROS LINEALES de consumo por
+      prenda; metros = cm / 100. El ancho del material NO participa.
     - Herrajes 'cm2' (precio por cm2) / 'un' (conteo de piezas): as-is.
     """
     if cantidad_raw is None:
@@ -203,10 +190,7 @@ def convertir_cantidad_bom(
     if numero is None or numero <= 0:
         return None
     if unidad == "m":
-        ancho = _ancho_en_nombre(nombre_insumo)
-        if ancho is None:
-            ancho = Decimal("100")  # default conservador (D4); el plan lo reporta
-        return numero / (ancho * Decimal("100"))
+        return numero / Decimal("100")
     return numero
 
 
@@ -253,13 +237,6 @@ def _procesar_bloque(
                 f"no interpretable; linea excluida (EXM-2)",
             )
         return
-    if unidad == "m" and _ancho_en_nombre(nombre) is None:
-        plan.sin_ancho += 1
-        if report:
-            report.warn(
-                hoja, fila_idx, col_nombre,
-                f"{nombre}: sin ancho en el nombre, conversion con default 100cm (D4)",
-            )
     plan.insumos.append(
         BomLinea(
             producto_nombre=producto_nombre,
@@ -498,7 +475,7 @@ def cargar_bom(ctx: MigrationContext) -> BomPlan:
         "F3", None, None,
         f"plan BOM: {plan.conteo_insumos} lineas insumos | "
         f"{plan.conteo_combos} items de combos | sin cantidad "
-        f"{plan.sin_cantidad} | ancho default {plan.sin_ancho}",
+        f"{plan.sin_cantidad}",
     )
     if ctx.options.modo == "commit" and ctx.session is not None:
         with session_scope(ctx, ctx.session) as db:

@@ -3,10 +3,10 @@
 Covers STRICT TDD acceptance from tasks #424 T6 (spec BOM-1..BOM-3,
 EXM-2/3/4, NFR-1/2; design #423 bom.py + D4):
 
-- Pure: BOM quantity conversion from the Excel area cell (''cantidad Cms'' =
-  cm2) to the insumo canonical unit: Telas -> m via the width in the name
-  (regex ancho, default 100cm + WARN), Herrajes cm2 -> cm2 as-is, 'un' piece
-  counts as-is; junk rows filtered.
+- Pure: BOM quantity conversion from the Excel ''cantidad Cms'' cell (LINEAR
+  cm of consumption per garment) to the insumo canonical unit: Telas -> m via
+  metros = cm / 100 (the material width does NOT participate), Herrajes cm2 ->
+  cm2 as-is, 'un' piece counts as-is; junk rows filtered.
 - Workbook -> plan: per BOM sheet the LEFT block feeds the product and, where
   the sheet defines TWO products (BLUSAS: MANGA LARGA + MANGA CORTA), the
   right block feeds the second product; TANGA ghost sub-blocks (sheets whose
@@ -230,24 +230,33 @@ def _preparar_catalogo_aliases(db) -> dict[str, int]:
 
 
 # --------------------------------------------------------------------------- #
-# 1. Pure: quantity conversion (cm2 -> canonical unit, design D4)
+# 1. Pure: quantity conversion (cm lineales -> canonical unit)
 # --------------------------------------------------------------------------- #
 
 
-def test_convertir_cantidad_bom_tela_usa_ancho_del_nombre():
+def test_convertir_cantidad_bom_m_centimetros_lineales():
     from migrate.bom import convertir_cantidad_bom
 
-    # "24 cm" en el nombre = ancho de la tela: 432 cm2 / (24 x 100) = 0.18 m
-    assert convertir_cantidad_bom("432", "Tul 24 cm", "m") == Decimal("0.18")
-
-
-def test_convertir_cantidad_bom_ancho_default():
-    from migrate.bom import convertir_cantidad_bom
-
-    # Sin ancho en el nombre -> default 100cm (D4): 2368 / (100*100) = 0.2368 m
-    assert convertir_cantidad_bom("2368", "Tela Maya Ilustrada", "m") == Decimal(
-        "0.2368"
+    # 'cantidad Cms' = centimetros LINEALES de consumo por prenda.
+    # metros = cm / 100; el ancho del material no participa.
+    assert convertir_cantidad_bom("5", "Elastico pitillo rosa", "m") == Decimal("0.05")
+    assert convertir_cantidad_bom("74", "Tira de Brasier negro 10 mts", "m") == Decimal(
+        "0.74"
     )
+    assert convertir_cantidad_bom("6", "Sesgo Elastico 10 mts", "m") == Decimal("0.06")
+    assert convertir_cantidad_bom("40", "Framilon elastico plano 20 mts", "m") == Decimal(
+        "0.40"
+    )
+
+
+def test_convertir_cantidad_bom_m_ignora_ancho_del_nombre():
+    from migrate.bom import convertir_cantidad_bom
+
+    # El ancho declarado en el nombre ('19 cm') YA NO afecta la conversion:
+    # el consumo es lineal, metros = cm / 100 (regresion del bug 100x).
+    assert convertir_cantidad_bom(
+        "74", "Encaje Elastico 19 cm negro 10 mts", "m"
+    ) == Decimal("0.74")
 
 
 def test_convertir_cantidad_bom_piezas_y_cm2():
@@ -267,6 +276,7 @@ def test_convertir_cantidad_bom_rechaza_no_numerico():
     assert convertir_cantidad_bom(None, "Tela", "m") is None
     assert convertir_cantidad_bom("#DIV/0!", "Tela", "m") is None
     assert convertir_cantidad_bom("0", "Tela", "m") is None  # cero no es consumo
+    assert convertir_cantidad_bom("-3", "Tela", "m") is None  # negativo tampoco
 
 
 # --------------------------------------------------------------------------- #
@@ -316,14 +326,14 @@ def test_plan_bom_cantidades_convertidas_exactas(mini_bom):
         plan = plan_bom(libro, bloques=_bloques_mini())
 
     por = {(l.producto_nombre, l.insumo_nombre): l.cantidad for l in plan.insumos}
-    # Corset Tul: sin ancho en el nombre -> default 100cm (D4): 432 / 10000
-    assert por[(P_CORSET, P_TUL)] == Decimal("0.0432")
-    # Corset Tela: 2368 / (100 x 100) -> 0.2368 m
-    assert por[(P_CORSET, P_TELA)] == Decimal("0.2368")
-    # Blusa ML (bloque izquierdo): 2430 / 10000 -> 0.243
-    assert por[(P_BLUSA_ML, P_TELA)] == Decimal("0.243")
-    # Blusa MC (bloque derecho): 7200 / 10000 -> 0.72
-    assert por[(P_BLUSA_MC, P_TELA)] == Decimal("0.72")
+    # Corset Tul: 432 cm lineales / 100 = 4.32 m (el ancho ya no participa)
+    assert por[(P_CORSET, P_TUL)] == Decimal("4.32")
+    # Corset Tela: 2368 cm lineales / 100 = 23.68 m
+    assert por[(P_CORSET, P_TELA)] == Decimal("23.68")
+    # Blusa ML (bloque izquierdo): 2430 / 100 = 24.3 m
+    assert por[(P_BLUSA_ML, P_TELA)] == Decimal("24.3")
+    # Blusa MC (bloque derecho): 7200 / 100 = 72 m
+    assert por[(P_BLUSA_MC, P_TELA)] == Decimal("72")
 
 
 def test_plan_bom_combos_cajas(mini_bom):
@@ -355,8 +365,8 @@ def test_aplicar_bom_crea_insumos_con_cantidades(db, mini_bom):
     lineas = db.query(BomInsumo).filter(BomInsumo.producto_id == corset.id).all()
     assert len(lineas) == 3
     por = {l.insumo.nombre: l for l in lineas}
-    assert por[P_TUL].cantidad_requerida == Decimal("0.0432")
-    assert por[P_TELA].cantidad_requerida == Decimal("0.2368")
+    assert por[P_TUL].cantidad_requerida == Decimal("4.32")
+    assert por[P_TELA].cantidad_requerida == Decimal("23.68")
     assert all(l.variante_id is None for l in lineas)  # variante NULL
 
 
