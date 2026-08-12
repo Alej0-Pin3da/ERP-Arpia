@@ -819,3 +819,403 @@ def test_patch_venta_marcar_regalo_consulta_forbidden(client, consulta_token):
         headers={"Authorization": f"Bearer {consulta_token}"},
     )
     assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# PUT /ventas/{id}: edit (recalc total + stock rebalance, ONE atomic commit)
+# ---------------------------------------------------------------------------
+
+
+def test_put_venta_edita_cantidad_recalcula_y_rebalancea_stock(client, operador_token):
+    """Edit the quantity of a sale: total recalculated and stock rebalanced.
+
+    BOM: product consumes 10 of insumo X (stock 100).
+      - sell 2  -> stock 100 -> 80
+      - edit 3  -> restock 20 (-> 100) then deduct 30 -> 70
+      - edit 1  -> restock 30 (-> 100) then deduct 10 -> 90
+    """
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="100")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="10")
+    try:
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id, cantidad="2", precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_id = resp.json()["id"]
+        assert _read_stock(ins_id) == Decimal("80")
+
+        resp = client.put(
+            f"/api/v1/ventas/{venta_id}",
+            json=_venta_payload(prod_id, cantidad="3", precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert Decimal(body["total_venta"]) == Decimal("30.0000")
+        assert Decimal(body["detalles"][0]["cantidad"]) == Decimal("3")
+        assert _read_stock(ins_id) == Decimal("70")
+
+        resp = client.put(
+            f"/api/v1/ventas/{venta_id}",
+            json=_venta_payload(prod_id, cantidad="1", precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert Decimal(body["total_venta"]) == Decimal("10.0000")
+        assert Decimal(body["detalles"][0]["cantidad"]) == Decimal("1")
+        assert _read_stock(ins_id) == Decimal("90")
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_put_venta_cambia_producto_repone_viejo_y_descuenta_nuevo(client, operador_token):
+    """Switching the sold product restores the old insumo and deducts the new
+    one: prod_a consumes 10 of X (stock 100), prod_b consumes 5 of Y (50)."""
+    cat_x = _make_categoria()
+    cat_y = _make_categoria()
+    ins_x = _make_insumo(cat_x, stock="100")
+    ins_y = _make_insumo(cat_y, stock="50")
+    tipo_id = _make_tipo()
+    prod_a = _make_producto(tipo_id)
+    prod_b = _make_producto(tipo_id)
+    _make_linea_insumo(prod_a, ins_x, cantidad="10")
+    _make_linea_insumo(prod_b, ins_y, cantidad="5")
+    try:
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_a, cantidad="2", precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_id = resp.json()["id"]
+        assert _read_stock(ins_x) == Decimal("80")
+        assert _read_stock(ins_y) == Decimal("50")
+
+        resp = client.put(
+            f"/api/v1/ventas/{venta_id}",
+            json=_venta_payload(prod_b, cantidad="3", precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body["detalles"]) == 1
+        assert body["detalles"][0]["producto_id"] == prod_b
+        assert Decimal(body["detalles"][0]["cantidad"]) == Decimal("3")
+        assert Decimal(body["total_venta"]) == Decimal("30.0000")
+        assert _read_stock(ins_x) == Decimal("100")  # old explosion restored
+        assert _read_stock(ins_y) == Decimal("35")  # new explosion deducted
+    finally:
+        _cleanup_ventas_for_producto(prod_a)
+        _cleanup_ventas_for_producto(prod_b)
+        _cleanup_producto(prod_a)
+        _cleanup_producto(prod_b)
+        _cleanup_insumo(ins_x)
+        _cleanup_insumo(ins_y)
+        _cleanup_categoria(cat_x)
+        _cleanup_categoria(cat_y)
+        _cleanup_tipo(tipo_id)
+
+
+def test_put_venta_edita_precio_y_cliente(client, operador_token):
+    """Editing price/cliente keeps stock untouched but updates total and
+    cliente_id (venta_id is immutable)."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="100")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="10")
+    cli_a = _make_cliente()
+    cli_b = _make_cliente()
+    try:
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id, cantidad="2", precio="10", cliente_id=cli_a),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_id = resp.json()["id"]
+        assert _read_stock(ins_id) == Decimal("80")
+
+        resp = client.put(
+            f"/api/v1/ventas/{venta_id}",
+            json=_venta_payload(prod_id, cantidad="2", precio="25", cliente_id=cli_b),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["cliente_id"] == cli_b
+        assert Decimal(body["total_venta"]) == Decimal("50.0000")
+        assert _read_stock(ins_id) == Decimal("80")  # same explosion, no net move
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+        _cleanup_cliente(cli_a)
+        _cleanup_cliente(cli_b)
+
+
+def test_put_venta_stock_insuficiente_409_atomico(client, operador_token):
+    """Editing to a quantity the available stock cannot cover -> 409 AND the
+    old state is fully preserved: the restored stock is rolled back and the
+    venta keeps its original lines/total."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="100")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="10")
+    try:
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id, cantidad="2", precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_id = resp.json()["id"]
+        assert _read_stock(ins_id) == Decimal("80")
+
+        resp = client.put(
+            f"/api/v1/ventas/{venta_id}",
+            json=_venta_payload(prod_id, cantidad="100", precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 409
+
+        # Old stock restored AND rolled back -> back to 80; venta untouched.
+        assert _read_stock(ins_id) == Decimal("80")
+        resp = client.get(
+            "/api/v1/ventas",
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        venta = next(v for v in resp.json()["items"] if v["id"] == venta_id)
+        assert len(venta["detalles"]) == 1
+        assert Decimal(venta["detalles"][0]["cantidad"]) == Decimal("2")
+        assert Decimal(venta["total_venta"]) == Decimal("20.0000")
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_put_venta_anulada_400(client, operador_token):
+    """Editing an anulada venta -> 400 (history is immutable)."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_id = resp.json()["id"]
+        resp = client.delete(
+            f"/api/v1/ventas/{venta_id}",
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+
+        resp = client.put(
+            f"/api/v1/ventas/{venta_id}",
+            json=_venta_payload(prod_id),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "No se puede editar una venta anulada"
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_put_venta_inexistente_404(client, operador_token):
+    """PUT on a nonexistent venta -> 404."""
+    resp = client.put(
+        "/api/v1/ventas/99999999",
+        json=_venta_payload(1),
+        headers={"Authorization": f"Bearer {operador_token}"},
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Venta no encontrada"
+
+
+def test_put_venta_consulta_forbidden(client, consulta_token):
+    """consulta is read-only -> 403 on PUT /ventas/{id}."""
+    resp = client.put(
+        "/api/v1/ventas/1",
+        json=_venta_payload(1),
+        headers={"Authorization": f"Bearer {consulta_token}"},
+    )
+    assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# DELETE /ventas/{id}: anular (soft-cancel, NOT a physical delete)
+# ---------------------------------------------------------------------------
+
+
+def test_delete_venta_anula_y_repone_stock(client, operador_token):
+    """DELETE marks estado='anulada' and restores the BOM stock; the row is
+    KEPT (soft delete — history preserved)."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="100")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="10")
+    try:
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id, cantidad="2", precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_id = resp.json()["id"]
+        assert _read_stock(ins_id) == Decimal("80")
+
+        resp = client.delete(
+            f"/api/v1/ventas/{venta_id}",
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["id"] == venta_id
+        assert body["estado"] == "anulada"
+        assert _read_stock(ins_id) == Decimal("100")  # fully restored
+
+        # The record still exists (soft delete) and lists as anulada.
+        resp = client.get(
+            "/api/v1/ventas",
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        venta = next(v for v in resp.json()["items"] if v["id"] == venta_id)
+        assert venta["estado"] == "anulada"
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_delete_venta_repetido_400(client, operador_token):
+    """Anularing an already-anulada venta -> 400 (single anular invariant)."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_id = resp.json()["id"]
+
+        resp = client.delete(
+            f"/api/v1/ventas/{venta_id}",
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+
+        resp = client.delete(
+            f"/api/v1/ventas/{venta_id}",
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "La venta ya está anulada"
+        assert _read_stock(ins_id) == Decimal("10")  # not restored twice
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_delete_venta_inexistente_404(client, operador_token):
+    """DELETE on a nonexistent venta -> 404."""
+    resp = client.delete(
+        "/api/v1/ventas/99999999",
+        headers={"Authorization": f"Bearer {operador_token}"},
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Venta no encontrada"
+
+
+def test_delete_venta_consulta_forbidden(client, consulta_token):
+    """consulta is read-only -> 403 on DELETE /ventas/{id}."""
+    resp = client.delete(
+        "/api/v1/ventas/1",
+        headers={"Authorization": f"Bearer {consulta_token}"},
+    )
+    assert resp.status_code == 403
+
+
+def test_post_venta_sigue_funcionando_despues_de_editar_y_anular(client, operador_token):
+    """POST regression: a normal sale still works after edit/anular ops ran on
+    the same product/insumo."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="100")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="10")
+    try:
+        # edit path
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id, cantidad="1", precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_id = resp.json()["id"]
+        assert _read_stock(ins_id) == Decimal("90")
+        resp = client.put(
+            f"/api/v1/ventas/{venta_id}",
+            json=_venta_payload(prod_id, cantidad="2", precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        assert _read_stock(ins_id) == Decimal("80")
+
+        # anular path
+        resp = client.delete(
+            f"/api/v1/ventas/{venta_id}",
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200
+        assert _read_stock(ins_id) == Decimal("100")
+
+        # fresh POST still works
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id, cantidad="1", precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        assert _read_stock(ins_id) == Decimal("90")
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)

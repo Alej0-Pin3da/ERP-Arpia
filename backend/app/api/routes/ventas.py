@@ -9,7 +9,11 @@ from app.models.clientes import Cliente
 from app.models.ventas import DetalleVenta, Venta
 from app.schemas.common import Paginated
 from app.schemas.venta import VentaCreate, VentaRead, VentaUpdate
-from app.services.inventory import registrar_venta
+from app.services.inventory import (
+    actualizar_venta,
+    anular_venta as anular_venta_service,
+    registrar_venta,
+)
 from app.services.paginacion import aplicar_orden, paginar
 
 router = APIRouter(prefix="/ventas", tags=["ventas"])
@@ -86,4 +90,41 @@ def update_venta_es_regalo(
     venta.es_regalo = payload.es_regalo
     db.commit()
     db.refresh(venta)
+    return venta
+
+
+@router.put("/{venta_id}", response_model=VentaRead)
+def update_venta(
+    venta_id: int,
+    payload: VentaCreate,
+    db: Session = Depends(get_db),
+    _: Venta = Depends(mutation_user),
+):
+    """Full update of a venta (PUT /ventas/{id}).
+
+    Accepts the SAME body as POST /ventas (VentaCreate): cliente_id,
+    canal_venta, descuento_porcentaje, es_regalo and detalles[]. The service
+    recalculates total_venta and rebalances stock atomically — the old detail
+    explosion is restored and the new one deducted in a single commit (409 if
+    the new quantities exceed available stock). 404 when the venta does not
+    exist, 400 when it is already anulada.
+    """
+    venta: Venta = actualizar_venta(db, venta_id, payload.model_dump())
+    return venta
+
+
+@router.delete("/{venta_id}", response_model=VentaRead)
+def anular_venta(
+    venta_id: int,
+    db: Session = Depends(get_db),
+    _: Venta = Depends(mutation_user),
+):
+    """Anular (soft-cancel) a venta — NOT a physical delete.
+
+    Marks ``estado='anulada'`` and restores the sold BOM stock (reponer) in a
+    single atomic commit, keeping the historical record (consistent with the
+    es_regalo flag philosophy). Returns the anulada venta so the UI can
+    refresh. 404 when the venta does not exist, 400 when already anulada.
+    """
+    venta: Venta = anular_venta_service(db, venta_id)
     return venta

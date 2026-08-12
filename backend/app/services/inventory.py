@@ -240,3 +240,172 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
     except Exception:
         db.rollback()
         raise
+
+
+def _explosion_venta(db: Session, venta: Venta) -> dict[int, Decimal]:
+    """Aggregate the current material explosion of a venta's detail lines.
+
+    Sums ``explosion_materiales`` per existing DetalleVenta (quantity + variant
+    as sold). Read-only: no locks, no commits — safe inside the caller's
+    transaction.
+    """
+    explosiones: dict[int, Decimal] = {}
+    for detalle in venta.detalles:
+        for insumo_id, qty in explosion_materiales(
+            db, detalle.producto_id, detalle.variante_id, detalle.cantidad
+        ).items():
+            explosiones[insumo_id] = explosiones.get(insumo_id, Decimal("0")) + qty
+    return explosiones
+
+
+def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
+    """Full update of a venta in ONE atomic transaction.
+
+    Payload is a plain dict mirroring VentaCreate (``cliente_id``,
+    ``canal_venta``, ``descuento_porcentaje``, ``es_regalo``, ``detalles``).
+    The old material explosion is RESTORED into stock first, then the new
+    payload is validated exactly like ``registrar_venta`` (404 missing
+    producto/cliente, 400 foreign variante) and its explosion is deducted with
+    FOR UPDATE (409 if insufficient — checked against the real available stock,
+    since the old units are already back). Fields are updated (``fecha`` is
+    NEVER touched), old detail lines are replaced by new ones with a fresh
+    ``costo_unitario_aplicado`` snapshot, and the total is recalculated. There
+    is a SINGLE commit at the end; ANY exception rolls everything back (the
+    reponed stock and the new lines alike), so a failed edit leaves the venta
+    and the stock exactly as they were.
+    """
+    venta = db.get(Venta, venta_id, with_for_update=True)
+    if venta is None:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    if venta.estado == "anulada":
+        raise HTTPException(
+            status_code=400, detail="No se puede editar una venta anulada"
+        )
+
+    detalles = payload["detalles"]
+    if not detalles:
+        raise HTTPException(status_code=400, detail="Debe incluir al menos un detalle")
+
+    cliente_id = payload.get("cliente_id")
+    if cliente_id is not None:
+        if db.get(Cliente, cliente_id) is None:
+            raise HTTPException(status_code=404, detail="Cliente not found")
+
+    canal_venta = payload.get("canal_venta", "feria")
+    descuento = Decimal(payload.get("descuento_porcentaje", "0"))
+    descuento_factor = Decimal("1") - descuento / Decimal("100")
+
+    # 1) Restore the CURRENT stock (the venta as sold).
+    reponer_stock(db, _explosion_venta(db, venta))
+    # A FLUSH (not a commit) is required BEFORE the new deduction: both stock
+    # helpers re-read with populate_existing + FOR UPDATE, so without it the
+    # second re-read would clobber the session's pending restock with the stale
+    # committed row and double-deduct.
+    db.flush()
+
+    # 2) Validate the new payload and build its explosion (mirrors
+    #    registrar_venta); the caller's rollback undoes the restock above.
+    explosiones: dict[int, Decimal] = {}
+    lineas_costo: list[Decimal] = []
+    lineas_subtotal: list[Decimal] = []
+
+    for detalle in detalles:
+        producto_id = detalle["producto_id"]
+        variante_id = detalle.get("variante_id")
+        cantidad = Decimal(detalle["cantidad"])
+        precio_unitario = Decimal(detalle["precio_unitario"])
+
+        producto = db.get(Producto, producto_id)
+        if producto is None:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+        if variante_id is not None:
+            variante = db.get(VarianteProducto, variante_id)
+            if variante is None or variante.producto_id != producto_id:
+                raise HTTPException(
+                    status_code=400, detail="variante_id no pertenece al producto"
+                )
+
+        costo_unitario = calcular_costo_produccion(db, producto_id, variante_id)
+        lineas_costo.append(costo_unitario)
+        lineas_subtotal.append(cantidad * precio_unitario)
+
+        for insumo_id, qty in explosion_materiales(
+            db, producto_id, variante_id, cantidad
+        ).items():
+            explosiones[insumo_id] = explosiones.get(insumo_id, Decimal("0")) + qty
+
+    descontar_stock(db, explosiones)
+
+    # 3) Recalculate the total and replace the fields + detail lines.
+    total_venta = Decimal(sum(lineas_subtotal)) * descuento_factor
+    es_regalo = bool(payload.get("es_regalo", False))
+    if es_regalo:
+        total_venta = Decimal("0")
+
+    venta.cliente_id = cliente_id
+    venta.canal_venta = canal_venta
+    venta.descuento_porcentaje = descuento
+    venta.es_regalo = es_regalo
+    venta.total_venta = total_venta
+    # fecha is deliberately NOT touched.
+
+    for detalle in list(venta.detalles):
+        db.delete(detalle)
+    for i, detalle in enumerate(detalles):
+        db.add(
+            DetalleVenta(
+                venta=venta,
+                producto_id=detalle["producto_id"],
+                variante_id=detalle.get("variante_id"),
+                cantidad=Decimal(detalle["cantidad"]),
+                precio_unitario_aplicado=Decimal(detalle["precio_unitario"]),
+                costo_unitario_aplicado=lineas_costo[i],
+            )
+        )
+
+    try:
+        db.commit()
+        db.refresh(venta)
+        return venta
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Conflicto al actualizar la venta; no se persistió nada",
+        )
+    except Exception:
+        db.rollback()
+        raise
+
+
+def anular_venta(db: Session, venta_id: int) -> Venta:
+    """Anular (soft-cancel) a venta in ONE atomic transaction.
+
+    NOT a physical delete: the venta's current material explosion is restored
+    into stock (``reponer_stock``) and ``estado`` is marked 'anulada', keeping
+    the history (consistent with the es_regalo flag philosophy). 404 when the
+    venta does not exist, 400 when it is already anulada. A single commit at
+    the end; any exception rolls everything back.
+    """
+    venta = db.get(Venta, venta_id, with_for_update=True)
+    if venta is None:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    if venta.estado == "anulada":
+        raise HTTPException(status_code=400, detail="La venta ya está anulada")
+
+    reponer_stock(db, _explosion_venta(db, venta))
+    venta.estado = "anulada"
+
+    try:
+        db.commit()
+        db.refresh(venta)
+        return venta
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Conflicto al anular la venta; no se persistió nada",
+        )
+    except Exception:
+        db.rollback()
+        raise
