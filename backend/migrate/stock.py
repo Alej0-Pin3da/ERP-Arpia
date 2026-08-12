@@ -38,7 +38,11 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.models import Insumo
-from migrate.catalog import _es_material_valido, normalizar_nombre
+from migrate.catalog import (
+    _es_material_valido,
+    clave_normalizada,
+    normalizar_nombre,
+)
 from migrate.context import MigrationContext, session_scope
 from migrate.loaders import HojaInexistenteError, LibroMigracion, SHEET_BOUNDS
 from migrate.normalize import normalizar_decimal
@@ -48,6 +52,42 @@ from migrate.purchases import normalizar_cantidad_compra
 # MATERIAL nombre en B, cantidad en D ('11 mts'); HERRAJES nombre en F,
 # cantidad en H (bare number). PRENDAS (J..O) is reference only, never read.
 _BLOQUES_OCT25: tuple[tuple[str, str], ...] = (("B", "D"), ("F", "H"))
+
+# INVENTARIO OCT25 material names that do NOT match the F1 catalog 1:1 (key
+# normalizada -> canonical catalog name). The OCT25 sheet uses short or
+# divergent names vs the catalog loaded from investments (e.g. "Tira de brasier
+# blanca" vs catalog "Tira de Brasier blanco 10 mts"); everything else resolves
+# by exact match. These aliases never create insumos: the orchestrator creates
+# the missing ones in the real DB with the exact canonical name, so an alias
+# line is still omitted until that insumo exists (intended behavior).
+ALIASES_STOCK_A_CATALOGO: dict[str, str] = {
+    "tira de brasier blanca": "Tira de Brasier blanco 10 mts",
+    "tira de brasier negra": "Tira de Brasier negro 10 mts",
+    "contorno para bustier negro 2 cm ancho": "Elastico contorno negro 2cm 10 mts",
+    "sesgo de 2cm negro": "sesgo 2 cm negro",
+    "mallatex negra": "mallatex negro",
+    "variila plastica cortada 18cms": "varilla plastica cortada 18 cm",
+    "argollas grandes": "Argolla numero 10 mm",
+    "* argollas medianas": "Argolla numero 8 mm",
+    "* ochos grandes": "herrajes en forma 8 / G",
+    "* gancho g grandes": "herrajes en forma 8 / G",
+    "elastico plano negro": "Framilon elastico plano 20 mts",
+    "elastico plano blanco": "Elastico Panty blanco 10 mts",
+    "varilla copa brasier talla 30": "ARCO METALICO 2001 30",
+    "varilla copa brasier talla 32": "ARCO METALICO 2001 32",
+      "varilla copa brasier talla 34": "ARCO METALICO 2001 34",
+      "varilla copa brasier talla 36": "ARCO METALICO 2001 36",
+      # Insumos nuevos creados en el catalogo con el nombre canonico (categoría
+      # y unidad segun el material): la hoja OCT25 los trae con `*` inicial,
+      # tilde o espaciado distinto al nombre canonico del catalogo.
+      "* argollas pequenas": "Argollas pequeñas",
+      "* ochos medianos": "Ochos medianos",
+      "* ochos pequenos": "Ochos pequeños",
+      "* gancho g medianos": "Gancho G medianos",
+      "* ganchos g pequenos": "Ganchos G pequeños",
+      "elastico de contorno de 1 cm blanco": "Elastico de Contorno de 1 cm blanco",
+      "sesgo de 2cm blanco": "Sesgo de 2 cm blanco",
+  }
 
 
 @dataclass(frozen=True)
@@ -159,6 +199,12 @@ def plan_stock(libro, report=None) -> StockPlan:
 # ------------------------------------------------------------------------- #
 
 
+def _insumo_por_nombre(db, nombre: str):
+    """Insumo del catalogo por nombre canonico (alias primero, luego exacto)."""
+    nombre = ALIASES_STOCK_A_CATALOGO.get(clave_normalizada(nombre), nombre)
+    return db.scalar(select(Insumo).where(Insumo.nombre == nombre))
+
+
 def aplicar_stock(db, plan: StockPlan, report=None) -> dict[str, int]:
     """Set ``stock_actual`` del snapshot OCT25 (solo stock; costo queda WAC).
 
@@ -168,7 +214,7 @@ def aplicar_stock(db, plan: StockPlan, report=None) -> dict[str, int]:
     """
     res = {"seteados": 0, "ya_iguales": 0, "omitidos": 0}
     for linea in plan.stock:
-        insumo = db.scalar(select(Insumo).where(Insumo.nombre == linea.insumo_nombre))
+        insumo = _insumo_por_nombre(db, linea.insumo_nombre)
         if insumo is None:
             res["omitidos"] += 1
             if report:

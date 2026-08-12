@@ -77,6 +77,22 @@ def _mini_workbook(path: Path) -> None:
     wb.save(path)
 
 
+def _mini_workbook_una_fila(
+    path: Path, col_nombre: int, nombre: str, col_cant: int, cantidad: object
+) -> None:
+    """Mini OCT25 con UNA fila de datos (header row 8, data row 9)."""
+    wb = openpyxl.Workbook()
+    oct25 = wb.active
+    oct25.title = "INVENTARIO OCT25"
+    oct25.cell(row=8, column=2, value="MATERIAL")     # B8
+    oct25.cell(row=8, column=4, value="CANTIDAD")     # D8
+    oct25.cell(row=8, column=6, value="HERRAJES")     # F8
+    oct25.cell(row=8, column=8, value="CANTIDAD")     # H8
+    oct25.cell(row=9, column=col_nombre, value=nombre)
+    oct25.cell(row=9, column=col_cant, value=cantidad)
+    wb.save(path)
+
+
 @pytest.fixture
 def mini_stock(tmp_path) -> Path:
     path = tmp_path / "mini-oct25.xlsx"
@@ -254,6 +270,98 @@ def test_aplicar_stock_no_pisa_costo_wac(db, mini_stock):
     db.refresh(tela)
     assert tela.stock_actual == Decimal("11")       # snapshot OCT25
     assert tela.costo_promedio_actual == Decimal("100")  # WAC preservado
+
+
+# --------------------------------------------------------------------------- #
+# 3b. Aliases OCT25 -> catalogo (ALIASES_STOCK_A_CATALOGO, patron de bom.py)
+# --------------------------------------------------------------------------- #
+
+
+def test_aplicar_stock_alias_tira_brasier_blanca(db, tmp_path):
+    from migrate.catalog import upsert_insumo
+    from migrate.stock import aplicar_stock, plan_stock
+
+    _preparar_insumos(db)
+    canonico = upsert_insumo(db, "Tira de Brasier blanco 10 mts")
+    db.commit()
+
+    path = tmp_path / "alias-tira.xlsx"
+    _mini_workbook_una_fila(path, 2, "Tira de brasier blanca", 4, "7 mts")
+    with LibroMigracion(path) as libro:
+        plan = plan_stock(libro)
+    res = aplicar_stock(db, plan)
+    db.commit()
+
+    assert res["seteados"] == 1
+    assert res["omitidos"] == 0
+    db.refresh(canonico)
+    assert canonico.stock_actual == Decimal("7")
+    # El alias NUNCA crea insumos: el nombre corto no existe en el catalogo.
+    assert (
+        db.query(Insumo).filter(Insumo.nombre == "Tira de brasier blanca").count()
+        == 0
+    )
+
+
+def test_aplicar_stock_alias_argollas_medianas_estrella(db, tmp_path):
+    from migrate.catalog import upsert_insumo
+    from migrate.stock import aplicar_stock, plan_stock
+
+    _preparar_insumos(db)
+    canonico = upsert_insumo(db, "Argolla numero 8 mm")
+    db.commit()
+
+    path = tmp_path / "alias-argollas.xlsx"
+    _mini_workbook_una_fila(path, 6, " * Argollas Medianas ", 8, 120)
+    with LibroMigracion(path) as libro:
+        plan = plan_stock(libro)
+    res = aplicar_stock(db, plan)
+    db.commit()
+
+    assert res["seteados"] == 1
+    assert res["omitidos"] == 0
+    db.refresh(canonico)
+    assert canonico.stock_actual == Decimal("120")
+
+
+def test_aplicar_stock_alias_varilla_copa_talla_34(db, tmp_path):
+    from migrate.catalog import upsert_insumo
+    from migrate.stock import aplicar_stock, plan_stock
+
+    _preparar_insumos(db)
+    canonico = upsert_insumo(db, "ARCO METALICO 2001 34")
+    db.commit()
+
+    path = tmp_path / "alias-varilla.xlsx"
+    _mini_workbook_una_fila(path, 6, "Varilla copa brasier talla 34", 8, 50)
+    with LibroMigracion(path) as libro:
+        plan = plan_stock(libro)
+    res = aplicar_stock(db, plan)
+    db.commit()
+
+    assert res["seteados"] == 1
+    assert res["omitidos"] == 0
+    db.refresh(canonico)
+    assert canonico.stock_actual == Decimal("50")
+
+
+def test_aplicar_stock_sin_alias_ni_match_exacto_se_omite(db, tmp_path):
+    from migrate.stock import aplicar_stock, plan_stock
+
+    _preparar_insumos(db)
+    nombre_faltante = "Migratest Sin Alias"
+    path = tmp_path / "sin-alias.xlsx"
+    _mini_workbook_una_fila(path, 2, nombre_faltante, 4, "3 mts")
+    with LibroMigracion(path) as libro:
+        plan = plan_stock(libro)
+    res = aplicar_stock(db, plan)
+    db.commit()
+
+    assert res["omitidos"] == 1
+    assert res["seteados"] == 0
+    assert (
+        db.query(Insumo).filter(Insumo.nombre == nombre_faltante).count() == 0
+    )
 
 
 # --------------------------------------------------------------------------- #
