@@ -1,9 +1,9 @@
 from decimal import Decimal
 
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import BomCycleDetectedError, EntityNotFoundError
 from app.models.productos import BomInsumo, BomProducto, Producto
 from app.schemas.costo import CostoLineaRead
 
@@ -49,17 +49,13 @@ def _calcular(
     """
     key = (producto_id, variante_id)
     if producto_id in path:
-        cadena = " -> ".join(str(p) for p in [*path, producto_id])
-        raise HTTPException(
-            status_code=409,
-            detail=f"Cycle detected in BOM cost calculation: {cadena}",
-        )
+        raise BomCycleDetectedError([*path, producto_id])
     if key in memo:
         return memo[key]
 
     producto = db.get(Producto, producto_id)
     if producto is None:
-        raise HTTPException(status_code=404, detail="Producto not found")
+        raise EntityNotFoundError("Producto", producto_id)
 
     fijos = producto.costos_operativos_fijos
 

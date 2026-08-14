@@ -1,10 +1,11 @@
 import datetime as dt
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, get_db
+from app.core.limiter import limiter
 from app.core.refresh import (
     generate_refresh_token,
     hash_refresh_token,
@@ -35,7 +36,8 @@ def _issue_token(db: Session, user: Usuario) -> Token:
 
 
 @router.post("/login", response_model=Token)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> Token:
+@limiter.limit("10/minute")
+def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)) -> Token:
     stmt = select(Usuario).where(Usuario.email == payload.email)
     user = db.scalar(stmt)
     if user is None or not verify_password(payload.password, user.password_hash):
@@ -48,7 +50,8 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> Token:
 
 
 @router.post("/refresh", response_model=Token)
-def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> Token:
+@limiter.limit("20/minute")
+def refresh(request: Request, payload: RefreshRequest, db: Session = Depends(get_db)) -> Token:
     stmt = select(RefreshToken).where(
         RefreshToken.token_hash == hash_refresh_token(payload.refresh_token)
     )

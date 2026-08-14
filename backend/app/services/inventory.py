@@ -8,11 +8,16 @@ only at display time.
 
 from decimal import Decimal
 
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import (
+    BomCycleDetectedError,
+    DomainValidationError,
+    EntityNotFoundError,
+    InsufficientStockError,
+)
 from app.models.clientes import Cliente
 from app.models.insumos import Insumo
 from app.models.productos import BomInsumo, BomProducto, Producto, VarianteProducto
@@ -49,17 +54,13 @@ def _explode(
     root: bool = False,
 ) -> None:
     if producto_id in path:
-        cadena = " -> ".join(str(p) for p in [*path, producto_id])
-        raise HTTPException(
-            status_code=409, detail=f"Cycle detected in BOM explosion: {cadena}"
-        )
+        raise BomCycleDetectedError([*path, producto_id])
     producto = db.get(Producto, producto_id)
     if producto is None:
-        raise HTTPException(status_code=404, detail="Producto not found")
+        raise EntityNotFoundError("Producto", producto_id)
     if root and variante_id is None and producto.variantes:
-        raise HTTPException(
-            status_code=400,
-            detail="El producto tiene variantes; debe indicar variante_id",
+        raise DomainValidationError(
+            "El producto tiene variantes; debe indicar variante_id"
         )
 
     insumo_rows = list(
@@ -118,12 +119,9 @@ def descontar_stock(db: Session, explosiones: dict[int, Decimal]) -> None:
             Insumo, insumo_id, with_for_update=True, populate_existing=True
         )
         if insumo is None:
-            raise HTTPException(status_code=404, detail="Insumo not found")
+            raise EntityNotFoundError("Insumo", insumo_id)
         if insumo.stock_actual < cantidad:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Stock insuficiente para insumo {insumo.nombre!r}",
-            )
+            raise InsufficientStockError(insumo.nombre)
         insumo.stock_actual -= cantidad
 
 
@@ -141,7 +139,7 @@ def reponer_stock(db: Session, explosiones: dict[int, Decimal]) -> None:
             Insumo, insumo_id, with_for_update=True, populate_existing=True
         )
         if insumo is None:
-            raise HTTPException(status_code=404, detail="Insumo not found")
+            raise EntityNotFoundError("Insumo", insumo_id)
         insumo.stock_actual += explosiones[insumo_id]
 
 
@@ -161,12 +159,12 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
     """
     detalles = payload["detalles"]
     if not detalles:
-        raise HTTPException(status_code=400, detail="Debe incluir al menos un detalle")
+        raise DomainValidationError("Debe incluir al menos un detalle")
 
     cliente_id = payload.get("cliente_id")
     if cliente_id is not None:
         if db.get(Cliente, cliente_id) is None:
-            raise HTTPException(status_code=404, detail="Cliente not found")
+            raise EntityNotFoundError("Cliente", cliente_id)
 
     canal_venta = payload.get("canal_venta", "feria")
     descuento = Decimal(payload.get("descuento_porcentaje", "0"))
@@ -184,13 +182,11 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
 
         producto = db.get(Producto, producto_id)
         if producto is None:
-            raise HTTPException(status_code=404, detail="Producto no encontrado")
+            raise EntityNotFoundError("Producto", producto_id)
         if variante_id is not None:
             variante = db.get(VarianteProducto, variante_id)
             if variante is None or variante.producto_id != producto_id:
-                raise HTTPException(
-                    status_code=400, detail="variante_id no pertenece al producto"
-                )
+                raise DomainValidationError("variante_id no pertenece al producto")
 
         costo_unitario = calcular_costo_produccion(db, producto_id, variante_id)
         lineas_costo.append(costo_unitario)
@@ -233,10 +229,13 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
         return venta
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
+        raise DomainValidationError(
+            "Conflicto al registrar la venta; no se persistió nada",
             status_code=409,
-            detail="Conflicto al registrar la venta; no se persistió nada",
         )
+    except Exception:
+        db.rollback()
+        raise
     except Exception:
         db.rollback()
         raise
@@ -276,20 +275,18 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
     """
     venta = db.get(Venta, venta_id, with_for_update=True)
     if venta is None:
-        raise HTTPException(status_code=404, detail="Venta no encontrada")
+        raise EntityNotFoundError("Venta", venta_id)
     if venta.estado == "anulada":
-        raise HTTPException(
-            status_code=400, detail="No se puede editar una venta anulada"
-        )
+        raise DomainValidationError("No se puede editar una venta anulada")
 
     detalles = payload["detalles"]
     if not detalles:
-        raise HTTPException(status_code=400, detail="Debe incluir al menos un detalle")
+        raise DomainValidationError("Debe incluir al menos un detalle")
 
     cliente_id = payload.get("cliente_id")
     if cliente_id is not None:
         if db.get(Cliente, cliente_id) is None:
-            raise HTTPException(status_code=404, detail="Cliente not found")
+            raise EntityNotFoundError("Cliente", cliente_id)
 
     canal_venta = payload.get("canal_venta", "feria")
     descuento = Decimal(payload.get("descuento_porcentaje", "0"))
@@ -317,13 +314,11 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
 
         producto = db.get(Producto, producto_id)
         if producto is None:
-            raise HTTPException(status_code=404, detail="Producto no encontrado")
+            raise EntityNotFoundError("Producto", producto_id)
         if variante_id is not None:
             variante = db.get(VarianteProducto, variante_id)
             if variante is None or variante.producto_id != producto_id:
-                raise HTTPException(
-                    status_code=400, detail="variante_id no pertenece al producto"
-                )
+                raise DomainValidationError("variante_id no pertenece al producto")
 
         costo_unitario = calcular_costo_produccion(db, producto_id, variante_id)
         lineas_costo.append(costo_unitario)
@@ -369,9 +364,9 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
         return venta
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
+        raise DomainValidationError(
+            "Conflicto al actualizar la venta; no se persistió nada",
             status_code=409,
-            detail="Conflicto al actualizar la venta; no se persistió nada",
         )
     except Exception:
         db.rollback()
@@ -389,9 +384,9 @@ def anular_venta(db: Session, venta_id: int) -> Venta:
     """
     venta = db.get(Venta, venta_id, with_for_update=True)
     if venta is None:
-        raise HTTPException(status_code=404, detail="Venta no encontrada")
+        raise EntityNotFoundError("Venta", venta_id)
     if venta.estado == "anulada":
-        raise HTTPException(status_code=400, detail="La venta ya está anulada")
+        raise DomainValidationError("La venta ya está anulada")
 
     reponer_stock(db, _explosion_venta(db, venta))
     venta.estado = "anulada"
@@ -402,9 +397,9 @@ def anular_venta(db: Session, venta_id: int) -> Venta:
         return venta
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
+        raise DomainValidationError(
+            "Conflicto al anular la venta; no se persistió nada",
             status_code=409,
-            detail="Conflicto al anular la venta; no se persistió nada",
         )
     except Exception:
         db.rollback()
