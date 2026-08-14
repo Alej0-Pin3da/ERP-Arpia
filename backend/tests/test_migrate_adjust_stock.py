@@ -26,7 +26,6 @@ CONSUMOS_BOM ni filas reales); el registro se escribe en tmp_path.
 """
 
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 
@@ -49,13 +48,11 @@ MAPA_TEST = {P_AJUSTE: Decimal("2"), P_AJUSTE2: Decimal("30")}
 
 
 def _borrar_filas_test(db) -> None:
-    db.query(Insumo).filter(
-        Insumo.nombre.in_([P_AJUSTE, P_AJUSTE2, P_FANTASMA])
-    ).delete(synchronize_session=False)
+    db.query(Insumo).filter(Insumo.nombre.in_([P_AJUSTE, P_AJUSTE2, P_FANTASMA])).delete(
+        synchronize_session=False
+    )
     db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
+        TipoProducto.nombre.in_(["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"])
     ).delete(synchronize_session=False)
     db.commit()
 
@@ -87,9 +84,9 @@ def _preparar_insumos(db) -> None:
     upsert_insumo(db, P_AJUSTE, categoria_nombre="Telas")
     upsert_insumo(db, P_AJUSTE2, categoria_nombre="Herrajes")
     # reset de stock por test (la sesion de modulo es compartida entre tests).
-    db.query(Insumo).filter(
-        Insumo.nombre.in_([P_AJUSTE, P_AJUSTE2])
-    ).update({"stock_actual": Decimal("0")}, synchronize_session=False)
+    db.query(Insumo).filter(Insumo.nombre.in_([P_AJUSTE, P_AJUSTE2])).update(
+        {"stock_actual": Decimal("0")}, synchronize_session=False
+    )
     db.commit()
 
 
@@ -165,9 +162,7 @@ def test_dry_run_no_escribe_ni_crea_registro(db, tmp_path):
     insumo.stock_actual = Decimal("0")
     db.commit()
 
-    codigo = ejecutar(
-        modo="dry-run", consumos=MAPA_TEST, registry_path=reg, fase_final=4
-    )
+    codigo = ejecutar(modo="dry-run", consumos=MAPA_TEST, registry_path=reg, fase_final=4)
     assert codigo == 0
     db.expire_all()
     insumo = db.query(Insumo).filter(Insumo.nombre == P_AJUSTE).one()
@@ -186,9 +181,7 @@ def test_commit_suma_stock_ajuste_y_escribe_registro(db, tmp_path):
     _preparar_insumos(db)
     reg = tmp_path / "registry.json"
 
-    codigo = ejecutar(
-        modo="commit", consumos=MAPA_TEST, registry_path=reg, fase_final=4
-    )
+    codigo = ejecutar(modo="commit", consumos=MAPA_TEST, registry_path=reg, fase_final=4)
     assert codigo == 0
     db.expire_all()
     tela = db.query(Insumo).filter(Insumo.nombre == P_AJUSTE).one()
@@ -214,9 +207,8 @@ def test_commit_idempotente_segunda_corrida_no_suma(db, tmp_path):
 
     assert ejecutar(modo="commit", consumos=MAPA_TEST, registry_path=reg) == 0
     db.expire_all()
-    assert (
-        db.query(Insumo).filter(Insumo.nombre == P_AJUSTE).one().stock_actual
-        == Decimal("3.0000")
+    assert db.query(Insumo).filter(Insumo.nombre == P_AJUSTE).one().stock_actual == Decimal(
+        "3.0000"
     )
     # 2da corrida: stock ya en el objetivo -> delta 0 + marca de registro
     assert ejecutar(modo="commit", consumos=MAPA_TEST, registry_path=reg) == 0
@@ -253,9 +245,8 @@ def test_commit_insumo_inexistente_error_y_rollback_atomico(db, tmp_path):
     assert codigo == 1  # ERROR -> exit 1
     db.expire_all()
     # rollback atomico: NADA se aplico (ni el insumo valido)
-    assert (
-        db.query(Insumo).filter(Insumo.nombre == P_AJUSTE).one().stock_actual
-        == Decimal("0.0000")
+    assert db.query(Insumo).filter(Insumo.nombre == P_AJUSTE).one().stock_actual == Decimal(
+        "0.0000"
     )
 
 
@@ -297,9 +288,7 @@ def test_ejecutar_dry_run_real_mapa_default_no_escribe(db, tmp_path):
     from migrate.adjust_stock import CONSUMOS_BOM, ejecutar
 
     antes = db.query(Insumo).count()
-    codigo = ejecutar(
-        modo="dry-run", consumos=CONSUMOS_BOM, registry_path=tmp_path / "r.json"
-    )
+    codigo = ejecutar(modo="dry-run", consumos=CONSUMOS_BOM, registry_path=tmp_path / "r.json")
     assert codigo == 0
     assert db.query(Insumo).count() == antes  # 0 escrituras
     assert not (tmp_path / "r.json").exists()

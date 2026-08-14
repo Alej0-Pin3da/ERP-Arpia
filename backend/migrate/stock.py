@@ -44,7 +44,7 @@ from migrate.catalog import (
     normalizar_nombre,
 )
 from migrate.context import MigrationContext, session_scope
-from migrate.loaders import HojaInexistenteError, LibroMigracion, SHEET_BOUNDS
+from migrate.loaders import SHEET_BOUNDS, HojaInexistenteError, LibroMigracion
 from migrate.normalize import normalizar_decimal
 from migrate.purchases import normalizar_cantidad_compra
 
@@ -75,19 +75,19 @@ ALIASES_STOCK_A_CATALOGO: dict[str, str] = {
     "elastico plano blanco": "Elastico Panty blanco 10 mts",
     "varilla copa brasier talla 30": "ARCO METALICO 2001 30",
     "varilla copa brasier talla 32": "ARCO METALICO 2001 32",
-      "varilla copa brasier talla 34": "ARCO METALICO 2001 34",
-      "varilla copa brasier talla 36": "ARCO METALICO 2001 36",
-      # Insumos nuevos creados en el catalogo con el nombre canonico (categoría
-      # y unidad segun el material): la hoja OCT25 los trae con `*` inicial,
-      # tilde o espaciado distinto al nombre canonico del catalogo.
-      "* argollas pequenas": "Argollas pequeñas",
-      "* ochos medianos": "Ochos medianos",
-      "* ochos pequenos": "Ochos pequeños",
-      "* gancho g medianos": "Gancho G medianos",
-      "* ganchos g pequenos": "Ganchos G pequeños",
-      "elastico de contorno de 1 cm blanco": "Elastico de Contorno de 1 cm blanco",
-      "sesgo de 2cm blanco": "Sesgo de 2 cm blanco",
-  }
+    "varilla copa brasier talla 34": "ARCO METALICO 2001 34",
+    "varilla copa brasier talla 36": "ARCO METALICO 2001 36",
+    # Insumos nuevos creados en el catalogo con el nombre canonico (categoría
+    # y unidad segun el material): la hoja OCT25 los trae con `*` inicial,
+    # tilde o espaciado distinto al nombre canonico del catalogo.
+    "* argollas pequenas": "Argollas pequeñas",
+    "* ochos medianos": "Ochos medianos",
+    "* ochos pequenos": "Ochos pequeños",
+    "* gancho g medianos": "Gancho G medianos",
+    "* ganchos g pequenos": "Ganchos G pequeños",
+    "elastico de contorno de 1 cm blanco": "Elastico de Contorno de 1 cm blanco",
+    "sesgo de 2cm blanco": "Sesgo de 2 cm blanco",
+}
 
 
 @dataclass(frozen=True)
@@ -105,7 +105,7 @@ class StockPlan:
     """Plan (dry-run) of the stock snapshot F4 would set."""
 
     stock: list[StockLinea] = field(default_factory=list)
-    sin_cantidad: int = 0      # EXM-2: cantidad no interpretable -> excluida
+    sin_cantidad: int = 0  # EXM-2: cantidad no interpretable -> excluida
 
     @property
     def conteo_stock(self) -> int:
@@ -178,7 +178,9 @@ def plan_stock(libro, report=None) -> StockPlan:
                 plan.sin_cantidad += 1
                 if report:
                     report.warn(
-                        hoja, fila_idx, col_cant,
+                        hoja,
+                        fila_idx,
+                        col_cant,
                         f"{nombre}: cantidad {fila.get(col_cant)!r} no interpretable; "
                         f"fila excluida (EXM-2)",
                     )
@@ -219,7 +221,9 @@ def aplicar_stock(db, plan: StockPlan, report=None) -> dict[str, int]:
             res["omitidos"] += 1
             if report:
                 report.error(
-                    linea.hoja, linea.fila, None,
+                    linea.hoja,
+                    linea.fila,
+                    None,
                     f"{linea.insumo_nombre}: insumo ausente en catalogo; stock no "
                     f"aplicado (correr F1 antes)",
                 )
@@ -231,13 +235,16 @@ def aplicar_stock(db, plan: StockPlan, report=None) -> dict[str, int]:
         res["seteados"] += 1
         if report:
             report.info(
-                linea.hoja, linea.fila, None,
-                f"{linea.insumo_nombre}: stock_actual -> {linea.cantidad} "
-                f"(costo WAC intacto)",
+                linea.hoja,
+                linea.fila,
+                None,
+                f"{linea.insumo_nombre}: stock_actual -> {linea.cantidad} (costo WAC intacto)",
             )
     if report:
         report.info(
-            "F4", None, None,
+            "F4",
+            None,
+            None,
             f"stock OCT25: {res['seteados']} seteados, "
             f"{res['ya_iguales']} ya-iguales, {res['omitidos']} omitidos",
         )
@@ -257,9 +264,10 @@ def cargar_stock(ctx: MigrationContext) -> StockPlan:
         plan = plan_stock(libro, report)
 
     report.info(
-        "F4", None, None,
-        f"plan stock OCT25: {plan.conteo_stock} insumos | sin cantidad "
-        f"{plan.sin_cantidad}",
+        "F4",
+        None,
+        None,
+        f"plan stock OCT25: {plan.conteo_stock} insumos | sin cantidad {plan.sin_cantidad}",
     )
     if ctx.options.modo == "commit" and ctx.session is not None:
         with session_scope(ctx, ctx.session) as db:

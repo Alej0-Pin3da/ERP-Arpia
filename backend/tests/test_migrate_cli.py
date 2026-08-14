@@ -16,17 +16,15 @@ rows. Test rows in Migracion_Omisiones are wiped at module start/end.
 """
 
 import json
-import sys
 from pathlib import Path
 
 import openpyxl
 import pytest
 
-from migrate import cli
-from migrate.context import FaseOptions
-
 from app.db.session import SessionLocal
 from app.models import MigracionOmision
+from migrate import cli
+from migrate.context import FaseOptions
 
 
 @pytest.fixture(autouse=True)
@@ -153,12 +151,15 @@ def test_fallo_persistencia_db_no_fatal_y_json_intacto(tmp_path, monkeypatch):
     finally:
         db.close()
     try:
+
         def _db_caida(db, run_report, corrida_id):
             raise RuntimeError("db caida simulada")
 
         monkeypatch.setattr("migrate.omisiones.persistir_omisiones", _db_caida)
         reports_b = tmp_path / "reports_b"
-        codigo = cli.ejecutar(FaseOptions(source=mini, modo="commit"), ["F0"], reports_dir=reports_b)
+        codigo = cli.ejecutar(
+            FaseOptions(source=mini, modo="commit"), ["F0"], reports_dir=reports_b
+        )
         assert codigo == 0  # WARN-only run: exit code intact despite the failure
 
         jsons_b = sorted(reports_b.glob("migracion_*.json"))

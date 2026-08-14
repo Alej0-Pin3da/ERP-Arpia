@@ -29,9 +29,7 @@ _SORTABLE_INSUMOS = {
 
 def _to_read(insumo: Insumo) -> InsumoRead:
     data = InsumoRead.model_validate(insumo)
-    data.nombre_categoria = (
-        insumo.categoria.nombre if insumo.categoria is not None else None
-    )
+    data.nombre_categoria = insumo.categoria.nombre if insumo.categoria is not None else None
     return data
 
 

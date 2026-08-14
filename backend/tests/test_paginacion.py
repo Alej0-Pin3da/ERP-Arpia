@@ -59,11 +59,7 @@ def test_paginar_devuelve_total_completo_y_filas_acotadas(_categoria, _insumos):
     """total == full filtered count (5); rows honor limit (2) and offset (0)."""
     db = SessionLocal()
     try:
-        stmt = (
-            select(Insumo)
-            .where(Insumo.categoria_id == _categoria.id)
-            .order_by(Insumo.id)
-        )
+        stmt = select(Insumo).where(Insumo.categoria_id == _categoria.id).order_by(Insumo.id)
         rows, total = paginar(db, stmt, limit=2, offset=0)
         assert total == 5
         assert len(rows) == 2
@@ -76,11 +72,7 @@ def test_paginar_offset_fuera_de_rango_total_intacto(_categoria, _insumos):
     """offset beyond the filtered set -> empty rows, total still 5 (no 404)."""
     db = SessionLocal()
     try:
-        stmt = (
-            select(Insumo)
-            .where(Insumo.categoria_id == _categoria.id)
-            .order_by(Insumo.id)
-        )
+        stmt = select(Insumo).where(Insumo.categoria_id == _categoria.id).order_by(Insumo.id)
         rows, total = paginar(db, stmt, limit=50, offset=200)
         assert rows == []
         assert total == 5

@@ -53,9 +53,7 @@ def create_tipo_producto(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=409, detail="TipoProducto name already exists"
-        )
+        raise HTTPException(status_code=409, detail="TipoProducto name already exists") from None
     db.refresh(tipo)
     return tipo
 
@@ -76,9 +74,7 @@ def update_tipo_producto(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=409, detail="TipoProducto name already exists"
-        )
+        raise HTTPException(status_code=409, detail="TipoProducto name already exists") from None
     db.refresh(tipo)
     return tipo
 
@@ -99,4 +95,4 @@ def delete_tipo_producto(
         db.rollback()
         raise HTTPException(
             status_code=409, detail="TipoProducto is in use and cannot be deleted"
-        )
+        ) from None

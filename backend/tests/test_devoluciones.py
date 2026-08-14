@@ -31,8 +31,8 @@ from app.models import (
     BomInsumo,
     CategoriaInsumo,
     Cliente,
-    Devolucion,
     DetalleVenta,
+    Devolucion,
     Insumo,
     Producto,
     TipoProducto,
@@ -215,12 +215,8 @@ def _cleanup_categoria(categoria_id: int) -> None:
 def _cleanup_ventas_for_producto(producto_id: int) -> None:
     db = SessionLocal()
     try:
-        ven_ids = select(DetalleVenta.venta_id).where(
-            DetalleVenta.producto_id == producto_id
-        )
-        db.query(Venta).filter(Venta.id.in_(ven_ids)).delete(
-            synchronize_session=False
-        )
+        ven_ids = select(DetalleVenta.venta_id).where(DetalleVenta.producto_id == producto_id)
+        db.query(Venta).filter(Venta.id.in_(ven_ids)).delete(synchronize_session=False)
         db.query(DetalleVenta).filter(DetalleVenta.producto_id == producto_id).delete(
             synchronize_session=False
         )
@@ -278,9 +274,13 @@ def test_devolucion_total_cancela_y_restaura_todo_el_stock():
         db = SessionLocal()
         try:
             venta = registrar_venta(
-                db, {"cliente_id": cliente_id, "canal_venta": "web",
-                     "descuento_porcentaje": Decimal("0"),
-                     "detalles": [_venta_detalle(producto, cantidad="1", precio="10")]}
+                db,
+                {
+                    "cliente_id": cliente_id,
+                    "canal_venta": "web",
+                    "descuento_porcentaje": Decimal("0"),
+                    "detalles": [_venta_detalle(producto, cantidad="1", precio="10")],
+                },
             )
         finally:
             db.close()
@@ -289,9 +289,9 @@ def test_devolucion_total_cancela_y_restaura_todo_el_stock():
         db = SessionLocal()
         try:
             dev = registrar_devolucion(
-                db, user_id=None,
-                payload={"venta_id": venta.id, "tipo": "total",
-                         "motivo": "cliente final"},
+                db,
+                user_id=None,
+                payload={"venta_id": venta.id, "tipo": "total", "motivo": "cliente final"},
             )
         finally:
             db.close()
@@ -322,9 +322,13 @@ def test_registrar_devolucion_total_venta_ya_anulada_400():
         db = SessionLocal()
         try:
             venta = registrar_venta(
-                db, {"cliente_id": None, "canal_venta": "web",
-                     "descuento_porcentaje": Decimal("0"),
-                     "detalles": [_venta_detalle(producto, cantidad="1")]}
+                db,
+                {
+                    "cliente_id": None,
+                    "canal_venta": "web",
+                    "descuento_porcentaje": Decimal("0"),
+                    "detalles": [_venta_detalle(producto, cantidad="1")],
+                },
             )
         finally:
             db.close()
@@ -363,9 +367,13 @@ def test_registrar_devolucion_total_sin_bom_400():
         db = SessionLocal()
         try:
             venta = registrar_venta(
-                db, {"cliente_id": None, "canal_venta": "web",
-                     "descuento_porcentaje": Decimal("0"),
-                     "detalles": [_venta_detalle(producto, cantidad="1", precio="10")]}
+                db,
+                {
+                    "cliente_id": None,
+                    "canal_venta": "web",
+                    "descuento_porcentaje": Decimal("0"),
+                    "detalles": [_venta_detalle(producto, cantidad="1", precio="10")],
+                },
             )
         finally:
             db.close()
@@ -400,9 +408,15 @@ def test_registrar_devolucion_parcial_restaura_solo_linea_devuelta():
         db = SessionLocal()
         try:
             dev = registrar_devolucion(
-                db, None, {"venta_id": ctx["venta"].id, "tipo": "parcial",
-                           "items": [{"producto_id": ctx["p1"], "variante_id": None,
-                                      "cantidad": Decimal("1")}]}
+                db,
+                None,
+                {
+                    "venta_id": ctx["venta"].id,
+                    "tipo": "parcial",
+                    "items": [
+                        {"producto_id": ctx["p1"], "variante_id": None, "cantidad": Decimal("1")}
+                    ],
+                },
             )
             dev_id = dev.id
             items = [it for it in dev.items]
@@ -436,9 +450,13 @@ def test_registrar_devolucion_parcial_usa_precio_snapshot_de_la_venta():
         db = SessionLocal()
         try:
             v1 = registrar_venta(
-                db, {"cliente_id": None, "canal_venta": "web",
-                     "descuento_porcentaje": Decimal("0"),
-                     "detalles": [_venta_detalle(producto, cantidad="1", precio="10")]}
+                db,
+                {
+                    "cliente_id": None,
+                    "canal_venta": "web",
+                    "descuento_porcentaje": Decimal("0"),
+                    "detalles": [_venta_detalle(producto, cantidad="1", precio="10")],
+                },
             )
         finally:
             db.close()
@@ -446,18 +464,28 @@ def test_registrar_devolucion_parcial_usa_precio_snapshot_de_la_venta():
         db = SessionLocal()
         try:
             registrar_venta(
-                db, {"cliente_id": None, "canal_venta": "web",
-                     "descuento_porcentaje": Decimal("0"),
-                     "detalles": [_venta_detalle(producto, cantidad="1", precio="25")]}
+                db,
+                {
+                    "cliente_id": None,
+                    "canal_venta": "web",
+                    "descuento_porcentaje": Decimal("0"),
+                    "detalles": [_venta_detalle(producto, cantidad="1", precio="25")],
+                },
             )
         finally:
             db.close()
         db = SessionLocal()
         try:
             dev = registrar_devolucion(
-                db, None, {"venta_id": v1.id, "tipo": "parcial",
-                           "items": [{"producto_id": producto, "variante_id": None,
-                                      "cantidad": Decimal("1")}]}
+                db,
+                None,
+                {
+                    "venta_id": v1.id,
+                    "tipo": "parcial",
+                    "items": [
+                        {"producto_id": producto, "variante_id": None, "cantidad": Decimal("1")}
+                    ],
+                },
             )
             precio_snapshot = dev.items[0].precio_unitario
         finally:
@@ -481,10 +509,19 @@ def test_registrar_devolucion_parcial_cantidad_excede_vendida_422():
         try:
             with pytest.raises(HTTPException) as excinfo:
                 registrar_devolucion(
-                    db, None,
-                    {"venta_id": ctx["venta"].id, "tipo": "parcial",
-                     "items": [{"producto_id": ctx["producto"], "variante_id": None,
-                                "cantidad": Decimal("6")}]},  # vendido 5
+                    db,
+                    None,
+                    {
+                        "venta_id": ctx["venta"].id,
+                        "tipo": "parcial",
+                        "items": [
+                            {
+                                "producto_id": ctx["producto"],
+                                "variante_id": None,
+                                "cantidad": Decimal("6"),
+                            }
+                        ],
+                    },  # vendido 5
                 )
         finally:
             db.rollback()
@@ -508,9 +545,19 @@ def test_registrar_devolucion_doble_devolucion_409():
         db = SessionLocal()
         try:
             registrar_devolucion(
-                db, None, {"venta_id": ctx["venta"].id, "tipo": "parcial",
-                           "items": [{"producto_id": ctx["producto"], "variante_id": None,
-                                      "cantidad": Decimal("1")}]}
+                db,
+                None,
+                {
+                    "venta_id": ctx["venta"].id,
+                    "tipo": "parcial",
+                    "items": [
+                        {
+                            "producto_id": ctx["producto"],
+                            "variante_id": None,
+                            "cantidad": Decimal("1"),
+                        }
+                    ],
+                },
             )
         finally:
             db.close()
@@ -518,9 +565,19 @@ def test_registrar_devolucion_doble_devolucion_409():
         try:
             with pytest.raises(HTTPException) as excinfo:
                 registrar_devolucion(
-                    db, None, {"venta_id": ctx["venta"].id, "tipo": "parcial",
-                               "items": [{"producto_id": ctx["producto"], "variante_id": None,
-                                          "cantidad": Decimal("1")}]}
+                    db,
+                    None,
+                    {
+                        "venta_id": ctx["venta"].id,
+                        "tipo": "parcial",
+                        "items": [
+                            {
+                                "producto_id": ctx["producto"],
+                                "variante_id": None,
+                                "cantidad": Decimal("1"),
+                            }
+                        ],
+                    },
                 )
         finally:
             db.rollback()
@@ -545,9 +602,19 @@ def test_registrar_devolucion_concurrente_for_update_no_doble_restaura():
         try:
             barrier.wait(timeout=10)
             registrar_devolucion(
-                db, None, {"venta_id": ctx["venta"].id, "tipo": "parcial",
-                           "items": [{"producto_id": ctx["producto"], "variante_id": None,
-                                      "cantidad": Decimal("1")}]}
+                db,
+                None,
+                {
+                    "venta_id": ctx["venta"].id,
+                    "tipo": "parcial",
+                    "items": [
+                        {
+                            "producto_id": ctx["producto"],
+                            "variante_id": None,
+                            "cantidad": Decimal("1"),
+                        }
+                    ],
+                },
             )
             devolute_ok[slot] = True
         except HTTPException as exc:
@@ -607,7 +674,8 @@ def test_registrar_devolucion_integrity_error_409(monkeypatch):
 
         def raising_commit(self):
             raise IntegrityError(
-                "INSERT INTO Devoluciones ...", {},
+                "INSERT INTO Devoluciones ...",
+                {},
                 Exception("duplicate key value violates unique constraint"),
             )
 
@@ -644,27 +712,46 @@ def test_listar_devoluciones_filtra_por_venta_y_pagina():
     try:
         db = SessionLocal()
         try:
-            v1 = registrar_venta(db, {"cliente_id": None, "canal_venta": "web",
-                                      "descuento_porcentaje": Decimal("0"),
-                                      "detalles": [_venta_detalle(p1, cantidad="1")]})
+            v1 = registrar_venta(
+                db,
+                {
+                    "cliente_id": None,
+                    "canal_venta": "web",
+                    "descuento_porcentaje": Decimal("0"),
+                    "detalles": [_venta_detalle(p1, cantidad="1")],
+                },
+            )
             v1_id = v1.id
         finally:
             db.close()
         db = SessionLocal()
         try:
-            v2 = registrar_venta(db, {"cliente_id": None, "canal_venta": "web",
-                                      "descuento_porcentaje": Decimal("0"),
-                                      "detalles": [_venta_detalle(p1, cantidad="2")]})
+            v2 = registrar_venta(
+                db,
+                {
+                    "cliente_id": None,
+                    "canal_venta": "web",
+                    "descuento_porcentaje": Decimal("0"),
+                    "detalles": [_venta_detalle(p1, cantidad="2")],
+                },
+            )
             v2_id = v2.id
         finally:
             db.close()
         for venta_id in (v1_id, v2_id):
             db = SessionLocal()
             try:
-                registrar_devolucion(db, None, {"venta_id": venta_id, "tipo": "parcial",
-                                               "items": [{"producto_id": p1,
-                                                          "variante_id": None,
-                                                          "cantidad": Decimal("1")}]})
+                registrar_devolucion(
+                    db,
+                    None,
+                    {
+                        "venta_id": venta_id,
+                        "tipo": "parcial",
+                        "items": [
+                            {"producto_id": p1, "variante_id": None, "cantidad": Decimal("1")}
+                        ],
+                    },
+                )
             finally:
                 db.close()
         db = SessionLocal()
@@ -705,9 +792,13 @@ def _vender_una_linea(cantidad: str, stock: str) -> dict:
     db = SessionLocal()
     try:
         venta = registrar_venta(
-            db, {"cliente_id": None, "canal_venta": "web",
-                 "descuento_porcentaje": Decimal("0"),
-                 "detalles": [_venta_detalle(producto, cantidad=cantidad, precio="10")]}
+            db,
+            {
+                "cliente_id": None,
+                "canal_venta": "web",
+                "descuento_porcentaje": Decimal("0"),
+                "detalles": [_venta_detalle(producto, cantidad=cantidad, precio="10")],
+            },
         )
     finally:
         db.close()
@@ -742,15 +833,28 @@ def _vender_dos_lineas() -> dict:
     db = SessionLocal()
     try:
         venta = registrar_venta(
-            db, {"cliente_id": None, "canal_venta": "web",
-                 "descuento_porcentaje": Decimal("0"),
-                 "detalles": [_venta_detalle(p1, cantidad="1", precio="10"),
-                              _venta_detalle(p2, cantidad="1", precio="20")]}
+            db,
+            {
+                "cliente_id": None,
+                "canal_venta": "web",
+                "descuento_porcentaje": Decimal("0"),
+                "detalles": [
+                    _venta_detalle(p1, cantidad="1", precio="10"),
+                    _venta_detalle(p2, cantidad="1", precio="20"),
+                ],
+            },
         )
     finally:
         db.close()
-    return {"categoria": categoria, "i1": i1, "i2": i2, "tipo": tipo,
-            "p1": p1, "p2": p2, "venta": venta}
+    return {
+        "categoria": categoria,
+        "i1": i1,
+        "i2": i2,
+        "tipo": tipo,
+        "p1": p1,
+        "p2": p2,
+        "venta": venta,
+    }
 
 
 def _cleanup_ctx_dos_lineas(ctx: dict) -> None:

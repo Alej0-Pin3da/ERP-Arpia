@@ -40,9 +40,9 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Iterable
 
 from sqlalchemy import select
 
@@ -55,7 +55,7 @@ from app.models import (
     VarianteProducto,
 )
 from migrate.context import MigrationContext, session_scope
-from migrate.loaders import HojaInexistenteError, LibroMigracion, SHEET_BOUNDS
+from migrate.loaders import SHEET_BOUNDS, HojaInexistenteError, LibroMigracion
 
 # --------------------------------------------------------------------------- #
 # Canonical catalog content (spec CAT-1..CAT-4)
@@ -120,9 +120,7 @@ PRODUCTOS_CATALOGO: tuple[dict[str, object], ...] = (
 # un digito, unificando variantes ortograficas de un mismo material en la clave
 # (compra 'Argolla numero 10 mm' == BOM 'Argolla 10 mm'). Se aplica SOLO en la
 # clave de dedup (el display name conserva la grafia original del Excel).
-_SINONIMOS_NUMERO_RE = re.compile(
-    r"\b(?:numero|nro|num|no)\s*\.?\s+(?=\d)|nº\s+(?=\d)|n°\s+(?=\d)"
-)
+_SINONIMOS_NUMERO_RE = re.compile(r"\b(?:numero|nro|num|no)\s*\.?\s+(?=\d)|nº\s+(?=\d)|n°\s+(?=\d)")
 
 
 def normalizar_nombre(texto: object) -> str:
@@ -140,8 +138,7 @@ def clave_normalizada(nombre: object) -> str:
     """
     texto = normalizar_nombre(nombre).casefold()
     texto = "".join(
-        ch for ch in unicodedata.normalize("NFD", texto)
-        if unicodedata.category(ch) != "Mn"
+        ch for ch in unicodedata.normalize("NFD", texto) if unicodedata.category(ch) != "Mn"
     )
     return _SINONIMOS_NUMERO_RE.sub("", texto)
 
@@ -196,25 +193,74 @@ def _unidad_de_cantidad(cantidad: object) -> str | None:
 
 _CATEGORIA_KEYWORDS: dict[str, tuple[str, ...]] = {
     "Empaques": (
-        "gafete", "caja", "bolsa", "papel", "vela", "etiqueta", "sticker",
-        "tarjeta", "empaque", "envoltura", "envio",
+        "gafete",
+        "caja",
+        "bolsa",
+        "papel",
+        "vela",
+        "etiqueta",
+        "sticker",
+        "tarjeta",
+        "empaque",
+        "envoltura",
+        "envio",
     ),
     "Herrajes": (
-        "argolla", "tensor", "aro", "varilla", "barilla", "gancho", "ocho",
-        "zeta", "boton", "cremallera", "cadena", "cierre", "tapa", "tubo",
-        "mosqueton", "ojal", "broche", "velcro", "cordon", "puntilla",
+        "argolla",
+        "tensor",
+        "aro",
+        "varilla",
+        "barilla",
+        "gancho",
+        "ocho",
+        "zeta",
+        "boton",
+        "cremallera",
+        "cadena",
+        "cierre",
+        "tapa",
+        "tubo",
+        "mosqueton",
+        "ojal",
+        "broche",
+        "velcro",
+        "cordon",
+        "puntilla",
     ),
     "Telas": (
-        "tela", "tul", "encaje", "satin", "malla", "gasa", "velo", "franela",
-        "lycra", "maya", "poli", "gabardina", "entretela", "lino", "algodon",
-        "jersey", "pitillo", "sesgo", "elastico", "contorno", "framilon",
-        "cinta", "tira", "mallas",
+        "tela",
+        "tul",
+        "encaje",
+        "satin",
+        "malla",
+        "gasa",
+        "velo",
+        "franela",
+        "lycra",
+        "maya",
+        "poli",
+        "gabardina",
+        "entretela",
+        "lino",
+        "algodon",
+        "jersey",
+        "pitillo",
+        "sesgo",
+        "elastico",
+        "contorno",
+        "framilon",
+        "cinta",
+        "tira",
+        "mallas",
     ),
     "Químicos": ("quimico", "tinte", "pegante", "silicona", "pintura"),
 }
 
 _UNIDAD_FINAL_POR_CATEGORIA: dict[str, str] = {
-    "Telas": "m", "Herrajes": "un", "Empaques": "un", "Químicos": "kg",
+    "Telas": "m",
+    "Herrajes": "un",
+    "Empaques": "un",
+    "Químicos": "kg",
 }
 
 
@@ -256,13 +302,39 @@ def clasificar_material(nombre: object, cantidad: object = None) -> tuple[str, s
 # --------------------------------------------------------------------------- #
 
 _JUNK_SUBCADENA = (
-    "costo total", "ganancia", "precio", "venta", "total conjunto",
-    "hora de trabajo", "horas de trabajo", "trabajo",
+    "costo total",
+    "ganancia",
+    "precio",
+    "venta",
+    "total conjunto",
+    "hora de trabajo",
+    "horas de trabajo",
+    "trabajo",
 )
 _JUNK_EXACTOS = frozenset(
-    {"total", "ganancia", "venta", "precio", "costo", "arpia", "mar",
-     "material", "herrajes", "prendas", "xs", "s", "m", "l", "xl",
-     "xxl", "xxs", "tipo", "ur", "requiere", "ubicacion"}
+    {
+        "total",
+        "ganancia",
+        "venta",
+        "precio",
+        "costo",
+        "arpia",
+        "mar",
+        "material",
+        "herrajes",
+        "prendas",
+        "xs",
+        "s",
+        "m",
+        "l",
+        "xl",
+        "xxl",
+        "xxs",
+        "tipo",
+        "ur",
+        "requiere",
+        "ubicacion",
+    }
 )
 
 
@@ -352,9 +424,7 @@ class CatalogPlan:
 # Workbook -> plan (bounded read, pure aggregate)
 # --------------------------------------------------------------------------- #
 
-_CAJAS_EMPAQUES = frozenset(
-    {"caja", "vela", "papel", "envio", "bolsa", "etiqueta", "tarjeta"}
-)
+_CAJAS_EMPAQUES = frozenset({"caja", "vela", "papel", "envio", "bolsa", "etiqueta", "tarjeta"})
 
 
 def _leer_proveedores(libro: LibroMigracion, report) -> list[ProveedorPlan]:
@@ -564,7 +634,9 @@ def upsert_producto(
         v.nombre_variante: v
         for v in db.execute(
             select(VarianteProducto).where(VarianteProducto.producto_id == producto.id)
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     }
     for nombre_variante in variantes:
         limpio = normalizar_nombre(nombre_variante)
@@ -586,9 +658,7 @@ def aplicar_plan(db, plan: CatalogPlan, report=None) -> dict[str, int]:
         upsert_proveedor(db, proveedor.nombre, url=proveedor.url, ubicacion=proveedor.ubicacion)
         totales["proveedores"] += 1
     for insumo in plan.insumos:
-        upsert_insumo(
-            db, insumo.nombre, unidad=insumo.unidad, categoria_nombre=insumo.categoria
-        )
+        upsert_insumo(db, insumo.nombre, unidad=insumo.unidad, categoria_nombre=insumo.categoria)
         totales["insumos"] += 1
     for producto in plan.productos:
         upsert_producto(db, producto.nombre, producto.tipo, producto.variantes)
@@ -596,7 +666,9 @@ def aplicar_plan(db, plan: CatalogPlan, report=None) -> dict[str, int]:
         totales["variantes"] += len(producto.variantes)
     if report:
         report.info(
-            "F1", None, None,
+            "F1",
+            None,
+            None,
             f"upsert aplicados: {totales['proveedores']} proveedores, "
             f"{totales['insumos']} insumos, {totales['productos']} productos, "
             f"{totales['variantes']} variantes",
@@ -613,7 +685,9 @@ def bootstrap_catalog_phase(ctx: MigrationContext) -> None:
     """F0: bootstrap (categorias + Tipos_Producto), idempotente, sin Excel."""
     if ctx.session is None:
         ctx.report.info(
-            "F0", None, None,
+            "F0",
+            None,
+            None,
             f"plan bootstrap: {len(BASE_CATEGORIAS)} categorias + "
             f"{len(TIPOS_CATALOGO)} Tipos_Producto (dry-run, 0 escrituras)",
         )
@@ -632,7 +706,9 @@ def catalogar(ctx: MigrationContext) -> CatalogPlan:
         plan = plan_catalogo(libro, report)
 
     report.info(
-        "F1", None, None,
+        "F1",
+        None,
+        None,
         f"plan catalogo: {plan.conteo_proveedores} proveedores, "
         f"{plan.conteo_insumos} insumos, {plan.conteo_productos} productos, "
         f"{plan.conteo_tipos} tipos",

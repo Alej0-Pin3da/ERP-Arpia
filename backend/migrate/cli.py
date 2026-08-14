@@ -30,9 +30,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from migrate import FASES, FASE_RUNNERS, get_fase
+from migrate import FASE_RUNNERS, FASES, get_fase
 from migrate.context import FaseOptions, MigrationContext
-from migrate.loaders import HojaInexistenteError, LibroMigracion, SHEET_BOUNDS
+from migrate.loaders import SHEET_BOUNDS, HojaInexistenteError, LibroMigracion
 from migrate.report import LEVEL_ERROR, NIVELES, Report
 
 _DEFAULT_SOURCE = Path(__file__).resolve().parents[2] / "ARPIA.xlsx"
@@ -180,9 +180,7 @@ def ejecutar(
         # NFR-2: el report interno del runner (conteos por fase) se pinta en stdout.
         _emitir_entradas(ctx.report.entradas)
         # EXM-6: conteos por fase + entradas del runner en la traza de la corrida.
-        run_report.conteos_por_fase[fase_id] = {
-            nivel: ctx.report.count(nivel) for nivel in NIVELES
-        }
+        run_report.conteos_por_fase[fase_id] = {nivel: ctx.report.count(nivel) for nivel in NIVELES}
         run_report.entradas.extend(ctx.report.entradas)
 
     # EXM-6: persistir la traza JSON (reports/migracion_YYYYMMDD_HHMMSS.json)

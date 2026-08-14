@@ -149,9 +149,7 @@ def _make_linea_insumo(
         db.close()
 
 
-def _make_linea_producto(
-    combo_id: int, incluido_id: int, cantidad: str = "1"
-) -> int:
+def _make_linea_producto(combo_id: int, incluido_id: int, cantidad: str = "1") -> int:
     db = SessionLocal()
     try:
         linea = BomProducto(
@@ -187,9 +185,7 @@ def _cleanup_producto(producto_id: int) -> None:
                 BomProducto.producto_incluido_id == producto_id,
             )
         ).delete(synchronize_session=False)
-        db.query(VarianteProducto).filter(
-            VarianteProducto.producto_id == producto_id
-        ).delete()
+        db.query(VarianteProducto).filter(VarianteProducto.producto_id == producto_id).delete()
         db.query(Producto).filter(Producto.id == producto_id).delete()
         db.commit()
     finally:
@@ -199,9 +195,7 @@ def _cleanup_producto(producto_id: int) -> None:
 def _cleanup_tipo(tipo_id: int) -> None:
     db = SessionLocal()
     try:
-        producto_ids = db.query(Producto.id).filter(
-            Producto.tipo_producto_id == tipo_id
-        )
+        producto_ids = db.query(Producto.id).filter(Producto.tipo_producto_id == tipo_id)
         db.query(BomInsumo).filter(BomInsumo.producto_id.in_(producto_ids)).delete(
             synchronize_session=False
         )
@@ -211,9 +205,9 @@ def _cleanup_tipo(tipo_id: int) -> None:
                 BomProducto.producto_incluido_id.in_(producto_ids),
             )
         ).delete(synchronize_session=False)
-        db.query(VarianteProducto).filter(
-            VarianteProducto.producto_id.in_(producto_ids)
-        ).delete(synchronize_session=False)
+        db.query(VarianteProducto).filter(VarianteProducto.producto_id.in_(producto_ids)).delete(
+            synchronize_session=False
+        )
         db.query(Producto).filter(Producto.tipo_producto_id == tipo_id).delete(
             synchronize_session=False
         )
@@ -266,9 +260,7 @@ def _count_bom_insumo_queries_for(producto_id: int):
 
     def _before_execute(conn, cursor, statement, parameters, context, executemany):
         if '"BOM_Productos"' in statement:
-            values = parameters.values() if isinstance(parameters, dict) else (
-                parameters or ()
-            )
+            values = parameters.values() if isinstance(parameters, dict) else (parameters or ())
             if producto_id in values:
                 holder["count"] += 1
 
@@ -299,9 +291,7 @@ def test_costo_single_level_insumos():
 def test_costo_desperdicio_en_contribucion_insumo():
     categoria_id, insumo_id, tipo_id = _setup_insumo_base(costo="5")
     producto_id = _make_producto(tipo_id)
-    _make_linea_insumo(
-        producto_id, insumo_id, cantidad="10", desperdicio="20"
-    )
+    _make_linea_insumo(producto_id, insumo_id, cantidad="10", desperdicio="20")
     try:
         db = SessionLocal()
         try:
@@ -439,9 +429,7 @@ def test_costo_ciclo_directo_409():
 def test_costo_precision_sin_redondeo():
     categoria_id, insumo_id, tipo_id = _setup_insumo_base(costo="5")
     producto_id = _make_producto(tipo_id)
-    _make_linea_insumo(
-        producto_id, insumo_id, cantidad="10", desperdicio="33.3333"
-    )
+    _make_linea_insumo(producto_id, insumo_id, cantidad="10", desperdicio="33.3333")
     try:
         db = SessionLocal()
         try:
@@ -593,9 +581,7 @@ def test_get_costo_returns_total_y_desglose(client, admin_token):
 
 
 def test_get_costo_missing_returns_404(client, admin_token):
-    resp = client.get(
-        f"{BASE}/99999999/costo", headers=_auth(admin_token)
-    )
+    resp = client.get(f"{BASE}/99999999/costo", headers=_auth(admin_token))
     assert resp.status_code == 404
 
 

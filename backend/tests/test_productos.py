@@ -75,9 +75,7 @@ def _cleanup_variante(variante_id: int) -> None:
 def _cleanup_producto(producto_id: int) -> None:
     db = SessionLocal()
     try:
-        db.query(VarianteProducto).filter(
-            VarianteProducto.producto_id == producto_id
-        ).delete()
+        db.query(VarianteProducto).filter(VarianteProducto.producto_id == producto_id).delete()
         db.query(Producto).filter(Producto.id == producto_id).delete()
         db.commit()
     finally:
@@ -104,9 +102,7 @@ def _cleanup_tipo(tipo_id: int) -> None:
 def _producto_named_exists(nombre: str) -> bool:
     db = SessionLocal()
     try:
-        return (
-            db.query(Producto.id).filter(Producto.nombre == nombre).first() is not None
-        )
+        return db.query(Producto.id).filter(Producto.nombre == nombre).first() is not None
     finally:
         db.close()
 
@@ -530,16 +526,12 @@ def test_create_tipo_requires_auth(client):
 
 
 def test_create_producto_requires_auth(client):
-    resp = client.post(
-        "/api/v1/productos", json={"tipo_producto_id": 1, "nombre": "Sin Token"}
-    )
+    resp = client.post("/api/v1/productos", json={"tipo_producto_id": 1, "nombre": "Sin Token"})
     assert resp.status_code == 401
 
 
 def test_create_variante_requires_auth(client):
-    resp = client.post(
-        "/api/v1/productos/1/variantes", json={"nombre_variante": "Sin Token"}
-    )
+    resp = client.post("/api/v1/productos/1/variantes", json={"nombre_variante": "Sin Token"})
     assert resp.status_code == 401
 
 

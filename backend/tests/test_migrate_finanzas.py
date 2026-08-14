@@ -24,7 +24,7 @@ migration data; the canonical catalog tipos inserted by bootstrap_catalogo()
 are removed at module cleanup (same pattern as the other test_migrate_*).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -60,9 +60,9 @@ P_CURSO = f"{PREFIX} Curso"
 P_ENVIO = f"{PREFIX} Envio Materiales"
 P_MARG = f"{PREFIX} Marg Equipo"
 
-FECHA_TERMO = datetime(2023, 3, 17, tzinfo=timezone.utc)
-FECHA_EQUIPO = datetime(2024, 2, 8, tzinfo=timezone.utc)
-FECHA_CURSO = datetime(2025, 1, 16, tzinfo=timezone.utc)
+FECHA_TERMO = datetime(2023, 3, 17, tzinfo=UTC)
+FECHA_EQUIPO = datetime(2024, 2, 8, tzinfo=UTC)
+FECHA_CURSO = datetime(2025, 1, 16, tzinfo=UTC)
 
 
 # --------------------------------------------------------------------------- #
@@ -110,9 +110,9 @@ def _mini_workbook(path: Path) -> None:
     inv.cell(row=5, column=5, value=datetime(2023, 12, 1))
     # R6: right price sub-table (J..N) duplicates a purchase -> never a movement.
     inv.cell(row=6, column=10, value="Tensor 8")  # J
-    inv.cell(row=6, column=11, value=100)         # K
-    inv.cell(row=6, column=12, value=1)           # L
-    inv.cell(row=6, column=13, value=6600)        # M
+    inv.cell(row=6, column=11, value=100)  # K
+    inv.cell(row=6, column=12, value=1)  # L
+    inv.cell(row=6, column=13, value=6600)  # M
 
     marg = wb.create_sheet("INVERSION MARGARA")
     marg.cell(row=2, column=1, value="Cantidad")
@@ -159,12 +159,10 @@ def _borrar_test(db) -> None:
     """Limpia solo lo de este modulo: movimientos test, insumo."""
     mids = _movimientos_id_de_test(db)
     if mids:
-        db.query(MovimientoFinanciero).filter(
-            MovimientoFinanciero.id.in_(mids)
-        ).delete(synchronize_session=False)
-    db.query(Insumo).filter(Insumo.nombre == P_BOM_TELA).delete(
-        synchronize_session=False
-    )
+        db.query(MovimientoFinanciero).filter(MovimientoFinanciero.id.in_(mids)).delete(
+            synchronize_session=False
+        )
+    db.query(Insumo).filter(Insumo.nombre == P_BOM_TELA).delete(synchronize_session=False)
     db.commit()
 
 
@@ -190,28 +188,26 @@ def _borrar_socios_y_tipos(db) -> None:
     Solo se borran socios sin movimientos (o con movimientos de TEST, que se
     limpian primero); un socio con movimientos reales nunca se borra."""
     # Movimientos de test por socio, primero.
-    mids = db.query(MovimientoFinanciero).filter(
-        MovimientoFinanciero.descripcion.like(f"{PREFIX}%")
-    ).all()
+    mids = (
+        db.query(MovimientoFinanciero)
+        .filter(MovimientoFinanciero.descripcion.like(f"{PREFIX}%"))
+        .all()
+    )
     if mids:
         db.query(MovimientoFinanciero).filter(
             MovimientoFinanciero.id.in_([m.id for m in mids])
         ).delete(synchronize_session=False)
     for nombre in SOCIOS_ESPERADOS:
-        socio = db.query(SociosConfiguracion).filter(
-            SociosConfiguracion.nombre == nombre
-        ).first()
+        socio = db.query(SociosConfiguracion).filter(SociosConfiguracion.nombre == nombre).first()
         if socio is None:
             continue
-        con_movimientos = db.query(MovimientoFinanciero).filter(
-            MovimientoFinanciero.socio_id == socio.id
-        ).first()
+        con_movimientos = (
+            db.query(MovimientoFinanciero).filter(MovimientoFinanciero.socio_id == socio.id).first()
+        )
         if con_movimientos is None:
             db.delete(socio)
     db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
+        TipoProducto.nombre.in_(["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"])
     ).delete(synchronize_session=False)
     db.commit()
 
@@ -265,8 +261,6 @@ def test_clasificar_prestamo_rafael_tipo_inversion():
 def _plan_de(path):
     from migrate.finanzas import plan_finanzas
 
-    from migrate.loaders import LibroMigracion
-
     with LibroMigracion(path) as libro:
         return plan_finanzas(libro)
 
@@ -286,7 +280,7 @@ def test_plan_fechas_reales_y_montos(mini_finanzas):
     plan = _plan_de(mini_finanzas)
     termo = [m for m in plan.movimientos if m.descripcion == P_TERMO][0]
     assert termo.monto == Decimal("960000")
-    assert termo.fecha == datetime(2023, 3, 17, tzinfo=timezone.utc)
+    assert termo.fecha == datetime(2023, 3, 17, tzinfo=UTC)
     assert termo.tipo == "Inversion"
 
 
@@ -309,11 +303,10 @@ def test_aplicar_crea_socios_batch_40_30_30(db, mini_finanzas):
 
     _preparar_entorno(db)  # bootstrap (sin borrar socios previos)
     plan = _plan_de(mini_finanzas)
-    res = aplicar_finanzas(db, plan)
+    aplicar_finanzas(db, plan)
     db.commit()
 
-    socios = {s.nombre: s.porcentaje_participacion
-              for s in db.query(SociosConfiguracion).all()}
+    socios = {s.nombre: s.porcentaje_participacion for s in db.query(SociosConfiguracion).all()}
     for nombre, pct in SOCIOS_ESPERADOS.items():
         assert socios.get(nombre) == pct
     # Suma == 100 de los 3 socios canonicos (FIN-2: la garantiza el pipeline)
@@ -347,11 +340,7 @@ def test_aplicar_persiste_fecha_real(mini_finanzas, db):
     aplicar_finanzas(db, plan)
     db.commit()
 
-    mov = (
-        db.query(MovimientoFinanciero)
-        .filter(MovimientoFinanciero.descripcion == P_TERMO)
-        .one()
-    )
+    mov = db.query(MovimientoFinanciero).filter(MovimientoFinanciero.descripcion == P_TERMO).one()
     assert mov.fecha.strftime("%Y-%m-%d") == "2023-03-17"
     assert mov.tipo == "Inversion"
     assert mov.monto == Decimal("960000")
@@ -366,9 +355,7 @@ def test_prestamo_rafael_socio_id_null(mini_finanzas, db):
     db.commit()
 
     mov = (
-        db.query(MovimientoFinanciero)
-        .filter(MovimientoFinanciero.descripcion == P_PRESTAMO)
-        .one()
+        db.query(MovimientoFinanciero).filter(MovimientoFinanciero.descripcion == P_PRESTAMO).one()
     )
     assert mov.tipo == "Inversion"
     assert mov.socio_id is None  # decision 2: NO se crea socio Rafael
@@ -425,9 +412,7 @@ def test_cargar_finanzas_dry_run_real_no_escribe():
     db = SessionLocal()
     try:
         antes = db.query(MovimientoFinanciero).count()
-        ctx = MigrationContext.para_fase(
-            FaseOptions(source=REAL_XLSX, modo="dry-run"), "F6"
-        )
+        ctx = MigrationContext.para_fase(FaseOptions(source=REAL_XLSX, modo="dry-run"), "F6")
         plan = cargar_finanzas(ctx)
         despues = db.query(MovimientoFinanciero).count()
         assert antes == despues  # NFR-2: 0 filas escritas

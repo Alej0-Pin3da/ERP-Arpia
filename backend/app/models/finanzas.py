@@ -4,12 +4,12 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
     Numeric,
     String,
-    CheckConstraint,
     func,
     text,
 )
@@ -29,9 +29,7 @@ class SociosConfiguracion(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nombre: Mapped[str] = mapped_column(String(150), unique=True, nullable=False)
-    porcentaje_participacion: Mapped[Decimal] = mapped_column(
-        Numeric(15, 4), nullable=False
-    )
+    porcentaje_participacion: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
     # Multi-row invariant "sum of percentages == 100" cannot be enforced as a
     # single-row CHECK constraint in PostgreSQL; it is validated in the service layer,
     # not in SQL. The check above only guarantees each row is positive.

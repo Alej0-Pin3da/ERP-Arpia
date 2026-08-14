@@ -18,7 +18,7 @@ Business phases (catalog, purchases, ...) receive a ``MigrationContext``.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import dataclass, field, fields, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from migrate.report import Report
@@ -48,14 +48,14 @@ class MigrationContext:
     session: object | None = None
 
     @classmethod
-    def para_fase(cls, options: FaseOptions, fase_id: str) -> "MigrationContext":
+    def para_fase(cls, options: FaseOptions, fase_id: str) -> MigrationContext:
         return cls(
             options=options,
             fase_id=fase_id,
             report=Report(fase=fase_id, modo=options.modo),
         )
 
-    def con_session(self, session: object) -> "MigrationContext":
+    def con_session(self, session: object) -> MigrationContext:
         """Return a copy bound to the given SQLAlchemy session (commit mode)."""
         return replace(self, session=session)
 

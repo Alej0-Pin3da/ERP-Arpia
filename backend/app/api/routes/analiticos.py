@@ -58,14 +58,11 @@ def ventas_mensuales(
             func.coalesce(func.sum(Venta.total_venta), 0).label("total"),
             func.count(Venta.id).label("cantidad"),
         )
-        .where(Venta.estado != "anulada", Venta.es_regalo == False)
+        .where(Venta.estado != "anulada", Venta.es_regalo.is_(False))
         .group_by(mes)
         .order_by(mes)
     ).all()
-    return [
-        VentasMensualesRead(mes=r.mes.date(), total=r.total, cantidad=r.cantidad)
-        for r in rows
-    ]
+    return [VentasMensualesRead(mes=r.mes.date(), total=r.total, cantidad=r.cantidad) for r in rows]
 
 
 @router.get("/insumos-bajo-stock", response_model=list[InsumoBajoStockRead])
@@ -76,9 +73,7 @@ def insumos_bajo_stock(
     """Insumos whose stock_actual is below stock_minimo, with their minima
     (ANA-2)."""
     rows = db.scalars(
-        select(Insumo)
-        .where(Insumo.stock_actual < Insumo.stock_minimo)
-        .order_by(Insumo.id)
+        select(Insumo).where(Insumo.stock_actual < Insumo.stock_minimo).order_by(Insumo.id)
     ).all()
     return [
         InsumoBajoStockRead(
@@ -100,9 +95,7 @@ def margen_por_producto(
     """Margin per (producto, variante): SUM and AVG of
     (precio - costo_unitario_aplicado) from the Detalle_Ventas SNAPSHOT only,
     excluding anulada sales (ANA-3)."""
-    margen = (
-        DetalleVenta.precio_unitario_aplicado - DetalleVenta.costo_unitario_aplicado
-    )
+    margen = DetalleVenta.precio_unitario_aplicado - DetalleVenta.costo_unitario_aplicado
     rows = db.execute(
         select(
             DetalleVenta.producto_id,
@@ -111,7 +104,7 @@ def margen_por_producto(
             cast(func.avg(margen), Numeric(15, 4)).label("margen_promedio"),
         )
         .join(Venta, DetalleVenta.venta_id == Venta.id)
-        .where(Venta.estado != "anulada", Venta.es_regalo == False)
+        .where(Venta.estado != "anulada", Venta.es_regalo.is_(False))
         .group_by(DetalleVenta.producto_id, DetalleVenta.variante_id)
         .order_by(DetalleVenta.producto_id)
     ).all()
@@ -137,9 +130,7 @@ def top_productos(
     # One expression object reused in SELECT/ORDER BY so SQLAlchemy binds the
     # aggregate identically in every occurrence.
     unidades_total = func.sum(DetalleVenta.cantidad)
-    ingresos_total = func.sum(
-        DetalleVenta.cantidad * DetalleVenta.precio_unitario_aplicado
-    )
+    ingresos_total = func.sum(DetalleVenta.cantidad * DetalleVenta.precio_unitario_aplicado)
     rows = db.execute(
         select(
             DetalleVenta.producto_id,
@@ -147,7 +138,7 @@ def top_productos(
             cast(ingresos_total, Numeric(15, 4)).label("ingresos"),
         )
         .join(Venta, DetalleVenta.venta_id == Venta.id)
-        .where(Venta.estado != "anulada", Venta.es_regalo == False)
+        .where(Venta.estado != "anulada", Venta.es_regalo.is_(False))
         .group_by(DetalleVenta.producto_id)
         .order_by(unidades_total.desc(), DetalleVenta.producto_id)
     ).all()
@@ -210,7 +201,7 @@ def finanzas_mensuales(
             mes_ventas.label("mes"),
             func.coalesce(func.sum(Venta.total_venta), 0).label("ingresos"),
         )
-        .where(Venta.estado != "anulada", Venta.es_regalo == False)
+        .where(Venta.estado != "anulada", Venta.es_regalo.is_(False))
         .group_by(mes_ventas)
     ).all()
     movimientos_rows = db.execute(
@@ -237,7 +228,4 @@ def finanzas_mensuales(
             {"mes": r.mes.date(), "ingresos": Decimal("0"), "gastos": Decimal("0")},
         )["gastos"] = r.gastos
 
-    return [
-        FinanzasMensualesRead(**por_mes[mes])
-        for mes in sorted(por_mes)
-    ]
+    return [FinanzasMensualesRead(**por_mes[mes]) for mes in sorted(por_mes)]

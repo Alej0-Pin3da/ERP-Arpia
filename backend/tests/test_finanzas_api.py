@@ -47,7 +47,9 @@ def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _movimiento_payload(tipo: str = "Gasto", monto: str = "10", socio_id: int | None = None) -> dict:
+def _movimiento_payload(
+    tipo: str = "Gasto", monto: str = "10", socio_id: int | None = None
+) -> dict:
     return {
         "tipo": tipo,
         "descripcion": f"Movimiento {_unique()}",
@@ -143,9 +145,7 @@ def test_post_movimiento_tipo_invalido_422(client, admin_token):
 
 def test_get_movimientos_consulta_allowed(client, consulta_token):
     """consulta CAN GET /finanzas/movimientos (audited list, FIN-1)."""
-    resp = client.get(
-        "/api/v1/finanzas/movimientos", headers=_auth(consulta_token)
-    )
+    resp = client.get("/api/v1/finanzas/movimientos", headers=_auth(consulta_token))
     assert resp.status_code == 200
     body = resp.json()
     assert set(body.keys()) == {"items", "total"}
@@ -200,15 +200,11 @@ def test_delete_movimiento_soft_delete(client, admin_token):
     assert created.status_code == 201
     mov_id = created.json()["id"]
     try:
-        resp = client.delete(
-            f"/api/v1/finanzas/movimientos/{mov_id}", headers=_auth(admin_token)
-        )
+        resp = client.delete(f"/api/v1/finanzas/movimientos/{mov_id}", headers=_auth(admin_token))
         assert resp.status_code == 200
         assert resp.json()["estado"] == "inactivo"
 
-        lista = client.get(
-            "/api/v1/finanzas/movimientos", headers=_auth(admin_token)
-        )
+        lista = client.get("/api/v1/finanzas/movimientos", headers=_auth(admin_token))
         assert lista.status_code == 200
         assert mov_id not in [m["id"] for m in lista.json()["items"]]
     finally:
@@ -217,9 +213,7 @@ def test_delete_movimiento_soft_delete(client, admin_token):
 
 def test_delete_movimiento_404(client, admin_token):
     """Unknown movimiento id -> 404."""
-    resp = client.delete(
-        "/api/v1/finanzas/movimientos/99999999", headers=_auth(admin_token)
-    )
+    resp = client.delete("/api/v1/finanzas/movimientos/99999999", headers=_auth(admin_token))
     assert resp.status_code == 404
 
 
@@ -332,9 +326,7 @@ def test_get_socios_sort_server_side(client, admin_token):
             headers=_auth(admin_token),
         )
         assert resp.status_code == 200
-        porcentajes = [
-            Decimal(s["porcentaje_participacion"]) for s in resp.json()["items"]
-        ]
+        porcentajes = [Decimal(s["porcentaje_participacion"]) for s in resp.json()["items"]]
         assert porcentajes == sorted(porcentajes, reverse=True)
         assert porcentajes[:2] == [Decimal("60.0000"), Decimal("30.0000")]
         assert {s["id"] for s in resp.json()["items"][:2]} == {a_id, b_id}
@@ -433,9 +425,7 @@ def test_socio_eliminar_bloqueado_con_pagos_409(client, admin_token):
             headers=_auth(admin_token),
         )
         assert mov.status_code == 201
-        resp = client.delete(
-            f"/api/v1/finanzas/socios/{a_id}", headers=_auth(admin_token)
-        )
+        resp = client.delete(f"/api/v1/finanzas/socios/{a_id}", headers=_auth(admin_token))
         assert resp.status_code == 409
     finally:
         _cleanup_all()
@@ -532,9 +522,7 @@ def test_patch_movimiento_soft_deleted_404(client, admin_token):
     """Soft-deleted movimiento -> 404."""
     try:
         mov_id = _crear_movimiento_activo(client, admin_token)
-        resp = client.delete(
-            f"/api/v1/finanzas/movimientos/{mov_id}", headers=_auth(admin_token)
-        )
+        resp = client.delete(f"/api/v1/finanzas/movimientos/{mov_id}", headers=_auth(admin_token))
         assert resp.status_code == 200
         resp = client.patch(
             f"/api/v1/finanzas/movimientos/{mov_id}",

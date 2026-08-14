@@ -27,8 +27,8 @@ from app.models import (
     BomInsumo,
     CategoriaInsumo,
     Cliente,
-    Devolucion,
     DetalleVenta,
+    Devolucion,
     Insumo,
     Producto,
     TipoProducto,
@@ -105,9 +105,7 @@ def _make_producto(tipo_producto_id: int) -> int:
         db.close()
 
 
-def _make_linea_insumo(
-    producto_id: int, insumo_id: int, cantidad: str = "1"
-) -> None:
+def _make_linea_insumo(producto_id: int, insumo_id: int, cantidad: str = "1") -> None:
     db = SessionLocal()
     try:
         db.add(
@@ -162,9 +160,9 @@ def _count_devoluciones(venta_id: int) -> int:
 def _cleanup_devoluciones(venta_ids: list[int]) -> None:
     db = SessionLocal()
     try:
-        db.query(Devolucion).filter(
-            Devolucion.venta_id.in_(venta_ids)
-        ).delete(synchronize_session=False)
+        db.query(Devolucion).filter(Devolucion.venta_id.in_(venta_ids)).delete(
+            synchronize_session=False
+        )
         db.commit()
     finally:
         db.close()
@@ -173,12 +171,8 @@ def _cleanup_devoluciones(venta_ids: list[int]) -> None:
 def _cleanup_ventas_for_producto(producto_id: int) -> None:
     db = SessionLocal()
     try:
-        ven_ids = select(DetalleVenta.venta_id).where(
-            DetalleVenta.producto_id == producto_id
-        )
-        db.query(Venta).filter(Venta.id.in_(ven_ids)).delete(
-            synchronize_session=False
-        )
+        ven_ids = select(DetalleVenta.venta_id).where(DetalleVenta.producto_id == producto_id)
+        db.query(Venta).filter(Venta.id.in_(ven_ids)).delete(synchronize_session=False)
         db.commit()
     finally:
         db.close()
@@ -404,9 +398,7 @@ def test_post_devolucion_total_sin_bom_400(client, admin_token):
 # ---------------------------------------------------------------------------
 
 
-def test_post_devolucion_parcial_201_restaura_solo_linea_devuelta(
-    client, admin_token
-):
+def test_post_devolucion_parcial_201_restaura_solo_linea_devuelta(client, admin_token):
     """Partial -> 201, only the returned line's insumo restored, sale stays
     'completada', refund = line subtotal at snapshot price (DEV-2)."""
     cat_id = _make_categoria()
@@ -437,7 +429,12 @@ def test_post_devolucion_parcial_201_restaura_solo_linea_devuelta(
                 "venta_id": venta["id"],
                 "tipo": "parcial",
                 "items": [
-                    {"producto_id": p1, "variante_id": None, "cantidad": "1", "precio_unitario": "10"}
+                    {
+                        "producto_id": p1,
+                        "variante_id": None,
+                        "cantidad": "1",
+                        "precio_unitario": "10",
+                    }
                 ],
             },
             headers=_auth(admin_token),
@@ -465,9 +462,7 @@ def test_post_devolucion_parcial_201_restaura_solo_linea_devuelta(
         _cleanup_tipo(tipo_id)
 
 
-def test_post_devolucion_parcial_precio_snapshot_no_el_del_cliente(
-    client, admin_token
-):
+def test_post_devolucion_parcial_precio_snapshot_no_el_del_cliente(client, admin_token):
     """Refund uses the sale-time snapshot even when the client sends a
     different price in the payload (DEV-2 snapshot rule)."""
     cat_id = _make_categoria()
@@ -486,7 +481,12 @@ def test_post_devolucion_parcial_precio_snapshot_no_el_del_cliente(
                 "venta_id": v1["id"],
                 "tipo": "parcial",
                 "items": [
-                    {"producto_id": prod_id, "variante_id": None, "cantidad": "1", "precio_unitario": "999"}
+                    {
+                        "producto_id": prod_id,
+                        "variante_id": None,
+                        "cantidad": "1",
+                        "precio_unitario": "999",
+                    }
                 ],
             },
             headers=_auth(admin_token),
@@ -520,7 +520,12 @@ def test_post_devolucion_parcial_cantidad_excede_422(client, admin_token):
                 "venta_id": venta["id"],
                 "tipo": "parcial",
                 "items": [
-                    {"producto_id": prod_id, "variante_id": None, "cantidad": "6", "precio_unitario": "10"}
+                    {
+                        "producto_id": prod_id,
+                        "variante_id": None,
+                        "cantidad": "6",
+                        "precio_unitario": "10",
+                    }
                 ],
             },
             headers=_auth(admin_token),
@@ -591,7 +596,12 @@ def test_post_devolucion_doble_409(client, admin_token):
                 "venta_id": venta["id"],
                 "tipo": "parcial",
                 "items": [
-                    {"producto_id": prod_id, "variante_id": None, "cantidad": "1", "precio_unitario": "10"}
+                    {
+                        "producto_id": prod_id,
+                        "variante_id": None,
+                        "cantidad": "1",
+                        "precio_unitario": "10",
+                    }
                 ],
             },
             headers=_auth(admin_token),
@@ -603,7 +613,12 @@ def test_post_devolucion_doble_409(client, admin_token):
                 "venta_id": venta["id"],
                 "tipo": "parcial",
                 "items": [
-                    {"producto_id": prod_id, "variante_id": None, "cantidad": "1", "precio_unitario": "10"}
+                    {
+                        "producto_id": prod_id,
+                        "variante_id": None,
+                        "cantidad": "1",
+                        "precio_unitario": "10",
+                    }
                 ],
             },
             headers=_auth(admin_token),
@@ -643,7 +658,12 @@ def test_get_devoluciones_filtros_y_paginacion(client, admin_token):
                     "venta_id": vid,
                     "tipo": "parcial",
                     "items": [
-                        {"producto_id": prod_id, "variante_id": None, "cantidad": "1", "precio_unitario": "10"}
+                        {
+                            "producto_id": prod_id,
+                            "variante_id": None,
+                            "cantidad": "1",
+                            "precio_unitario": "10",
+                        }
                     ],
                 },
                 headers=_auth(admin_token),
@@ -663,9 +683,7 @@ def test_get_devoluciones_filtros_y_paginacion(client, admin_token):
         assert len(body["items"][0]["items"]) == 1
 
         # pagination -> at most 1 row
-        resp = client.get(
-            "/api/v1/devoluciones?limit=1", headers=_auth(admin_token)
-        )
+        resp = client.get("/api/v1/devoluciones?limit=1", headers=_auth(admin_token))
         assert resp.status_code == 200
         assert len(resp.json()["items"]) == 1
 
@@ -680,9 +698,7 @@ def test_get_devoluciones_filtros_y_paginacion(client, admin_token):
         assert body["total"] == 0
 
         # unknown venta -> empty
-        resp = client.get(
-            "/api/v1/devoluciones?venta_id=99999999", headers=_auth(admin_token)
-        )
+        resp = client.get("/api/v1/devoluciones?venta_id=99999999", headers=_auth(admin_token))
         assert resp.status_code == 200
         assert resp.json() == {"items": [], "total": 0}
     finally:

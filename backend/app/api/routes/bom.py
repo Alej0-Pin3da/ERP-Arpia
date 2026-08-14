@@ -27,9 +27,7 @@ def _get_producto_or_404(db: Session, producto_id: int) -> Producto:
     return producto
 
 
-def _validar_variante_del_producto(
-    db: Session, producto_id: int, variante_id: int
-) -> None:
+def _validar_variante_del_producto(db: Session, producto_id: int, variante_id: int) -> None:
     variante = db.get(VarianteProducto, variante_id)
     if variante is None or variante.producto_id != producto_id:
         raise HTTPException(
@@ -66,7 +64,7 @@ def validar_linea_insumo_unica(
         raise HTTPException(
             status_code=409,
             detail="BomInsumo line already exists for this product, insumo and variant",
-        )
+        ) from None
 
 
 def _validar_linea_producto_unica(
@@ -81,7 +79,7 @@ def _validar_linea_producto_unica(
     if db.scalars(stmt).first() is not None:
         raise HTTPException(
             status_code=409, detail="BomProducto line already exists for this combo"
-        )
+        ) from None
 
 
 # ---------------------------------------------------------------------------
@@ -96,11 +94,7 @@ def list_bom_insumos(
     _: Producto = Depends(audited_user),
 ):
     _get_producto_or_404(db, producto_id)
-    stmt = (
-        select(BomInsumo)
-        .where(BomInsumo.producto_id == producto_id)
-        .order_by(BomInsumo.id)
-    )
+    stmt = select(BomInsumo).where(BomInsumo.producto_id == producto_id).order_by(BomInsumo.id)
     return list(db.scalars(stmt).all())
 
 
@@ -130,7 +124,7 @@ def create_bom_insumo(
         raise HTTPException(
             status_code=409,
             detail="BomInsumo line already exists for this product, insumo and variant",
-        )
+        ) from None
     db.refresh(linea)
     return linea
 
@@ -166,14 +160,12 @@ def update_bom_insumo(
         raise HTTPException(
             status_code=409,
             detail="BomInsumo line already exists for this product, insumo and variant",
-        )
+        ) from None
     db.refresh(linea)
     return linea
 
 
-@router.delete(
-    "/{producto_id}/bom/insumos/{linea_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/{producto_id}/bom/insumos/{linea_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_bom_insumo(
     producto_id: int,
     linea_id: int,
@@ -200,11 +192,7 @@ def list_bom_productos(
     _: Producto = Depends(audited_user),
 ):
     _get_producto_or_404(db, producto_id)
-    stmt = (
-        select(BomProducto)
-        .where(BomProducto.combo_id == producto_id)
-        .order_by(BomProducto.id)
-    )
+    stmt = select(BomProducto).where(BomProducto.combo_id == producto_id).order_by(BomProducto.id)
     return list(db.scalars(stmt).all())
 
 
@@ -231,7 +219,7 @@ def create_bom_producto(
         db.rollback()
         raise HTTPException(
             status_code=409, detail="BomProducto line already exists for this combo"
-        )
+        ) from None
     db.refresh(linea)
     return linea
 
@@ -250,13 +238,12 @@ def update_bom_producto(
         raise HTTPException(status_code=404, detail="BomProducto not found")
     updates = payload.model_dump(exclude_unset=True)
     nuevo_incluido_id = updates.get("producto_incluido_id", linea.producto_incluido_id)
-    if nuevo_incluido_id != linea.producto_incluido_id and db.get(
-        Producto, nuevo_incluido_id
-    ) is None:
+    if (
+        nuevo_incluido_id != linea.producto_incluido_id
+        and db.get(Producto, nuevo_incluido_id) is None
+    ):
         raise HTTPException(status_code=400, detail="Producto does not exist")
-    _validar_linea_producto_unica(
-        db, producto_id, nuevo_incluido_id, exclude_id=linea_id
-    )
+    _validar_linea_producto_unica(db, producto_id, nuevo_incluido_id, exclude_id=linea_id)
     for field, value in updates.items():
         setattr(linea, field, value)
     try:
@@ -265,7 +252,7 @@ def update_bom_producto(
         db.rollback()
         raise HTTPException(
             status_code=409, detail="BomProducto line already exists for this combo"
-        )
+        ) from None
     db.refresh(linea)
     return linea
 

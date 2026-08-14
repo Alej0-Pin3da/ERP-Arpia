@@ -5,7 +5,6 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.security import decode_token
 from app.db.session import SessionLocal
 from app.models.usuarios import Usuario
@@ -38,7 +37,7 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from None
 
     user_id = payload.get("sub")
     if not user_id:

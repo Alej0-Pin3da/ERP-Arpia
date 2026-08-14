@@ -82,9 +82,7 @@ def get_fase(fase_id: str) -> Fase:
 
 
 # Fases whose business logic is already implemented (status reporting).
-FASES_IMPLEMENTADAS: tuple[str, ...] = (
-    "F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7"
-)
+FASES_IMPLEMENTADAS: tuple[str, ...] = ("F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7")
 
 
 __all__ = [

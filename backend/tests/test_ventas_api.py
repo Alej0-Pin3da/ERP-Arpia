@@ -17,7 +17,6 @@ BOM lines and clientes; FK-ordered cleanup.
 import uuid
 from decimal import Decimal
 
-import pytest
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
@@ -106,9 +105,7 @@ def _make_producto(tipo_producto_id: int) -> int:
 def _make_variante(producto_id: int) -> int:
     db = SessionLocal()
     try:
-        var = VarianteProducto(
-            producto_id=producto_id, nombre_variante=f"Variante {_unique()}"
-        )
+        var = VarianteProducto(producto_id=producto_id, nombre_variante=f"Variante {_unique()}")
         db.add(var)
         db.commit()
         db.refresh(var)
@@ -155,12 +152,8 @@ def _make_cliente() -> int:
 def _cleanup_ventas_for_producto(producto_id: int) -> None:
     db = SessionLocal()
     try:
-        ven_ids = select(DetalleVenta.venta_id).where(
-            DetalleVenta.producto_id == producto_id
-        )
-        db.query(Venta).filter(Venta.id.in_(ven_ids)).delete(
-            synchronize_session=False
-        )
+        ven_ids = select(DetalleVenta.venta_id).where(DetalleVenta.producto_id == producto_id)
+        db.query(Venta).filter(Venta.id.in_(ven_ids)).delete(synchronize_session=False)
         db.commit()
     finally:
         db.close()
@@ -170,9 +163,7 @@ def _cleanup_producto(producto_id: int) -> None:
     db = SessionLocal()
     try:
         db.query(BomInsumo).filter(BomInsumo.producto_id == producto_id).delete()
-        db.query(VarianteProducto).filter(
-            VarianteProducto.producto_id == producto_id
-        ).delete()
+        db.query(VarianteProducto).filter(VarianteProducto.producto_id == producto_id).delete()
         db.query(Producto).filter(Producto.id == producto_id).delete()
         db.commit()
     finally:
@@ -192,9 +183,7 @@ def _cleanup_insumo(insumo_id: int) -> None:
 def _cleanup_categoria(categoria_id: int) -> None:
     db = SessionLocal()
     try:
-        db.query(CategoriaInsumo).filter(
-            CategoriaInsumo.id == categoria_id
-        ).delete()
+        db.query(CategoriaInsumo).filter(CategoriaInsumo.id == categoria_id).delete()
         db.commit()
     finally:
         db.close()
@@ -445,7 +434,7 @@ def test_get_ventas_filtro_producto(client, operador_token):
 
 
 def _is_non_decreasing(values) -> bool:
-    return all(a <= b for a, b in zip(values, values[1:]))
+    return all(a <= b for a, b in zip(values, values[1:], strict=False))
 
 
 def test_list_ventas_sort_server_side(client, operador_token):
@@ -544,9 +533,7 @@ def test_create_venta_happy_path_cost_snapshot(client, admin_token):
         body = resp.json()
         assert body["id"] > 0
         assert len(body["detalles"]) == 1
-        assert Decimal(body["detalles"][0]["costo_unitario_aplicado"]) == Decimal(
-            "5.1234"
-        )
+        assert Decimal(body["detalles"][0]["costo_unitario_aplicado"]) == Decimal("5.1234")
         assert Decimal(body["detalles"][0]["cantidad"]) == Decimal("1")
         assert Decimal(body["total_venta"]) == Decimal("10.0000")  # 1 x 10
         assert _read_stock(ins_id) == Decimal("9")  # stock actually deducted

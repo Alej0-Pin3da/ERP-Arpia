@@ -25,7 +25,7 @@ migration data; the canonical catalog tipos inserted by bootstrap_catalogo()
 are removed at module cleanup (same pattern as the other test_migrate_*).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -70,22 +70,93 @@ def _mini_workbook(path: Path) -> None:
     ws = wb.active
     ws.title = "VENTAS"
     # Header (R1) — informational only (loader starts at R2).
-    ws.append(["Producto", "Set Ocipete", "Set Aelo", None, "Blusa Arpia ML",
-               None, "Precio Venta", "Costo", "Ganancias", None, None, None,
-               "Fecha", "Col 1", "Col 2", "Col 3"])
+    ws.append(
+        [
+            "Producto",
+            "Set Ocipete",
+            "Set Aelo",
+            None,
+            "Blusa Arpia ML",
+            None,
+            "Precio Venta",
+            "Costo",
+            "Ganancias",
+            None,
+            None,
+            None,
+            "Fecha",
+            "Col 1",
+            "Col 2",
+            "Col 3",
+        ]
+    )
     # R2: product with variant + cliente NOTES (price already discounted).
-    ws.append([P_SET, None, "S", None, None, None, 71250.0, 26109, 45141,
-               None, None, None, datetime(2026, 3, 20), "vino", "DESC 25%", P_CLI])
+    ws.append(
+        [
+            P_SET,
+            None,
+            "S",
+            None,
+            None,
+            None,
+            71250.0,
+            26109,
+            45141,
+            None,
+            None,
+            None,
+            datetime(2026, 3, 20),
+            "vino",
+            "DESC 25%",
+            P_CLI,
+        ]
+    )
     # R3: product without variant/talla.
-    ws.append([P_TOTE, None, None, None, None, None, 45000.0, 25765.09524,
-               19234.90476, None, None, None, datetime(2026, 4, 24), None,
-               None, P_CLI2])
+    ws.append(
+        [
+            P_TOTE,
+            None,
+            None,
+            None,
+            None,
+            None,
+            45000.0,
+            25765.09524,
+            19234.90476,
+            None,
+            None,
+            None,
+            datetime(2026, 4, 24),
+            None,
+            None,
+            P_CLI2,
+        ]
+    )
     # R4: no product -> SCOPE OUT (VTA-4).
-    ws.append([None, None, None, None, None, None, 95000.0, 29826.0, 65174,
-               None, None, None, datetime(2026, 5, 9), None, None, "Olga"])
+    ws.append(
+        [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            95000.0,
+            29826.0,
+            65174,
+            None,
+            None,
+            None,
+            datetime(2026, 5, 9),
+            None,
+            None,
+            "Olga",
+        ]
+    )
     # R5: junk totals (zeros) -> excluded too.
-    ws.append([None, None, None, None, None, None, None, None, None, 0, 0, 0,
-               None, None, None, None])
+    ws.append(
+        [None, None, None, None, None, None, None, None, None, 0, 0, 0, None, None, None, None]
+    )
     wb.save(path)
 
 
@@ -112,13 +183,9 @@ def _ventas_id_de_test(db):
         )
         .all()
     )
-    cli = db.query(Cliente).filter(
-        Cliente.nombre.in_([P_CLI, P_CLI2])
-    ).first()
+    cli = db.query(Cliente).filter(Cliente.nombre.in_([P_CLI, P_CLI2])).first()
     if cli is not None:
-        ids |= set(
-            db.query(Venta.id).filter(Venta.cliente_id == cli.id).all()
-        )
+        ids |= set(db.query(Venta.id).filter(Venta.cliente_id == cli.id).all())
     return {i for (i,) in ids}
 
 
@@ -129,12 +196,8 @@ def _limpiar_ventas_test(db) -> None:
         db.query(DetalleVenta).filter(DetalleVenta.venta_id == vid).delete(
             synchronize_session=False
         )
-        db.query(Venta).filter(Venta.id == vid).delete(
-            synchronize_session=False
-        )
-    db.query(Cliente).filter(Cliente.nombre.in_([P_CLI, P_CLI2])).delete(
-        synchronize_session=False
-    )
+        db.query(Venta).filter(Venta.id == vid).delete(synchronize_session=False)
+    db.query(Cliente).filter(Cliente.nombre.in_([P_CLI, P_CLI2])).delete(synchronize_session=False)
     db.commit()
 
 
@@ -142,13 +205,9 @@ def _borrar_filas_test(db) -> None:
     """Remove rows this test module injected (exact-name matches only)."""
     _limpiar_ventas_test(db)
     db.query(BomInsumo).filter(
-        BomInsumo.insumo_id.in_(
-            db.query(Insumo.id).filter(Insumo.nombre == P_TELA)
-        )
+        BomInsumo.insumo_id.in_(db.query(Insumo.id).filter(Insumo.nombre == P_TELA))
     ).delete(synchronize_session=False)
-    db.query(Insumo).filter(Insumo.nombre == P_TELA).delete(
-        synchronize_session=False
-    )
+    db.query(Insumo).filter(Insumo.nombre == P_TELA).delete(synchronize_session=False)
     db.query(VarianteProducto).filter(
         VarianteProducto.producto_id.in_(
             db.query(Producto.id).filter(Producto.nombre.in_([P_SET, P_TOTE]))
@@ -159,9 +218,7 @@ def _borrar_filas_test(db) -> None:
     )
     # Remove the canonical catalog tipos that bootstrap_catalogo() inserts.
     db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
+        TipoProducto.nombre.in_(["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"])
     ).delete(synchronize_session=False)
     db.commit()
 
@@ -191,13 +248,9 @@ def _preparar_catalogo(db) -> None:
 
     _limpiar_ventas_test(db)
     db.query(BomInsumo).filter(
-        BomInsumo.insumo_id.in_(
-            db.query(Insumo.id).filter(Insumo.nombre == P_TELA)
-        )
+        BomInsumo.insumo_id.in_(db.query(Insumo.id).filter(Insumo.nombre == P_TELA))
     ).delete(synchronize_session=False)
-    db.query(Insumo).filter(Insumo.nombre == P_TELA).delete(
-        synchronize_session=False
-    )
+    db.query(Insumo).filter(Insumo.nombre == P_TELA).delete(synchronize_session=False)
     db.query(VarianteProducto).filter(
         VarianteProducto.producto_id.in_(
             db.query(Producto.id).filter(Producto.nombre.in_([P_SET, P_TOTE]))
@@ -217,10 +270,14 @@ def _preparar_catalogo(db) -> None:
     ids[P_TOTE] = upsert_producto(db, P_TOTE, tipo="Accesorio").id
     db.flush()
     set_prod = db.query(Producto).filter(Producto.nombre == P_SET).one()
-    var = db.query(VarianteProducto).filter(
-        VarianteProducto.producto_id == set_prod.id,
-        VarianteProducto.nombre_variante == "S",
-    ).one()
+    var = (
+        db.query(VarianteProducto)
+        .filter(
+            VarianteProducto.producto_id == set_prod.id,
+            VarianteProducto.nombre_variante == "S",
+        )
+        .one()
+    )
     db.add(
         BomInsumo(
             producto_id=set_prod.id,
@@ -249,7 +306,7 @@ def test_plan_ventas_lee_productos_reales(mini_ventas):
     assert set_.variante_nombre == "S"
     assert set_.precio == Decimal("71250.00")
     assert set_.costo == Decimal("26109")
-    assert set_.fecha == datetime(2026, 3, 20, tzinfo=timezone.utc)
+    assert set_.fecha == datetime(2026, 3, 20, tzinfo=UTC)
     assert set_.cliente_nombre == P_CLI
 
 
@@ -271,7 +328,7 @@ def test_plan_ventas_fecha_precio_costo_no_inventados(mini_ventas):
         plan = plan_ventas(libro)
 
     tote = [v for v in plan.ventas if v.producto_nombre == P_TOTE][0]
-    assert tote.fecha == datetime(2026, 4, 24, tzinfo=timezone.utc)
+    assert tote.fecha == datetime(2026, 4, 24, tzinfo=UTC)
     assert tote.precio == Decimal("45000.00")
     assert tote.costo == Decimal("25765.09524")
 
@@ -304,9 +361,7 @@ def test_aplicar_ventas_inserta_con_fecha_real_canal_y_snapshot(db, mini_ventas)
         .filter(Cliente.nombre == P_CLI)
         .one()
     )
-    detalle = db.query(DetalleVenta).filter(
-        DetalleVenta.venta_id == set_venta.id
-    ).one()
+    detalle = db.query(DetalleVenta).filter(DetalleVenta.venta_id == set_venta.id).one()
     # costo FULL del Excel (igual a H), sin recalcular con WAC actual
     assert detalle.costo_unitario_aplicado == Decimal("26109")
     assert detalle.precio_unitario_aplicado == Decimal("71250.00")
@@ -406,7 +461,7 @@ def test_aplicar_ventas_stock_insuficiente_rollback(db, mini_ventas):
 
 
 def test_f5_registrada_en_runner():
-    from migrate import FASES, FASES_IMPLEMENTADAS, FASE_RUNNERS
+    from migrate import FASE_RUNNERS, FASES, FASES_IMPLEMENTADAS
 
     assert any(f.id == "F5" for f in FASES)
     assert "F5" in FASE_RUNNERS
@@ -423,9 +478,7 @@ def test_cargar_ventas_dry_run_real_no_escribe():
     try:
         antes_ventas = db.query(Venta).count()
         antes_det = db.query(DetalleVenta).count()
-        ctx = MigrationContext.para_fase(
-            FaseOptions(source=REAL_XLSX, modo="dry-run"), "F5"
-        )
+        ctx = MigrationContext.para_fase(FaseOptions(source=REAL_XLSX, modo="dry-run"), "F5")
         plan = cargar_ventas(ctx)
         assert db.query(Venta).count() == antes_ventas
         assert db.query(DetalleVenta).count() == antes_det

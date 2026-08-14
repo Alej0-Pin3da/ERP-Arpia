@@ -58,7 +58,7 @@ def refresh(request: Request, payload: RefreshRequest, db: Session = Depends(get
     record = db.scalar(stmt)
     if record is None:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
-    now = dt.datetime.now(dt.timezone.utc)
+    now = dt.datetime.now(dt.UTC)
     if record.revocado_en is not None:
         # A revoked token being reused means the token (or its rotation chain)
         # was captured. Revoke every active token for this user to contain the
@@ -86,7 +86,7 @@ def logout(payload: RefreshRequest, db: Session = Depends(get_db)) -> None:
     )
     record = db.scalar(stmt)
     if record is not None and record.revocado_en is None:
-        record.revocado_en = dt.datetime.now(dt.timezone.utc)
+        record.revocado_en = dt.datetime.now(dt.UTC)
         db.commit()
 
 

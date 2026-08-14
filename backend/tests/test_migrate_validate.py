@@ -28,7 +28,7 @@ migration data; the canonical catalog tipos inserted by bootstrap_catalogo()
 are removed at module cleanup (same pattern as the other test_migrate_*).
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -64,9 +64,9 @@ P_VAR = "S"
 P_CLI = f"{P} Cliente"
 P_MOV = f"{P} Movimiento"
 
-FECHA_VENTA = datetime(2024, 10, 20, tzinfo=timezone.utc)
-FECHA_COMPRA = datetime(2025, 9, 15, tzinfo=timezone.utc)
-FECHA_MOV = datetime(2025, 8, 1, tzinfo=timezone.utc)
+FECHA_VENTA = datetime(2024, 10, 20, tzinfo=UTC)
+FECHA_COMPRA = datetime(2025, 9, 15, tzinfo=UTC)
+FECHA_MOV = datetime(2025, 8, 1, tzinfo=UTC)
 
 PRECIO_VENTA = Decimal("71250")
 COSTO_VENTA = Decimal("26109")
@@ -122,15 +122,49 @@ def _mini_workbook(path: Path, extra_oct25: tuple[str, str] | None = None) -> No
     if extra_oct25 is not None:
         nombre_extra, cant_extra = extra_oct25
         oct25.cell(row=9, column=6, value=nombre_extra)  # F: HERRAJES nombre
-        oct25.cell(row=9, column=8, value=cant_extra)    # H: HERRAJES cantidad
+        oct25.cell(row=9, column=8, value=cant_extra)  # H: HERRAJES cantidad
 
     ventas = wb.create_sheet("VENTAS")
-    ventas.append(["Producto", None, None, None, None, None, "Precio Venta",
-                   "Costo", "Ganancias", None, None, None, "Fecha", "Color",
-                   "Desc", "Cliente"])
-    ventas.append([P_PROD, P_VAR, None, None, None, None, 71250.0, COSTO_VENTA,
-                   45141, None, None, None, datetime(2024, 10, 20), "vino",
-                   None, P_CLI])
+    ventas.append(
+        [
+            "Producto",
+            None,
+            None,
+            None,
+            None,
+            None,
+            "Precio Venta",
+            "Costo",
+            "Ganancias",
+            None,
+            None,
+            None,
+            "Fecha",
+            "Color",
+            "Desc",
+            "Cliente",
+        ]
+    )
+    ventas.append(
+        [
+            P_PROD,
+            P_VAR,
+            None,
+            None,
+            None,
+            None,
+            71250.0,
+            COSTO_VENTA,
+            45141,
+            None,
+            None,
+            None,
+            datetime(2024, 10, 20),
+            "vino",
+            None,
+            P_CLI,
+        ]
+    )
 
     inv = wb.create_sheet("INVERSION VALQUI")
     inv.cell(row=2, column=1, value="Cantidad")
@@ -168,9 +202,9 @@ def _borrar_detalles_ventas_p(db) -> None:
     """Quita Detalle_Ventas/Ventas que referencian el producto test."""
     vids = set(
         db.query(DetalleVenta.venta_id)
-        .filter(DetalleVenta.producto_id.in_(
-            db.query(Producto.id).filter(Producto.nombre == P_PROD)
-        ))
+        .filter(
+            DetalleVenta.producto_id.in_(db.query(Producto.id).filter(Producto.nombre == P_PROD))
+        )
         .all()
     )
     vids |= set(
@@ -183,64 +217,44 @@ def _borrar_detalles_ventas_p(db) -> None:
         db.query(DetalleVenta).filter(DetalleVenta.venta_id == vid).delete(
             synchronize_session=False
         )
-        db.query(Venta).filter(Venta.id == vid).delete(
-            synchronize_session=False
-        )
-    db.query(Cliente).filter(Cliente.nombre == P_CLI).delete(
-        synchronize_session=False
-    )
+        db.query(Venta).filter(Venta.id == vid).delete(synchronize_session=False)
+    db.query(Cliente).filter(Cliente.nombre == P_CLI).delete(synchronize_session=False)
 
 
 def _borrar_test(db) -> None:
     """Borra SOLO filas de test por nombre exacto/parejas exactas."""
     _borrar_detalles_ventas_p(db)
-    db.query(MovimientoFinanciero).filter(
-        MovimientoFinanciero.descripcion == P_MOV
-    ).delete(synchronize_session=False)
+    db.query(MovimientoFinanciero).filter(MovimientoFinanciero.descripcion == P_MOV).delete(
+        synchronize_session=False
+    )
     # Compras y BOM que referencian al insumo test (FK RESTRICT).
     db.query(CompraInsumo).filter(
-        CompraInsumo.insumo_id.in_(
-            db.query(Insumo.id).filter(Insumo.nombre == P_TELA)
-        )
+        CompraInsumo.insumo_id.in_(db.query(Insumo.id).filter(Insumo.nombre == P_TELA))
     ).delete(synchronize_session=False)
     db.query(BomInsumo).filter(
-        BomInsumo.insumo_id.in_(
-            db.query(Insumo.id).filter(Insumo.nombre == P_TELA)
-        )
+        BomInsumo.insumo_id.in_(db.query(Insumo.id).filter(Insumo.nombre == P_TELA))
     ).delete(synchronize_session=False)
     db.query(BomInsumo).filter(
-        BomInsumo.producto_id.in_(
-            db.query(Producto.id).filter(Producto.nombre == P_PROD)
-        )
+        BomInsumo.producto_id.in_(db.query(Producto.id).filter(Producto.nombre == P_PROD))
     ).delete(synchronize_session=False)
-    db.query(Insumo).filter(Insumo.nombre == P_TELA).delete(
-        synchronize_session=False
-    )
-    db.query(Producto).filter(Producto.nombre == P_PROD).delete(
-        synchronize_session=False
-    )
-    db.query(Proveedor).filter(Proveedor.nombre == P_PROV).delete(
-        synchronize_session=False
-    )
+    db.query(Insumo).filter(Insumo.nombre == P_TELA).delete(synchronize_session=False)
+    db.query(Producto).filter(Producto.nombre == P_PROD).delete(synchronize_session=False)
+    db.query(Proveedor).filter(Proveedor.nombre == P_PROV).delete(synchronize_session=False)
     db.commit()
 
 
 def _borrar_socios_y_tipos(db) -> None:
     for nombre in SOCIOS_ESPERADOS:
-        socio = db.query(SociosConfiguracion).filter(
-            SociosConfiguracion.nombre == nombre
-        ).first()
+        socio = db.query(SociosConfiguracion).filter(SociosConfiguracion.nombre == nombre).first()
         if socio is None:
             continue
-        con_movimientos = db.query(MovimientoFinanciero).filter(
-            MovimientoFinanciero.socio_id == socio.id
-        ).first()
+        con_movimientos = (
+            db.query(MovimientoFinanciero).filter(MovimientoFinanciero.socio_id == socio.id).first()
+        )
         if con_movimientos is None:
             db.delete(socio)
     db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
+        TipoProducto.nombre.in_(["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"])
     ).delete(synchronize_session=False)
     db.commit()
 
@@ -286,33 +300,35 @@ def _preparar_entorno(db) -> None:
     # Snapshot OCT25 + compra WAC (F2+F4 del mini): stock 10, compra 2.
     tela.stock_actual = Decimal("10")
     tela.costo_promedio_actual = Decimal("100")
-    db.add(CompraInsumo(
-        insumo_id=tela.id,
-        proveedor_id=proveedor.id,
-        fecha_compra=FECHA_COMPRA,
-        cantidad_comprada=Decimal("2"),
-        precio_unitario_compra=Decimal("100"),
-    ))
+    db.add(
+        CompraInsumo(
+            insumo_id=tela.id,
+            proveedor_id=proveedor.id,
+            fecha_compra=FECHA_COMPRA,
+            cantidad_comprada=Decimal("2"),
+            precio_unitario_compra=Decimal("100"),
+        )
+    )
 
     # Socios F6 (spec FIN-2): sum == 100.
     for nombre, pct in SOCIOS_ESPERADOS.items():
-        socio_existente = db.query(SociosConfiguracion).filter(
-            SociosConfiguracion.nombre == nombre
-        ).first()
+        socio_existente = (
+            db.query(SociosConfiguracion).filter(SociosConfiguracion.nombre == nombre).first()
+        )
         if socio_existente is None:
-            db.add(SociosConfiguracion(
-                nombre=nombre, porcentaje_participacion=pct
-            ))
+            db.add(SociosConfiguracion(nombre=nombre, porcentaje_participacion=pct))
     db.flush()
 
     var = next(v for v in producto.variantes if v.nombre_variante == P_VAR)
     # BOM de 'Corset': consume 2 m de tela por unidad.
-    db.add(BomInsumo(
-        producto_id=producto.id,
-        insumo_id=tela.id,
-        variante_id=var.id,
-        cantidad_requerida=Decimal("2"),
-    ))
+    db.add(
+        BomInsumo(
+            producto_id=producto.id,
+            insumo_id=tela.id,
+            variante_id=var.id,
+            cantidad_requerida=Decimal("2"),
+        )
+    )
     # Venta historica real (VTA-1/VTA-2): costo FULL snapshot, precio tal-cual.
     venta = Venta(
         fecha=FECHA_VENTA,
@@ -324,26 +340,28 @@ def _preparar_entorno(db) -> None:
     )
     db.add(venta)
     db.flush()
-    db.add(DetalleVenta(
-        venta_id=venta.id,
-        producto_id=producto.id,
-        variante_id=var.id,
-        cantidad=Decimal("1"),
-        precio_unitario_aplicado=PRECIO_VENTA,
-        costo_unitario_aplicado=COSTO_VENTA,
-    ))
+    db.add(
+        DetalleVenta(
+            venta_id=venta.id,
+            producto_id=producto.id,
+            variante_id=var.id,
+            cantidad=Decimal("1"),
+            precio_unitario_aplicado=PRECIO_VENTA,
+            costo_unitario_aplicado=COSTO_VENTA,
+        )
+    )
     # Movimiento financiero F6 (equipo, socio Valqui) con fecha real.
-    socio = db.query(SociosConfiguracion).filter(
-        SociosConfiguracion.nombre == "Valqui"
-    ).first()
-    db.add(MovimientoFinanciero(
-        tipo="Gasto",
-        descripcion=P_MOV,
-        monto=Decimal("320000"),
-        fecha=FECHA_MOV,
-        socio_id=socio.id if socio else None,
-        estado="activo",
-    ))
+    socio = db.query(SociosConfiguracion).filter(SociosConfiguracion.nombre == "Valqui").first()
+    db.add(
+        MovimientoFinanciero(
+            tipo="Gasto",
+            descripcion=P_MOV,
+            monto=Decimal("320000"),
+            fecha=FECHA_MOV,
+            socio_id=socio.id if socio else None,
+            estado="activo",
+        )
+    )
     db.commit()
 
 
@@ -373,9 +391,7 @@ def _no_resultado(dic, idiom: str):
 def test_checks_generan_los_7_ids(db, mini_libro):
     _preparar_entorno(db)
     res = _controllers(db, mini_libro)
-    assert {k for k in res} == {
-        "N7a", "N7b", "N7c", "N7d", "N7e", "N7f", "N7g"
-    }
+    assert {k for k in res} == {"N7a", "N7b", "N7c", "N7d", "N7e", "N7f", "N7g"}
 
 
 def test_n7a_conteos_coinciden_con_el_plan(db, mini_libro):
@@ -388,13 +404,12 @@ def test_n7a_conteos_coinciden_con_el_plan(db, mini_libro):
 
 def test_n7a_conteo_faltante_es_warn(db, mini_libro):
     """Plan espera un movimiento; la DB no lo tiene -> WARN (faltante con causa)."""
-    from migrate.validate import plan_para_validacion
 
     _preparar_entorno(db)
     # Borro el movimiento test -> DB < plan.
-    db.query(MovimientoFinanciero).filter(
-        MovimientoFinanciero.descripcion == P_MOV
-    ).delete(synchronize_session=False)
+    db.query(MovimientoFinanciero).filter(MovimientoFinanciero.descripcion == P_MOV).delete(
+        synchronize_session=False
+    )
     db.commit()
     res = _controllers(db, mini_libro)
     assert _no_resultado(res, "N7a").estado == "WARN"
@@ -406,14 +421,16 @@ def test_n7a_conteo_duplicado_es_error(db, mini_libro):
 
     _preparar_entorno(db)
     dup = upsert_insumo(db, P_TELA, unidad="m", categoria_nombre="Telas")
-    db.add(Insumo(
-        nombre=P_TELA,  # mismo nombre -> cuenta doble en el dominio
-        categoria_id=dup.categoria_id,
-        unidad_medida="m",
-        stock_actual=Decimal("0"),
-        stock_minimo=Decimal("0"),
-        costo_promedio_actual=Decimal("0"),
-    ))
+    db.add(
+        Insumo(
+            nombre=P_TELA,  # mismo nombre -> cuenta doble en el dominio
+            categoria_id=dup.categoria_id,
+            unidad_medida="m",
+            stock_actual=Decimal("0"),
+            stock_minimo=Decimal("0"),
+            costo_promedio_actual=Decimal("0"),
+        )
+    )
     db.commit()
     res = _controllers(db, mini_libro)
     assert _no_resultado(res, "N7a").estado == "ERROR"
@@ -483,9 +500,7 @@ def test_n7c_plan_movimiento_duplicado_cuenta_una_vez(db, tmp_path):
 
 def test_n7c_monto_cero_es_error(db, mini_libro):
     _preparar_entorno(db)
-    mov = db.query(MovimientoFinanciero).filter(
-        MovimientoFinanciero.descripcion == P_MOV
-    ).first()
+    mov = db.query(MovimientoFinanciero).filter(MovimientoFinanciero.descripcion == P_MOV).first()
     mov.monto = Decimal("0")
     db.commit()
     res = _controllers(db, mini_libro)
@@ -494,9 +509,7 @@ def test_n7c_monto_cero_es_error(db, mini_libro):
 
 def test_n7c_socios_menos_cien_error(db, mini_libro):
     _preparar_entorno(db)
-    marg = db.query(SociosConfiguracion).filter(
-        SociosConfiguracion.nombre == "Margarita"
-    ).first()
+    marg = db.query(SociosConfiguracion).filter(SociosConfiguracion.nombre == "Margarita").first()
     marg.porcentaje_participacion = Decimal("40")
     db.commit()
     res = _controllers(db, mini_libro)
@@ -516,8 +529,8 @@ def test_n7d_cuadre_exacto(db, mini_libro):
 
 
 # Fecha del corte fisico del snapshot OCT25 (design: stock OCT25 = 2025-10-25).
-FECHA_CORTE_OCT25 = datetime(2025, 10, 25, tzinfo=timezone.utc)
-FECHA_POST_CORTE = datetime(2025, 11, 1, tzinfo=timezone.utc)
+FECHA_CORTE_OCT25 = datetime(2025, 10, 25, tzinfo=UTC)
+FECHA_POST_CORTE = datetime(2025, 11, 1, tzinfo=UTC)
 
 
 def test_n7d_compra_del_corte_no_se_suma(db, mini_libro):
@@ -525,13 +538,15 @@ def test_n7d_compra_del_corte_no_se_suma(db, mini_libro):
     suma al cuadre: el snapshot YA la contiene (Ref 100: 39 + 0 - consumos)."""
     _preparar_entorno(db)
     tela = db.query(Insumo).filter(Insumo.nombre == P_TELA).first()
-    db.add(CompraInsumo(
-        insumo_id=tela.id,
-        proveedor_id=None,
-        fecha_compra=FECHA_CORTE_OCT25,
-        cantidad_comprada=Decimal("10"),
-        precio_unitario_compra=Decimal("100"),
-    ))
+    db.add(
+        CompraInsumo(
+            insumo_id=tela.id,
+            proveedor_id=None,
+            fecha_compra=FECHA_CORTE_OCT25,
+            cantidad_comprada=Decimal("10"),
+            precio_unitario_compra=Decimal("100"),
+        )
+    )
     db.commit()
     res = _controllers(db, mini_libro)
     # esperado = snapshot 10 + compra pre-corte 2 + 0 (corte excluida) - 2 = 10.
@@ -543,13 +558,15 @@ def test_n7d_compra_post_corte_si_suma(db, mini_libro):
     del corte (son compras nuevas despues del inventario)."""
     _preparar_entorno(db)
     tela = db.query(Insumo).filter(Insumo.nombre == P_TELA).first()
-    db.add(CompraInsumo(
-        insumo_id=tela.id,
-        proveedor_id=None,
-        fecha_compra=FECHA_POST_CORTE,
-        cantidad_comprada=Decimal("3"),
-        precio_unitario_compra=Decimal("100"),
-    ))
+    db.add(
+        CompraInsumo(
+            insumo_id=tela.id,
+            proveedor_id=None,
+            fecha_compra=FECHA_POST_CORTE,
+            cantidad_comprada=Decimal("3"),
+            precio_unitario_compra=Decimal("100"),
+        )
+    )
     tela.stock_actual = Decimal("13")  # 10 + 3 post-corte - 2 consumidos
     db.commit()
     res = _controllers(db, mini_libro)
@@ -622,7 +639,7 @@ def test_n7f_fechas_reales_ok(db, mini_libro):
 def test_n7f_compra_con_fecha_now_error(db, mini_libro):
     _preparar_entorno(db)
     compra = db.query(CompraInsumo).first()
-    compra.fecha_compra = datetime.now(timezone.utc)
+    compra.fecha_compra = datetime.now(UTC)
     db.commit()
     res = _controllers(db, mini_libro)
     assert _no_resultado(res, "N7f").estado == "ERROR"
@@ -642,13 +659,15 @@ def test_n7g_sin_duplicados_ok(db, mini_libro):
 def test_n7g_compra_duplicada_error(db, mini_libro):
     _preparar_entorno(db)
     compra = db.query(CompraInsumo).first()
-    db.add(CompraInsumo(
-        insumo_id=compra.insumo_id,
-        proveedor_id=compra.proveedor_id,
-        fecha_compra=compra.fecha_compra,
-        cantidad_comprada=compra.cantidad_comprada,
-        precio_unitario_compra=compra.precio_unitario_compra,
-    ))
+    db.add(
+        CompraInsumo(
+            insumo_id=compra.insumo_id,
+            proveedor_id=compra.proveedor_id,
+            fecha_compra=compra.fecha_compra,
+            cantidad_comprada=compra.cantidad_comprada,
+            precio_unitario_compra=compra.precio_unitario_compra,
+        )
+    )
     db.commit()
     res = _controllers(db, mini_libro)
     assert _no_resultado(res, "N7g").estado == "ERROR"
@@ -656,17 +675,17 @@ def test_n7g_compra_duplicada_error(db, mini_libro):
 
 def test_n7g_movimiento_duplicado_error(db, mini_libro):
     _preparar_entorno(db)
-    mov = db.query(MovimientoFinanciero).filter(
-        MovimientoFinanciero.descripcion == P_MOV
-    ).first()
-    db.add(MovimientoFinanciero(
-        tipo=mov.tipo,
-        descripcion=mov.descripcion,
-        monto=mov.monto,
-        fecha=mov.fecha,
-        socio_id=mov.socio_id,
-        estado="activo",
-    ))
+    mov = db.query(MovimientoFinanciero).filter(MovimientoFinanciero.descripcion == P_MOV).first()
+    db.add(
+        MovimientoFinanciero(
+            tipo=mov.tipo,
+            descripcion=mov.descripcion,
+            monto=mov.monto,
+            fecha=mov.fecha,
+            socio_id=mov.socio_id,
+            estado="activo",
+        )
+    )
     db.commit()
     res = _controllers(db, mini_libro)
     assert _no_resultado(res, "N7g").estado == "ERROR"
@@ -701,9 +720,7 @@ def test_cargar_validate_dry_run_real_no_escribe():
             "movimientos": db.query(MovimientoFinanciero).count(),
             "productos": db.query(Producto).count(),
         }
-        ctx = MigrationContext.para_fase(
-            FaseOptions(source=REAL_XLSX, modo="dry-run"), "F7"
-        )
+        ctx = MigrationContext.para_fase(FaseOptions(source=REAL_XLSX, modo="dry-run"), "F7")
         cargar_validate(ctx)
         despues = {
             "insumos": db.query(Insumo).count(),

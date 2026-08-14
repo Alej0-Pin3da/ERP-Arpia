@@ -9,6 +9,7 @@ os.chdir(_BACKEND_DIR)
 
 from a2wsgi import ASGIMiddleware
 from a2wsgi.asgi import ASGIResponder
+
 from app.main import app
 
 
@@ -42,8 +43,7 @@ class ForkSafeASGIMiddleware(ASGIMiddleware):
 
     def _run(self, chunks, loop, thread):
         try:
-            for chunk in chunks:
-                yield chunk
+            yield from chunks
         finally:
             loop.call_soon_threadsafe(loop.stop)
             thread.join(timeout=2)

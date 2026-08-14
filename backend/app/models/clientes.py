@@ -11,9 +11,7 @@ class Cliente(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nombre: Mapped[str] = mapped_column(String(255), nullable=False)
-    documento_identidad: Mapped[str | None] = mapped_column(
-        String(100), unique=True, nullable=True
-    )
+    documento_identidad: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     telefono: Mapped[str | None] = mapped_column(String(50), nullable=True)
 

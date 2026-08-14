@@ -51,15 +51,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Any
+from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.models import MovimientoFinanciero, SociosConfiguracion
 from migrate.catalog import clave_normalizada, normalizar_nombre
 from migrate.context import MigrationContext, session_scope
-from migrate.loaders import HojaInexistenteError, LibroMigracion, SHEET_BOUNDS
+from migrate.loaders import SHEET_BOUNDS, HojaInexistenteError, LibroMigracion
 from migrate.normalize import coerce_aware, normalizar_decimal
 
 # --- Canonical partners (product decision 1): sum MUST be 100 --------------- #
@@ -78,20 +77,80 @@ SOCIO_POR_HOJA: dict[str, str] = {
 }
 
 _INVERSION_KEYWORDS: tuple[str, ...] = (
-    "prestamo", "maquin", "impresora", "impresion", "term", "cinta termica", "termo",
-    "teflon", "cortador", "regla", "modisteria", "tijeras", "guillotina",
-    "plancha", "patron", "patrones", "curso", "estampar", "brazo",
-    "madera", "tornillo", "maniqui", "lampara", "silla", "kit",
-    "accesorio", "impresion", "printer", "maquina", "miquina", "planchuela",
-    "barilla", "varilla", "aro", "arco", "fly", "refrigerador", "refrigeracion",
-    "wash", "cur", "resina", "filamento", "aerografo", "stand", "sello",
-    "sillas", "termonegative", "configuracion tecnica", "taller",
+    "prestamo",
+    "maquin",
+    "impresora",
+    "impresion",
+    "term",
+    "cinta termica",
+    "termo",
+    "teflon",
+    "cortador",
+    "regla",
+    "modisteria",
+    "tijeras",
+    "guillotina",
+    "plancha",
+    "patron",
+    "patrones",
+    "curso",
+    "estampar",
+    "brazo",
+    "madera",
+    "tornillo",
+    "maniqui",
+    "lampara",
+    "silla",
+    "kit",
+    "accesorio",
+    "impresion",
+    "printer",
+    "maquina",
+    "miquina",
+    "planchuela",
+    "barilla",
+    "varilla",
+    "aro",
+    "arco",
+    "fly",
+    "refrigerador",
+    "refrigeracion",
+    "wash",
+    "cur",
+    "resina",
+    "filamento",
+    "aerografo",
+    "stand",
+    "sello",
+    "sillas",
+    "termonegative",
+    "configuracion tecnica",
+    "taller",
 )
 _GASTO_DE_KEYWORDS: tuple[str, ...] = (
-    "hosting", "dominio", "publicidad", "ads", "envio", "domicilio",
-    "ayudante", "papeleria", "organizacion", "bono", "fotografia", "video",
-    "revision", "fragancia", "decoracion", "feria", "materiales surtidos",
-    "maneula", "mueble", "papel", "compras varias", "domicilios", "envios",
+    "hosting",
+    "dominio",
+    "publicidad",
+    "ads",
+    "envio",
+    "domicilio",
+    "ayudante",
+    "papeleria",
+    "organizacion",
+    "bono",
+    "fotografia",
+    "video",
+    "revision",
+    "fragancia",
+    "decoracion",
+    "feria",
+    "materiales surtidos",
+    "maneula",
+    "mueble",
+    "papel",
+    "compras varias",
+    "domicilios",
+    "envios",
 )
 
 
@@ -138,9 +197,9 @@ class MovimientoPlan:
 class ConteosFinanzas:
     """Counters of the phase (reporte N7a / EXM-1)."""
 
-    bom_skip: int = 0      # fila del universo BOM (ya compra WAC F2 -> no duplicar)
-    sin_fecha: int = 0     # D5: fila sin fecha -> omitida + WARN (nunca now())
-    subtabla: int = 0      # sub-tabla derecha (lista de precios) ignorada
+    bom_skip: int = 0  # fila del universo BOM (ya compra WAC F2 -> no duplicar)
+    sin_fecha: int = 0  # D5: fila sin fecha -> omitida + WARN (nunca now())
+    subtabla: int = 0  # sub-tabla derecha (lista de precios) ignorada
     planificadas: int = 0  # movimientos que entran al plan
     gastos_referencia: int = 0  # GASTOS ARP4 filas sin fecha (reporte INFO)
 
@@ -222,8 +281,7 @@ def plan_finanzas(libro, report=None) -> FinanzasPlan:
             if hoja == "INVERSION VALQUI" and _es_subtabla_j_n(fila):
                 conteos.subtabla += 1
                 continue
-            _agregar_fila(plan, fila, hoja, indx, col_desc, col_costo,
-                          col_fecha, universo, report)
+            _agregar_fila(plan, fila, hoja, indx, col_desc, col_costo, col_fecha, universo, report)
 
     # INVERSION MARGARA: right block H..L (real INVERSION MARZO/OCT).
     if "INVERSION MARGARA" in SHEET_BOUNDS:
@@ -247,13 +305,23 @@ def plan_finanzas(libro, report=None) -> FinanzasPlan:
                 if fecha is None:
                     conteos.sin_fecha += 1
                     if report:
-                        report.warn("INVERSION MARGARA", indx, "K",
-                                    f"{normalizar_nombre(nombre)}: fila sin fecha "
-                                    f"(D5, nunca now()) -> omitida")
+                        report.warn(
+                            "INVERSION MARGARA",
+                            indx,
+                            "K",
+                            f"{normalizar_nombre(nombre)}: fila sin fecha "
+                            f"(D5, nunca now()) -> omitida",
+                        )
                     continue
-                _movimiento_a_plan(plan, normalizar_nombre(nombre), costo,
-                                 fecha, hoja="INVERSION MARGARA", fila=indx,
-                                 report=report)
+                _movimiento_a_plan(
+                    plan,
+                    normalizar_nombre(nombre),
+                    costo,
+                    fecha,
+                    hoja="INVERSION MARGARA",
+                    fila=indx,
+                    report=report,
+                )
 
     # GASTOS ARP4: sin columna de fecha en el Excel -> se reporta, no migra.
     if _HOJA_GASTOS[0] in SHEET_BOUNDS:
@@ -272,7 +340,9 @@ def plan_finanzas(libro, report=None) -> FinanzasPlan:
                 conteos.gastos_referencia += 1
                 if report:
                     report.warn(
-                        _HOJA_GASTOS[0], indx, None,
+                        _HOJA_GASTOS[0],
+                        indx,
+                        None,
                         f"{normalizar_nombre(nombre)}: hoja sin columna de fecha; "
                         f"gasto NO migrado (D5: fechas reales, nunca now()).",
                     )
@@ -286,8 +356,7 @@ def _es_subtabla_j_n(fila: dict[str, object]) -> bool:
     return derecha and not izquierda
 
 
-def _agregar_fila(plan, fila, hoja, indx, col_desc, col_costo, col_fecha,
-                  universo, report) -> None:
+def _agregar_fila(plan, fila, hoja, indx, col_desc, col_costo, col_fecha, universo, report) -> None:
     nombre_raw = fila.get(col_desc)
     if not isinstance(nombre_raw, str) or not nombre_raw.strip():
         return
@@ -302,23 +371,25 @@ def _agregar_fila(plan, fila, hoja, indx, col_desc, col_costo, col_fecha,
     if fecha is None:
         plan.conteos.sin_fecha += 1
         if report:
-            report.warn(hoja, indx, col_fecha,
-                        f"{normalizar_nombre(nombre_raw)}: fecha vacia; "
-                        f"no migrado (D5, nunca now())")
+            report.warn(
+                hoja,
+                indx,
+                col_fecha,
+                f"{normalizar_nombre(nombre_raw)}: fecha vacia; no migrado (D5, nunca now())",
+            )
         return
-    _movimiento_a_plan(plan, normalizar_nombre(nombre_raw), monto, fecha,
-                       hoja, indx, report)
+    _movimiento_a_plan(plan, normalizar_nombre(nombre_raw), monto, fecha, hoja, indx, report)
 
 
 def _movimiento_a_plan(plan, descripcion, monto, fecha, hoja, fila, report) -> None:
-    socio_nombre = None
     if _es_prestamo(descripcion):
         # approved decision 2: prestamo intro overcome -> socio NULL
         tipo = "Inversion"
         socio = None
         if report:
-            report.info(hoja, fila, None,
-                        f"{descripcion}: prestamo -> movimiento Inversion socio NULL")
+            report.info(
+                hoja, fila, None, f"{descripcion}: prestamo -> movimiento Inversion socio NULL"
+            )
     else:
         tipo = clasificar_tipo(descripcion)
         socio = SOCIO_POR_HOJA.get(hoja, "ARPIA")
@@ -350,15 +421,11 @@ def _socio_ids(db) -> dict[str, int]:
     """Partner ids by name (get-or-create, batch guaranteed sum==100)."""
     ids: dict[str, int] = {}
     for nombre, pct in SOCIOS:
-        exist = db.scalar(
-            select(SociosConfiguracion).where(SociosConfiguracion.nombre == nombre)
-        )
+        exist = db.scalar(select(SociosConfiguracion).where(SociosConfiguracion.nombre == nombre))
         if exist is None:
             # Design D3: INSERT directo ORM, batch atomico; the pipeline
             # guarantees the global sum == 100 (FIN-2). Service rejects a batch.
-            exist = SociosConfiguracion(
-                nombre=nombre, porcentaje_participacion=Decimal(pct)
-            )
+            exist = SociosConfiguracion(nombre=nombre, porcentaje_participacion=Decimal(pct))
             db.add(exist)
             db.flush()
         ids[nombre] = exist.id
@@ -382,18 +449,13 @@ def aplicar_finanzas(db, plan: FinanzasPlan, report=None) -> dict[str, int]:
     Socios: batch atomico get-or-create por nombre (suma=100 pipeline).
     Movimientos: por clave natural; re-run nunca duplica.
     """
-    res = {"socios": len(SOCIOS), "socios_nuevos": 0, "movimientos": 0,
-           "ya_presentes": 0}
+    res = {"socios": len(SOCIOS), "socios_nuevos": 0, "movimientos": 0, "ya_presentes": 0}
 
     # Partners (solo crea los que faltan; nunca toca porcentajes existentes).
     for nombre, pct in SOCIOS:
-        exist = db.scalar(
-            select(SociosConfiguracion).where(SociosConfiguracion.nombre == nombre)
-        )
+        exist = db.scalar(select(SociosConfiguracion).where(SociosConfiguracion.nombre == nombre))
         if exist is None:
-            exist = SociosConfiguracion(
-                nombre=nombre, porcentaje_participacion=Decimal(pct)
-            )
+            exist = SociosConfiguracion(nombre=nombre, porcentaje_participacion=Decimal(pct))
             db.add(exist)
             db.flush()
             res["socios_nuevos"] += 1
@@ -414,12 +476,18 @@ def aplicar_finanzas(db, plan: FinanzasPlan, report=None) -> dict[str, int]:
         _insertar_movimiento(db, mv, socio_id)
         res["movimientos"] += 1
         if report:
-            report.info(mv.hoja, mv.fila, None,
-                        f"{mv.descripcion}: {mv.tipo} {mv.monto} fecha "
-                        f"{mv.fecha.date()} socio {mv.socio_nombre or 'NULL'}")
+            report.info(
+                mv.hoja,
+                mv.fila,
+                None,
+                f"{mv.descripcion}: {mv.tipo} {mv.monto} fecha "
+                f"{mv.fecha.date()} socio {mv.socio_nombre or 'NULL'}",
+            )
     if report:
         report.info(
-            "F6", None, None,
+            "F6",
+            None,
+            None,
             f"finanzas aplicadas: {res['movimientos']} movimientos, "
             f"{res['socios_nuevos']} socios nuevos, "
             f"{res['ya_presentes']} ya-existentes",
@@ -448,7 +516,7 @@ def _insertar_movimiento(db, mv: MovimientoPlan, socio_id: int | None) -> None:
             tipo=mv.tipo,
             descripcion=mv.descripcion,
             monto=mv.monto,  # Decimal NUMERIC(15,4)
-            fecha=mv.fecha,   # fecha real del Excel (nunca now())
+            fecha=mv.fecha,  # fecha real del Excel (nunca now())
             socio_id=socio_id,
             estado="activo",
         )
@@ -469,7 +537,9 @@ def cargar_finanzas(ctx: MigrationContext) -> FinanzasPlan:
         plan = plan_finanzas(libro, report)
 
     report.info(
-        "F6", None, None,
+        "F6",
+        None,
+        None,
         f"plan finanzas: {plan.conteo_movimientos} movimientos | "
         f"bom-skip {plan.conteos.bom_skip} | sin fecha {plan.conteos.sin_fecha} "
         f"| sub-tabla {plan.conteos.subtabla} | gastos sin fecha "

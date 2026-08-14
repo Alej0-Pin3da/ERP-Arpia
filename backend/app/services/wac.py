@@ -42,9 +42,7 @@ def registrar_compra(
     precio_dec = Decimal(str(precio_unitario))
 
     try:
-        insumo = db.scalar(
-            select(Insumo).where(Insumo.id == insumo_id).with_for_update()
-        )
+        insumo = db.scalar(select(Insumo).where(Insumo.id == insumo_id).with_for_update())
         if insumo is None:
             raise HTTPException(status_code=404, detail="Insumo not found")
 
@@ -55,9 +53,7 @@ def registrar_compra(
 
         stock = insumo.stock_actual
         costo = insumo.costo_promedio_actual
-        nuevo_costo = (stock * costo + cantidad_dec * precio_dec) / (
-            stock + cantidad_dec
-        )
+        nuevo_costo = (stock * costo + cantidad_dec * precio_dec) / (stock + cantidad_dec)
 
         insumo.stock_actual = stock + cantidad_dec
         insumo.costo_promedio_actual = nuevo_costo
@@ -80,7 +76,7 @@ def registrar_compra(
         raise HTTPException(
             status_code=409,
             detail="Conflicting purchase state; the purchase was not registered",
-        )
+        ) from None
     except Exception:
         db.rollback()
         raise

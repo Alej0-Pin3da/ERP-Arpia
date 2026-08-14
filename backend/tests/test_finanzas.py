@@ -14,7 +14,7 @@ setup against SessionLocal, FK-ordered cleanup (movimientos before socios).
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -29,8 +29,8 @@ from app.services.finanzas import (
     crear_socio_configuracion,
     eliminar_movimiento,
     eliminar_socio_configuracion,
-    settle_liquidacion,
     listar_movimientos,
+    settle_liquidacion,
 )
 
 
@@ -86,9 +86,9 @@ def _socios_60_40() -> tuple[int, int]:
 def _cleanup_movimientos(mov_ids: list[int]) -> None:
     db = SessionLocal()
     try:
-        db.query(MovimientoFinanciero).filter(
-            MovimientoFinanciero.id.in_(mov_ids)
-        ).delete(synchronize_session=False)
+        db.query(MovimientoFinanciero).filter(MovimientoFinanciero.id.in_(mov_ids)).delete(
+            synchronize_session=False
+        )
         db.commit()
     finally:
         db.close()
@@ -108,9 +108,9 @@ def _cleanup_movimientos_por_liquidacion(liquidacion_key: str) -> None:
 def _cleanup_socios(socio_ids: list[int]) -> None:
     db = SessionLocal()
     try:
-        db.query(SociosConfiguracion).filter(
-            SociosConfiguracion.id.in_(socio_ids)
-        ).delete(synchronize_session=False)
+        db.query(SociosConfiguracion).filter(SociosConfiguracion.id.in_(socio_ids)).delete(
+            synchronize_session=False
+        )
         db.commit()
     finally:
         db.close()
@@ -329,9 +329,7 @@ def test_socio_eliminar_bloqueado_con_movimiento_409():
     try:
         db = SessionLocal()
         try:
-            crear_movimiento(
-                db, _movimiento_payload(tipo="Retiro", monto="50", socio_id=a_id)
-            )
+            crear_movimiento(db, _movimiento_payload(tipo="Retiro", monto="50", socio_id=a_id))
         finally:
             db.close()
         db = SessionLocal()
@@ -418,12 +416,10 @@ def test_actualizar_movimiento_cambia_fecha_y_tipo():
         mov_id = mov.id
     finally:
         db.close()
-    nueva_fecha = datetime(2026, 6, 15, 12, 30, 0, tzinfo=timezone.utc)
+    nueva_fecha = datetime(2026, 6, 15, 12, 30, 0, tzinfo=UTC)
     db = SessionLocal()
     try:
-        actualizado = actualizar_movimiento(
-            db, mov_id, {"fecha": nueva_fecha, "tipo": "Retiro"}
-        )
+        actualizado = actualizar_movimiento(db, mov_id, {"fecha": nueva_fecha, "tipo": "Retiro"})
     finally:
         db.close()
     assert actualizado.fecha.replace(tzinfo=None) == nueva_fecha.replace(tzinfo=None)
@@ -445,7 +441,12 @@ def test_actualizar_movimiento_payload_vacio_ok():
         actualizado = actualizar_movimiento(db, mov_id, {})
     finally:
         db.close()
-    assert (actualizado.tipo, actualizado.descripcion, actualizado.monto, actualizado.socio_id) == original
+    assert (
+        actualizado.tipo,
+        actualizado.descripcion,
+        actualizado.monto,
+        actualizado.socio_id,
+    ) == original
     _cleanup_movimientos([mov_id])
 
 
@@ -578,9 +579,7 @@ def test_actualizar_movimiento_liquidacion_descripcion_ok():
             db.close()
         db = SessionLocal()
         try:
-            actualizado = actualizar_movimiento(
-                db, mov_id, {"descripcion": "Nota corregida"}
-            )
+            actualizado = actualizar_movimiento(db, mov_id, {"descripcion": "Nota corregida"})
         finally:
             db.close()
         assert actualizado.descripcion == "Nota corregida"

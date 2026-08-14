@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 
 from migrate.report import Report
@@ -80,10 +80,20 @@ _UNIDADES_REGISTRO: dict[str, tuple[str, str]] = {
 }
 
 _SINONIMOS: dict[str, str] = {
-    "mt": "m", "mts": "m", "metros": "m", "metro": "m", "metr": "m",
-    "cms": "cm", "centimetro": "cm", "centimetros": "cm",
-    "unidades": "un", "unid": "un", "und": "un", "unidad": "un",
-    "gms": "g", "gramos": "g",
+    "mt": "m",
+    "mts": "m",
+    "metros": "m",
+    "metro": "m",
+    "metr": "m",
+    "cms": "cm",
+    "centimetro": "cm",
+    "centimetros": "cm",
+    "unidades": "un",
+    "unid": "un",
+    "und": "un",
+    "unidad": "un",
+    "gms": "g",
+    "gramos": "g",
 }
 
 _CANT_UNIDAD_RE = re.compile(r"^\s*([+-]?\d+(?:[.,]\d+)?)\s*([A-Za-zº²]+)\s*$")
@@ -123,7 +133,9 @@ def unidad_canonica(unidad_raw: str) -> str:
     return clave  # unknown stays raw -> caller decides (stop + report)
 
 
-def convertir_cantidad(cant: Decimal, unidad_raw: str, categoria: str) -> tuple[Decimal, str] | None:
+def convertir_cantidad(
+    cant: Decimal, unidad_raw: str, categoria: str
+) -> tuple[Decimal, str] | None:
     """Convert (cantidad, unidad) to the canonical unit for the category.
 
     Returns (cantidad_canonica, unidad_canonica) or None when uninterpretable
@@ -178,11 +190,14 @@ def ancho_desde_nombre(
         if ancho is not None:
             return ancho
     if report is not None:
-        report.warn(hoja, fila, None, f"ancho no informado en {nombre!r} -> default {ANCHO_DEFAULT}cm")
+        report.warn(
+            hoja, fila, None, f"ancho no informado en {nombre!r} -> default {ANCHO_DEFAULT}cm"
+        )
     return ANCHO_DEFAULT
 
 
 # --- Dates: contiguous inheritance policy (D5 — never now()) -------------------
+
 
 @dataclass(frozen=True)
 class ClaveFecha:
@@ -218,5 +233,5 @@ def coerce_aware(dt: object, tz=None) -> object:
     """Make an Excel naive datetime timezone-aware (server tz) so no ambiguity
     is persisted (spec 'compras-insumos' borde scenario)."""
     if isinstance(dt, datetime) and dt.tzinfo is None:
-        return dt.replace(tzinfo=tz or timezone.utc)
+        return dt.replace(tzinfo=tz or UTC)
     return dt

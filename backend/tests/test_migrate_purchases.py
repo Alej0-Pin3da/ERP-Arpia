@@ -22,7 +22,7 @@ Test-injected rows use the 'MigraTest ' prefix so cleanup never touches real
 migration data.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -37,8 +37,8 @@ from migrate.loaders import LibroMigracion
 REAL_XLSX = Path(r"C:\wamp64\www\ERP-Arpia\ARPIA.xlsx")
 PREFIX_TEST = "Migratest"
 
-DIA = datetime(2026, 2, 17, tzinfo=timezone.utc)
-DIA2 = datetime(2026, 3, 3, tzinfo=timezone.utc)
+DIA = datetime(2026, 2, 17, tzinfo=UTC)
+DIA2 = datetime(2026, 3, 3, tzinfo=UTC)
 
 
 # --------------------------------------------------------------------------- #
@@ -139,17 +139,13 @@ def _borrar_filas_test(db) -> None:
     """Remove rows injected by this test module (exact-name matches only)."""
     from app.models import CompraInsumo, Insumo, Proveedor, TipoProducto
 
-    nombres_insumo = [
-        f"{PREFIX_TEST} Tela", f"{PREFIX_TEST} Argolla", f"{PREFIX_TEST} Encaje"
-    ]
+    nombres_insumo = [f"{PREFIX_TEST} Tela", f"{PREFIX_TEST} Argolla", f"{PREFIX_TEST} Encaje"]
     insumos = db.query(Insumo).filter(Insumo.nombre.in_(nombres_insumo)).all()
     for insumo in insumos:
         db.query(CompraInsumo).filter(CompraInsumo.insumo_id == insumo.id).delete(
             synchronize_session=False
         )
-    db.query(Insumo).filter(Insumo.nombre.in_(nombres_insumo)).delete(
-        synchronize_session=False
-    )
+    db.query(Insumo).filter(Insumo.nombre.in_(nombres_insumo)).delete(synchronize_session=False)
     db.query(Proveedor).filter(Proveedor.nombre == f"{PREFIX_TEST} Prov").delete(
         synchronize_session=False
     )
@@ -157,9 +153,7 @@ def _borrar_filas_test(db) -> None:
     # They are migration content, not app seed data; leaving them pollutes the
     # shared per-sheet DB and breaks pagination tests that assume an empty table.
     db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
+        TipoProducto.nombre.in_(["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"])
     ).delete(synchronize_session=False)
     db.commit()
 
@@ -228,7 +222,6 @@ def test_normalizar_cantidad_compra_expresion_area_a_m2():
     assert normalizar_cantidad_compra("50 x 280 cm", "un") is None
 
 
-
 # --------------------------------------------------------------------------- #
 # 2. Workbook -> plan: BOM filter, right sub-table, fecha policy
 # --------------------------------------------------------------------------- #
@@ -260,7 +253,6 @@ def test_plan_compras_calcula_precio_unitario(mini_libro):
 
 def test_plan_compras_fecha_heredada_contigua(mini_libro):
     plan = _plan_de(mini_libro)
-    por = {c.insumo_nombre: c for c in plan.compras}
     # R7 hereda la fecha DIA de la compra R3 (mismo insumo Tela + mismo proveedor)
     tela_2m = [c for c in plan.compras if c.insumo_nombre == f"{PREFIX_TEST} Tela"]
     heredada = [c for c in tela_2m if c.fecha_heredada]
@@ -310,7 +302,7 @@ def _mini_workbook_derecha(path: Path) -> None:
     inv.cell(row=2, column=4, value="Costo")
     inv.cell(row=2, column=5, value="Fecha")
     inv.cell(row=2, column=6, value="Provedor")
-    inv.cell(row=13, column=10, value="Producto")   # header sub-tabla J..N
+    inv.cell(row=13, column=10, value="Producto")  # header sub-tabla J..N
     inv.cell(row=13, column=11, value="Largo CMS")
     inv.cell(row=13, column=12, value="Ancho CMS")
     inv.cell(row=13, column=13, value="Valor")
@@ -355,13 +347,10 @@ def test_plan_compras_derecha_fuente_unica_genera_compra(mini_libro_derecha):
     (cantidad = K en la unidad canonica, precio = M / K, fecha del bloque
     izquierdo de la misma fila)."""
     plan = _plan_de(mini_libro_derecha)
-    compra = next(
-        c for c in plan.compras
-        if c.insumo_nombre == f"{PREFIX_TEST} Argolla Derecha"
-    )
-    assert compra.cantidad == 100          # K=100 en 'un' (Herrajes)
-    assert compra.precio_unitario == 72    # M/K = 7200/100
-    assert compra.fecha == DIA             # fecha del left E de la misma fila
+    compra = next(c for c in plan.compras if c.insumo_nombre == f"{PREFIX_TEST} Argolla Derecha")
+    assert compra.cantidad == 100  # K=100 en 'un' (Herrajes)
+    assert compra.precio_unitario == 72  # M/K = 7200/100
+    assert compra.fecha == DIA  # fecha del left E de la misma fila
     assert compra.hoja == "INVERSION VALQUI"
 
 
@@ -369,13 +358,10 @@ def test_plan_compras_derecha_duplicada_se_descarta(mini_libro_derecha):
     """P1 fix: cuando la derecha duplica un item YA comprado en la izquierda
     de la misma hoja, se descarta como antes (no se duplica WAC)."""
     plan = _plan_de(mini_libro_derecha)
-    tela_derecha = [
-        c for c in plan.compras
-        if c.insumo_nombre == f"{PREFIX_TEST} Tela Derecha"
-    ]
-    assert len(tela_derecha) == 1          # solo la compra izquierda R5
-    assert tela_derecha[0].cantidad == 4   # 4 mts (no la copia de 400cm)
-    assert plan.conteos.derecha >= 1       # la fila derecha duplicada se cuenta
+    tela_derecha = [c for c in plan.compras if c.insumo_nombre == f"{PREFIX_TEST} Tela Derecha"]
+    assert len(tela_derecha) == 1  # solo la compra izquierda R5
+    assert tela_derecha[0].cantidad == 4  # 4 mts (no la copia de 400cm)
+    assert plan.conteos.derecha >= 1  # la fila derecha duplicada se cuenta
 
 
 # --------------------------------------------------------------------------- #
@@ -438,9 +424,7 @@ def test_rollback_no_persiste_nada(db):
         synchronize_session=False
     )
     db.commit()
-    registrar_compra(
-        db, tela_id, None, 10, 25, fecha_compra=DIA, commit=False
-    )
+    registrar_compra(db, tela_id, None, 10, 25, fecha_compra=DIA, commit=False)
     db.rollback()
     assert db.query(CompraInsumo).filter(CompraInsumo.insumo_id == tela_id).count() == 0
 
@@ -468,9 +452,7 @@ def test_cargar_compras_dry_run_real_no_escribe():
     db = SessionLocal()
     try:
         antes = db.query(CompraInsumo).count()
-        ctx = MigrationContext.para_fase(
-            FaseOptions(source=REAL_XLSX, modo="dry-run"), "F2"
-        )
+        ctx = MigrationContext.para_fase(FaseOptions(source=REAL_XLSX, modo="dry-run"), "F2")
         cargar_compras(ctx)
         despues = db.query(CompraInsumo).count()
         assert antes == despues  # NFR-2: 0 filas escritas

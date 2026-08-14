@@ -15,7 +15,6 @@ import json
 from pathlib import Path
 
 import openpyxl
-import pytest
 
 from migrate import cli
 from migrate.context import FaseOptions
@@ -41,9 +40,7 @@ def _ejecutar(tmp_path: Path, fases: list[str]):
     reports_dir = tmp_path / "reports"
     mini = tmp_path / "mini.xlsx"
     _mini_workbook(mini)
-    codigo = cli.ejecutar(
-        FaseOptions(source=mini, modo="dry-run"), fases, reports_dir=reports_dir
-    )
+    codigo = cli.ejecutar(FaseOptions(source=mini, modo="dry-run"), fases, reports_dir=reports_dir)
     jsons = sorted(reports_dir.glob("migracion_*.json"))
     return codigo, jsons
 

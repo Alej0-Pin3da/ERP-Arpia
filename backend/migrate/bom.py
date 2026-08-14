@@ -40,7 +40,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Iterable
 
 from openpyxl.utils import column_index_from_string
 from sqlalchemy import select
@@ -48,7 +47,7 @@ from sqlalchemy import select
 from app.models import BomInsumo, BomProducto, Insumo, Producto
 from migrate.catalog import _es_material_valido, clave_normalizada, normalizar_nombre
 from migrate.context import MigrationContext, session_scope
-from migrate.loaders import HojaInexistenteError, LibroMigracion, SHEET_BOUNDS
+from migrate.loaders import SHEET_BOUNDS, HojaInexistenteError, LibroMigracion
 from migrate.normalize import normalizar_decimal
 
 # Recipe sheets -> (product of the left block, product of the right block or
@@ -57,7 +56,7 @@ from migrate.normalize import normalizar_decimal
 # right CACHETERRO block is a re-run of the dedicated 'Noche y Dia CACHETERO'
 # sheet, so it is skipped to avoid dual-inventory of Cachetero.
 BLOQUES_BOM: dict[str, tuple[str, str | None]] = {
-      "Braleth diseño 1": ("Bralete", None),
+    "Braleth diseño 1": ("Bralete", None),
     "Noche y Dia CACHETERO": ("Cachetero", None),
     "Noche y Dia": ("Bralete", None),
     "CORSET": ("Corset", None),
@@ -66,7 +65,7 @@ BLOQUES_BOM: dict[str, tuple[str, str | None]] = {
     "FALDA EMILY": ("Falda Emily", None),
     "Corset Hypatia": ("Corset Hypatia", None),
     "BUSTIER": ("Bustier", None),
-      "BLUSAS": ("Blusa Manga Larga", "Blusa Arpia"),
+    "BLUSAS": ("Blusa Manga Larga", "Blusa Arpia"),
     "TOTEBAG": ("Tote Bag Arpia", None),
 }
 
@@ -85,9 +84,7 @@ _COLS_COMBOS: tuple[tuple[str, str, str], ...] = (
 )
 # Packaging names inside a combo block -> BOM_Insumos of the combo product
 # (catalog F1 considers them insumos too, design D4 / CAJAS sheet).
-_EMPAQUES_COMBO = frozenset(
-    {"caja", "vela", "papel", "envio", "bolsa", "etiqueta", "tarjeta"}
-)
+_EMPAQUES_COMBO = frozenset({"caja", "vela", "papel", "envio", "bolsa", "etiqueta", "tarjeta"})
 
 # Recipe-sheet material names that do NOT match the F1 catalog 1:1 (key
 # normalizada -> canonical catalog name). The recipe Excel uses short or
@@ -152,7 +149,7 @@ class BomPlan:
     insumos: list[BomLinea] = field(default_factory=list)
     combos: list[ComboLinea] = field(default_factory=list)
     combos_insumos: list[ComboInsumoLinea] = field(default_factory=list)
-    sin_cantidad: int = 0   # EXM-2: amount not interpretable -> excluded
+    sin_cantidad: int = 0  # EXM-2: amount not interpretable -> excluded
 
     @property
     def conteo_insumos(self) -> int:
@@ -232,8 +229,10 @@ def _procesar_bloque(
         plan.sin_cantidad += 1
         if report:
             report.warn(
-                hoja, fila_idx, col_cant,
-                f"{producto_nombre} <- {nombre}: cantidad {fila.get(col_cant)!r} " 
+                hoja,
+                fila_idx,
+                col_cant,
+                f"{producto_nombre} <- {nombre}: cantidad {fila.get(col_cant)!r} "
                 f"no interpretable; linea excluida (EXM-2)",
             )
         return
@@ -265,9 +264,7 @@ def _plan_combos(libro: LibroMigracion, plan: BomPlan, report=None) -> None:
     for pos, (col_nombre, _col_costo, _col_precio) in enumerate(_COLS_COMBOS):
         header = ws.cell(row=2, column=column_index_from_string(col_nombre)).value
         nombre_combo = normalizar_nombre(header)
-        if not nombre_combo or re.fullmatch(
-            r"caja\s*[123]", clave_normalizada(nombre_combo)
-        ):
+        if not nombre_combo or re.fullmatch(r"caja\s*[123]", clave_normalizada(nombre_combo)):
             nombre_combo = _COMBOS_CAJAS_POSICION[pos]
         for fila_idx, fila in enumerate(filas, start=inicio):
             item = fila.get(col_nombre)
@@ -281,12 +278,12 @@ def _plan_combos(libro: LibroMigracion, plan: BomPlan, report=None) -> None:
                     ComboInsumoLinea(nombre_combo, item, Decimal("1"), "CAJAS", fila_idx)
                 )
             else:
-                plan.combos.append(
-                    ComboLinea(nombre_combo, item, Decimal("1"), "CAJAS", fila_idx)
-                )
+                plan.combos.append(ComboLinea(nombre_combo, item, Decimal("1"), "CAJAS", fila_idx))
 
 
-def plan_bom(libro: LibroMigracion, report=None, bloques: dict[str, tuple[str, str | None]] | None = None) -> BomPlan:
+def plan_bom(
+    libro: LibroMigracion, report=None, bloques: dict[str, tuple[str, str | None]] | None = None
+) -> BomPlan:
     """Aggregate the BOM plan from the bounded workbook (read-only).
 
     ``bloques`` maps recipe sheets to their catalog product(s); it defaults to
@@ -378,7 +375,9 @@ def aplicar_bom(db, plan: BomPlan, report=None) -> dict[str, int]:
             res["omitidos"] += 1
             if report:
                 report.error(
-                    linea.hoja, linea.fila, None,
+                    linea.hoja,
+                    linea.fila,
+                    None,
                     f"{linea.insumo_nombre} ({linea.producto_nombre}): producto o "
                     f"insumo ausente en catalogo; linea omitida",
                 )
@@ -399,7 +398,9 @@ def aplicar_bom(db, plan: BomPlan, report=None) -> dict[str, int]:
         res["bom_insumos"] += 1
         if report:
             report.info(
-                linea.hoja, linea.fila, None,
+                linea.hoja,
+                linea.fila,
+                None,
                 f"{linea.producto_nombre}: {linea.insumo_nombre} x {linea.cantidad}",
             )
 
@@ -410,7 +411,9 @@ def aplicar_bom(db, plan: BomPlan, report=None) -> dict[str, int]:
             res["omitidos"] += 1
             if report:
                 report.error(
-                    linea.hoja, linea.fila, None,
+                    linea.hoja,
+                    linea.fila,
+                    None,
                     f"combo {linea.combo_nombre}: producto "
                     f"{linea.producto_incluido} ausente en el catalogo; omitido",
                 )
@@ -451,7 +454,9 @@ def aplicar_bom(db, plan: BomPlan, report=None) -> dict[str, int]:
 
     if report:
         report.info(
-            "F3", None, None,
+            "F3",
+            None,
+            None,
             f"BOM aplicado: {res['bom_insumos']} BOM_Insumos, "
             f"{res['combos']} BOM_Productos, {res['combos_insumos']} empaques, "
             f"{res['ya_exist']} ya-existentes, {res['omitidos']} omitidos",
@@ -472,7 +477,9 @@ def cargar_bom(ctx: MigrationContext) -> BomPlan:
         plan = plan_bom(libro, report)
 
     report.info(
-        "F3", None, None,
+        "F3",
+        None,
+        None,
         f"plan BOM: {plan.conteo_insumos} lineas insumos | "
         f"{plan.conteo_combos} items de combos | sin cantidad "
         f"{plan.sin_cantidad}",

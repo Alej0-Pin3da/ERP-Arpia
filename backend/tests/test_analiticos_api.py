@@ -208,12 +208,10 @@ def _insertar_movimiento(
 def _cleanup_ventas(venta_ids: list[int]) -> None:
     db = SessionLocal()
     try:
-        db.query(DetalleVenta).filter(
-            DetalleVenta.venta_id.in_(venta_ids)
-        ).delete(synchronize_session=False)
-        db.query(Venta).filter(Venta.id.in_(venta_ids)).delete(
+        db.query(DetalleVenta).filter(DetalleVenta.venta_id.in_(venta_ids)).delete(
             synchronize_session=False
         )
+        db.query(Venta).filter(Venta.id.in_(venta_ids)).delete(synchronize_session=False)
         db.commit()
     finally:
         db.close()
@@ -233,9 +231,9 @@ def _cleanup_compras(insumo_id: int) -> None:
 def _cleanup_movimientos(movimiento_ids: list[int]) -> None:
     db = SessionLocal()
     try:
-        db.query(MovimientoFinanciero).filter(
-            MovimientoFinanciero.id.in_(movimiento_ids)
-        ).delete(synchronize_session=False)
+        db.query(MovimientoFinanciero).filter(MovimientoFinanciero.id.in_(movimiento_ids)).delete(
+            synchronize_session=False
+        )
         db.commit()
     finally:
         db.close()
@@ -296,9 +294,7 @@ def test_ventas_mensuales_requires_auth(client):
 
 def test_ventas_mensuales_consulta_allowed(client, consulta_token):
     """consulta CAN GET (audited role, ANA-1)."""
-    resp = client.get(
-        "/api/v1/analiticos/ventas-mensuales", headers=_auth(consulta_token)
-    )
+    resp = client.get("/api/v1/analiticos/ventas-mensuales", headers=_auth(consulta_token))
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
 
@@ -314,14 +310,25 @@ def test_ventas_mensuales_excluye_anuladas(client, admin_token):
     _make_linea_insumo(prod_id, ins_id)
     try:
         v_ids = [
-            _insertar_venta(prod_id, datetime(2026, 1, 15, 12, 0, 0), "100", precio="100", costo="60"),
-            _insertar_venta(prod_id, datetime(2026, 1, 20, 12, 0, 0), "200", precio="100", costo="70"),
-            _insertar_venta(prod_id, datetime(2026, 2, 5, 12, 0, 0), "50", precio="100", costo="50"),
-            _insertar_venta(prod_id, datetime(2026, 2, 10, 12, 0, 0), "9999", estado="anulada", precio="100", costo="10"),
+            _insertar_venta(
+                prod_id, datetime(2026, 1, 15, 12, 0, 0), "100", precio="100", costo="60"
+            ),
+            _insertar_venta(
+                prod_id, datetime(2026, 1, 20, 12, 0, 0), "200", precio="100", costo="70"
+            ),
+            _insertar_venta(
+                prod_id, datetime(2026, 2, 5, 12, 0, 0), "50", precio="100", costo="50"
+            ),
+            _insertar_venta(
+                prod_id,
+                datetime(2026, 2, 10, 12, 0, 0),
+                "9999",
+                estado="anulada",
+                precio="100",
+                costo="10",
+            ),
         ]
-        resp = client.get(
-            "/api/v1/analiticos/ventas-mensuales", headers=_auth(admin_token)
-        )
+        resp = client.get("/api/v1/analiticos/ventas-mensuales", headers=_auth(admin_token))
         assert resp.status_code == 200
         por_mes = {r["mes"]: r for r in resp.json()}
 
@@ -353,9 +360,7 @@ def test_insumos_bajo_stock_requires_auth(client):
 
 def test_insumos_bajo_stock_operador_allowed(client, operador_token):
     """operador CAN GET (audited role, ANA-2)."""
-    resp = client.get(
-        "/api/v1/analiticos/insumos-bajo-stock", headers=_auth(operador_token)
-    )
+    resp = client.get("/api/v1/analiticos/insumos-bajo-stock", headers=_auth(operador_token))
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
 
@@ -364,13 +369,11 @@ def test_insumos_bajo_stock_solo_bajo_minimo(client, admin_token):
     """Only insumos with stock_actual < stock_minimo are returned, with their
     minima (ANA-2)."""
     cat_id = _make_categoria()
-    bajo_a = _make_insumo(cat_id, stock="5", stock_minimo="10")   # below
+    bajo_a = _make_insumo(cat_id, stock="5", stock_minimo="10")  # below
     sano_b = _make_insumo(cat_id, stock="15", stock_minimo="10")  # above
-    bajo_c = _make_insumo(cat_id, stock="0", stock_minimo="5")    # below
+    bajo_c = _make_insumo(cat_id, stock="0", stock_minimo="5")  # below
     try:
-        resp = client.get(
-            "/api/v1/analiticos/insumos-bajo-stock", headers=_auth(admin_token)
-        )
+        resp = client.get("/api/v1/analiticos/insumos-bajo-stock", headers=_auth(admin_token))
         assert resp.status_code == 200
         body = resp.json()
         por_id = {r["insumo_id"]: r for r in body}
@@ -404,9 +407,7 @@ def test_margen_por_producto_requires_auth(client):
 
 def test_margen_por_producto_consulta_allowed(client, consulta_token):
     """consulta CAN GET (audited role, ANA-3)."""
-    resp = client.get(
-        "/api/v1/analiticos/margen-por-producto", headers=_auth(consulta_token)
-    )
+    resp = client.get("/api/v1/analiticos/margen-por-producto", headers=_auth(consulta_token))
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
 
@@ -425,14 +426,25 @@ def test_margen_por_producto_usa_snapshot_y_excluye_anuladas(client, admin_token
     _make_linea_insumo(prod_id, ins_id)
     try:
         v_ids = [
-            _insertar_venta(prod_id, datetime(2026, 1, 15, 12, 0, 0), "100", precio="100", costo="60"),
-            _insertar_venta(prod_id, datetime(2026, 1, 20, 12, 0, 0), "200", precio="100", costo="70"),
-            _insertar_venta(prod_id, datetime(2026, 2, 5, 12, 0, 0), "50", precio="100", costo="50"),
-            _insertar_venta(prod_id, datetime(2026, 2, 10, 12, 0, 0), "9999", estado="anulada", precio="100", costo="10"),
+            _insertar_venta(
+                prod_id, datetime(2026, 1, 15, 12, 0, 0), "100", precio="100", costo="60"
+            ),
+            _insertar_venta(
+                prod_id, datetime(2026, 1, 20, 12, 0, 0), "200", precio="100", costo="70"
+            ),
+            _insertar_venta(
+                prod_id, datetime(2026, 2, 5, 12, 0, 0), "50", precio="100", costo="50"
+            ),
+            _insertar_venta(
+                prod_id,
+                datetime(2026, 2, 10, 12, 0, 0),
+                "9999",
+                estado="anulada",
+                precio="100",
+                costo="10",
+            ),
         ]
-        resp = client.get(
-            "/api/v1/analiticos/margen-por-producto", headers=_auth(admin_token)
-        )
+        resp = client.get("/api/v1/analiticos/margen-por-producto", headers=_auth(admin_token))
         assert resp.status_code == 200
         body = resp.json()
         por_producto = {r["producto_id"]: r for r in body}
@@ -462,9 +474,7 @@ def test_top_productos_requires_auth(client):
 
 def test_top_productos_consulta_allowed(client, consulta_token):
     """consulta CAN GET (audited role, ANA-4)."""
-    resp = client.get(
-        "/api/v1/analiticos/top-productos", headers=_auth(consulta_token)
-    )
+    resp = client.get("/api/v1/analiticos/top-productos", headers=_auth(consulta_token))
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
 
@@ -483,14 +493,25 @@ def test_top_productos_agrupa_por_producto_y_descarta_anuladas(client, admin_tok
     prod_b = _make_producto(tipo_id)
     try:
         v_ids = [
-            _insertar_venta(prod_a, datetime(2026, 3, 3, 12, 0, 0), "200", precio="100", cantidad="2"),
-            _insertar_venta(prod_a, datetime(2026, 3, 5, 12, 0, 0), "300", precio="100", cantidad="3"),
-            _insertar_venta(prod_a, datetime(2026, 3, 9, 12, 0, 0), "9999", estado="anulada", precio="100", cantidad="8"),
-            _insertar_venta(prod_b, datetime(2026, 3, 15, 12, 0, 0), "150", precio="150", cantidad="1"),
+            _insertar_venta(
+                prod_a, datetime(2026, 3, 3, 12, 0, 0), "200", precio="100", cantidad="2"
+            ),
+            _insertar_venta(
+                prod_a, datetime(2026, 3, 5, 12, 0, 0), "300", precio="100", cantidad="3"
+            ),
+            _insertar_venta(
+                prod_a,
+                datetime(2026, 3, 9, 12, 0, 0),
+                "9999",
+                estado="anulada",
+                precio="100",
+                cantidad="8",
+            ),
+            _insertar_venta(
+                prod_b, datetime(2026, 3, 15, 12, 0, 0), "150", precio="150", cantidad="1"
+            ),
         ]
-        resp = client.get(
-            "/api/v1/analiticos/top-productos", headers=_auth(admin_token)
-        )
+        resp = client.get("/api/v1/analiticos/top-productos", headers=_auth(admin_token))
         assert resp.status_code == 200
         body = resp.json()
         por_producto = {r["producto_id"]: r for r in body}
@@ -526,9 +547,7 @@ def test_top_insumos_requires_auth(client):
 
 def test_top_insumos_operador_allowed(client, operador_token):
     """operador CAN GET (audited role, ANA-5)."""
-    resp = client.get(
-        "/api/v1/analiticos/top-insumos", headers=_auth(operador_token)
-    )
+    resp = client.get("/api/v1/analiticos/top-insumos", headers=_auth(operador_token))
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
 
@@ -547,9 +566,7 @@ def test_top_insumos_suma_compras_y_ordena_desc(client, admin_token):
         _insertar_compra(ins_x, "2")
         _insertar_compra(ins_y, "4")
 
-        resp = client.get(
-            "/api/v1/analiticos/top-insumos", headers=_auth(admin_token)
-        )
+        resp = client.get("/api/v1/analiticos/top-insumos", headers=_auth(admin_token))
         assert resp.status_code == 200
         body = resp.json()
         por_insumo = {r["insumo_id"]: r for r in body}
@@ -587,9 +604,7 @@ def test_finanzas_mensuales_requires_auth(client):
 
 def test_finanzas_mensuales_consulta_allowed(client, consulta_token):
     """consulta CAN GET (audited role, ANA-6)."""
-    resp = client.get(
-        "/api/v1/analiticos/finanzas-mensuales", headers=_auth(consulta_token)
-    )
+    resp = client.get("/api/v1/analiticos/finanzas-mensuales", headers=_auth(consulta_token))
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
 
@@ -612,10 +627,23 @@ def test_finanzas_mensuales_mezcla_ingresos_y_gastos(client, admin_token):
     _make_linea_insumo(prod_id, ins_id)
     try:
         v_ids = [
-            _insertar_venta(prod_id, datetime(2026, 4, 5, 12, 0, 0), "100", precio="100", costo="60"),
-            _insertar_venta(prod_id, datetime(2026, 4, 20, 12, 0, 0), "200", precio="100", costo="70"),
-            _insertar_venta(prod_id, datetime(2026, 5, 10, 12, 0, 0), "50", precio="100", costo="50"),
-            _insertar_venta(prod_id, datetime(2026, 5, 12, 12, 0, 0), "9999", estado="anulada", precio="100", costo="10"),
+            _insertar_venta(
+                prod_id, datetime(2026, 4, 5, 12, 0, 0), "100", precio="100", costo="60"
+            ),
+            _insertar_venta(
+                prod_id, datetime(2026, 4, 20, 12, 0, 0), "200", precio="100", costo="70"
+            ),
+            _insertar_venta(
+                prod_id, datetime(2026, 5, 10, 12, 0, 0), "50", precio="100", costo="50"
+            ),
+            _insertar_venta(
+                prod_id,
+                datetime(2026, 5, 12, 12, 0, 0),
+                "9999",
+                estado="anulada",
+                precio="100",
+                costo="10",
+            ),
         ]
         mov_ids = [
             _insertar_movimiento(datetime(2026, 4, 2, 12, 0, 0), "Gasto", "80"),
@@ -624,15 +652,15 @@ def test_finanzas_mensuales_mezcla_ingresos_y_gastos(client, admin_token):
             _insertar_movimiento(datetime(2026, 4, 6, 12, 0, 0), "Retiro", "999"),
             _insertar_movimiento(datetime(2026, 6, 8, 12, 0, 0), "Gasto", "30"),
         ]
-        resp = client.get(
-            "/api/v1/analiticos/finanzas-mensuales", headers=_auth(admin_token)
-        )
+        resp = client.get("/api/v1/analiticos/finanzas-mensuales", headers=_auth(admin_token))
         assert resp.status_code == 200
         por_mes = {r["mes"]: r for r in resp.json()}
 
         abril = por_mes["2026-04-01"]
         assert Decimal(abril["ingresos"]) == Decimal("300.0000")  # 100 + 200
-        assert Decimal(abril["gastos"]) == Decimal("100.0000")  # 80 + 20 (inactivo + Retiro EXCLUDED)
+        assert Decimal(abril["gastos"]) == Decimal(
+            "100.0000"
+        )  # 80 + 20 (inactivo + Retiro EXCLUDED)
 
         mayo = por_mes["2026-05-01"]
         assert Decimal(mayo["ingresos"]) == Decimal("50.0000")  # anulada EXCLUDED
@@ -670,9 +698,7 @@ def test_ventas_mensuales_excluye_regalos(client, admin_token):
                 prod_id, datetime(2026, 7, 8, 12, 0, 0), "9999", precio="100", es_regalo=True
             ),
         ]
-        resp = client.get(
-            "/api/v1/analiticos/ventas-mensuales", headers=_auth(admin_token)
-        )
+        resp = client.get("/api/v1/analiticos/ventas-mensuales", headers=_auth(admin_token))
         assert resp.status_code == 200
         julio = {r["mes"]: r for r in resp.json()}["2026-07-01"]
         assert Decimal(julio["total"]) == Decimal("100.0000")  # gift EXCLUDED
@@ -692,14 +718,19 @@ def test_top_productos_excluye_regalos(client, admin_token):
     prod_id = _make_producto(tipo_id)
     try:
         v_ids = [
-            _insertar_venta(prod_id, datetime(2026, 7, 5, 12, 0, 0), "200", precio="100", cantidad="2"),
             _insertar_venta(
-                prod_id, datetime(2026, 7, 8, 12, 0, 0), "0", precio="100", cantidad="8", es_regalo=True
+                prod_id, datetime(2026, 7, 5, 12, 0, 0), "200", precio="100", cantidad="2"
+            ),
+            _insertar_venta(
+                prod_id,
+                datetime(2026, 7, 8, 12, 0, 0),
+                "0",
+                precio="100",
+                cantidad="8",
+                es_regalo=True,
             ),
         ]
-        resp = client.get(
-            "/api/v1/analiticos/top-productos", headers=_auth(admin_token)
-        )
+        resp = client.get("/api/v1/analiticos/top-productos", headers=_auth(admin_token))
         assert resp.status_code == 200
         por_producto = {r["producto_id"]: r for r in resp.json()}
         prod = por_producto[prod_id]
@@ -726,9 +757,7 @@ def test_finanzas_mensuales_excluye_regalos(client, admin_token):
                 prod_id, datetime(2026, 8, 8, 12, 0, 0), "9999", precio="100", es_regalo=True
             ),
         ]
-        resp = client.get(
-            "/api/v1/analiticos/finanzas-mensuales", headers=_auth(admin_token)
-        )
+        resp = client.get("/api/v1/analiticos/finanzas-mensuales", headers=_auth(admin_token))
         assert resp.status_code == 200
         agosto = {r["mes"]: r for r in resp.json()}["2026-08-01"]
         assert Decimal(agosto["ingresos"]) == Decimal("100.0000")  # gift EXCLUDED

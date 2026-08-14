@@ -3,7 +3,17 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, CheckConstraint, func, Text, text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -46,10 +56,8 @@ class Venta(Base):
         Boolean, nullable=False, default=False, server_default=text("false")
     )
 
-    cliente: Mapped[Cliente | None] = relationship(lazy="selectin")
-    detalles: Mapped[list[DetalleVenta]] = relationship(
-        back_populates="venta", lazy="selectin"
-    )
+    cliente: Mapped[Cliente | None] = relationship(lazy="selectin")  # noqa: F821
+    detalles: Mapped[list[DetalleVenta]] = relationship(back_populates="venta", lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<Venta id={self.id} estado={self.estado!r} total={self.total_venta}>"
@@ -69,9 +77,7 @@ class DetalleVenta(Base):
         ForeignKey("Variantes_Producto.id", ondelete="SET NULL"), nullable=True, index=True
     )
     cantidad: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
-    precio_unitario_aplicado: Mapped[Decimal] = mapped_column(
-        Numeric(15, 4), nullable=False
-    )
+    precio_unitario_aplicado: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
     costo_unitario_aplicado: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
@@ -110,9 +116,7 @@ class Devolucion(Base):
     )
 
     venta: Mapped[Venta] = relationship()
-    items: Mapped[list[DevolucionItem]] = relationship(
-        back_populates="devolucion", lazy="selectin"
-    )
+    items: Mapped[list[DevolucionItem]] = relationship(back_populates="devolucion", lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<Devolucion id={self.id} venta_id={self.venta_id} tipo={self.tipo!r}>"

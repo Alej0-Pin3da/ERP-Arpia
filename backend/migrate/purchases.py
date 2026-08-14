@@ -69,7 +69,7 @@ from migrate.catalog import (
     normalizar_nombre,
 )
 from migrate.context import MigrationContext, savepoint, session_scope
-from migrate.loaders import HojaInexistenteError, LibroMigracion, SHEET_BOUNDS
+from migrate.loaders import SHEET_BOUNDS, HojaInexistenteError, LibroMigracion
 from migrate.normalize import (
     ClaveFecha,
     coerce_aware,
@@ -94,12 +94,20 @@ HOJAS_COMPRAS: tuple[tuple[str, str, str, str, str, str], ...] = (
 #   unidad), I=Producto, J=Costo, K=Fecha, L=Provedor (fechas propias).
 _COLS_DERECHA: dict[str, dict[str, str]] = {
     "INVERSION VALQUI": {
-        "nombre": "J", "cantidad": "K", "ancho": "L", "costo": "M",
-        "fecha": "E", "proveedor": "F",
+        "nombre": "J",
+        "cantidad": "K",
+        "ancho": "L",
+        "costo": "M",
+        "fecha": "E",
+        "proveedor": "F",
     },
     "INVERSION MARGARA": {
-        "nombre": "I", "cantidad": "H", "ancho": None, "costo": "J",
-        "fecha": "K", "proveedor": "L",
+        "nombre": "I",
+        "cantidad": "H",
+        "ancho": None,
+        "costo": "J",
+        "fecha": "K",
+        "proveedor": "L",
     },
 }
 
@@ -122,11 +130,11 @@ class CompraPlan:
 class ConteosCompras:
     """Counters of the phase (reporte N7a / EXM-1)."""
 
-    no_bom: int = 0         # no esta en el catalogo F1 -> finanzas (F6)
-    derecha: int = 0         # sub-tabla derecha descartada (dup / no-BOM)
-    sin_cantidad: int = 0    # cantidad/costo no interpretable (EXM-2)
-    sin_fecha: int = 0       # fecha vacia sin contigua heredable (D5) -> omitida
-    planificadas: int = 0    # filas que entran al plan (BOM ok)
+    no_bom: int = 0  # no esta en el catalogo F1 -> finanzas (F6)
+    derecha: int = 0  # sub-tabla derecha descartada (dup / no-BOM)
+    sin_cantidad: int = 0  # cantidad/costo no interpretable (EXM-2)
+    sin_fecha: int = 0  # fecha vacia sin contigua heredable (D5) -> omitida
+    planificadas: int = 0  # filas que entran al plan (BOM ok)
 
 
 @dataclass
@@ -268,7 +276,9 @@ def _procesar_subtabla_derecha(
         conteos.sin_cantidad += 1
         if report:
             report.warn(
-                hoja, indx, config["cantidad"],
+                hoja,
+                indx,
+                config["cantidad"],
                 f"{nombre_display} (sub-tabla derecha): cantidad "
                 f"{fila.get(config['cantidad'])!r} no interpretable; "
                 f"fila excluida (EXM-2)",
@@ -279,19 +289,16 @@ def _procesar_subtabla_derecha(
         conteos.sin_cantidad += 1
         if report:
             report.warn(
-                hoja, indx, config["costo"],
-                f"{nombre_display} (sub-tabla derecha): costo no interpretable; "
-                f"fila excluida",
+                hoja,
+                indx,
+                config["costo"],
+                f"{nombre_display} (sub-tabla derecha): costo no interpretable; fila excluida",
             )
         return True
     precio_unitario = costo_total / cantidad
 
     proveedor_raw = fila.get(config["proveedor"])
-    proveedor_nombre = (
-        normalizar_nombre(proveedor_raw)
-        if proveedor_raw is not None
-        else None
-    )
+    proveedor_nombre = normalizar_nombre(proveedor_raw) if proveedor_raw is not None else None
     fecha_raw = fila.get(config["fecha"])
     clave_f = ClaveFecha(clave_ins, proveedor_nombre or "<sin-proveedor>")
     fecha = fecha_para_fila(fecha_raw, clave_f, ultima_fecha)
@@ -299,7 +306,9 @@ def _procesar_subtabla_derecha(
         conteos.sin_fecha += 1
         if report:
             report.warn(
-                hoja, indx, config["fecha"],
+                hoja,
+                indx,
+                config["fecha"],
                 f"{nombre_display} (sub-tabla derecha): fecha vacia y sin fila "
                 f"contigua del mismo insumo+proveedor; omitida (D5, nunca now())",
             )
@@ -320,7 +329,9 @@ def _procesar_subtabla_derecha(
     conteos.planificadas += 1
     if report:
         report.info(
-            hoja, indx, config["nombre"],
+            hoja,
+            indx,
+            config["nombre"],
             f"sub-tabla derecha (fuente unica): {nombre_display} "
             f"{cantidad} @ {precio_unitario:.2f} fecha "
             f"{fecha.date() if fecha else '?'}"
@@ -332,9 +343,7 @@ def _procesar_subtabla_derecha(
 def _universo_bom(libro, report) -> dict[str, str]:
     """clave normalizada -> nombre display (el mismo universo que cataloga F1:
     recetas BOM + OCT25 + CAJAS)."""
-    return {
-        clave_normalizada(v): v for v in _leer_materiales(libro, report).values()
-    }
+    return {clave_normalizada(v): v for v in _leer_materiales(libro, report).values()}
 
 
 def _nombres_izquierda_hoja(filas: list[dict[str, object]], col_nom: str) -> set[str]:
@@ -357,7 +366,6 @@ def plan_compras(libro, report=None) -> ComprasPlan:
     never now().
     """
     plan = ComprasPlan()
-    conteos = plan.conteos
     universo = _universo_bom(libro, report)
 
     for hoja, col_cant, col_nom, col_costo, col_fecha, col_prov in HOJAS_COMPRAS:
@@ -380,13 +388,29 @@ def plan_compras(libro, report=None) -> ComprasPlan:
             nombre = fila.get(col_nom)
             if isinstance(nombre, str):
                 _procesar_fila_izquierda(
-                    plan, fila, indx, hoja, col_cant, col_costo, col_fecha,
-                    col_prov, cantidad_raw, nombre, universo, ultima_fecha,
+                    plan,
+                    fila,
+                    indx,
+                    hoja,
+                    col_cant,
+                    col_costo,
+                    col_fecha,
+                    col_prov,
+                    cantidad_raw,
+                    nombre,
+                    universo,
+                    ultima_fecha,
                     report,
                 )
             _procesar_subtabla_derecha(
-                plan, fila, indx, hoja, universo, nombres_izquierda,
-                ultima_fecha, report,
+                plan,
+                fila,
+                indx,
+                hoja,
+                universo,
+                nombres_izquierda,
+                ultima_fecha,
+                report,
             )
     return plan
 
@@ -419,7 +443,9 @@ def _procesar_fila_izquierda(
         conteos.sin_cantidad += 1
         if report:
             report.warn(
-                hoja, indx, col_cant,
+                hoja,
+                indx,
+                col_cant,
                 f"{nombre_display}: cantidad {cantidad_raw!r} no interpretable; "
                 f"fila excluida (EXM-2)",
             )
@@ -429,18 +455,16 @@ def _procesar_fila_izquierda(
         conteos.sin_cantidad += 1
         if report:
             report.warn(
-                hoja, indx, col_costo,
+                hoja,
+                indx,
+                col_costo,
                 f"{nombre_display}: costo no interpretable; fila excluida",
             )
         return
     precio_unitario = costo_total / cantidad
 
     proveedor_raw = fila.get(col_prov)
-    proveedor_nombre = (
-        normalizar_nombre(proveedor_raw)
-        if proveedor_raw is not None
-        else None
-    )
+    proveedor_nombre = normalizar_nombre(proveedor_raw) if proveedor_raw is not None else None
     fecha_raw = fila.get(col_fecha)
     clave_f = ClaveFecha(clave_ins, proveedor_nombre or "<sin-proveedor>")
     fecha = fecha_para_fila(fecha_raw, clave_f, ultima_fecha)
@@ -448,7 +472,9 @@ def _procesar_fila_izquierda(
         conteos.sin_fecha += 1
         if report:
             report.warn(
-                hoja, indx, col_fecha,
+                hoja,
+                indx,
+                col_fecha,
                 f"{nombre_display}: fecha vacia y sin fila contigua del mismo "
                 f"insumo+proveedor; omitida (D5, nunca now())",
             )
@@ -475,9 +501,7 @@ def _procesar_fila_izquierda(
 # ------------------------------------------------------------------------- #
 
 
-def _clave_compra_existente(
-    db, insumo_id: int, fecha, cantidad: Decimal, precio: Decimal
-) -> bool:
+def _clave_compra_existente(db, insumo_id: int, fecha, cantidad: Decimal, precio: Decimal) -> bool:
     """Check natural key (insumo, fecha, cantidad, precio) in the DB."""
     if fecha is None:
         return False
@@ -517,7 +541,9 @@ def aplicar_compras(db, plan: ComprasPlan, report=None) -> dict[str, int]:
             res["omitidas"] += 1
             if report:
                 report.error(
-                    compra.hoja, compra.fila, None,
+                    compra.hoja,
+                    compra.fila,
+                    None,
                     f"{compra.insumo_nombre}: insumo ausente en catalogo; no registrada",
                 )
             continue
@@ -541,7 +567,9 @@ def aplicar_compras(db, plan: ComprasPlan, report=None) -> dict[str, int]:
             res["insertadas"] += 1
             if report:
                 report.info(
-                    compra.hoja, compra.fila, None,
+                    compra.hoja,
+                    compra.fila,
+                    None,
                     f"compra {compra.insumo_nombre}: {compra.cantidad} "
                     f"@ {compra.precio_unitario:.2f} fecha "
                     f"{compra.fecha.date() if compra.fecha else '?'}"
@@ -551,12 +579,16 @@ def aplicar_compras(db, plan: ComprasPlan, report=None) -> dict[str, int]:
             res["omitidas"] += 1
             if report:
                 report.error(
-                    compra.hoja, compra.fila, None,
+                    compra.hoja,
+                    compra.fila,
+                    None,
                     f"{compra.insumo_nombre}: {type(exc).__name__}: {exc}",
                 )
     if report:
         report.info(
-            "F2", None, None,
+            "F2",
+            None,
+            None,
             f"compras aplicadas: {res['insertadas']} insertadas, "
             f"{res['ya_exist']} ya-existentes, {res['omitidas']} omitidas",
         )
@@ -577,7 +609,9 @@ def cargar_compras(ctx: MigrationContext) -> ComprasPlan:
         plan = plan_compras(libro, report)
 
     report.info(
-        "F2", None, None,
+        "F2",
+        None,
+        None,
         f"plan compras WAC: {plan.conteo_compras} compras BOM | "
         f"no-BOM {plan.conteos.no_bom} (-> finanzas F6) | sub-tabla derecha "
         f"{plan.conteos.derecha} | cant sin interpretar "

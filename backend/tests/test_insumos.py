@@ -126,7 +126,7 @@ def test_list_insumos_sort_by_nombre(client, admin_token, categoria_fixture):
 
     db = SessionLocal()
     try:
-        for idx, nombre in enumerate([f"{prefix} Zeta", f"{prefix} Alfa"]):
+        for _idx, nombre in enumerate([f"{prefix} Zeta", f"{prefix} Alfa"]):
             ins = Insumo(
                 categoria_id=categoria_fixture["id"],
                 nombre=nombre,
@@ -180,9 +180,7 @@ def test_list_insumos_sort_by_nombre(client, admin_token, categoria_fixture):
     finally:
         db = SessionLocal()
         try:
-            db.query(Insumo).filter(Insumo.id.in_(ids)).delete(
-                synchronize_session=False
-            )
+            db.query(Insumo).filter(Insumo.id.in_(ids)).delete(synchronize_session=False)
             db.commit()
         finally:
             db.close()

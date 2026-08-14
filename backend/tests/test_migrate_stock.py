@@ -54,26 +54,26 @@ def _mini_workbook(path: Path) -> None:
     oct25 = wb.active
     oct25.title = "INVENTARIO OCT25"
     # R8 header; data R9+ (SHEET_BOUNDS 9..29). Real layout, verified 2026-08-08.
-    oct25.cell(row=8, column=2, value="MATERIAL")     # B8
-    oct25.cell(row=8, column=4, value="CANTIDAD")     # D8
-    oct25.cell(row=8, column=6, value="HERRAJES")     # F8
-    oct25.cell(row=8, column=8, value="CANTIDAD")     # H8
-    oct25.cell(row=8, column=10, value="PRENDAS")     # J8
+    oct25.cell(row=8, column=2, value="MATERIAL")  # B8
+    oct25.cell(row=8, column=4, value="CANTIDAD")  # D8
+    oct25.cell(row=8, column=6, value="HERRAJES")  # F8
+    oct25.cell(row=8, column=8, value="CANTIDAD")  # H8
+    oct25.cell(row=8, column=10, value="PRENDAS")  # J8
     oct25.cell(row=8, column=13, value="PRECIO VENTA")  # M8
     # Data rows R9+ (within SHEET_BOUNDS 9..29).
-    oct25.cell(row=9, column=2, value=P_TELA)         # B9 material
-    oct25.cell(row=9, column=4, value="11 mts")       # D9 cantidad
-    oct25.cell(row=9, column=6, value=P_ARG)          # F9 herraje
-    oct25.cell(row=9, column=8, value="150")          # H9 cantidad
-    oct25.cell(row=9, column=10, value="Corset")      # J9 PRENDAS: never read
-    oct25.cell(row=9, column=13, value=75000)         # M9 precio (reference)
+    oct25.cell(row=9, column=2, value=P_TELA)  # B9 material
+    oct25.cell(row=9, column=4, value="11 mts")  # D9 cantidad
+    oct25.cell(row=9, column=6, value=P_ARG)  # F9 herraje
+    oct25.cell(row=9, column=8, value="150")  # H9 cantidad
+    oct25.cell(row=9, column=10, value="Corset")  # J9 PRENDAS: never read
+    oct25.cell(row=9, column=13, value=75000)  # M9 precio (reference)
     oct25.cell(row=10, column=2, value=P_LINO)
     oct25.cell(row=10, column=4, value="50 cm")
     oct25.cell(row=10, column=6, value="Sublimacion (cm2)")
     oct25.cell(row=10, column=8, value="4670")
-    oct25.cell(row=11, column=2, value="GANANCIA")    # junk (subcadena)
+    oct25.cell(row=11, column=2, value="GANANCIA")  # junk (subcadena)
     oct25.cell(row=11, column=6, value="TOTAL HERR")  # junk
-    oct25.cell(row=12, column=2, value=4.0)           # junk numeric
+    oct25.cell(row=12, column=2, value=4.0)  # junk numeric
     wb.save(path)
 
 
@@ -84,10 +84,10 @@ def _mini_workbook_una_fila(
     wb = openpyxl.Workbook()
     oct25 = wb.active
     oct25.title = "INVENTARIO OCT25"
-    oct25.cell(row=8, column=2, value="MATERIAL")     # B8
-    oct25.cell(row=8, column=4, value="CANTIDAD")     # D8
-    oct25.cell(row=8, column=6, value="HERRAJES")     # F8
-    oct25.cell(row=8, column=8, value="CANTIDAD")     # H8
+    oct25.cell(row=8, column=2, value="MATERIAL")  # B8
+    oct25.cell(row=8, column=4, value="CANTIDAD")  # D8
+    oct25.cell(row=8, column=6, value="HERRAJES")  # F8
+    oct25.cell(row=8, column=8, value="CANTIDAD")  # H8
     oct25.cell(row=9, column=col_nombre, value=nombre)
     oct25.cell(row=9, column=col_cant, value=cantidad)
     wb.save(path)
@@ -107,22 +107,18 @@ def mini_stock(tmp_path) -> Path:
 
 def _borrar_filas_test(db) -> None:
     """Remove rows this test module injected (exact-name matches only)."""
-    insumos = db.query(Insumo).filter(
-        Insumo.nombre.in_([P_TELA, P_ARG, P_LINO])
-    ).all()
+    insumos = db.query(Insumo).filter(Insumo.nombre.in_([P_TELA, P_ARG, P_LINO])).all()
     for ins in insumos:
         # registrar_compra lega CompraInsumo (FK al insumo); borrar primero.
-        db.query(CompraInsumo).filter(
-            CompraInsumo.insumo_id == ins.id
-        ).delete(synchronize_session=False)
-    db.query(Insumo).filter(
-        Insumo.nombre.in_([P_TELA, P_ARG, P_LINO])
-    ).delete(synchronize_session=False)
+        db.query(CompraInsumo).filter(CompraInsumo.insumo_id == ins.id).delete(
+            synchronize_session=False
+        )
+    db.query(Insumo).filter(Insumo.nombre.in_([P_TELA, P_ARG, P_LINO])).delete(
+        synchronize_session=False
+    )
     # Remove the canonical catalog tipos that bootstrap_catalogo() inserts.
     db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
+        TipoProducto.nombre.in_(["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"])
     ).delete(synchronize_session=False)
     db.commit()
 
@@ -268,7 +264,7 @@ def test_aplicar_stock_no_pisa_costo_wac(db, mini_stock):
     db.commit()
 
     db.refresh(tela)
-    assert tela.stock_actual == Decimal("11")       # snapshot OCT25
+    assert tela.stock_actual == Decimal("11")  # snapshot OCT25
     assert tela.costo_promedio_actual == Decimal("100")  # WAC preservado
 
 
@@ -297,10 +293,7 @@ def test_aplicar_stock_alias_tira_brasier_blanca(db, tmp_path):
     db.refresh(canonico)
     assert canonico.stock_actual == Decimal("7")
     # El alias NUNCA crea insumos: el nombre corto no existe en el catalogo.
-    assert (
-        db.query(Insumo).filter(Insumo.nombre == "Tira de brasier blanca").count()
-        == 0
-    )
+    assert db.query(Insumo).filter(Insumo.nombre == "Tira de brasier blanca").count() == 0
 
 
 def test_aplicar_stock_alias_argollas_medianas_estrella(db, tmp_path):
@@ -359,9 +352,7 @@ def test_aplicar_stock_sin_alias_ni_match_exacto_se_omite(db, tmp_path):
 
     assert res["omitidos"] == 1
     assert res["seteados"] == 0
-    assert (
-        db.query(Insumo).filter(Insumo.nombre == nombre_faltante).count() == 0
-    )
+    assert db.query(Insumo).filter(Insumo.nombre == nombre_faltante).count() == 0
 
 
 # --------------------------------------------------------------------------- #
@@ -386,9 +377,7 @@ def test_cargar_stock_dry_run_real_no_escribe():
     db = SessionLocal()
     try:
         antes = db.query(Insumo).count()
-        ctx = MigrationContext.para_fase(
-            FaseOptions(source=REAL_XLSX, modo="dry-run"), "F4"
-        )
+        ctx = MigrationContext.para_fase(FaseOptions(source=REAL_XLSX, modo="dry-run"), "F4")
         cargar_stock(ctx)
         assert db.query(Insumo).count() == antes
         assert not ctx.report.tenga_errores

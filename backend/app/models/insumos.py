@@ -15,9 +15,7 @@ class CategoriaInsumo(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     nombre: Mapped[str] = mapped_column(String(150), unique=True, nullable=False)
 
-    insumos: Mapped[list[Insumo]] = relationship(
-        back_populates="categoria", lazy="selectin"
-    )
+    insumos: Mapped[list[Insumo]] = relationship(back_populates="categoria", lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<CategoriaInsumo id={self.id} nombre={self.nombre!r}>"
@@ -43,9 +41,7 @@ class Insumo(Base):
     )
 
     categoria: Mapped[CategoriaInsumo] = relationship(back_populates="insumos")
-    compras: Mapped[list[CompraInsumo]] = relationship(
-        back_populates="insumo", lazy="selectin"
-    )
+    compras: Mapped[list[CompraInsumo]] = relationship(back_populates="insumo", lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<Insumo id={self.id} nombre={self.nombre!r}>"
@@ -65,12 +61,10 @@ class CompraInsumo(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )
     cantidad_comprada: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
-    precio_unitario_compra: Mapped[Decimal] = mapped_column(
-        Numeric(15, 4), nullable=False
-    )
+    precio_unitario_compra: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
 
     insumo: Mapped[Insumo] = relationship(back_populates="compras")
-    proveedor: Mapped[Proveedor | None] = relationship()
+    proveedor: Mapped[Proveedor | None] = relationship()  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<CompraInsumo id={self.id} insumo_id={self.insumo_id}>"

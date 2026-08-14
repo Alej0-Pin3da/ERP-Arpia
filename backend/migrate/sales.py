@@ -49,7 +49,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func, select
 
@@ -57,7 +57,7 @@ from app.models import Cliente, DetalleVenta, Producto, VarianteProducto, Venta
 from app.services.inventory import descontar_stock, explosion_materiales
 from migrate.catalog import clave_normalizada, normalizar_nombre
 from migrate.context import MigrationContext, session_scope
-from migrate.loaders import HojaInexistenteError, LibroMigracion, SHEET_BOUNDS
+from migrate.loaders import SHEET_BOUNDS, HojaInexistenteError, LibroMigracion
 from migrate.normalize import coerce_aware, normalizar_decimal
 
 # Columnas reales de la hoja VENTAS (verificadas contra ARPIA.xlsx 2026-08-08).
@@ -106,9 +106,9 @@ class VentasPlan:
     """Plan (dry-run) of the historical sales F5 would insert."""
 
     ventas: list[VentaPlanLinea] = field(default_factory=list)
-    scope_out: int = 0            # filas sin producto (VTA-4): reportadas, no cargan
-    sin_fecha: int = 0            # D5: fila sin fecha -> nunca now()
-    sin_precio: int = 0           # EXM-2: precio/costo no interpretable
+    scope_out: int = 0  # filas sin producto (VTA-4): reportadas, no cargan
+    sin_fecha: int = 0  # D5: fila sin fecha -> nunca now()
+    sin_precio: int = 0  # EXM-2: precio/costo no interpretable
 
     @property
     def conteo_ventas(self) -> int:
@@ -133,8 +133,9 @@ def plan_ventas(libro, report=None) -> VentasPlan:
         lectura = libro.leer_hoja(HOJA_VENTAS, report=report)
     except HojaInexistenteError:
         if report:
-            report.warn(HOJA_VENTAS, None, None,
-                        "hoja ausente en este workbook; omitida (0 ventas)")
+            report.warn(
+                HOJA_VENTAS, None, None, "hoja ausente en este workbook; omitida (0 ventas)"
+            )
         return plan
     inicio = SHEET_BOUNDS[HOJA_VENTAS][0]
     for fila_idx, fila in enumerate(lectura.filas, start=inicio):
@@ -143,33 +144,49 @@ def plan_ventas(libro, report=None) -> VentasPlan:
             # VTA-4: sin producto -> SCOPE OUT
             plan.scope_out += 1
             if report:
-                report.warn(HOJA_VENTAS, fila_idx, COL_PRODUCTO,
-                            "venta sin producto (col A) -> SCOPE OUT, no migra")
+                report.warn(
+                    HOJA_VENTAS,
+                    fila_idx,
+                    COL_PRODUCTO,
+                    "venta sin producto (col A) -> SCOPE OUT, no migra",
+                )
             continue
         producto = resolver_nombre_producto(producto_excel)
         fecha_raw = fila.get(COL_FECHA)
         if fecha_raw is None:
             plan.sin_fecha += 1
             if report:
-                report.warn(HOJA_VENTAS, fila_idx, COL_FECHA,
-                            f"{producto}: fecha vacia -> sin venta (D5, nunca now())")
+                report.warn(
+                    HOJA_VENTAS,
+                    fila_idx,
+                    COL_FECHA,
+                    f"{producto}: fecha vacia -> sin venta (D5, nunca now())",
+                )
             continue
         fecha = coerce_aware(fecha_raw)
         precio = normalizar_decimal(fila.get(COL_PRECIO))
         if precio is None or precio <= 0:
             plan.sin_precio += 1
             if report:
-                report.warn(HOJA_VENTAS, fila_idx, COL_PRECIO,
-                            f"{producto}: precio {fila.get(COL_PRECIO)!r} no "
-                            f"interpretable -> fila excluida (EXM-2)")
+                report.warn(
+                    HOJA_VENTAS,
+                    fila_idx,
+                    COL_PRECIO,
+                    f"{producto}: precio {fila.get(COL_PRECIO)!r} no "
+                    f"interpretable -> fila excluida (EXM-2)",
+                )
             continue
         costo = normalizar_decimal(fila.get(COL_COSTO))
         if costo is None or costo <= 0:
             plan.sin_precio += 1
             if report:
-                report.warn(HOJA_VENTAS, fila_idx, COL_COSTO,
-                            f"{producto}: costo {fila.get(COL_COSTO)!r} no "
-                            f"interpretable -> fila excluida (EXM-2)")
+                report.warn(
+                    HOJA_VENTAS,
+                    fila_idx,
+                    COL_COSTO,
+                    f"{producto}: costo {fila.get(COL_COSTO)!r} no "
+                    f"interpretable -> fila excluida (EXM-2)",
+                )
             continue
         cliente_raw = fila.get(COL_CLIENTE)
         cliente = (
@@ -182,7 +199,9 @@ def plan_ventas(libro, report=None) -> VentasPlan:
         if nota_txt:
             if report:
                 report.info(
-                    HOJA_VENTAS, fila_idx, COL_NOTA,
+                    HOJA_VENTAS,
+                    fila_idx,
+                    COL_NOTA,
                     f"{producto}: nota {nota_txt!r} (precio YA descontado, "
                     f"VTA-2: descuento no re-aplicado)",
                 )
@@ -233,8 +252,9 @@ def _upsert_cliente(db, nombre: str | None) -> int | None:
     return cli.id
 
 
-def _clave_venta(venta: VentaPlanLinea, producto_id: int,
-                 variante_id: int | None, cliente_id: int | None) -> tuple:
+def _clave_venta(
+    venta: VentaPlanLinea, producto_id: int, variante_id: int | None, cliente_id: int | None
+) -> tuple:
     """Clave natural: fecha + cliente + producto + variante + cant + precio + costo.
 
     Precio/costo se redondean a la escala NUMERIC(15,4) (``_moneda``): es
@@ -320,7 +340,9 @@ def aplicar_ventas(db, plan: VentasPlan, report=None, canal_venta: str = "feria"
             res["omitidas"] += 1
             if report:
                 report.error(
-                    venta.hoja, venta.fila, COL_PRODUCTO,
+                    venta.hoja,
+                    venta.fila,
+                    COL_PRODUCTO,
                     f"{venta.producto_nombre}: producto ausente en catalogo; "
                     f"venta no aplicada (correr F1 antes)",
                 )
@@ -374,7 +396,9 @@ def aplicar_ventas(db, plan: VentasPlan, report=None, canal_venta: str = "feria"
         res["insertadas"] += 1
         if report:
             report.info(
-                venta.hoja, venta.fila, None,
+                venta.hoja,
+                venta.fila,
+                None,
                 f"venta {venta.producto_nombre} {venta.variante_nombre or ''} "
                 f"cant {venta.cantidad} @ {venta.precio} costo {venta.costo} "
                 f"fecha {venta.fecha.date()} canal {canal_venta}",
@@ -386,14 +410,18 @@ def aplicar_ventas(db, plan: VentasPlan, report=None, canal_venta: str = "feria"
         res["destock"] = len(explosiones)
         if report:
             report.info(
-                "F5", None, None,
+                "F5",
+                None,
+                None,
                 f"destock batch: {len(explosiones)} insumos consumidos "
                 f"(stock FOR UPDATE, unica transaccion)",
             )
 
     if report:
         report.info(
-            "F5", None, None,
+            "F5",
+            None,
+            None,
             f"ventas aplicadas: {res['insertadas']} insertadas, "
             f"{res['ya_presentes']} ya-presentes, {res['omitidas']} omitidas",
         )
@@ -416,7 +444,9 @@ def cargar_ventas(ctx: MigrationContext) -> VentasPlan:
         plan = plan_ventas(libro, report)
 
     report.info(
-        "F5", None, None,
+        "F5",
+        None,
+        None,
         f"plan ventas: {plan.conteo_ventas} ventas | scope out "
         f"{plan.scope_out} | sin fecha {plan.sin_fecha} | sin precio/costo "
         f"{plan.sin_precio}",

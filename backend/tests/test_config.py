@@ -16,7 +16,9 @@ def test_settings_production_rejects_default_secret():
 
 
 def test_settings_production_accepts_secure_secret():
-    s = Settings(ENVIRONMENT="production", JWT_SECRET_KEY="super_secure_production_secret_key_12345")
+    s = Settings(
+        ENVIRONMENT="production", JWT_SECRET_KEY="super_secure_production_secret_key_12345"
+    )
     assert s.JWT_SECRET_KEY == "super_secure_production_secret_key_12345"
 
 

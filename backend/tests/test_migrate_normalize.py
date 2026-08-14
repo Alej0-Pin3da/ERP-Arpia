@@ -1,6 +1,6 @@
 """Tests for migrate.normalize (units, decimals, dates, cm2) - PR#1 slice."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -110,9 +110,8 @@ def test_ancho_default_con_warn():
 
 
 def test_fecha_heredada_mismo_insumo_proveedor():
-    cache: dict = {}
     # Fila contigua previa: misma clave (insumo, proveedor) -> hereda.
-    fecha_base = datetime(2025, 10, 25, tzinfo=timezone.utc)
+    fecha_base = datetime(2025, 10, 25, tzinfo=UTC)
     clave = ("Encaje negro", "Kilotelas")
     ultima = {clave: fecha_base}
     assert fecha_para_fila(None, clave, ultima) == fecha_base
@@ -122,11 +121,12 @@ def test_fecha_no_heredada_sin_contigua():
     # Sin contigua del mismo (insumo, proveedor) -> None, NUNCA now().
     assert fecha_para_fila(None, ("Velo", "Las 3BBB"), {}) is None
 
+
 @pytest.mark.parametrize(
     "dt,esperado",
     [
         (datetime(2025, 10, 25), False),
-        (datetime(2025, 10, 25, tzinfo=timezone.utc), True),
+        (datetime(2025, 10, 25, tzinfo=UTC), True),
     ],
 )
 def test_es_aware(dt, esperado):

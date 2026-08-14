@@ -139,9 +139,7 @@ def _make_linea_insumo(
         db.close()
 
 
-def _make_linea_producto(
-    combo_id: int, incluido_id: int, cantidad: str = "1"
-) -> int:
+def _make_linea_producto(combo_id: int, incluido_id: int, cantidad: str = "1") -> int:
     db = SessionLocal()
     try:
         linea = BomProducto(
@@ -195,9 +193,7 @@ def _cleanup_producto(producto_id: int) -> None:
                 BomProducto.producto_incluido_id == producto_id,
             )
         ).delete(synchronize_session=False)
-        db.query(VarianteProducto).filter(
-            VarianteProducto.producto_id == producto_id
-        ).delete()
+        db.query(VarianteProducto).filter(VarianteProducto.producto_id == producto_id).delete()
         db.query(Producto).filter(Producto.id == producto_id).delete()
         db.commit()
     finally:
@@ -207,9 +203,7 @@ def _cleanup_producto(producto_id: int) -> None:
 def _cleanup_tipo(tipo_id: int) -> None:
     db = SessionLocal()
     try:
-        producto_ids = db.query(Producto.id).filter(
-            Producto.tipo_producto_id == tipo_id
-        )
+        producto_ids = db.query(Producto.id).filter(Producto.tipo_producto_id == tipo_id)
         db.query(BomInsumo).filter(BomInsumo.producto_id.in_(producto_ids)).delete(
             synchronize_session=False
         )
@@ -219,9 +213,9 @@ def _cleanup_tipo(tipo_id: int) -> None:
                 BomProducto.producto_incluido_id.in_(producto_ids),
             )
         ).delete(synchronize_session=False)
-        db.query(VarianteProducto).filter(
-            VarianteProducto.producto_id.in_(producto_ids)
-        ).delete(synchronize_session=False)
+        db.query(VarianteProducto).filter(VarianteProducto.producto_id.in_(producto_ids)).delete(
+            synchronize_session=False
+        )
         db.query(Producto).filter(Producto.tipo_producto_id == tipo_id).delete(
             synchronize_session=False
         )
@@ -315,9 +309,7 @@ def test_validar_linea_null_y_variante_ok():
         try:
             # no raise: NULL base exists, validating a variant-specific line
             validar_linea_insumo_unica(db, producto_id, insumo_id, variante_id)
-            linea_variante_id = _make_linea_insumo(
-                producto_id, insumo_id, variante_id=variante_id
-            )
+            linea_variante_id = _make_linea_insumo(producto_id, insumo_id, variante_id=variante_id)
             try:
                 # both rules coexist as separate rows
                 assert (
@@ -401,9 +393,7 @@ def test_create_bom_insumo_waste_out_of_range_returns_422(client, admin_token):
         _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
 
 
-def test_create_bom_insumo_variante_de_otro_producto_returns_400(
-    client, admin_token
-):
+def test_create_bom_insumo_variante_de_otro_producto_returns_400(client, admin_token):
     categoria_id, insumo_id, tipo_id = _setup_insumo_base()
     producto_a = _make_producto(tipo_id)
     producto_b = _make_producto(tipo_id)
@@ -426,9 +416,7 @@ def test_create_bom_insumo_variante_de_otro_producto_returns_400(
 
 
 def test_list_bom_insumos_parent_missing_returns_404(client, admin_token):
-    resp = client.get(
-        f"{BASE}/99999999/bom/insumos", headers=_auth(admin_token)
-    )
+    resp = client.get(f"{BASE}/99999999/bom/insumos", headers=_auth(admin_token))
     assert resp.status_code == 404
 
 
@@ -521,9 +509,7 @@ def test_list_bom_insumos_returns_lines_ordered(client, admin_token):
     linea_1 = _make_linea_insumo(producto_id, insumo_id)
     linea_2 = _make_linea_insumo(producto_id, insumo_2)
     try:
-        resp = client.get(
-            f"{BASE}/{producto_id}/bom/insumos", headers=_auth(admin_token)
-        )
+        resp = client.get(f"{BASE}/{producto_id}/bom/insumos", headers=_auth(admin_token))
         assert resp.status_code == 200
         rows = resp.json()
         assert len(rows) == 2
@@ -578,9 +564,7 @@ def test_delete_bom_insumo_returns_204(client, admin_token):
             headers=_auth(admin_token),
         )
         assert resp.status_code == 204
-        rows = client.get(
-            f"{BASE}/{producto_id}/bom/insumos", headers=_auth(admin_token)
-        ).json()
+        rows = client.get(f"{BASE}/{producto_id}/bom/insumos", headers=_auth(admin_token)).json()
         assert rows == []
         resp = client.delete(
             f"{BASE}/{producto_id}/bom/insumos/{linea_id}",
@@ -659,9 +643,7 @@ def test_create_bom_producto_included_missing_returns_400(client, admin_token):
 
 
 def test_list_bom_productos_parent_missing_returns_404(client, admin_token):
-    resp = client.get(
-        f"{BASE}/99999999/bom/productos", headers=_auth(admin_token)
-    )
+    resp = client.get(f"{BASE}/99999999/bom/productos", headers=_auth(admin_token))
     assert resp.status_code == 404
 
 
@@ -691,9 +673,7 @@ def test_list_bom_productos_returns_lines_ordered(client, admin_token):
     linea_a = _make_linea_producto(combo_id, incluido_a)
     linea_b = _make_linea_producto(combo_id, incluido_b)
     try:
-        resp = client.get(
-            f"{BASE}/{combo_id}/bom/productos", headers=_auth(admin_token)
-        )
+        resp = client.get(f"{BASE}/{combo_id}/bom/productos", headers=_auth(admin_token))
         assert resp.status_code == 200
         rows = resp.json()
         assert len(rows) == 2
@@ -748,9 +728,7 @@ def test_delete_bom_producto_returns_204(client, admin_token):
             headers=_auth(admin_token),
         )
         assert resp.status_code == 204
-        rows = client.get(
-            f"{BASE}/{combo_id}/bom/productos", headers=_auth(admin_token)
-        ).json()
+        rows = client.get(f"{BASE}/{combo_id}/bom/productos", headers=_auth(admin_token)).json()
         assert rows == []
         resp = client.delete(
             f"{BASE}/{combo_id}/bom/productos/{linea_id}",
@@ -769,9 +747,7 @@ def test_delete_bom_producto_returns_204(client, admin_token):
 
 
 def test_create_bom_insumo_requires_auth(client):
-    resp = client.post(
-        f"{BASE}/1/bom/insumos", json={"insumo_id": 1, "cantidad_requerida": 1}
-    )
+    resp = client.post(f"{BASE}/1/bom/insumos", json={"insumo_id": 1, "cantidad_requerida": 1})
     assert resp.status_code == 401
 
 
@@ -806,14 +782,10 @@ def test_get_bom_consulta_allowed(client, consulta_token, admin_token):
     producto_id = _make_producto(tipo_id)
     linea_id = _make_linea_insumo(producto_id, insumo_id)
     try:
-        resp = client.get(
-            f"{BASE}/{producto_id}/bom/insumos", headers=_auth(consulta_token)
-        )
+        resp = client.get(f"{BASE}/{producto_id}/bom/insumos", headers=_auth(consulta_token))
         assert resp.status_code == 200
         assert len(resp.json()) == 1
-        resp = client.get(
-            f"{BASE}/{producto_id}/bom/productos", headers=_auth(consulta_token)
-        )
+        resp = client.get(f"{BASE}/{producto_id}/bom/productos", headers=_auth(consulta_token))
         assert resp.status_code == 200
         assert resp.json() == []
     finally:

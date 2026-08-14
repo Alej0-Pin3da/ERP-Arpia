@@ -6,9 +6,9 @@ import openpyxl
 import pytest
 
 from migrate.loaders import (
+    SHEET_BOUNDS,
     HojaInexistenteError,
     LibroMigracion,
-    SHEET_BOUNDS,
 )
 
 
@@ -113,7 +113,6 @@ def test_camisetas_inv_aplica_mapeo_columnas_por_hoja(tmp_path):
     assert warns, "el encabezado desalineado debe reportarse como WARN"
     assert any("desalineado" in e.mensaje.lower() for e in warns)
     assert COL_MAP_CAMISETAS_INV["D"] == "Tipo"
-
 
 
 def test_todas_las_hojas_registradas():

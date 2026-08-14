@@ -59,22 +59,16 @@ def _explode(
     if producto is None:
         raise EntityNotFoundError("Producto", producto_id)
     if root and variante_id is None and producto.variantes:
-        raise DomainValidationError(
-            "El producto tiene variantes; debe indicar variante_id"
-        )
+        raise DomainValidationError("El producto tiene variantes; debe indicar variante_id")
 
     insumo_rows = list(
         db.scalars(
-            select(BomInsumo)
-            .where(BomInsumo.producto_id == producto_id)
-            .order_by(BomInsumo.id)
+            select(BomInsumo).where(BomInsumo.producto_id == producto_id).order_by(BomInsumo.id)
         )
     )
     producto_rows = list(
         db.scalars(
-            select(BomProducto)
-            .where(BomProducto.combo_id == producto_id)
-            .order_by(BomProducto.id)
+            select(BomProducto).where(BomProducto.combo_id == producto_id).order_by(BomProducto.id)
         )
     )
 
@@ -85,9 +79,7 @@ def _explode(
                 Decimal("1") + linea.porcentaje_desperdicio / Decimal("100")
             )
             contribucion = multiplicador * cantidad_efectiva
-            result[linea.insumo_id] = (
-                result.get(linea.insumo_id, Decimal("0")) + contribucion
-            )
+            result[linea.insumo_id] = result.get(linea.insumo_id, Decimal("0")) + contribucion
         for linea in producto_rows:
             _explode(
                 db,
@@ -115,9 +107,7 @@ def descontar_stock(db: Session, explosiones: dict[int, Decimal]) -> None:
         # session's identity map (e.g. via the cost engine's selectin traversal);
         # the FOR UPDATE re-read must overwrite it with the latest committed row,
         # or a concurrent sale would keep seeing stale stock and double-deduct.
-        insumo = db.get(
-            Insumo, insumo_id, with_for_update=True, populate_existing=True
-        )
+        insumo = db.get(Insumo, insumo_id, with_for_update=True, populate_existing=True)
         if insumo is None:
             raise EntityNotFoundError("Insumo", insumo_id)
         if insumo.stock_actual < cantidad:
@@ -135,9 +125,7 @@ def reponer_stock(db: Session, explosiones: dict[int, Decimal]) -> None:
     insumo raises 404. No commit here — the caller owns the transaction.
     """
     for insumo_id in sorted(explosiones):
-        insumo = db.get(
-            Insumo, insumo_id, with_for_update=True, populate_existing=True
-        )
+        insumo = db.get(Insumo, insumo_id, with_for_update=True, populate_existing=True)
         if insumo is None:
             raise EntityNotFoundError("Insumo", insumo_id)
         insumo.stock_actual += explosiones[insumo_id]
@@ -192,9 +180,7 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
         lineas_costo.append(costo_unitario)
         lineas_subtotal.append(cantidad * precio_unitario)
 
-        for insumo_id, qty in explosion_materiales(
-            db, producto_id, variante_id, cantidad
-        ).items():
+        for insumo_id, qty in explosion_materiales(db, producto_id, variante_id, cantidad).items():
             explosiones[insumo_id] = explosiones.get(insumo_id, Decimal("0")) + qty
 
     descontar_stock(db, explosiones)
@@ -232,10 +218,7 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
         raise DomainValidationError(
             "Conflicto al registrar la venta; no se persistió nada",
             status_code=409,
-        )
-    except Exception:
-        db.rollback()
-        raise
+        ) from None
     except Exception:
         db.rollback()
         raise
@@ -324,9 +307,7 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
         lineas_costo.append(costo_unitario)
         lineas_subtotal.append(cantidad * precio_unitario)
 
-        for insumo_id, qty in explosion_materiales(
-            db, producto_id, variante_id, cantidad
-        ).items():
+        for insumo_id, qty in explosion_materiales(db, producto_id, variante_id, cantidad).items():
             explosiones[insumo_id] = explosiones.get(insumo_id, Decimal("0")) + qty
 
     descontar_stock(db, explosiones)
@@ -367,7 +348,7 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
         raise DomainValidationError(
             "Conflicto al actualizar la venta; no se persistió nada",
             status_code=409,
-        )
+        ) from None
     except Exception:
         db.rollback()
         raise
@@ -400,7 +381,7 @@ def anular_venta(db: Session, venta_id: int) -> Venta:
         raise DomainValidationError(
             "Conflicto al anular la venta; no se persistió nada",
             status_code=409,
-        )
+        ) from None
     except Exception:
         db.rollback()
         raise

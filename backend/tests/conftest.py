@@ -57,8 +57,9 @@ def _bd_test_lista():
     try:
         _crear_bd_test_si_no_existe()
 
-        from alembic import command as alembic_command
         from alembic.config import Config as AlembicConfig
+
+        from alembic import command as alembic_command
 
         alembic_ini = Path(__file__).resolve().parents[1] / "alembic.ini"
         cfg = AlembicConfig(str(alembic_ini))
@@ -86,9 +87,7 @@ def client():
 def _operador_user():
     db = SessionLocal()
     try:
-        existing = (
-            db.query(Usuario).filter(Usuario.email == "operador@arpia.com").first()
-        )
+        existing = db.query(Usuario).filter(Usuario.email == "operador@arpia.com").first()
         if existing:
             user = existing
         else:
@@ -110,9 +109,7 @@ def _operador_user():
 def _consulta_user():
     db = SessionLocal()
     try:
-        existing = (
-            db.query(Usuario).filter(Usuario.email == "consulta@arpia.com").first()
-        )
+        existing = db.query(Usuario).filter(Usuario.email == "consulta@arpia.com").first()
         if existing:
             user = existing
         else:
@@ -134,11 +131,7 @@ def _consulta_user():
 def categoria_fixture():
     db = SessionLocal()
     try:
-        existing = (
-            db.query(CategoriaInsumo)
-            .filter(CategoriaInsumo.nombre == "Telas")
-            .first()
-        )
+        existing = db.query(CategoriaInsumo).filter(CategoriaInsumo.nombre == "Telas").first()
         if existing:
             categoria = existing
         else:

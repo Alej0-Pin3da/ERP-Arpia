@@ -59,8 +59,12 @@ class Report:
     def error(self, hoja: str, fila: int | None, celda: str | None, mensaje: str) -> None:
         self._add(LEVEL_ERROR, hoja, fila, celda, mensaje)
 
-    def _add(self, nivel: str, hoja: str, fila: int | None, celda: str | None, mensaje: str) -> None:
-        self.entradas.append(ReportEntry(nivel=nivel, hoja=hoja, fila=fila, celda=celda, mensaje=mensaje))
+    def _add(
+        self, nivel: str, hoja: str, fila: int | None, celda: str | None, mensaje: str
+    ) -> None:
+        self.entradas.append(
+            ReportEntry(nivel=nivel, hoja=hoja, fila=fila, celda=celda, mensaje=mensaje)
+        )
 
     def count(self, nivel: str) -> int:
         return sum(1 for entry in self.entradas if entry.nivel == nivel)

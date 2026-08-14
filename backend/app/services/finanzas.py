@@ -54,15 +54,13 @@ def crear_movimiento(db: Session, payload: dict) -> MovimientoFinanciero:
         raise HTTPException(
             status_code=409,
             detail="Conflicto al crear el movimiento; no se persistió nada",
-        )
+        ) from None
     except Exception:
         db.rollback()
         raise
 
 
-def listar_movimientos(
-    db: Session, estado: str = "activo"
-) -> list[MovimientoFinanciero]:
+def listar_movimientos(db: Session, estado: str = "activo") -> list[MovimientoFinanciero]:
     """List movements ordered by id, filtered by estado (soft-delete aware)."""
     stmt = (
         select(MovimientoFinanciero)
@@ -83,9 +81,7 @@ def eliminar_movimiento(db: Session, movimiento_id: int) -> MovimientoFinanciero
     return movimiento
 
 
-def actualizar_movimiento(
-    db: Session, movimiento_id: int, payload: dict
-) -> MovimientoFinanciero:
+def actualizar_movimiento(db: Session, movimiento_id: int, payload: dict) -> MovimientoFinanciero:
     """Partial update of a movement (FIN-1 PATCH).
 
     Applies ONLY the fields present in ``payload`` (the route passes
@@ -142,9 +138,7 @@ def settle_liquidacion(
     else:
         key = liquidacion_id[:10]
         existente = db.scalar(
-            select(MovimientoFinanciero).where(
-                MovimientoFinanciero.liquidacion_id.like(f"{key}%")
-            )
+            select(MovimientoFinanciero).where(MovimientoFinanciero.liquidacion_id.like(f"{key}%"))
         )
         if existente is not None:
             raise HTTPException(
@@ -177,7 +171,7 @@ def settle_liquidacion(
         raise HTTPException(
             status_code=409,
             detail="Conflicto al liquidar; la liquidación ya fue procesada",
-        )
+        ) from None
     except Exception:
         db.rollback()
         raise
@@ -196,9 +190,7 @@ def crear_socio_configuracion(db: Session, nombre: str, porcentaje: Decimal) -> 
             status_code=422,
             detail="La suma de porcentajes de participación debe ser exactamente 100",
         )
-    socio = SociosConfiguracion(
-        nombre=nombre, porcentaje_participacion=porcentaje
-    )
+    socio = SociosConfiguracion(nombre=nombre, porcentaje_participacion=porcentaje)
     db.add(socio)
     try:
         db.commit()
@@ -209,13 +201,15 @@ def crear_socio_configuracion(db: Session, nombre: str, porcentaje: Decimal) -> 
         raise HTTPException(
             status_code=409,
             detail="Ya existe un socio con ese nombre",
-        )
+        ) from None
     except Exception:
         db.rollback()
         raise
 
 
-def actualizar_socio_configuracion(db: Session, socio_id: int, porcentaje: Decimal) -> SociosConfiguracion:
+def actualizar_socio_configuracion(
+    db: Session, socio_id: int, porcentaje: Decimal
+) -> SociosConfiguracion:
     """Update a partner's share.
 
     The resulting global sum may drop below 100 (interim rebalancing while

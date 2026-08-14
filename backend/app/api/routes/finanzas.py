@@ -96,8 +96,10 @@ def list_movimientos_route(
     {items, total} and an optional tipo filter (API-1/API-3)."""
     # Socio joined once up-front so the socio sort key works; outer join since
     # socio_id is nullable.
-    stmt = select(MovimientoFinanciero).outerjoin(MovimientoFinanciero.socio).where(
-        MovimientoFinanciero.estado == "activo"
+    stmt = (
+        select(MovimientoFinanciero)
+        .outerjoin(MovimientoFinanciero.socio)
+        .where(MovimientoFinanciero.estado == "activo")
     )
     if tipo is not None:
         stmt = stmt.where(MovimientoFinanciero.tipo == tipo)
@@ -127,9 +129,7 @@ def update_movimiento_route(
     """Partial update of a movement (FIN-1): fecha/tipo/descripcion/monto/
     socio_id, only the sent fields applied. Liquidacion-born rows freeze
     monto/socio_id server-side (FIN-2 -> 422)."""
-    return actualizar_movimiento(
-        db, movimiento_id, payload.model_dump(exclude_unset=True)
-    )
+    return actualizar_movimiento(db, movimiento_id, payload.model_dump(exclude_unset=True))
 
 
 # ---------------------------------------------------------------------------

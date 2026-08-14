@@ -66,9 +66,7 @@ def _make_categoria() -> int:
         db.close()
 
 
-def _make_insumo(
-    categoria_id: int, costo: str = "0", stock: str = "0"
-) -> int:
+def _make_insumo(categoria_id: int, costo: str = "0", stock: str = "0") -> int:
     db = SessionLocal()
     try:
         insumo = Insumo(
@@ -186,9 +184,7 @@ def _cleanup_producto(producto_id: int) -> None:
             (BomProducto.combo_id == producto_id)
             | (BomProducto.producto_incluido_id == producto_id)
         ).delete(synchronize_session=False)
-        db.query(VarianteProducto).filter(
-            VarianteProducto.producto_id == producto_id
-        ).delete()
+        db.query(VarianteProducto).filter(VarianteProducto.producto_id == producto_id).delete()
         db.query(Producto).filter(Producto.id == producto_id).delete()
         db.commit()
     finally:
@@ -206,9 +202,9 @@ def _cleanup_tipo(tipo_id: int) -> None:
             (BomProducto.combo_id.in_(producto_ids))
             | (BomProducto.producto_incluido_id.in_(producto_ids))
         ).delete(synchronize_session=False)
-        db.query(VarianteProducto).filter(
-            VarianteProducto.producto_id.in_(producto_ids)
-        ).delete(synchronize_session=False)
+        db.query(VarianteProducto).filter(VarianteProducto.producto_id.in_(producto_ids)).delete(
+            synchronize_session=False
+        )
         db.query(Producto).filter(Producto.tipo_producto_id == tipo_id).delete(
             synchronize_session=False
         )
@@ -257,12 +253,8 @@ def _make_cliente() -> int:
 def _cleanup_ventas_for_producto(producto_id: int) -> None:
     db = SessionLocal()
     try:
-        ven_ids = select(DetalleVenta.venta_id).where(
-            DetalleVenta.producto_id == producto_id
-        )
-        db.query(Venta).filter(Venta.id.in_(ven_ids)).delete(
-            synchronize_session=False
-        )
+        ven_ids = select(DetalleVenta.venta_id).where(DetalleVenta.producto_id == producto_id)
+        db.query(Venta).filter(Venta.id.in_(ven_ids)).delete(synchronize_session=False)
         db.commit()
     finally:
         db.close()
@@ -536,8 +528,18 @@ def test_registrar_venta_two_lines_second_short_rolls_back_all():
         "canal_venta": "web",
         "descuento_porcentaje": Decimal("0"),
         "detalles": [
-            {"producto_id": p1, "variante_id": None, "cantidad": Decimal("3"), "precio_unitario": Decimal("10")},
-            {"producto_id": p2, "variante_id": None, "cantidad": Decimal("3"), "precio_unitario": Decimal("10")},
+            {
+                "producto_id": p1,
+                "variante_id": None,
+                "cantidad": Decimal("3"),
+                "precio_unitario": Decimal("10"),
+            },
+            {
+                "producto_id": p2,
+                "variante_id": None,
+                "cantidad": Decimal("3"),
+                "precio_unitario": Decimal("10"),
+            },
         ],
     }
     try:

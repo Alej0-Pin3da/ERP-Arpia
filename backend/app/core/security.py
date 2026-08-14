@@ -21,7 +21,7 @@ def create_access_token(
     rol: str | None = None,
     expires_delta: dt.timedelta | None = None,
 ) -> str:
-    now = dt.datetime.now(dt.timezone.utc)
+    now = dt.datetime.now(dt.UTC)
     expire = now + (
         expires_delta
         if expires_delta

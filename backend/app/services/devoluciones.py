@@ -19,9 +19,7 @@ from app.models.ventas import Devolucion, DevolucionItem, Venta
 from app.services.inventory import explosion_materiales, reponer_stock
 
 
-def registrar_devolucion(
-    db: Session, user_id: int | None, payload: dict
-) -> Devolucion:
+def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Devolucion:
     """Register a return (full cancel or partial by line), atomically.
 
     Payload mirrors the future schema fields: ``venta_id``, ``tipo``
@@ -132,9 +130,7 @@ def registrar_devolucion(
                 explosiones[insumo_id] = explosiones.get(insumo_id, Decimal("0")) + qty
 
         if not items:
-            raise HTTPException(
-                status_code=400, detail="Debe incluir al menos un item a devolver"
-            )
+            raise HTTPException(status_code=400, detail="Debe incluir al menos un item a devolver")
         devolucion = Devolucion(
             venta_id=venta_id,
             tipo="parcial",
@@ -145,9 +141,7 @@ def registrar_devolucion(
         )
         db.add(devolucion)
     else:
-        raise HTTPException(
-            status_code=400, detail="tipo debe ser 'total' o 'parcial'"
-        )
+        raise HTTPException(status_code=400, detail="tipo debe ser 'total' o 'parcial'")
 
     reponer_stock(db, explosiones)
 
@@ -160,7 +154,7 @@ def registrar_devolucion(
         raise HTTPException(
             status_code=409,
             detail="Conflicto al registrar la devolución; no se persistió nada",
-        )
+        ) from None
     except Exception:
         db.rollback()
         raise

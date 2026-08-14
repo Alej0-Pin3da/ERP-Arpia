@@ -90,8 +90,12 @@ def _borrar_filas_test(db) -> None:
     """Remove rows this test module injected (exact-name matches only)."""
     db.query(Insumo).filter(
         Insumo.nombre.in_(
-            ["Material Migra Test", "Argolla Migra Test", "Tela Migra para Upsert",
-             f"{PREFIX_TEST} Insumo A"]
+            [
+                "Material Migra Test",
+                "Argolla Migra Test",
+                "Tela Migra para Upsert",
+                f"{PREFIX_TEST} Insumo A",
+            ]
         )
     ).delete(synchronize_session=False)
     db.query(Proveedor).filter(
@@ -99,17 +103,19 @@ def _borrar_filas_test(db) -> None:
     ).delete(synchronize_session=False)
     db.query(Producto).filter(
         Producto.nombre.in_(
-            [f"{PREFIX_TEST} Corset", f"{PREFIX_TEST} Set",
-             f"{PREFIX_TEST} P1", f"{PREFIX_TEST} P2"]
+            [
+                f"{PREFIX_TEST} Corset",
+                f"{PREFIX_TEST} Set",
+                f"{PREFIX_TEST} P1",
+                f"{PREFIX_TEST} P2",
+            ]
         )
     ).delete(synchronize_session=False)
     # Remove the canonical catalog tipos that bootstrap_catalogo() inserts.
     # They are migration content, not app seed data; leaving them pollutes the
     # shared per-sheet DB and breaks pagination tests that assume an empty table.
     db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
+        TipoProducto.nombre.in_(["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"])
     ).delete(synchronize_session=False)
     db.commit()
 
@@ -239,8 +245,12 @@ def test_plan_workbook_mini_proveedores_insumos_dedup(mini_libro):
     assert plan.conteo_insumos == 6
     nombres = {i.nombre for i in plan.insumos}
     assert {
-        "Tela Maya Test 1", "Encaje Elastico 19 cm negro 10 mts", "Argolla 90 mm",
-        "Sesgo Elastico 10 mts", "Material Migra Test", "Argolla Migra Test",
+        "Tela Maya Test 1",
+        "Encaje Elastico 19 cm negro 10 mts",
+        "Argolla 90 mm",
+        "Sesgo Elastico 10 mts",
+        "Material Migra Test",
+        "Argolla Migra Test",
     } <= nombres
 
 
@@ -261,7 +271,7 @@ def test_plan_catalogo_unidades_normalizadas(mini_libro):
 
 
 def test_plan_catalogo_tipos_y_productos_static(mini_libro):
-    from migrate.catalog import plan_catalogo, TIPOS_CATALOGO, PRODUCTOS_CATALOGO
+    from migrate.catalog import PRODUCTOS_CATALOGO, TIPOS_CATALOGO, plan_catalogo
     from migrate.loaders import LibroMigracion
 
     with LibroMigracion(mini_libro) as libro:
@@ -346,7 +356,7 @@ def test_upsert_producto_variantes_dedup(db):
 
 
 def test_catalogar_dry_run_real_no_escribe():
-    from migrate.catalog import catalogar, PRODUCTOS_CATALOGO
+    from migrate.catalog import PRODUCTOS_CATALOGO, catalogar
 
     if not REAL_XLSX.exists():
         pytest.skip("ARPIA.xlsx no disponible")
@@ -354,16 +364,18 @@ def test_catalogar_dry_run_real_no_escribe():
     db = SessionLocal()
     try:
         antes = (
-            db.query(TipoProducto).count(), db.query(Proveedor).count(),
-            db.query(Insumo).count(), db.query(Producto).count(),
+            db.query(TipoProducto).count(),
+            db.query(Proveedor).count(),
+            db.query(Insumo).count(),
+            db.query(Producto).count(),
         )
-        ctx = MigrationContext.para_fase(
-            FaseOptions(source=REAL_XLSX, modo="dry-run"), "F1"
-        )
+        ctx = MigrationContext.para_fase(FaseOptions(source=REAL_XLSX, modo="dry-run"), "F1")
         plan = catalogar(ctx)
         despues = (
-            db.query(TipoProducto).count(), db.query(Proveedor).count(),
-            db.query(Insumo).count(), db.query(Producto).count(),
+            db.query(TipoProducto).count(),
+            db.query(Proveedor).count(),
+            db.query(Insumo).count(),
+            db.query(Producto).count(),
         )
         # NFR-2: dry-run termina con 0 filas escritas
         assert antes == despues
@@ -386,24 +398,41 @@ def test_oct25_layout_real_entra_al_universo_f1():
         pytest.skip("ARPIA.xlsx no disponible")
 
     materiales_b = [
-        "Encaje negro sin pelitos", "Tela entrepierna negra",
+        "Encaje negro sin pelitos",
+        "Tela entrepierna negra",
         "Tela entrepierna blanca",
         "Encaje blanco chantilli (pelitos) para bicolor",
-        "Encaje negro chantilli (pelitos) para bicolor", "Tira de brasier blanca",
-        "Contorno para Bustier negro 2 cm ancho", "Tapa varilla Negro #1",
-        "Tapa varilla Negro #2", "Elastico de contorno de 1 cm blanco",
-        "Tapa Costura Negro", "Elastico plano negro", "Elastico plano blanco",
-        "Tira de brasier negra", "Sesgo de 2cm blanco", "Sesgo de 2cm negro",
-        "Mallatex negra", "Mallatex blanca",
+        "Encaje negro chantilli (pelitos) para bicolor",
+        "Tira de brasier blanca",
+        "Contorno para Bustier negro 2 cm ancho",
+        "Tapa varilla Negro #1",
+        "Tapa varilla Negro #2",
+        "Elastico de contorno de 1 cm blanco",
+        "Tapa Costura Negro",
+        "Elastico plano negro",
+        "Elastico plano blanco",
+        "Tira de brasier negra",
+        "Sesgo de 2cm blanco",
+        "Sesgo de 2cm negro",
+        "Mallatex negra",
+        "Mallatex blanca",
         "Ref 100 24 cm tul bordado negro",
         "Ref 159 24 cm tul bordado rojo pastel",
     ]
     herrajes = [
-        "Argollas grandes", "* Argollas Medianas", "* Argollas Pequenas",
-        "* Ochos Grandes", "* Ochos Medianos", "* Ochos Pequenos",
-        "* Gancho G grandes", "* Gancho G Medianos", "* Ganchos G Pequenos",
-        "Varilla copa brasier talla 30", "Varilla copa brasier talla 32",
-        "Varilla copa brasier talla 36", "Varilla copa brasier talla 34",
+        "Argollas grandes",
+        "* Argollas Medianas",
+        "* Argollas Pequenas",
+        "* Ochos Grandes",
+        "* Ochos Medianos",
+        "* Ochos Pequenos",
+        "* Gancho G grandes",
+        "* Gancho G Medianos",
+        "* Ganchos G Pequenos",
+        "Varilla copa brasier talla 30",
+        "Varilla copa brasier talla 32",
+        "Varilla copa brasier talla 36",
+        "Varilla copa brasier talla 34",
         "Variila plastica cortada 18cms",
     ]
     with LibroMigracion(REAL_XLSX) as libro:

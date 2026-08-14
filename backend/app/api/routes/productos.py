@@ -95,7 +95,7 @@ def create_producto(
         db.rollback()
         raise HTTPException(
             status_code=409, detail="Producto conflicts with existing data"
-        )
+        ) from None
     db.refresh(producto)
     return producto
 
@@ -123,7 +123,7 @@ def update_producto(
         db.rollback()
         raise HTTPException(
             status_code=409, detail="Producto conflicts with existing data"
-        )
+        ) from None
     db.refresh(producto)
     return producto
 
@@ -144,7 +144,7 @@ def delete_producto(
         db.rollback()
         raise HTTPException(
             status_code=409, detail="Producto is in use and cannot be deleted"
-        )
+        ) from None
 
 
 # ---------------------------------------------------------------------------
@@ -152,9 +152,7 @@ def delete_producto(
 # ---------------------------------------------------------------------------
 
 
-@router.get(
-    "/{producto_id}/variantes", response_model=list[VarianteProductoRead]
-)
+@router.get("/{producto_id}/variantes", response_model=list[VarianteProductoRead])
 def list_variantes(
     producto_id: int,
     db: Session = Depends(get_db),
@@ -192,14 +190,12 @@ def create_variante(
         raise HTTPException(
             status_code=409,
             detail="VarianteProducto name already exists for this product",
-        )
+        ) from None
     db.refresh(variante)
     return variante
 
 
-@router.put(
-    "/{producto_id}/variantes/{variante_id}", response_model=VarianteProductoRead
-)
+@router.put("/{producto_id}/variantes/{variante_id}", response_model=VarianteProductoRead)
 def update_variante(
     producto_id: int,
     variante_id: int,
@@ -221,7 +217,7 @@ def update_variante(
         raise HTTPException(
             status_code=409,
             detail="VarianteProducto name already exists for this product",
-        )
+        ) from None
     db.refresh(variante)
     return variante
 

@@ -11,7 +11,7 @@ from decimal import Decimal
 import pytest
 
 from app.db.session import SessionLocal
-from app.models import CategoriaInsumo, CompraInsumo, Insumo, Proveedor
+from app.models import CompraInsumo, Insumo, Proveedor
 
 URL = "/api/v1/compras-insumos"
 
@@ -174,7 +174,9 @@ def test_invalid_proveedor_400(client, operador_token, categoria_fixture):
         _cleanup_insumo(insumo_id)
 
 
-@pytest.mark.parametrize("bad_field,bad_value", [("cantidad_comprada", 0), ("cantidad_comprada", -5)])
+@pytest.mark.parametrize(
+    "bad_field,bad_value", [("cantidad_comprada", 0), ("cantidad_comprada", -5)]
+)
 def test_invalid_quantity_422(client, operador_token, categoria_fixture, bad_field, bad_value):
     insumo_id = _make_insumo(categoria_fixture["id"])
     try:
@@ -239,18 +241,12 @@ def test_list_filter_by_insumo(client, operador_token, categoria_fixture):
     insumo_a = _make_insumo(categoria_fixture["id"])
     insumo_b = _make_insumo(categoria_fixture["id"])
     try:
-        resp = client.post(
-            URL, json=_valid_payload(insumo_a), headers=_auth(operador_token)
-        )
+        resp = client.post(URL, json=_valid_payload(insumo_a), headers=_auth(operador_token))
         assert resp.status_code == 201
-        resp = client.post(
-            URL, json=_valid_payload(insumo_b), headers=_auth(operador_token)
-        )
+        resp = client.post(URL, json=_valid_payload(insumo_b), headers=_auth(operador_token))
         assert resp.status_code == 201
 
-        resp = client.get(
-            URL, params={"insumo_id": insumo_a}, headers=_auth(operador_token)
-        )
+        resp = client.get(URL, params={"insumo_id": insumo_a}, headers=_auth(operador_token))
         body = resp.json()
         rows = body["items"]
         assert len(rows) == 1
@@ -274,9 +270,7 @@ def test_list_ordered_by_id(client, operador_token, categoria_fixture):
             assert resp.status_code == 201
             created_ids.append(resp.json()["id"])
 
-        resp = client.get(
-            URL, params={"insumo_id": insumo_id}, headers=_auth(operador_token)
-        )
+        resp = client.get(URL, params={"insumo_id": insumo_id}, headers=_auth(operador_token))
         rows = resp.json()["items"]
         assert [row["id"] for row in rows] == sorted(created_ids)
     finally:
@@ -371,7 +365,9 @@ def test_list_sorted_by_price_desc(client, operador_token, categoria_fixture):
         _cleanup_insumo(insumo_id)
 
 
-def test_list_nombre_proveedor_poblado(client, operador_token, categoria_fixture, proveedor_fixture):
+def test_list_nombre_proveedor_poblado(
+    client, operador_token, categoria_fixture, proveedor_fixture
+):
     """GET list rows carry nombre_proveedor from the eager-loaded relationship
     (None when proveedor_id is NULL, name otherwise)."""
     insumo_id = _make_insumo(categoria_fixture["id"])

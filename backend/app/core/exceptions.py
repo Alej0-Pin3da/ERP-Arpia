@@ -38,7 +38,11 @@ class EntityNotFoundError(DomainError):
     """Raised when a requested domain entity does not exist."""
 
     def __init__(self, entity_name: str, entity_id: Any | None = None):
-        msg = f"{entity_name} no encontrado" if entity_id is None else f"{entity_name} {entity_id!r} no encontrado"
+        msg = (
+            f"{entity_name} no encontrado"
+            if entity_id is None
+            else f"{entity_name} {entity_id!r} no encontrado"
+        )
         super().__init__(
             message=msg,
             status_code=404,

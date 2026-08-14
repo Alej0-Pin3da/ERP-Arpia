@@ -8,9 +8,7 @@ from app.models.productos import BomInsumo, BomProducto, Producto
 from app.schemas.costo import CostoLineaRead
 
 
-def _lineas_insumo_efectivas(
-    rows: list[BomInsumo], variante_id: int | None
-) -> list[BomInsumo]:
+def _lineas_insumo_efectivas(rows: list[BomInsumo], variante_id: int | None) -> list[BomInsumo]:
     """Pick the effective BOM insumo lines for a variant.
 
     A row with variante_id NULL is the base rule for ALL variants; a row with
@@ -20,11 +18,7 @@ def _lineas_insumo_efectivas(
         return [r for r in rows if r.variante_id is None]
     ids_variante = {r.insumo_id for r in rows if r.variante_id == variante_id}
     efectivas = [r for r in rows if r.variante_id == variante_id]
-    efectivas += [
-        r
-        for r in rows
-        if r.variante_id is None and r.insumo_id not in ids_variante
-    ]
+    efectivas += [r for r in rows if r.variante_id is None and r.insumo_id not in ids_variante]
     efectivas.sort(key=lambda r: r.id)
     return efectivas
 
@@ -78,16 +72,12 @@ def _calcular(
 
     insumo_rows = list(
         db.scalars(
-            select(BomInsumo)
-            .where(BomInsumo.producto_id == producto_id)
-            .order_by(BomInsumo.id)
+            select(BomInsumo).where(BomInsumo.producto_id == producto_id).order_by(BomInsumo.id)
         )
     )
     producto_rows = list(
         db.scalars(
-            select(BomProducto)
-            .where(BomProducto.combo_id == producto_id)
-            .order_by(BomProducto.id)
+            select(BomProducto).where(BomProducto.combo_id == producto_id).order_by(BomProducto.id)
         )
     )
 
@@ -128,9 +118,7 @@ def _calcular(
                     )
                 )
         for linea in producto_rows:
-            costo_hijo = _calcular(
-                db, linea.producto_incluido_id, variante_id, path, memo
-            )
+            costo_hijo = _calcular(db, linea.producto_incluido_id, variante_id, path, memo)
             subtotal = linea.cantidad * costo_hijo
             total += subtotal
             if lineas_out is not None:

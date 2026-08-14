@@ -11,8 +11,10 @@ from app.schemas.common import Paginated
 from app.schemas.venta import VentaCreate, VentaRead, VentaUpdate
 from app.services.inventory import (
     actualizar_venta,
-    anular_venta as anular_venta_service,
     registrar_venta,
+)
+from app.services.inventory import (
+    anular_venta as anular_venta_service,
 )
 from app.services.paginacion import aplicar_orden, paginar
 

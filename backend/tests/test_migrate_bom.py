@@ -143,12 +143,12 @@ def _borrar_filas_test(db) -> None:
         db.query(BomInsumo).filter(BomInsumo.insumo_id == insumo.id).delete(
             synchronize_session=False
         )
-    db.query(Insumo).filter(Insumo.nombre.in_(insumo_nombres)).delete(
-        synchronize_session=False
+    db.query(Insumo).filter(Insumo.nombre.in_(insumo_nombres)).delete(synchronize_session=False)
+    productos = (
+        db.query(Producto)
+        .filter(Producto.nombre.in_([P_CORSET, P_BLUSA_ML, P_BLUSA_MC, P_COMBO]))
+        .all()
     )
-    productos = db.query(Producto).filter(
-        Producto.nombre.in_([P_CORSET, P_BLUSA_ML, P_BLUSA_MC, P_COMBO])
-    ).all()
     for prod in productos:
         db.query(BomInsumo).filter(BomInsumo.producto_id == prod.id).delete(
             synchronize_session=False
@@ -156,9 +156,9 @@ def _borrar_filas_test(db) -> None:
         db.query(BomProducto).filter(BomProducto.combo_id == prod.id).delete(
             synchronize_session=False
         )
-        db.query(BomProducto).filter(
-            BomProducto.producto_incluido_id == prod.id
-        ).delete(synchronize_session=False)
+        db.query(BomProducto).filter(BomProducto.producto_incluido_id == prod.id).delete(
+            synchronize_session=False
+        )
     db.query(Producto).filter(
         Producto.nombre.in_([P_CORSET, P_BLUSA_ML, P_BLUSA_MC, P_COMBO])
     ).delete(synchronize_session=False)
@@ -166,9 +166,7 @@ def _borrar_filas_test(db) -> None:
     # They are migration content, not app seed data; leaving them pollutes the
     # shared per-sheet DB and breaks pagination tests that assume an empty table.
     db.query(TipoProducto).filter(
-        TipoProducto.nombre.in_(
-            ["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"]
-        )
+        TipoProducto.nombre.in_(["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"])
     ).delete(synchronize_session=False)
     db.commit()
 
@@ -216,15 +214,9 @@ def _preparar_catalogo_aliases(db) -> dict[str, int]:
     ids = _preparar_catalogo(db)
     from migrate.catalog import upsert_insumo
 
-    ids[P_ALIAS_ARG] = upsert_insumo(
-        db, P_ALIAS_ARG, categoria_nombre="Herrajes"
-    ).id
-    ids[P_ALIAS_TIRA] = upsert_insumo(
-        db, P_ALIAS_TIRA, categoria_nombre="Telas"
-    ).id
-    ids[P_ALIAS_POWERNET] = upsert_insumo(
-        db, P_ALIAS_POWERNET, categoria_nombre="Telas"
-    ).id
+    ids[P_ALIAS_ARG] = upsert_insumo(db, P_ALIAS_ARG, categoria_nombre="Herrajes").id
+    ids[P_ALIAS_TIRA] = upsert_insumo(db, P_ALIAS_TIRA, categoria_nombre="Telas").id
+    ids[P_ALIAS_POWERNET] = upsert_insumo(db, P_ALIAS_POWERNET, categoria_nombre="Telas").id
     db.commit()
     return ids
 
@@ -240,13 +232,9 @@ def test_convertir_cantidad_bom_m_centimetros_lineales():
     # 'cantidad Cms' = centimetros LINEALES de consumo por prenda.
     # metros = cm / 100; el ancho del material no participa.
     assert convertir_cantidad_bom("5", "Elastico pitillo rosa", "m") == Decimal("0.05")
-    assert convertir_cantidad_bom("74", "Tira de Brasier negro 10 mts", "m") == Decimal(
-        "0.74"
-    )
+    assert convertir_cantidad_bom("74", "Tira de Brasier negro 10 mts", "m") == Decimal("0.74")
     assert convertir_cantidad_bom("6", "Sesgo Elastico 10 mts", "m") == Decimal("0.06")
-    assert convertir_cantidad_bom("40", "Framilon elastico plano 20 mts", "m") == Decimal(
-        "0.40"
-    )
+    assert convertir_cantidad_bom("40", "Framilon elastico plano 20 mts", "m") == Decimal("0.40")
 
 
 def test_convertir_cantidad_bom_m_ignora_ancho_del_nombre():
@@ -254,9 +242,9 @@ def test_convertir_cantidad_bom_m_ignora_ancho_del_nombre():
 
     # El ancho declarado en el nombre ('19 cm') YA NO afecta la conversion:
     # el consumo es lineal, metros = cm / 100 (regresion del bug 100x).
-    assert convertir_cantidad_bom(
-        "74", "Encaje Elastico 19 cm negro 10 mts", "m"
-    ) == Decimal("0.74")
+    assert convertir_cantidad_bom("74", "Encaje Elastico 19 cm negro 10 mts", "m") == Decimal(
+        "0.74"
+    )
 
 
 def test_convertir_cantidad_bom_piezas_y_cm2():
@@ -265,9 +253,7 @@ def test_convertir_cantidad_bom_piezas_y_cm2():
     # Herrajes en "un": la cantidad Cms es conteo de piezas (2 argollas)
     assert convertir_cantidad_bom("2", "Argolla 10 mm", "un") == Decimal("2")
     # Herrajes en "cm2" (precio por cm2): cantidad se conserva en cm2
-    assert convertir_cantidad_bom("4670", "Sublimacion (cm2)", "cm2") == Decimal(
-        "4670"
-    )
+    assert convertir_cantidad_bom("4670", "Sublimacion (cm2)", "cm2") == Decimal("4670")
 
 
 def test_convertir_cantidad_bom_rechaza_no_numerico():
@@ -289,7 +275,7 @@ def _bloques_mini():
     from migrate.bom import BLOQUES_BOM
 
     bloques = dict(BLOQUES_BOM)
-    bloques["CORSET"] = (P_CORSET, None)          # right block TANGA = ghost
+    bloques["CORSET"] = (P_CORSET, None)  # right block TANGA = ghost
     bloques["BLUSAS"] = (P_BLUSA_ML, P_BLUSA_MC)
     return bloques
 
@@ -300,7 +286,7 @@ def test_plan_bom_asigna_producto_por_hoja(mini_bom):
     with LibroMigracion(mini_bom) as libro:
         plan = plan_bom(libro, bloques=_bloques_mini())
 
-    productos = {l.producto_nombre for l in plan.insumos}
+    productos = {item.producto_nombre for item in plan.insumos}
     # La hoja CORSET alimenta el producto Corset; BLUSAS alimenta ambos productos
     assert P_CORSET in productos
     assert P_BLUSA_ML in productos
@@ -314,9 +300,9 @@ def test_plan_bom_descarta_ghost_tanga_y_junk(mini_bom):
         plan = plan_bom(libro, bloques=_bloques_mini())
 
     # La fila fantasma TANGA (I9) NO alimenta el Corset (2xTela? no: solo izq)
-    corset = [l for l in plan.insumos if l.producto_nombre == P_CORSET]
+    corset = [item for item in plan.insumos if item.producto_nombre == P_CORSET]
     assert len(corset) == 3  # Tela + Argolla + Tul; junk y TANGA excluidos
-    assert all(l.cantidad > 0 for l in corset)
+    assert all(item.cantidad > 0 for item in corset)
 
 
 def test_plan_bom_cantidades_convertidas_exactas(mini_bom):
@@ -325,7 +311,7 @@ def test_plan_bom_cantidades_convertidas_exactas(mini_bom):
     with LibroMigracion(mini_bom) as libro:
         plan = plan_bom(libro, bloques=_bloques_mini())
 
-    por = {(l.producto_nombre, l.insumo_nombre): l.cantidad for l in plan.insumos}
+    por = {(item.producto_nombre, item.insumo_nombre): item.cantidad for item in plan.insumos}
     # Corset Tul: 432 cm lineales / 100 = 4.32 m (el ancho ya no participa)
     assert por[(P_CORSET, P_TUL)] == Decimal("4.32")
     # Corset Tela: 2368 cm lineales / 100 = 23.68 m
@@ -355,7 +341,7 @@ def test_plan_bom_combos_cajas(mini_bom):
 def test_aplicar_bom_crea_insumos_con_cantidades(db, mini_bom):
     from migrate.bom import aplicar_bom, plan_bom
 
-    ids = _preparar_catalogo(db)
+    _preparar_catalogo(db)
     with LibroMigracion(mini_bom) as libro:
         plan = plan_bom(libro, bloques=_bloques_mini())
     aplicar_bom(db, plan)
@@ -364,16 +350,16 @@ def test_aplicar_bom_crea_insumos_con_cantidades(db, mini_bom):
     corset = db.query(Producto).filter(Producto.nombre == P_CORSET).one()
     lineas = db.query(BomInsumo).filter(BomInsumo.producto_id == corset.id).all()
     assert len(lineas) == 3
-    por = {l.insumo.nombre: l for l in lineas}
+    por = {item.insumo.nombre: item for item in lineas}
     assert por[P_TUL].cantidad_requerida == Decimal("4.32")
     assert por[P_TELA].cantidad_requerida == Decimal("23.68")
-    assert all(l.variante_id is None for l in lineas)  # variante NULL
+    assert all(item.variante_id is None for item in lineas)  # variante NULL
 
 
 def test_aplicar_bom_idempotente_variante_null(db, mini_bom):
     from migrate.bom import aplicar_bom, plan_bom
 
-    ids = _preparar_catalogo(db)
+    _preparar_catalogo(db)
     with LibroMigracion(mini_bom) as libro:
         plan = plan_bom(libro, bloques=_bloques_mini())
     aplicar_bom(db, plan)
@@ -389,7 +375,7 @@ def test_aplicar_bom_idempotente_variante_null(db, mini_bom):
 def test_aplicar_bom_multinivel_combo(db, mini_bom):
     from migrate.bom import aplicar_bom, plan_bom
 
-    ids = _preparar_catalogo(db)
+    _preparar_catalogo(db)
     with LibroMigracion(mini_bom) as libro:
         plan = plan_bom(libro, bloques=_bloques_mini())
     aplicar_bom(db, plan)
@@ -402,15 +388,16 @@ def test_aplicar_bom_multinivel_combo(db, mini_bom):
     assert incluidos == {P_CORSET, P_BLUSA_ML}
     # Los productos del combo tienen su propio BOM_Insumos (multinivel real)
     for it in items:
-        assert db.query(BomInsumo).filter(
-            BomInsumo.producto_id == it.producto_incluido_id
-        ).count() >= 1
+        assert (
+            db.query(BomInsumo).filter(BomInsumo.producto_id == it.producto_incluido_id).count()
+            >= 1
+        )
 
 
 def test_aplicar_bom_combo_idempotente(db, mini_bom):
     from migrate.bom import aplicar_bom, plan_bom
 
-    ids = _preparar_catalogo(db)
+    _preparar_catalogo(db)
     with LibroMigracion(mini_bom) as libro:
         plan = plan_bom(libro, bloques=_bloques_mini())
     aplicar_bom(db, plan)
@@ -434,18 +421,15 @@ def test_aplicar_bom_alias_resuelve_insumos_canonicos(db, mini_bom_aliases):
 
     corset = db.query(Producto).filter(Producto.nombre == P_CORSET).one()
     por = {
-        l.insumo.nombre: l
-        for l in db.query(BomInsumo).filter(BomInsumo.producto_id == corset.id).all()
+        item.insumo.nombre: item
+        for item in db.query(BomInsumo).filter(BomInsumo.producto_id == corset.id).all()
     }
     # 'Argolla 10 mm' -> 'Argolla numero 10 mm' (insumo canonico del fixture)
     assert P_ALIAS_ARG in por and por[P_ALIAS_ARG].insumo_id == ids[P_ALIAS_ARG]
     # 'Tira de brasier' -> 'Tira de Brasier negro 10 mts'
     assert P_ALIAS_TIRA in por and por[P_ALIAS_TIRA].insumo_id == ids[P_ALIAS_TIRA]
     # 'Powernet negro delgado (corsets)' -> 'Powernet negro delgado'
-    assert (
-        P_ALIAS_POWERNET in por
-        and por[P_ALIAS_POWERNET].insumo_id == ids[P_ALIAS_POWERNET]
-    )
+    assert P_ALIAS_POWERNET in por and por[P_ALIAS_POWERNET].insumo_id == ids[P_ALIAS_POWERNET]
 
 
 def test_aplicar_bom_sin_alias_ni_match_exacto_omite(db, mini_bom_aliases):
@@ -461,8 +445,8 @@ def test_aplicar_bom_sin_alias_ni_match_exacto_omite(db, mini_bom_aliases):
     assert res["omitidos"] == 1  # solo el material fantasma
     corset = db.query(Producto).filter(Producto.nombre == P_CORSET).one()
     nombres = {
-        l.insumo.nombre
-        for l in db.query(BomInsumo).filter(BomInsumo.producto_id == corset.id).all()
+        item.insumo.nombre
+        for item in db.query(BomInsumo).filter(BomInsumo.producto_id == corset.id).all()
     }
     assert P_FANTASMA not in nombres
 
@@ -490,9 +474,7 @@ def test_cargar_bom_dry_run_real_no_escribe():
     try:
         antes_bom = db.query(BomInsumo).count()
         antes_combo = db.query(BomProducto).count()
-        ctx = MigrationContext.para_fase(
-            FaseOptions(source=REAL_XLSX, modo="dry-run"), "F3"
-        )
+        ctx = MigrationContext.para_fase(FaseOptions(source=REAL_XLSX, modo="dry-run"), "F3")
         cargar_bom(ctx)
         assert db.query(BomInsumo).count() == antes_bom
         assert db.query(BomProducto).count() == antes_combo

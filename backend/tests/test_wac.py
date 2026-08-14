@@ -9,7 +9,7 @@ SessionLocal for concurrency), matching the design's service-level test strategy
 """
 
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -18,9 +18,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models import CategoriaInsumo, CompraInsumo, Insumo, Proveedor
+from app.models import CompraInsumo, Insumo, Proveedor
 from app.services.wac import registrar_compra
-
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -86,9 +85,7 @@ def _read_inventory(insumo_id: int) -> tuple[Decimal, Decimal]:
 def _purchase_count(insumo_id: int) -> int:
     db = SessionLocal()
     try:
-        return (
-            db.query(CompraInsumo).filter(CompraInsumo.insumo_id == insumo_id).count()
-        )
+        return db.query(CompraInsumo).filter(CompraInsumo.insumo_id == insumo_id).count()
     finally:
         db.close()
 
@@ -352,7 +349,11 @@ def test_concurrent_purchases_same_insumo(categoria_fixture):
         try:
             barrier.wait(timeout=10)
             registrar_compra(
-                db, insumo_id=insumo_id, proveedor_id=None, cantidad=cantidad, precio_unitario=precio
+                db,
+                insumo_id=insumo_id,
+                proveedor_id=None,
+                cantidad=cantidad,
+                precio_unitario=precio,
             )
         except Exception as exc:  # noqa: BLE001
             results[slot] = exc
@@ -437,7 +438,7 @@ def test_compra_fecha_explicita_persistida(categoria_fixture):
     try:
         db = SessionLocal()
         try:
-            fecha = datetime(2025, 10, 25, 14, 30, 0, tzinfo=timezone.utc)
+            fecha = datetime(2025, 10, 25, 14, 30, 0, tzinfo=UTC)
             compra = registrar_compra(
                 db,
                 insumo_id=ins,
@@ -450,7 +451,7 @@ def test_compra_fecha_explicita_persistida(categoria_fixture):
             db.close()
         persistida = _read_compra_fecha(compra.id)
         assert persistida is not None
-        assert persistida.astimezone(timezone.utc) == fecha
+        assert persistida.astimezone(UTC) == fecha
         # La fecha NO participa en la formula WAC: stock/costo identicos.
         stock, costo = _read_inventory(ins)
         assert stock == Decimal("20")
@@ -463,7 +464,7 @@ def test_compra_fecha_none_usa_server_default(categoria_fixture):
     """fecha_compra=None (omision) -> server_default now(), comportamiento intacto."""
     ins = _make_insumo(categoria_fixture["id"], stock="0", costo="0")
     try:
-        antes = datetime.now(timezone.utc)
+        antes = datetime.now(UTC)
         db = SessionLocal()
         try:
             compra = registrar_compra(
@@ -476,11 +477,11 @@ def test_compra_fecha_none_usa_server_default(categoria_fixture):
             )
         finally:
             db.close()
-        despues = datetime.now(timezone.utc) + timedelta(seconds=5)
+        despues = datetime.now(UTC) + timedelta(seconds=5)
         persistida = _read_compra_fecha(compra.id)
         assert persistida is not None
-        assert persistida.astimezone(timezone.utc) >= antes.astimezone(timezone.utc)
-        assert persistida.astimezone(timezone.utc) <= despues.astimezone(timezone.utc)
+        assert persistida.astimezone(UTC) >= antes.astimezone(UTC)
+        assert persistida.astimezone(UTC) <= despues.astimezone(UTC)
     finally:
         _cleanup_insumo(ins)
 
@@ -522,7 +523,7 @@ def test_commit_false_rollback_deja_sin_efecto(categoria_fixture):
                 proveedor_id=None,
                 cantidad="10",
                 precio_unitario="9",
-                fecha_compra=datetime(2025, 10, 25, tzinfo=timezone.utc),
+                fecha_compra=datetime(2025, 10, 25, tzinfo=UTC),
                 commit=False,
             )
         finally:
@@ -548,7 +549,7 @@ def test_commit_false_transaccion_controlada_por_caller(categoria_fixture):
                 proveedor_id=None,
                 cantidad="10",
                 precio_unitario="9",
-                fecha_compra=datetime(2025, 10, 25, tzinfo=timezone.utc),
+                fecha_compra=datetime(2025, 10, 25, tzinfo=UTC),
                 commit=False,
             )
             db.commit()
@@ -561,8 +562,6 @@ def test_commit_false_transaccion_controlada_por_caller(categoria_fixture):
         assert _purchase_count(ins) == 1
         persistida = _read_compra_fecha(compra.id)
         assert persistida is not None
-        assert persistida.astimezone(timezone.utc) == datetime(
-            2025, 10, 25, tzinfo=timezone.utc
-        )
+        assert persistida.astimezone(UTC) == datetime(2025, 10, 25, tzinfo=UTC)
     finally:
         _cleanup_insumo(ins)

@@ -31,14 +31,14 @@ from migrate.report import Report
 # Per-sheet bounds: (first_data_row, last_data_row). Header rows precede the
 # first data row unless noted. Values verified against ARPIA.xlsx (2026-08-08).
 SHEET_BOUNDS: dict[str, tuple[int, int]] = {
-    "CAMISETAS": (3, 5),              # header R2 (Referencia..); junk R6-13
-    "ARPIA": (2, 9),                  # header R1; matrix R2-9; junk R10-14
-    "INVERSION VALQUI": (3, 137),     # header R2; sub-tab herrajes J-N right
-    "INVERSION MARGARA": (3, 70),     # header R2; multi-tab right H-J
-    "Proveedores": (2, 5),            # header R1; matrix to R1001, real R2-5
-    "IDEAS": (0, 0),                  # no data rows (single URL cell only)
-    "STICKERS": (2, 33),              # header R1
-    "CAMISETAS INV": (2, 9),          # header R1 (misaligned cols); junk R10-17
+    "CAMISETAS": (3, 5),  # header R2 (Referencia..); junk R6-13
+    "ARPIA": (2, 9),  # header R1; matrix R2-9; junk R10-14
+    "INVERSION VALQUI": (3, 137),  # header R2; sub-tab herrajes J-N right
+    "INVERSION MARGARA": (3, 70),  # header R2; multi-tab right H-J
+    "Proveedores": (2, 5),  # header R1; matrix to R1001, real R2-5
+    "IDEAS": (0, 0),  # no data rows (single URL cell only)
+    "STICKERS": (2, 33),  # header R1
+    "CAMISETAS INV": (2, 9),  # header R1 (misaligned cols); junk R10-17
     "Braleth dise\u00f1o 1": (3, 24),  # header R2
     "Noche y Dia CACHETERO": (3, 24),
     "Noche y Dia": (3, 30),
@@ -50,18 +50,22 @@ SHEET_BOUNDS: dict[str, tuple[int, int]] = {
     "BUSTIER": (3, 33),
     "BLUSAS": (3, 45),
     "TOTEBAG": (3, 44),
-    "DESCUENTOS": (3, 21),            # header R2; block header repeats at R13
-    "INVENTARIO OCT25": (9, 29),      # header R8; totals row R37
-    "CAJAS": (4, 13),                 # headers R2-3; totals R13-14
-    "VENTAS": (2, 17),                # header R1; 16 real rows; junk/zeros >17
-    "GASTOS ARPIA": (5, 8),           # header R4; block headers at R16+...
+    "DESCUENTOS": (3, 21),  # header R2; block header repeats at R13
+    "INVENTARIO OCT25": (9, 29),  # header R8; totals row R37
+    "CAJAS": (4, 13),  # headers R2-3; totals R13-14
+    "VENTAS": (2, 17),  # header R1; 16 real rows; junk/zeros >17
+    "GASTOS ARPIA": (5, 8),  # header R4; block headers at R16+...
 }
 
 # Misaligned header: physical cols vs real semantics. CAMISETAS INV header says
 # E=Fecha, F=Provedor but real data rows put Tipo/Origen/Color in D/E/F.
 COL_MAP_CAMISETAS_INV = {
-    "A": "Cantidad", "B": "Talla", "C": "Costo",
-    "D": "Tipo", "E": "Origen", "F": "Color",
+    "A": "Cantidad",
+    "B": "Talla",
+    "C": "Costo",
+    "D": "Tipo",
+    "E": "Origen",
+    "F": "Color",
 }
 
 # Per-sheet column maps (EXM-1 error scenario): sheets whose physical header is
@@ -147,7 +151,9 @@ class LibroMigracion:
             esperado = mapeo.get("D")
             if header is None or str(header).strip() != esperado:
                 report.warn(
-                    hoja, 1, "D1",
+                    hoja,
+                    1,
+                    "D1",
                     f"encabezado desalineado: fila real D/E/F = "
                     f"Tipo/Origen/Color pero header dice {header!r}; "
                     f"aplicado mapeo de columnas propio (EXM-1)",
@@ -171,8 +177,12 @@ class LibroMigracion:
                 # #DIV/0! (or similar): exclude the row, never infer (EXM-2).
                 resultado.omitidas += 1
                 resultado.issues.append(
-                    (None, fila_idx, error_celda,
-                     f"valor de error en {error_celda} -> fila excluida (no se infiere)")
+                    (
+                        None,
+                        fila_idx,
+                        error_celda,
+                        f"valor de error en {error_celda} -> fila excluida (no se infiere)",
+                    )
                 )
                 continue
 
@@ -186,7 +196,7 @@ class LibroMigracion:
             resultado.filas.append(celdas)
 
         # Explicit junk cells (M37 suelta in VENTAS): report, never data.
-        for (col_letter, fila_junk) in JUMP_CELLS.get(hoja, []):
+        for col_letter, fila_junk in JUMP_CELLS.get(hoja, []):
             cell = ws.cell(
                 row=fila_junk,
                 column=column_index_from_string(col_letter),
@@ -194,8 +204,12 @@ class LibroMigracion:
             if cell.value is not None:
                 coord = f"{col_letter}{fila_junk}"
                 if report is not None:
-                    report.warn(hoja, fila_junk, coord,
-                                f"celda suelta {cell.value!r} ignorada (no es fila de datos)")
+                    report.warn(
+                        hoja,
+                        fila_junk,
+                        coord,
+                        f"celda suelta {cell.value!r} ignorada (no es fila de datos)",
+                    )
                 resultado.issues.append((col_letter, fila_junk, coord, "celda suelta ignorada"))
         return resultado
 
@@ -204,7 +218,7 @@ class LibroMigracion:
             self._libro.close()
             self._libro = None
 
-    def __enter__(self) -> "LibroMigracion":
+    def __enter__(self) -> LibroMigracion:
         self.abrir()
         return self
 

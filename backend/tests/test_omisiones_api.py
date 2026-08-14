@@ -13,7 +13,7 @@ tests seed rows directly via SessionLocal and wipe the table at module
 start/end (same contract as test_finanzas_api.py).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -73,13 +73,34 @@ def _sembrar_mezcla() -> None:
     the module wipe): 2 WARN in F1/HojaA (one resuelta), 1 ERROR in F2/HojaB."""
     db = SessionLocal()
     try:
-        _crear_omision(db, corrida="mezcla-1", fase="F1", hoja="HojaA", nivel="WARN",
-                       mensaje="celda con divergencia comun", resuelta=False)
-        _crear_omision(db, corrida="mezcla-1", fase="F1", hoja="HojaA", nivel="WARN",
-                       mensaje="otra divergencia", resuelta=True)
-        _crear_omision(db, corrida="mezcla-2", fase="F2", hoja="HojaB", nivel="ERROR",
-                       mensaje="fila invalida marcada", resuelta=False,
-                       creado_en=datetime(2026, 8, 1, tzinfo=timezone.utc))
+        _crear_omision(
+            db,
+            corrida="mezcla-1",
+            fase="F1",
+            hoja="HojaA",
+            nivel="WARN",
+            mensaje="celda con divergencia comun",
+            resuelta=False,
+        )
+        _crear_omision(
+            db,
+            corrida="mezcla-1",
+            fase="F1",
+            hoja="HojaA",
+            nivel="WARN",
+            mensaje="otra divergencia",
+            resuelta=True,
+        )
+        _crear_omision(
+            db,
+            corrida="mezcla-2",
+            fase="F2",
+            hoja="HojaB",
+            nivel="ERROR",
+            mensaje="fila invalida marcada",
+            resuelta=False,
+            creado_en=datetime(2026, 8, 1, tzinfo=UTC),
+        )
     finally:
         db.close()
 
@@ -98,7 +119,9 @@ def test_get_omisiones_paginado_shape(client, admin_token):
     db = SessionLocal()
     try:
         for i in range(3):
-            _crear_omision(db, corrida=f"shape-{i}", fase="F1", nivel="WARN", mensaje=f"mensaje {i}")
+            _crear_omision(
+                db, corrida=f"shape-{i}", fase="F1", nivel="WARN", mensaje=f"mensaje {i}"
+            )
     finally:
         db.close()
 
@@ -108,8 +131,18 @@ def test_get_omisiones_paginado_shape(client, admin_token):
     assert set(body) == {"items", "total"}
     assert body["total"] == 3
     assert len(body["items"]) == 3
-    assert {"id", "corrida_id", "fase", "hoja", "fila", "celda", "nivel", "mensaje",
-            "resuelta", "creado_en"} <= set(body["items"][0])
+    assert {
+        "id",
+        "corrida_id",
+        "fase",
+        "hoja",
+        "fila",
+        "celda",
+        "nivel",
+        "mensaje",
+        "resuelta",
+        "creado_en",
+    } <= set(body["items"][0])
 
 
 def test_get_omisiones_paginado_respeta_limit_offset(client, admin_token):
@@ -167,8 +200,10 @@ def test_get_omisiones_filtro_fechas(client, admin_token):
     _sembrar_mezcla()
 
     # The ERROR row is dated 2026-08-01; the WARN rows get server now().
-    resp = client.get("/api/v1/omisiones?fecha_desde=2026-08-01&fecha_hasta=2026-08-01",
-                      headers=_auth(admin_token))
+    resp = client.get(
+        "/api/v1/omisiones?fecha_desde=2026-08-01&fecha_hasta=2026-08-01",
+        headers=_auth(admin_token),
+    )
     body = resp.json()
     assert body["total"] == 1
     assert body["items"][0]["nivel"] == "ERROR"
@@ -196,13 +231,17 @@ def test_get_omisiones_roles_audited(client, operador_token, consulta_token):
 
 
 def test_patch_omision_consulta_forbidden(client, consulta_token):
-    resp = client.patch("/api/v1/omisiones/1", json={"resuelta": True}, headers=_auth(consulta_token))
+    resp = client.patch(
+        "/api/v1/omisiones/1", json={"resuelta": True}, headers=_auth(consulta_token)
+    )
     assert resp.status_code == 403
 
 
 def test_patch_omision_operador_forbidden(client, operador_token):
     """D9: PATCH is require_admin — operador gets 403 despite GET access."""
-    resp = client.patch("/api/v1/omisiones/1", json={"resuelta": True}, headers=_auth(operador_token))
+    resp = client.patch(
+        "/api/v1/omisiones/1", json={"resuelta": True}, headers=_auth(operador_token)
+    )
     assert resp.status_code == 403
 
 
@@ -213,8 +252,9 @@ def test_patch_omision_admin_marca_resuelta(client, admin_token):
     finally:
         db.close()
 
-    resp = client.patch(f"/api/v1/omisiones/{omision_id}", json={"resuelta": True},
-                        headers=_auth(admin_token))
+    resp = client.patch(
+        f"/api/v1/omisiones/{omision_id}", json={"resuelta": True}, headers=_auth(admin_token)
+    )
     assert resp.status_code == 200
     assert resp.json()["resuelta"] is True
 
@@ -227,16 +267,21 @@ def test_patch_omision_admin_marca_resuelta(client, admin_token):
 def test_patch_omision_admin_reabre(client, admin_token):
     db = SessionLocal()
     try:
-        omision_id = _crear_omision(db, corrida="patch-2", nivel="ERROR", mensaje="reabrir", resuelta=True)
+        omision_id = _crear_omision(
+            db, corrida="patch-2", nivel="ERROR", mensaje="reabrir", resuelta=True
+        )
     finally:
         db.close()
 
-    resp = client.patch(f"/api/v1/omisiones/{omision_id}", json={"resuelta": False},
-                        headers=_auth(admin_token))
+    resp = client.patch(
+        f"/api/v1/omisiones/{omision_id}", json={"resuelta": False}, headers=_auth(admin_token)
+    )
     assert resp.status_code == 200
     assert resp.json()["resuelta"] is False
 
 
 def test_patch_omision_404_inexistente(client, admin_token):
-    resp = client.patch("/api/v1/omisiones/999999", json={"resuelta": True}, headers=_auth(admin_token))
+    resp = client.patch(
+        "/api/v1/omisiones/999999", json={"resuelta": True}, headers=_auth(admin_token)
+    )
     assert resp.status_code == 404

@@ -22,9 +22,7 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
     API_V1_PREFIX: str = "/api/v1"
 
-    DATABASE_URL: str = (
-        "postgresql+psycopg://arpia:arpia_secret@localhost:5432/arpia"
-    )
+    DATABASE_URL: str = "postgresql+psycopg://arpia:arpia_secret@localhost:5432/arpia"
     JWT_SECRET_KEY: str = "dev_secret_change_me"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
@@ -39,8 +37,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
-        if self.ENVIRONMENT in ("production", "staging") and self.JWT_SECRET_KEY == "dev_secret_change_me":
-            raise ValueError("JWT_SECRET_KEY must be configured with a secure secret in production/staging!")
+        if (
+            self.ENVIRONMENT in ("production", "staging")
+            and self.JWT_SECRET_KEY == "dev_secret_change_me"
+        ):
+            raise ValueError(
+                "JWT_SECRET_KEY must be configured with a secure secret in production/staging!"
+            )
         return self
 
 

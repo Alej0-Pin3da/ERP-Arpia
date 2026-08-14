@@ -47,7 +47,7 @@ import json
 import os
 import sys
 from datetime import datetime
-from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from sqlalchemy import select
@@ -61,9 +61,7 @@ from migrate.report import LEVEL_ERROR, Report
 _ESCALA = Decimal("0.0001")
 
 # Registro de ajustes (gitignored via backend/migrate/reports/).
-REGISTRO_DEFAULT = (
-    Path(__file__).resolve().parent / "reports" / "adjust_stock_registry.json"
-)
+REGISTRO_DEFAULT = Path(__file__).resolve().parent / "reports" / "adjust_stock_registry.json"
 
 # Consumo BOM exacto de las 13 ventas historicas (verificado 2026-08-09 contra
 # explosion_materiales real; coincide con el hallazgo residual de #425).
@@ -92,17 +90,13 @@ def margen_seguridad(consumo: Decimal) -> Decimal:
     10% redondeado hacia ARRIBA (ceil) para nunca quedar por debajo del 10%,
     con minimo 1 unidad (un consumo chico o fraccional siempre recibe >= 1).
     """
-    diez_por_ciento = (consumo * Decimal("0.10")).to_integral_value(
-        rounding=ROUND_CEILING
-    )
+    diez_por_ciento = (consumo * Decimal("0.10")).to_integral_value(rounding=ROUND_CEILING)
     return max(Decimal("1"), diez_por_ciento)
 
 
 def stock_final_objetivo(consumo: Decimal) -> Decimal:
     """Stock final objetivo = consumo BOM + margen, escala NUMERIC(15,4)."""
-    return (consumo + margen_seguridad(consumo)).quantize(
-        _ESCALA, rounding=ROUND_HALF_UP
-    )
+    return (consumo + margen_seguridad(consumo)).quantize(_ESCALA, rounding=ROUND_HALF_UP)
 
 
 def stock_ajuste_para(consumo: Decimal, stock_actual: Decimal) -> Decimal:
@@ -208,8 +202,7 @@ def aplicar_ajustes(
     for nombre in faltantes:
         res["omitidos"] += 1
         mensaje = (
-            f"{nombre}: insumo inexistente en el catalogo; ajuste NO aplicado "
-            f"(correr F1 antes)"
+            f"{nombre}: insumo inexistente en el catalogo; ajuste NO aplicado (correr F1 antes)"
         )
         if modo == "commit":
             report.error("AJUSTE", None, None, mensaje)
@@ -223,7 +216,9 @@ def aplicar_ajustes(
         if nombre in registro and not fuerza:
             res["ya_en_registro"] += 1
             report.info(
-                "AJUSTE", None, None,
+                "AJUSTE",
+                None,
+                None,
                 f"{nombre}: ya ajustado en {registro[nombre].get('fecha')}; "
                 f"omitido (--force para re-aplicar tras recarga)",
             )
@@ -237,13 +232,12 @@ def aplicar_ajustes(
         if delta <= 0:
             res["sin_delta"] += 1
             report.info(
-                "AJUSTE", None, None,
-                f"{nombre}: stock {anterior} ya cubre objetivo {objetivo}; "
-                f"sin ajuste",
+                "AJUSTE",
+                None,
+                None,
+                f"{nombre}: stock {anterior} ya cubre objetivo {objetivo}; sin ajuste",
             )
-            registro[nombre] = _entrada_registro(
-                nombre, consumo, anterior, Decimal("0"), anterior
-            )
+            registro[nombre] = _entrada_registro(nombre, consumo, anterior, Decimal("0"), anterior)
             continue
         final = (anterior + delta).quantize(_ESCALA, rounding=ROUND_HALF_UP)
         if modo == "commit":
@@ -251,7 +245,9 @@ def aplicar_ajustes(
         res["ajustados"] += 1
         registro[nombre] = _entrada_registro(nombre, consumo, anterior, delta, final)
         report.info(
-            "AJUSTE", None, None,
+            "AJUSTE",
+            None,
+            None,
             f"{nombre}: stock {anterior} + {delta} -> {final} "
             f"(consumo {consumo} cubierto, objetivo {objetivo})",
         )
