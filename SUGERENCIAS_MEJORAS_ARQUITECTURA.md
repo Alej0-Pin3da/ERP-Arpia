@@ -73,7 +73,7 @@ engine = create_engine(
 ---
 
 #### 🟡 Prioridad Media: Tarea de Limpieza (Pruning) de Refresh Tokens
-> **Estado:** ❌ NO HECHO — no hay script ni tarea programada de purga; solo se valida `expira_en` en el refresh
+> **Estado:** ✅ HECHO — script `backend/scripts/prune_tokens.py` (`--days N`, `--dry-run`) con instrucciones de cron
 - **Problema:** La tabla `RefreshTokens` almacena tokens expirados y revocados indefinidamente, creciendo con cada inicio de sesión y renovación.
 - **Acción Recomendada:**
   - Agregar un script o tarea programada (cron job/FastAPI background task) para purgar tokens revocados o expirados con más de $N$ días:
@@ -214,7 +214,7 @@ class BomCycleDetectedError(DomainError):
 ### 2.5 DevOps, CI/CD y Observabilidad
 
 #### 🟡 Prioridad Media: Pipeline de CI/CD (GitHub Actions)
-> **Estado:** ❌ NO HECHO — no existe `.github/workflows`
+> **Estado:** ✅ HECHO — `.github/workflows/ci.yml` con jobs backend (ruff check/format + pytest con Postgres 16 container) y frontend (lint + test + build)
 - **Problema:** No se observa configuración de `.github/workflows` para automatizar validaciones antes de mergear PRs.
 - **Acción Recomendada:**
   Crear workflow para ejecutar automáticamente:
@@ -224,7 +224,7 @@ class BomCycleDetectedError(DomainError):
 ---
 
 #### 🟢 Prioridad Baja: Logging Estructurado (JSON Logging)
-> **Estado:** ❌ NO HECHO — sin middleware de correlación `X-Request-ID`
+> **Estado:** ✅ HECHO — middleware `RequestContextMiddleware` (`X-Request-ID` en logs y respuesta) + `JsonFormatter` (JSON en prod/staging, texto en dev), sin dependencias externas
 - **Problema:** El sistema depende del logging por defecto de Uvicorn/FastAPI.
 - **Acción Recomendada:**
   Configurar logs estructurados con identificador de petición (`X-Request-ID`) para trazabilidad de ventas, devoluciones y compras en producción.
@@ -314,7 +314,7 @@ graph LR
 ---
 
 ### 🔹 Fase 4: CI/CD, Mantenimiento y Observabilidad (Esfuerzo: 2 días)
-> **Estado:** ❌ PENDIENTE COMPLETA — falta CI (GitHub Actions), pruning de tokens y logging estructurado
+> **Estado:** ✅ COMPLETA — CI (GitHub Actions), pruning de tokens (`scripts/prune_tokens.py`) y logging estructurado con `X-Request-ID`
 > **Objetivo:** Asegurar la calidad continua y el ciclo de vida de los datos en producción.
 
 1. **Pipeline de Integración Continua (GitHub Actions):**
