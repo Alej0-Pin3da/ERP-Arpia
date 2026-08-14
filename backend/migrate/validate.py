@@ -133,7 +133,9 @@ class PlanValidacion:
 # --------------------------------------------------------------------------- #
 
 
-def plan_para_validacion(libro: LibroMigracion, report=None, ruta_csv: Path | None = None) -> PlanValidacion:
+def plan_para_validacion(
+    libro: LibroMigracion, report=None, ruta_csv: Path | None = None
+) -> PlanValidacion:
     """Run the phase plans that feed the N7 checks (read-only).
 
     ``ruta_csv`` forwards the VENTAS CSV (sales.py) so F7 validates against the

@@ -115,7 +115,7 @@ def _leer_ventas_csv(ruta: Path) -> list[dict[str, object]]:
             if idx > FILAS_CSV_VENTAS:
                 break
             fila: dict[str, object] = {}
-            for col, valor in zip(_COLS_CSV_VENTAS, cells):
+            for col, valor in zip(_COLS_CSV_VENTAS, cells, strict=False):
                 if valor is None or valor == "":
                     continue
                 if col in (COL_PRECIO, COL_COSTO):
