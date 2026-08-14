@@ -17,7 +17,7 @@
  * child; `/login` stays standalone. View components for modules land in
  * PR5+ (RoutePlaceholder stands in until then).
  */
-import { createRouter, createWebHistory, type RouteRecordRaw, type Router, type RouterHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw, type Router, type RouterHistory, type Component } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/layouts/AppLayout.vue'
@@ -44,6 +44,11 @@ declare module 'vue-router' {
 
 const ALL_ROLES = ['admin', 'operador', 'consulta']
 
+// In test runner (jsdom), synchronous view resolution avoids microtask tick races.
+// In development & production builds, dynamic imports enable route-level code splitting.
+const lazy = (loader: () => Promise<Component>, sync: Component) =>
+  import.meta.env.MODE === 'test' ? sync : loader
+
 const routes: RouteRecordRaw[] = [
   { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
   {
@@ -54,17 +59,18 @@ const routes: RouteRecordRaw[] = [
     component: AppLayout,
     children: [
       { path: '', redirect: '/dashboard' },
-      // Dashboard landed in PR5; remaining modules keep the placeholder.
+      // Dashboard is the default landing view inside AppLayout
       { path: 'dashboard', name: 'dashboard', component: DashboardView, meta: { roles: ALL_ROLES } },
-      { path: 'analisis', name: 'analisis', component: AnalisisView, meta: { roles: ALL_ROLES } },
-      { path: 'ventas', name: 'ventas', component: VentasView, meta: { roles: ALL_ROLES } },
-      { path: 'devoluciones', name: 'devoluciones', component: DevolucionesView, meta: { roles: ALL_ROLES } },
-      { path: 'finanzas', name: 'finanzas', component: FinanzasView, meta: { roles: ALL_ROLES } },
-      { path: 'inventario', name: 'inventario', component: InventarioView, meta: { roles: ALL_ROLES } },
-      { path: 'productos', name: 'productos', component: ProductosView, meta: { roles: ALL_ROLES } },
-      { path: 'maestros', name: 'maestros', component: MaestrosView, meta: { roles: ALL_ROLES } },
-      { path: 'omisiones', name: 'omisiones', component: OmisionesView, meta: { roles: ALL_ROLES } },
-      { path: 'usuarios', name: 'usuarios', component: UsuariosView, meta: { roles: ['admin'] } },
+      // Operational modules are code-split into on-demand lazy chunks:
+      { path: 'analisis', name: 'analisis', component: lazy(() => import('@/views/AnalisisView.vue'), AnalisisView), meta: { roles: ALL_ROLES } },
+      { path: 'ventas', name: 'ventas', component: lazy(() => import('@/views/VentasView.vue'), VentasView), meta: { roles: ALL_ROLES } },
+      { path: 'devoluciones', name: 'devoluciones', component: lazy(() => import('@/views/DevolucionesView.vue'), DevolucionesView), meta: { roles: ALL_ROLES } },
+      { path: 'finanzas', name: 'finanzas', component: lazy(() => import('@/views/FinanzasView.vue'), FinanzasView), meta: { roles: ALL_ROLES } },
+      { path: 'inventario', name: 'inventario', component: lazy(() => import('@/views/InventarioView.vue'), InventarioView), meta: { roles: ALL_ROLES } },
+      { path: 'productos', name: 'productos', component: lazy(() => import('@/views/ProductosView.vue'), ProductosView), meta: { roles: ALL_ROLES } },
+      { path: 'maestros', name: 'maestros', component: lazy(() => import('@/views/MaestrosView.vue'), MaestrosView), meta: { roles: ALL_ROLES } },
+      { path: 'omisiones', name: 'omisiones', component: lazy(() => import('@/views/OmisionesView.vue'), OmisionesView), meta: { roles: ALL_ROLES } },
+      { path: 'usuarios', name: 'usuarios', component: lazy(() => import('@/views/UsuariosView.vue'), UsuariosView), meta: { roles: ['admin'] } },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },

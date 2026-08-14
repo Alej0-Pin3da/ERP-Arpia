@@ -3,27 +3,14 @@
  * Productos view (PR10, spec MOD-5).
  *
  * Three tabs:
- *  - Productos: the list from GET /productos?limit=1000 with a client join
- *    against GET /tipos-producto; create/edit form + Editar/Eliminar +
- *    "Variantes" (lazy GET /productos/{id}/variantes -> nested list with its
- *    own add/edit/delete form) are ADMIN ONLY (backend require_admin on every
- *    productos/variantes write — verified routes/productos.py).
- *  - BOM: pick a product -> GET /productos/{id}/bom/insumos +
- *    /bom/productos -> two sub-sections (insumo lines with the insumo name +
- *    unidad join; combo contents with the included product name join). All
- *    line writes (POST/PUT/DELETE) are admin only; a duplicate line surfaces
- *    the backend 409.
- *  - Costo: pick a product (+ optional variante) -> GET
- *    /productos/{id}/costo?variante_id -> buildCostoTree -> grouped tree with
- *    the grand total, es-CO. All roles read.
+ *  - Productos: table with CRUD + nested variantes (admin-only writes).
+ *  - BOM: bill-of-materials editor (admin-only writes).
+ *  - Costo: production cost breakdown (all roles read).
  *
- * Writes: admin only (canManage). Operador/consulta see read-only lists.
+ * All logic lives in the three composables; the view is a thin binding layer.
  */
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { insumosApi, productosApi, tiposProductoApi } from '@/api/endpoints'
-import { buildListParams } from '@/utils/pagination'
 import BomInsumoForm from '@/components/productos/BomInsumoForm.vue'
 import BomInsumosTable from '@/components/productos/BomInsumosTable.vue'
 import BomProductoForm from '@/components/productos/BomProductoForm.vue'
@@ -33,27 +20,10 @@ import ProductoForm from '@/components/productos/ProductoForm.vue'
 import ProductosTable from '@/components/productos/ProductosTable.vue'
 import VarianteForm from '@/components/productos/VarianteForm.vue'
 import VariantesTable from '@/components/productos/VariantesTable.vue'
+import { useProductosBom } from '@/composables/useProductosBom'
+import { useProductosCatalog } from '@/composables/useProductosCatalog'
+import { useProductosCosto } from '@/composables/useProductosCosto'
 import { useAuthStore } from '@/stores/auth'
-import type {
-  BomInsumoPayloadInput,
-  BomInsumoRow,
-  BomProductoPayloadInput,
-  BomProductoRow,
-  CostoTree as CostoTreeType,
-  ProductoPayloadInput,
-  ProductoRow,
-  VariantePayloadInput,
-} from '@/utils/productos'
-import { buildBomInsumoRows, buildBomProductoRows, buildCostoTree, buildProductoRows } from '@/utils/productos'
-import type {
-  BomInsumoRead,
-  BomProductoRead,
-  CostoProduccionRead,
-  InsumoRead,
-  ProductoRead,
-  TipoProductoRead,
-  VarianteProductoRead,
-} from '@/types/api.d'
 
 const auth = useAuthStore()
 
@@ -61,480 +31,46 @@ const auth = useAuthStore()
 const canManage = computed(() => auth.role === 'admin')
 
 const activeTab = ref('productos')
-const loading = ref(false)
-const error = ref<string | null>(null)
 
-// --- productos table: server-side pagination + filters ----------------------
-const productos = ref<ProductoRead[]>([])
-const productosTotal = ref(0)
-const productosPage = ref(1)
-const productosPageSize = ref(20)
-const productoQ = ref('')
-const filterTipoProductoId = ref<number | null>(null)
-const productosSortBy = ref<string | null>(null)
-const productosSortOrder = ref<'asc' | 'desc' | null>(null)
+const catalog = useProductosCatalog()
+const bom = useProductosBom(catalog.insumos, catalog.productosLookup)
+const costo = useProductosCosto()
 
-// --- lookups (full sets, limit:1000 — design D3) ---------------------------
-const productosLookup = ref<ProductoRead[]>([])
-const tipos = ref<TipoProductoRead[]>([])
-const insumos = ref<InsumoRead[]>([])
+// Flatten composable APIs into the template namespace for backward-compat.
+const {
+  loading, error,
+  productos, productosTotal, productosPage, productosPageSize,
+  productoQ, filterTipoProductoId, productosSortBy, productosSortOrder,
+  productoRows, tipos, insumos, productosLookup,
+  savingProducto, editingProducto, productoDialogVisible,
+  selectedProducto, variantes, variantesLoading, savingVariante,
+  editingVariante, varianteDialogVisible,
+  load,
+  onProductosSearch, onProductosFilterChange, onProductosTableSortChange,
+  openCreateProducto, onEditProducto, resetProductoDialog, submitProducto, onDeleteProducto,
+  onSelectVariantes, openCreateVariante, onEditVariante, resetVarianteDialog,
+  onSubmitVariante, onDeleteVariante,
+} = catalog
 
-const productoRows = computed(() => buildProductoRows(productos.value, tipos.value))
+const {
+  bomProductoId, bomInsumoRows, bomProductoRows, bomLoading,
+  savingBomInsumo, savingBomProducto, editingBomInsumo, editingBomProducto,
+  bomInsumoDialogVisible, bomProductoDialogVisible,
+  onSelectBomProducto,
+  openCreateBomInsumo, onEditBomInsumo, resetBomInsumoDialog,
+  onSubmitBomInsumo, onDeleteBomInsumo,
+  openCreateBomProducto, onEditBomProducto, resetBomProductoDialog,
+  onSubmitBomProducto, onDeleteBomProducto,
+} = bom
 
-const savingProducto = ref(false)
-const editingProducto = ref<ProductoRead | null>(null)
-
-// Nested variantes: lazy per selected product (click "Variantes" on a row).
-const selectedProducto = ref<ProductoRead | null>(null)
-const variantes = ref<VarianteProductoRead[]>([])
-const variantesLoading = ref(false)
-const savingVariante = ref(false)
-const editingVariante = ref<VarianteProductoRead | null>(null)
-
-// BOM tab: the product whose recipe is being edited.
-const bomProductoId = ref<number | null>(null)
-const bomInsumos = ref<BomInsumoRead[]>([])
-const bomProductos = ref<BomProductoRead[]>([])
-const bomInsumoRows = computed(() => buildBomInsumoRows(bomInsumos.value, insumos.value))
-const bomProductoRows = computed(() => buildBomProductoRows(bomProductos.value, productosLookup.value))
-const bomLoading = ref(false)
-const savingBomInsumo = ref(false)
-const savingBomProducto = ref(false)
-const editingBomInsumo = ref<BomInsumoRow | null>(null)
-const editingBomProducto = ref<BomProductoRow | null>(null)
-
-/** T8/FE-DLG-1: the four forms live in el-dialog at the usage site. */
-const productoDialogVisible = ref(false)
-const varianteDialogVisible = ref(false)
-const bomInsumoDialogVisible = ref(false)
-const bomProductoDialogVisible = ref(false)
-
-// Costo tab.
-const costoProductoId = ref<number | null>(null)
-const costoVarianteId = ref<number | null>(null)
-const costoProductoVariantes = ref<VarianteProductoRead[]>([])
-const costoTree = ref<CostoTreeType | null>(null)
-const costoLoading = ref(false)
-
-async function load(): Promise<void> {
-  loading.value = true
-  error.value = null
-  try {
-    const [productosList, tiposList, insumosList, productosLookup_] = await Promise.all([
-      // Table page: real server-side pagination + filters (T6).
-      productosApi.list(
-        buildListParams({
-          page: productosPage.value,
-          pageSize: productosPageSize.value,
-          filtros: { tipo_producto_id: filterTipoProductoId.value },
-          q: productoQ.value,
-          sortBy: productosSortBy.value ?? undefined,
-          sortOrder: productosSortOrder.value ?? undefined,
-        }),
-      ),
-      tiposProductoApi.list({ limit: 1000 }), // tipo label join + form options
-      insumosApi.list({ limit: 1000 }), // BOM insumo name/unidad join + form options
-      // D3: join fetches keep the full set (BOM/Costo selects, combo names).
-      productosApi.list({ limit: 1000 }),
-    ])
-    productos.value = productosList.items
-    productosTotal.value = productosList.total
-    tipos.value = tiposList.items
-    insumos.value = insumosList.items
-    productosLookup.value = productosLookup_.items
-  } catch {
-    error.value = 'No se pudo cargar la información de productos. Verifica la conexión con el servidor.'
-  } finally {
-    loading.value = false
-  }
-}
-
-/** FE-2: filter/busqueda changes reset to page 1 and refetch. */
-function onProductosSearch(): void {
-  productosPage.value = 1
-  load()
-}
-
-function onProductosFilterChange(): void {
-  productosPage.value = 1
-  load()
-}
-
-/** Server-side column sort: reset to page 1; a null order clears the sort. */
-function onProductosTableSortChange(sort: { prop: string; order: 'asc' | 'desc' | null }): void {
-  productosSortBy.value = sort.order === null ? null : sort.prop
-  productosSortOrder.value = sort.order
-  onProductosFilterChange()
-}
-
-/** Surface the server validation detail (400/404/409) when present. */
-function serverDetail(err: unknown): string | null {
-  if (typeof err === 'object' && err !== null && 'response' in err) {
-    const data = (err as { response?: { data?: unknown } }).response?.data
-    if (
-      typeof data === 'object' &&
-      data !== null &&
-      'detail' in data &&
-      typeof (data as { detail: unknown }).detail === 'string'
-    ) {
-      return (data as { detail: string }).detail
-    }
-  }
-  return null
-}
-
-// ---------------------------------------------------------------------------
-// Productos CRUD (admin)
-// ---------------------------------------------------------------------------
-
-async function onCreateProducto(payload: ProductoPayloadInput): Promise<void> {
-  savingProducto.value = true
-  try {
-    await productosApi.create(payload)
-    ElMessage.success('Producto creado correctamente')
-    productoDialogVisible.value = false // FE-DLG-2: success closes the dialog
-    await load()
-  } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo crear el producto.')
-  } finally {
-    savingProducto.value = false
-  }
-}
-
-/** T8: one @submit entry — route create vs edit by the dialog mode. */
-function submitProducto(payload: ProductoPayloadInput): void {
-  if (editingProducto.value === null) {
-    void onCreateProducto(payload)
-  } else {
-    void onUpdateProducto(payload)
-  }
-}
-
-function onEditProducto(row: ProductoRow): void {
-  const producto = productos.value.find((p) => p.id === row.id)
-  if (producto) editingProducto.value = producto
-  productoDialogVisible.value = true
-}
-
-/** FE-DLG-1: the toolbar button opens the dialog in create mode. */
-function openCreateProducto(): void {
-  editingProducto.value = null
-  productoDialogVisible.value = true
-}
-
-/** FE-DLG-2/3: closing without saving discards the edit prefill. */
-function resetProductoDialog(): void {
-  editingProducto.value = null
-}
-
-async function onUpdateProducto(payload: ProductoPayloadInput): Promise<void> {
-  if (editingProducto.value === null) return
-  savingProducto.value = true
-  try {
-    await productosApi.update({ producto_id: editingProducto.value.id }, payload)
-    ElMessage.success('Producto actualizado correctamente')
-    productoDialogVisible.value = false // FE-DLG-2: success closes the dialog
-    await load()
-  } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el producto.')
-  } finally {
-    savingProducto.value = false
-  }
-}
-
-/** MOD-5: delete answers 204; a 409 (in use) is surfaced via server detail. */
-async function onDeleteProducto(row: ProductoRow): Promise<void> {
-  try {
-    await ElMessageBox.confirm(
-      `¿Eliminar el producto "${row.nombre}"?`,
-      'Confirmar eliminación',
-      { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-    )
-  } catch {
-    return // cancelled
-  }
-  try {
-    await productosApi.delete({ producto_id: row.id })
-    ElMessage.success('Producto eliminado correctamente')
-    await load()
-  } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar el producto.')
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Nested variantes (admin writes; list lazy per selected product)
-// ---------------------------------------------------------------------------
-
-async function onSelectVariantes(row: ProductoRow): Promise<void> {
-  selectedProducto.value = productos.value.find((p) => p.id === row.id) ?? null
-  editingVariante.value = null
-  await loadVariantes(row.id)
-}
-
-async function loadVariantes(productoId: number): Promise<void> {
-  variantesLoading.value = true
-  try {
-    variantes.value = await productosApi.listVariantes({ producto_id: productoId })
-  } catch {
-    ElMessage.error('No se pudieron cargar las variantes del producto.')
-  } finally {
-    variantesLoading.value = false
-  }
-}
-
-function onEditVariante(variante: VarianteProductoRead): void {
-  editingVariante.value = variante
-  varianteDialogVisible.value = true
-}
-
-/** FE-DLG-1: the section button opens the variante dialog in create mode. */
-function openCreateVariante(): void {
-  editingVariante.value = null
-  varianteDialogVisible.value = true
-}
-
-/** FE-DLG-2/3: closing without saving discards the edit prefill. */
-function resetVarianteDialog(): void {
-  editingVariante.value = null
-}
-
-async function onSubmitVariante(payload: VariantePayloadInput): Promise<void> {
-  if (selectedProducto.value === null) return
-  savingVariante.value = true
-  try {
-    if (editingVariante.value !== null) {
-      await productosApi.updateVariante(
-        { producto_id: selectedProducto.value.id, variante_id: editingVariante.value.id },
-        payload,
-      )
-      ElMessage.success('Variante actualizada correctamente')
-      editingVariante.value = null
-    } else {
-      await productosApi.createVariante({ producto_id: selectedProducto.value.id }, payload)
-      ElMessage.success('Variante creada correctamente')
-    }
-    varianteDialogVisible.value = false // FE-DLG-2: success closes the dialog
-    await loadVariantes(selectedProducto.value.id)
-  } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo guardar la variante.')
-  } finally {
-    savingVariante.value = false
-  }
-}
-
-async function onDeleteVariante(variante: VarianteProductoRead): Promise<void> {
-  if (selectedProducto.value === null) return
-  try {
-    await ElMessageBox.confirm(
-      `¿Eliminar la variante "${variante.nombre_variante}"?`,
-      'Confirmar eliminación',
-      { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-    )
-  } catch {
-    return
-  }
-  try {
-    await productosApi.deleteVariante({ producto_id: selectedProducto.value.id, variante_id: variante.id })
-    ElMessage.success('Variante eliminada correctamente')
-    await loadVariantes(selectedProducto.value.id)
-  } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar la variante.')
-  }
-}
-
-// ---------------------------------------------------------------------------
-// BOM tab
-// ---------------------------------------------------------------------------
-
-async function onSelectBomProducto(productoId: number): Promise<void> {
-  bomProductoId.value = productoId
-  editingBomInsumo.value = null
-  editingBomProducto.value = null
-  await loadBom(productoId)
-}
-
-async function loadBom(productoId: number): Promise<void> {
-  bomLoading.value = true
-  try {
-    const [insumosList, productosList] = await Promise.all([
-      productosApi.listBomInsumos({ producto_id: productoId }),
-      productosApi.listBomProductos({ producto_id: productoId }),
-    ])
-    bomInsumos.value = insumosList
-    bomProductos.value = productosList
-  } catch {
-    ElMessage.error('No se pudo cargar la receta del producto.')
-  } finally {
-    bomLoading.value = false
-  }
-}
-
-function onEditBomInsumo(row: BomInsumoRow): void {
-  editingBomInsumo.value = row
-  bomInsumoDialogVisible.value = true
-}
-
-/** FE-DLG-1: the section button opens the BOM insumo dialog in create mode. */
-function openCreateBomInsumo(): void {
-  editingBomInsumo.value = null
-  bomInsumoDialogVisible.value = true
-}
-
-/** FE-DLG-2/3: closing without saving discards the edit prefill. */
-function resetBomInsumoDialog(): void {
-  editingBomInsumo.value = null
-}
-
-/** MOD-5: admin line create/edit; a duplicate line surfaces the backend 409. */
-async function onSubmitBomInsumo(payload: BomInsumoPayloadInput): Promise<void> {
-  if (bomProductoId.value === null) return
-  savingBomInsumo.value = true
-  try {
-    if (editingBomInsumo.value !== null) {
-      await productosApi.updateBomInsumo(
-        { producto_id: bomProductoId.value, linea_id: editingBomInsumo.value.id },
-        payload,
-      )
-      ElMessage.success('Línea de BOM actualizada correctamente')
-      editingBomInsumo.value = null
-    } else {
-      await productosApi.createBomInsumo({ producto_id: bomProductoId.value }, payload)
-      ElMessage.success('Línea de BOM agregada correctamente')
-    }
-    bomInsumoDialogVisible.value = false // FE-DLG-2: success closes the dialog
-    await loadBom(bomProductoId.value)
-  } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo guardar la línea de BOM.')
-  } finally {
-    savingBomInsumo.value = false
-  }
-}
-
-async function onDeleteBomInsumo(row: BomInsumoRow): Promise<void> {
-  if (bomProductoId.value === null) return
-  try {
-    await ElMessageBox.confirm(
-      `¿Eliminar la línea de insumo "${row.insumo}"?`,
-      'Confirmar eliminación',
-      { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-    )
-  } catch {
-    return
-  }
-  try {
-    await productosApi.deleteBomInsumo({ producto_id: bomProductoId.value, linea_id: row.id })
-    ElMessage.success('Línea de BOM eliminada correctamente')
-    await loadBom(bomProductoId.value)
-  } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar la línea de BOM.')
-  }
-}
-
-function onEditBomProducto(row: BomProductoRow): void {
-  editingBomProducto.value = row
-  bomProductoDialogVisible.value = true
-}
-
-/** FE-DLG-1: the section button opens the BOM combo dialog in create mode. */
-function openCreateBomProducto(): void {
-  editingBomProducto.value = null
-  bomProductoDialogVisible.value = true
-}
-
-/** FE-DLG-2/3: closing without saving discards the edit prefill. */
-function resetBomProductoDialog(): void {
-  editingBomProducto.value = null
-}
-
-async function onSubmitBomProducto(payload: BomProductoPayloadInput): Promise<void> {
-  if (bomProductoId.value === null) return
-  savingBomProducto.value = true
-  try {
-    if (editingBomProducto.value !== null) {
-      await productosApi.updateBomProducto(
-        { producto_id: bomProductoId.value, linea_id: editingBomProducto.value.id },
-        payload,
-      )
-      ElMessage.success('Línea de combo actualizada correctamente')
-      editingBomProducto.value = null
-    } else {
-      await productosApi.createBomProducto({ producto_id: bomProductoId.value }, payload)
-      ElMessage.success('Línea de combo agregada correctamente')
-    }
-    bomProductoDialogVisible.value = false // FE-DLG-2: success closes the dialog
-    await loadBom(bomProductoId.value)
-  } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo guardar la línea de combo.')
-  } finally {
-    savingBomProducto.value = false
-  }
-}
-
-async function onDeleteBomProducto(row: BomProductoRow): Promise<void> {
-  if (bomProductoId.value === null) return
-  try {
-    await ElMessageBox.confirm(
-      `¿Eliminar la línea de combo "${row.producto}"?`,
-      'Confirmar eliminación',
-      { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-    )
-  } catch {
-    return
-  }
-  try {
-    await productosApi.deleteBomProducto({ producto_id: bomProductoId.value, linea_id: row.id })
-    ElMessage.success('Línea de combo eliminada correctamente')
-    await loadBom(bomProductoId.value)
-  } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar la línea de combo.')
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Costo tab
-// ---------------------------------------------------------------------------
-
-/** Load the selected product's variantes (feeds the optional variante select). */
-async function loadCostoVariantes(productoId: number): Promise<void> {
-  try {
-    costoProductoVariantes.value = await productosApi.listVariantes({ producto_id: productoId })
-  } catch {
-    costoProductoVariantes.value = []
-  }
-}
-
-async function onSelectCostoProducto(productoId: number): Promise<void> {
-  costoProductoId.value = productoId
-  costoVarianteId.value = null
-  costoTree.value = null
-  await loadCostoVariantes(productoId)
-  await loadCosto()
-}
-
-async function loadCosto(): Promise<void> {
-  if (costoProductoId.value === null) return
-  costoLoading.value = true
-  try {
-    const costo: CostoProduccionRead = await productosApi.costo(
-      { producto_id: costoProductoId.value },
-      costoVarianteId.value === null ? undefined : { variante_id: costoVarianteId.value },
-    )
-    costoTree.value = buildCostoTree(costo)
-  } catch {
-    costoTree.value = null
-    ElMessage.error('No se pudo calcular el costo de producción.')
-  } finally {
-    costoLoading.value = false
-  }
-}
-
-function onCostoVarianteChange(): void {
-  loadCosto()
-}
+const {
+  costoProductoId, costoVarianteId, costoProductoVariantes, costoTree, costoLoading,
+  onSelectCostoProducto, onCostoVarianteChange,
+} = costo
 
 onMounted(load)
 </script>
+
 
 <template>
   <section class="productos">
