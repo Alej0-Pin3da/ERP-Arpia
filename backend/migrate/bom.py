@@ -65,12 +65,27 @@ BLOQUES_BOM: dict[str, tuple[str, str | None]] = {
     "FALDA EMILY": ("Falda Emily", None),
     "Corset Hypatia": ("Corset Hypatia", None),
     "BUSTIER": ("Bustier", None),
-    "BLUSAS": ("Blusa Manga Larga", "Blusa Arpia"),
+    "BLUSAS": ("Blusa Manga Larga", "Blusa Manga Corta"),
     "TOTEBAG": ("Tote Bag Arpia", None),
     # Recalculated 16-sheet workbook (2026-08): standard BOM recipe sheets.
     "SET AELO": ("Set Aelo", None),
     "SET OCIPETE": ("Set Ocipete", None),
     "Corset Garras": ("Corset Garras", None),
+}
+
+# Recipe-sheet BATCH sizes (consumption rows are for the WHOLE batch, not per
+# unit). Verified against ARPIA.xlsx 2026-08: 'TOTEBAG' declares 'UNIDAD |
+# TOTAL 6 totebag', 'BLUSAS' 'TOTAL 12 Prendas' (left) / 'TOTAL 15 Prendas'
+# (right), 'Noche y Dia' 'TOTAL 8 Prendas'. Sheets without a batch marker are
+# per-unit (batch 1). Before this fix the BOM of Tote Bag was 6x inflated
+# (Cadena gris 53 cm -> 0.53 m per totebag instead of 8.83 cm), the F5
+# destock requested ~6x the real material and failed with
+# InsufficientStockError; F7 N7d diverged by the same factor.
+_LOTES_BOM: dict[str, tuple[int | None, int | None]] = {
+    "TOTEBAG": (6, None),
+    "BLUSAS": (12, 15),
+    "Noche y Dia": (8, None),
+    "Noche y Dia CACHETERO": (8, None),
 }
 
 # CAJAS sheet: each combo block is a (nombre, costo, precio) column triplet.
@@ -103,25 +118,24 @@ ALIASES_COMBO_A_CATALOGO: dict[str, str] = {
 }
 
 # Recipe-sheet material names that do NOT match the F1 catalog 1:1 (key
-# normalizada -> canonical catalog name). The recipe Excel uses short or
-# divergent names vs the catalog loaded from investments (e.g. "Argolla 10 mm"
-# vs catalog "Argolla numero 10 mm"); everything else resolves by exact match.
-# These aliases never create insumos: the orchestrator creates the missing ones
-# in the real DB with the exact canonical name, so an alias line is still
-# omitted until that insumo exists (intended behavior).
+# normalizada -> canonical catalog name). The recalculated 16-sheet workbook
+# (2026-08) uses the SAME names in the recipe sheets and the catalog, so these
+# aliases are now mostly identity: kept as the mapping mechanism for future
+# divergences. These aliases never create insumos: the orchestrator creates the
+# missing ones in the real DB with the exact canonical name, so an alias line
+# is still omitted until that insumo exists (intended behavior).
 ALIASES_BOM_A_CATALOGO: dict[str, str] = {
-    "argolla 10 mm": "Argolla numero 10 mm",
-    "argolla 8 mm": "Argolla numero 8 mm",
-    "tensor 8 de 10mm": "Tensor 8 numero 10",
-    "zeta de 10 mm": "Zeta numero 10",
-    "tira de brasier": "Tira de Brasier negro 10 mts",
-    "franela lycra": "Franela lycra 1 mt (blanco y negro)",
-    "tela a cuadros": "Tejido plano sim popelina (a cuadros bn)",
-    "powernet negro delgado (corsets)": "Powernet negro delgado",
-    "tela maya ilustrada": "Tela Maya Ilustrada",
-    "sesgo elastico 10 mts": "Sesgo Elastico 10 mts",
+    "argolla 10 mm": "Argolla 10 mm",
+    "argolla 8 mm": "Argolla 8 mm",
     "aro copa brasier": "Aro Copa Brasier",
+    "powernet negro delgado (corsets)": "Powernet negro delgado (corsets)",
     "rosa tejida gris": "Rosa tejida gris",
+    "sesgo elastico 10 mts": "Sesgo Elastico 10 mts",
+    "tela a cuadros": "Tela a cuadros",
+    "tela maya ilustrada": "Tela Maya Ilustrada",
+    "tensor 8 de 10mm": "Tensor 8 de 10mm",
+    "tira de brasier": "Tira de brasier",
+    "zeta de 10 mm": "Zeta de 10 mm",
 }
 
 
@@ -231,6 +245,7 @@ def _procesar_bloque(
     col_nombre: str,
     col_cant: str,
     report=None,
+    lote: int | None = None,
 ) -> None:
     """One (left or right) BOM block cell: build a BomLinea or count/report."""
     valor = fila.get(col_nombre)
@@ -252,6 +267,8 @@ def _procesar_bloque(
                 f"no interpretable; linea excluida (EXM-2)",
             )
         return
+    if lote and lote > 1:
+        cantidad = cantidad / Decimal(lote)  # consumo por unidad (batch)
     plan.insumos.append(
         BomLinea(
             producto_nombre=producto_nombre,
@@ -301,16 +318,28 @@ def _plan_combos(libro: LibroMigracion, plan: BomPlan, report=None) -> None:
 
 
 def plan_bom(
-    libro: LibroMigracion, report=None, bloques: dict[str, tuple[str, str | None]] | None = None
+    libro: LibroMigracion,
+    report=None,
+    bloques: dict[str, tuple[str, str | None]] | None = None,
+    _lotes: dict[str, tuple[int | None, int | None]] | None = None,
 ) -> BomPlan:
     """Aggregate the BOM plan from the bounded workbook (read-only).
 
     ``bloques`` maps recipe sheets to their catalog product(s); it defaults to
     ``BLOQUES_BOM`` (the same provenance F1 uses). Tests / custom mini-books
     inject their own mapping; production always uses the canonical one.
+    ``_lotes`` maps recipe sheets to (batch izquierda, batch derecha); it
+    defaults to ``_LOTES_BOM``. The batch divides consumption rows so the
+    stored BOM quantity is per UNIT (sheets declare consumption for the whole
+    batch, e.g. 'TOTAL 6 totebag').
     """
     if bloques is None:
         bloques = BLOQUES_BOM
+    if _lotes is None:
+        # Default: canonical batch sizes only on the production path. A caller
+        # injecting a custom `bloques` (mini-books) describes per-unit rows
+        # unless it also passes `_lotes` explicitly.
+        _lotes = _LOTES_BOM if bloques is BLOQUES_BOM else {}
     plan = BomPlan()
     for hoja, (prod_izq, prod_der) in bloques.items():
         if hoja not in SHEET_BOUNDS:
@@ -324,10 +353,18 @@ def plan_bom(
                 report.warn(hoja, None, None, "hoja ausente en este workbook; omitida")
             continue
         inicio = SHEET_BOUNDS[hoja][0]
+        lote_izq, lote_der = _lotes.get(hoja, (None, None))
         for fila_idx, fila in enumerate(filas, start=inicio):
-            _procesar_bloque(plan, fila, fila_idx, hoja, prod_izq, "A", "D", report)
+            # Layout real del workbook alineado (2026-08): nombre en A, cantidad
+            # LINEAL en B (cm) y area en D = B x C (ancho). El F3 original leia
+            # D como cantidad, inflando el consumo de telas por el ancho (48 m en
+            # vez de 1.2 m en Corset Garras) y causando InsufficientStockError en
+            # F5. Los herrajes por pieza (ancho 1) no cambiaban porque D == B.
+            _procesar_bloque(plan, fila, fila_idx, hoja, prod_izq, "A", "B", report, lote=lote_izq)
             if prod_der is not None:
-                _procesar_bloque(plan, fila, fila_idx, hoja, prod_der, "A", "L", report)
+                _procesar_bloque(
+                    plan, fila, fila_idx, hoja, prod_der, "I", "J", report, lote=lote_der
+                )
     _plan_combos(libro, plan, report)
     return plan
 

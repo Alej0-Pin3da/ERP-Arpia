@@ -209,7 +209,6 @@ _CATEGORIA_KEYWORDS: dict[str, tuple[str, ...]] = {
         "tensor",
         "aro",
         "varilla",
-        "barilla",
         "gancho",
         "ocho",
         "zeta",
@@ -262,6 +261,23 @@ _UNIDAD_FINAL_POR_CATEGORIA: dict[str, str] = {
     "Químicos": "kg",
 }
 
+# Continuous materials the workbook buys in METROS and consumes in cm in the
+# BOM, but whose names hit a generic Herrajes keyword (cadena/cremallera/
+# ojal). Key: clave_normalizada -> (categoria, unidad). Herrajes by piece
+# sharing the same keyword (deslizadores cremallera, ojales metalicos,
+# Terminales de cordon) are NOT overridden. Verified against ARPIA.xlsx
+# 2026-08: 'Cadena plateada gruesa totebag' 1 mts / BOM 48 cm, 'Cremallera
+# num 3' 10 mts / BOM 40 cm, 'Sesgo rigido para ojales corset' 10 mts / BOM
+# 30 cm. Before this override the purchases were excluded (EXM-2), the
+# insumo kept stock 0 and F5 failed with InsufficientStockError.
+_CLASIFICACION_FORZADA: dict[str, tuple[str, str]] = {
+    clave_normalizada("Cadena plateada gruesa totebag"): ("Telas", "m"),
+    clave_normalizada("Cadena gris delgada totebag"): ("Telas", "m"),
+    clave_normalizada("Cremallera num 3"): ("Telas", "m"),
+    clave_normalizada("Sesgo rigido para ojales corset"): ("Telas", "m"),
+    clave_normalizada("Tapavarilla negro 10 mts"): ("Telas", "m"),
+}
+
 
 def _categoria_por_nombre(nombre: str) -> str | None:
     texto = clave_normalizada(nombre)
@@ -281,6 +297,11 @@ def clasificar_material(nombre: object, cantidad: object = None) -> tuple[str, s
     """
     texto = normalizar_nombre(nombre)
     unidad_hint = resolver_unidad(texto) or _unidad_de_cantidad(cantidad)
+    # Forzado por nombre: materiales continuos por metro que las keywords
+    # genericas de Herrajes pondrian en Herrajes/un (ver _CLASIFICACION_FORZADA).
+    forzada = _CLASIFICACION_FORZADA.get(clave_normalizada(texto))
+    if forzada is not None:
+        return forzada
     categoria = _categoria_por_nombre(texto)
     if categoria is None:
         if unidad_hint in ("m", "cm"):
@@ -306,6 +327,7 @@ _JUNK_SUBCADENA = (
     "precio",
     "venta",
     "total conjunto",
+    "total blusa",
     "hora de trabajo",
     "horas de trabajo",
     "trabajo",
@@ -319,6 +341,7 @@ _JUNK_EXACTOS = frozenset(
         "costo",
         "arpia",
         "mar",
+        "vlq",
         "material",
         "herrajes",
         "prendas",
@@ -494,13 +517,18 @@ def _leer_materiales(libro: LibroMigracion, report) -> dict[str, str]:
                     continue
                 nombres.setdefault(clave_normalizada(nombre), nombre)
     if "CAJAS" in SHEET_BOUNDS:
+        # CAJAS has no column A: combo members live in the (nombre, costo,
+        # precio) name columns B/F/J (design F3, same columns bom.py reads).
+        # Only the packaging items enter the F1 insumo universe; the combo
+        # products (Bralete/Set Aelo/...) come from PRODUCTOS_CATALOGO.
         for fila in filas_de("CAJAS"):
-            valor = fila.get("A")
-            if not isinstance(valor, str):
-                continue
-            nombre = normalizar_nombre(valor)
-            if clave_normalizada(nombre) in _CAJAS_EMPAQUES:
-                nombres.setdefault(clave_normalizada(nombre), nombre)
+            for col_nombre in ("B", "F", "J"):
+                valor = fila.get(col_nombre)
+                if not isinstance(valor, str):
+                    continue
+                nombre = normalizar_nombre(valor)
+                if clave_normalizada(nombre) in _CAJAS_EMPAQUES:
+                    nombres.setdefault(clave_normalizada(nombre), nombre)
     return nombres
 
 

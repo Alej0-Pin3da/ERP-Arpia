@@ -260,9 +260,18 @@ def _procesar_subtabla_derecha(
     if not _es_material_valido(nombre):
         return False  # headers 'Producto'/'Herrajes' o filas junk
     conteos = plan.conteos
-    if nombre in nombres_izquierda:
-        conteos.derecha += 1  # duplica el bloque izquierdo de la misma hoja
-        return True
+    fechas_izquierda = (
+        nombres_izquierda.get(nombre) if isinstance(nombres_izquierda, dict) else None
+    )
+    if fechas_izquierda is not None:
+        # Duplicado solo cuando el item se compro a la izquierda con la MISMA
+        # fecha de operacion de esta fila (el workbook pone el mismo item en
+        # ambos bloques de una misma compra). Una derecha sin fecha propia se
+        # procesa como compra normal (hereda via fecha_para_fila mas abajo);
+        # no se presume duplicado sin evidencia de la misma operacion.
+        if fila.get(config["fecha"]) in fechas_izquierda:
+            conteos.derecha += 1  # duplica el bloque izquierdo de la misma hoja
+            return True
     clave_ins = clave_normalizada(nombre)
     if clave_ins not in universo:
         conteos.derecha += 1  # lista de precios sin compra asociada (no-BOM)
@@ -340,20 +349,56 @@ def _procesar_subtabla_derecha(
     return True
 
 
+# Purchase-sheet names that do NOT match the BOM/catalog 1:1 (key normalizada ->
+# canonical catalog name). The workbook uses short/divergent names in purchases
+# (e.g. 'Elastico de Contorno' vs BOM 'Elastico de Contorno 1 CM', 'Tira de
+# Brasier negro 10 mts' vs 'Tira de brasier'). Without these aliases the
+# purchase row is filtered as no-BOM, the insumo keeps no WAC/stock and F5
+# fails with InsufficientStockError. Verified against ARPIA.xlsx 2026-08.
+ALIASES_COMPRA_A_CATALOGO: dict[str, str] = {
+    "elastico de contorno": "Elastico de Contorno 1 CM",
+    "tira de brasier negro 10 mts": "Tira de brasier",
+    "tira de brasier blanco 10 mts": "Tira de brasier",
+    "tira de brasier negro": "Tira de brasier",
+    "tira de brasier blanca": "Tira de brasier",
+    "sublimacion de la tela maya": "Sublimacion para las totebag",
+    "tela maya ilustrada": "Tela Maya Ilustrada",
+    "rosas tejidas para totebag": "Rosa tejida gris",
+}
+
+
 def _universo_bom(libro, report) -> dict[str, str]:
     """clave normalizada -> nombre display (el mismo universo que cataloga F1:
-    recetas BOM + OCT25 + CAJAS)."""
-    return {clave_normalizada(v): v for v in _leer_materiales(libro, report).values()}
+    recetas BOM + OCT25 + CAJAS, mas aliases de compra)."""
+    universo = {clave_normalizada(v): v for v in _leer_materiales(libro, report).values()}
+    for clave, canonico in ALIASES_COMPRA_A_CATALOGO.items():
+        if clave not in universo:
+            universo[clave] = canonico
+    return universo
 
 
-def _nombres_izquierda_hoja(filas: list[dict[str, object]], col_nom: str) -> set[str]:
-    """Nombres (display) del bloque izquierdo de la hoja: la derecha que
-    repita uno de estos se considera duplicado y se descarta."""
-    nombres: set[str] = set()
+def _nombres_izquierda_hoja(
+    filas: list[dict[str, object]],
+    col_nom: str,
+    col_fecha: str | None = None,
+) -> dict[str, set[object]]:
+    """Nombres (display) del bloque izquierdo de la hoja con las fechas en que
+    se compraron (dict nombre -> set de fechas crudas).
+
+    Regression (2026-08): la derecha duplica la izquierda SOLO cuando el item
+    se compro a la izquierda con la MISMA fecha de operacion (el workbook pone
+    el mismo item en ambos bloques de una misma compra). Un item que aparece a
+    la izquierda en OTRAS fechas NO es un duplicado: son compras historicas
+    distintas (p.ej. 'Cadena plateada gruesa totebag' derecha F54 2024-07-23
+    vs izquierda F96 2026-03-27). El criterio anterior (por nombre a secas)
+    descartaba 35 compras de 2024 y F5 fallaba con InsufficientStockError.
+    """
+    nombres: dict[str, set[object]] = {}
     for fila in filas:
         valor = fila.get(col_nom)
         if isinstance(valor, str) and valor.strip():
-            nombres.add(normalizar_nombre(valor))
+            fecha = fila.get(col_fecha) if col_fecha else None
+            nombres.setdefault(normalizar_nombre(valor), set()).add(fecha)
     return nombres
 
 
@@ -378,7 +423,7 @@ def plan_compras(libro, report=None) -> ComprasPlan:
                 report.warn(hoja, None, None, "hoja ausente en este workbook; omitida")
             continue
         filas = lectura.filas
-        nombres_izquierda = _nombres_izquierda_hoja(filas, col_nom)
+        nombres_izquierda = _nombres_izquierda_hoja(filas, col_nom, col_fecha)
         ultima_fecha: dict[ClaveFecha, object] = {}
         for indx, fila in enumerate(filas, start=SHEET_BOUNDS[hoja][0]):
             cantidad_raw = fila.get(col_cant)

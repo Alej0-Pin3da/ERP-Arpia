@@ -326,11 +326,13 @@ def _mini_workbook_derecha(path: Path) -> None:
     inv.cell(row=15, column=12, value=1)
     inv.cell(row=15, column=13, value=7200)
     inv.cell(row=15, column=5, value=datetime(2026, 2, 17))
-    # R16: derecha duplica izquierda (Tela Derecha ya comprada en R5) -> descarte
+    # R16: derecha duplica izquierda (Tela Derecha ya comprada en R5 con la
+    # MISMA fecha de operacion) -> descarte
     inv.cell(row=16, column=10, value=f"{PREFIX_TEST} Tela Derecha")
     inv.cell(row=16, column=11, value=400)
     inv.cell(row=16, column=12, value=1)
     inv.cell(row=16, column=13, value=200)
+    inv.cell(row=16, column=5, value=datetime(2026, 2, 17))
     wb.save(path)
 
 
@@ -352,6 +354,41 @@ def test_plan_compras_derecha_fuente_unica_genera_compra(mini_libro_derecha):
     assert compra.precio_unitario == 72  # M/K = 7200/100
     assert compra.fecha == DIA  # fecha del left E de la misma fila
     assert compra.hoja == "INVERSION VALQUI"
+
+
+def test_plan_compras_derecha_misma_fecha_duplica_se_descarta(mini_libro_derecha):
+    """Regression (2026-08): la sub-tabla derecha duplica la izquierda SOLO
+    cuando el item se compro a la izquierda con la MISMA fecha de operacion
+    (mismo registro en dos bloques). Aqui R16 'Tela Derecha' no tiene fecha
+    propia -> hereda la de la compra izquierda contigua (R5, DIA) -> es la
+    MISMA compra -> se descarta como duplicado (el workbook pone el mismo
+    item en ambos bloques de una misma operacion)."""
+    plan = _plan_de(mini_libro_derecha)
+    telas_derecha = [c for c in plan.compras if c.insumo_nombre == f"{PREFIX_TEST} Tela Derecha"]
+    assert len(telas_derecha) == 1  # solo la compra izquierda R5, la derecha se descarta
+    assert telas_derecha[0].fila == 5
+
+
+def test_plan_compras_derecha_fecha_distinta_no_es_duplicado():
+    """Regression (2026-08, workbook real): 'Cadena plateada gruesa totebag'
+    aparece a la izquierda (F96, 2026-03-27, 1 mts) y en la sub-tabla derecha
+    (F54, 2024-07-23, 100 mts). Son DOS compras legitimas en fechas distintas.
+    El criterio anterior descartaba la derecha por nombre -> 35 compras de
+    2024 se perdian y F5 fallaba con InsufficientStockError. La derecha solo
+    duplica cuando la fecha coincide."""
+    from migrate.purchases import plan_compras
+
+    if not REAL_XLSX.exists():
+        pytest.skip("ARPIA.xlsx no disponible")
+
+    with LibroMigracion(REAL_XLSX) as libro:
+        plan = plan_compras(libro)
+
+    cadenas = [c for c in plan.compras if "Cadena plateada gruesa" in c.insumo_nombre]
+    fechas = sorted(str(c.fecha.date()) for c in cadenas)
+    # La compra derecha F54 (2024) ya no se pierde.
+    assert any(f.startswith("2024-") for f in fechas), f"cadena 2024 perdida: {fechas}"
+    assert len(cadenas) >= 2
 
 
 def test_plan_compras_derecha_duplicada_se_descarta(mini_libro_derecha):

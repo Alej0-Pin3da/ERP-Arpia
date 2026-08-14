@@ -76,6 +76,18 @@ def _mini_workbook(path: Path) -> None:
     oct.cell(row=9, column=4, value="25 mts")
     oct.cell(row=10, column=6, value="Argolla Migra Test")
     oct.cell(row=10, column=8, value="34")
+
+    # CAJAS combo block: members live in the (nombre, costo, precio) name
+    # columns B/F/J (design F3 / bom.py); packaging items (Caja, Vela,
+    # Papel, Envio) are insumos too (F1, design D4). Column A does NOT
+    # exist on the real sheet, so reading it must not be the F1 path.
+    # SHEET_BOUNDS reads CAJAS rows 4..13, so members go on R4+ (col B).
+    cajas = wb.create_sheet("CAJAS")
+    cajas.cell(row=1, column=2, value="Caja Despertar")  # block header (R1)
+    cajas.cell(row=3, column=2, value="Producto")  # header (R3)
+    empaques = ["Caja", "Vela", "Papel", "Envio"]
+    for i, nombre in enumerate(empaques):
+        cajas.cell(row=4 + i, column=2, value=nombre)
     wb.save(path)
 
 
@@ -203,6 +215,45 @@ def test_clasificar_material_categoria_y_unidad_final():
     assert clasificar_material("Argolla Migra Test", "34") == ("Herrajes", "un")
 
 
+def test_clasificar_barilla_poliester_es_tela_no_herraje():
+    """Regression (2026-08, catalogo alineado 16 hojas): 'Barilla poliester
+    corset negro 8mm' es un textil continuo que se compra/consume en METROS
+    (compra VALQUI '45 mts', BOM 90 cm -> 0.9 m por corset). La keyword
+    'barilla' en Herrajes lo clasificaba como Herrajes/un: la compra '45 mts'
+    se excluia (EXM-2) y F5 fallaba con InsufficientStockError. Las varillas
+    de herraje reales se escriben 'varilla' (Varilla copa brasier talla 30).
+    """
+    from migrate.catalog import clasificar_material
+
+    assert clasificar_material("Barilla poliester corset negro 8mm", None) == ("Telas", "m")
+    # Los herrajes reales con 'varilla' NO cambian de categoria.
+    assert clasificar_material("Varilla copa brasier talla 30", None) == ("Herrajes", "un")
+    assert clasificar_material("Tapa varilla Negro #1", None) == ("Herrajes", "un")
+
+
+def test_clasificar_materiales_continuos_por_metro_son_telas():
+    """Regression (2026-08): materiales continuos que el workbook compra en
+    METROS ('1 mts', '10 mts') y consume en cm en el BOM (Tote Bag usa 48/53
+    cm de cadena, 40 cm de cremallera; el corset 30 cm de sesgo rigido).
+    Antes caian en Herrajes/un por keywords genericas, la compra se excluia
+    (EXM-2) y F5 fallaba con InsufficientStockError. Los herrajes POR PIEZA
+    que comparten keyword (deslizadores, ojales, terminales) NO cambian.
+    """
+    from migrate.catalog import clasificar_material
+
+    assert clasificar_material("Cadena plateada gruesa totebag", None) == ("Telas", "m")
+    assert clasificar_material("Cadena gris delgada totebag", None) == ("Telas", "m")
+    assert clasificar_material("Cremallera num 3", None) == ("Telas", "m")
+    assert clasificar_material("Sesgo rigido para ojales corset", None) == ("Telas", "m")
+    # Tapavarilla: nombre '10 mts' explicito -> textil continuo por metro.
+    assert clasificar_material("Tapavarilla negro 10 mts", None) == ("Telas", "m")
+    # Herrajes por pieza reales (misma keyword) NO cambian.
+    assert clasificar_material("deslizadores cremallera num 3", None) == ("Herrajes", "un")
+    assert clasificar_material("ojales metalicos 3/8 (grandes)", None) == ("Herrajes", "un")
+    assert clasificar_material("Terminales de cordon", None) == ("Herrajes", "un")
+    assert clasificar_material("Tapa varilla Negro #1", None) == ("Herrajes", "un")
+
+
 def test_filtrar_materiales_validos_excluye_junk():
     from migrate.catalog import filtrar_materiales_validos
 
@@ -214,6 +265,10 @@ def test_filtrar_materiales_validos_excluye_junk():
         {"A": 4.0},
         {"A": "VENTA"},
         {"A": 0},
+        {"A": "VLQ"},  # etiqueta de distribucion (Valqui), no material
+        {"A": "MAR"},  # etiqueta de distribucion (Margarita)
+        {"A": "ARPIA"},  # etiqueta de distribucion
+        {"A": "TOTAL BLUSA MANGA CORTA"},  # etiqueta de totales de hoja
         {"I": "Argolla 90 mm"},  # right-block material counts too
     ]
     efectivas = filtrar_materiales_validos(filas)
@@ -221,7 +276,17 @@ def test_filtrar_materiales_validos_excluye_junk():
     assert "Argolla 90 mm" in efectivas
     assert not any(
         m in efectivas
-        for m in ["Horas trabajo", "COSTO TOTAL CONJUNTO", "GANANCIA", "VENTA", "4.0"]
+        for m in [
+            "Horas trabajo",
+            "COSTO TOTAL CONJUNTO",
+            "GANANCIA",
+            "VENTA",
+            "4.0",
+            "VLQ",
+            "MAR",
+            "ARPIA",
+            "TOTAL BLUSA MANGA CORTA",
+        ]
     )
 
 
@@ -241,8 +306,9 @@ def test_plan_workbook_mini_proveedores_insumos_dedup(mini_libro):
     nombres_prov = {p.nombre for p in plan.proveedores}
     assert {"Bexxhamel", "JM Confecciones", "SEHA Text", "ZureTex"} <= nombres_prov
 
-    # CORSET(4) + BLUSAS adds Sesgo; OCT25 adds 2; 'Tela Maya Test 1' dedup across sheets.
-    assert plan.conteo_insumos == 6
+    # CORSET(4) + BLUSAS adds Sesgo; OCT25 adds 2; CAJAS adds 4 empaques;
+    # 'Tela Maya Test 1' dedup across sheets.
+    assert plan.conteo_insumos == 10
     nombres = {i.nombre for i in plan.insumos}
     assert {
         "Tela Maya Test 1",
@@ -251,7 +317,30 @@ def test_plan_workbook_mini_proveedores_insumos_dedup(mini_libro):
         "Sesgo Elastico 10 mts",
         "Material Migra Test",
         "Argolla Migra Test",
+        "Caja",
+        "Vela",
+        "Papel",
+        "Envio",
     } <= nombres
+
+
+def test_plan_catalogo_empaques_cajas_entran_al_universo(mini_libro):
+    """Regression (2026-08): F1 must read the CAJAS combo member columns
+    (B/F/J, design F3 / bom.py) -- NOT column A, which does not exist on the
+    sheet -- so the packaging insumos (Caja/Vela/Papel/Envio) enter the F1
+    universe. Before this fix F3 silently omitted the 12 combo packaging
+    rows because the insumo was never created."""
+    from migrate.catalog import plan_catalogo
+    from migrate.loaders import LibroMigracion
+
+    with LibroMigracion(mini_libro) as libro:
+        plan = plan_catalogo(libro)
+
+    por_categoria: dict[str, list[str]] = {}
+    for insumo in plan.insumos:
+        por_categoria.setdefault(insumo.categoria, []).append(insumo.nombre)
+    empaques = set(por_categoria.get("Empaques", []))
+    assert {"Caja", "Vela", "Papel", "Envio"} <= empaques
 
 
 def test_plan_catalogo_unidades_normalizadas(mini_libro):

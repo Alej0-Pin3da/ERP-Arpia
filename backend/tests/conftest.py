@@ -175,5 +175,3 @@ def consulta_token(client, _consulta_user):
     )
     resp.raise_for_status()
     return resp.json()["access_token"]
-
-

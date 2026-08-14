@@ -57,7 +57,16 @@ from pathlib import Path
 
 from sqlalchemy import func, select
 
-from app.models import Cliente, DetalleVenta, Producto, VarianteProducto, Venta
+from app.core.exceptions import EntityNotFoundError
+from app.models import (
+    CategoriaInsumo,
+    Cliente,
+    DetalleVenta,
+    Insumo,
+    Producto,
+    VarianteProducto,
+    Venta,
+)
 from app.services.inventory import descontar_stock, explosion_materiales
 from migrate.catalog import clave_normalizada, normalizar_nombre
 from migrate.context import MigrationContext, session_scope
@@ -119,9 +128,7 @@ def _leer_ventas_csv(ruta: Path) -> list[dict[str, object]]:
                 if valor is None or valor == "":
                     continue
                 if col in (COL_PRECIO, COL_COSTO):
-                    fila[col] = normalizar_decimal(
-                        valor.strip().lstrip("$").replace(" ", "")
-                    )
+                    fila[col] = normalizar_decimal(valor.strip().lstrip("$").replace(" ", ""))
                 elif col == COL_FECHA:
                     try:
                         fila[col] = datetime.strptime(valor.strip(), "%d/%m/%Y")
@@ -384,7 +391,48 @@ def _variante_por_nombre(db, producto_id: int, nombre: str | None) -> int | None
     return var.id if var is not None else None
 
 
-def aplicar_ventas(db, plan: VentasPlan, report=None, canal_venta: str = "feria") -> dict[str, int]:
+def _es_empaque_consumible(db, insumo_id: int) -> bool:
+    """Empaques de combo (Caja/Vela/Papel/Envio/...) son consumibles SIN
+    inventario rastreable: no estan en OCT25 ni tienen compras WAC. F5 los
+    excluye del destock (VTA-3); de lo contrario la venta de un combo falla
+    con InsufficientStockError aun con stock real de los materiales."""
+    insumo = db.get(Insumo, insumo_id)
+    if insumo is None or insumo.categoria_id is None:
+        return False
+    cat = db.get(CategoriaInsumo, insumo.categoria_id)
+    return cat is not None and cat.nombre == "Empaques"
+
+
+def _descontar_stock_tolerante(db, explosiones: dict[int, Decimal], report=None) -> None:
+    """Destock de la migracion historica que PERMITE stock negativo.
+
+    Decision de negocio (2026-08): el workbook no registra compras suficientes
+    para toda la produccion vendida (el negocio vendio de stock previo no
+    registrado). Igual que ``inventory.descontar_stock`` bloquea con FOR UPDATE,
+    pero en vez de lanzar 409 descuenta y reporta WARN por insumo deficitario.
+    Nunca se usa en el runtime de la app: solo en F5 con permitir_deficit=True.
+    """
+
+    for insumo_id in sorted(explosiones):
+        cantidad = explosiones[insumo_id]
+        insumo = db.get(Insumo, insumo_id, with_for_update=True, populate_existing=True)
+        if insumo is None:
+            raise EntityNotFoundError("Insumo", insumo_id)
+        if insumo.stock_actual < cantidad and report:
+            report.warn(
+                "F5",
+                None,
+                None,
+                f"stock insuficiente para '{insumo.nombre}': disponible "
+                f"{insumo.stock_actual}, requerido {cantidad}; stock quedara "
+                f"negativo (deficit historico permitido)",
+            )
+        insumo.stock_actual -= cantidad
+
+
+def aplicar_ventas(
+    db, plan: VentasPlan, report=None, canal_venta: str = "feria", permitir_deficit: bool = False
+) -> dict[str, int]:
     """INSERT directo Venta + Detalle_Ventas (fecha real, canal='feria', costo
     snapshot = H del Excel) + destock en lote al final (VTA-3).
 
@@ -392,6 +440,13 @@ def aplicar_ventas(db, plan: VentasPlan, report=None, canal_venta: str = "feria"
     variante, cantidad, precio, costo) con guard CUANTITATIVO por corrida; el
     caller (session_scope) controla el commit unico y ante 409 de destock la
     fase completa revierte (EXM-4): cero ventas residuales.
+
+    ``permitir_deficit`` (decision de negocio 2026-08): el historico de ventas
+    supera el inventario comprado (Lino vertigo 4.8m vs 1.8m, Satin elastico
+    4.8 vs 2, Tela a cuadros 1.8 vs 1) -- el negocio vendio de stock previo no
+    registrado. Con True, el destock tolerante descuenta dejando stock NEGATIVO
+    y reporta WARN por insumo deficitario, SIN rollback. El servicio runtime
+    inventory.descontar_stock NO cambia (sigue protegiendo ventas en vivo).
     """
     res: dict[str, int] = {"insertadas": 0, "ya_presentes": 0, "omitidas": 0, "destock": 0}
 
@@ -456,6 +511,8 @@ def aplicar_ventas(db, plan: VentasPlan, report=None, canal_venta: str = "feria"
         for insumo_id, qty in explosion_materiales(
             db, producto_id, variante_id, venta.cantidad
         ).items():
+            if _es_empaque_consumible(db, insumo_id):
+                continue  # empaques de combo sin inventario rastreable
             explosiones[insumo_id] = explosiones.get(insumo_id, Decimal("0")) + qty
         insertadas_por_clave[clave] += 1
         res["insertadas"] += 1
@@ -471,7 +528,10 @@ def aplicar_ventas(db, plan: VentasPlan, report=None, canal_venta: str = "feria"
 
     # 4) Destock en lote (VTA-3): 409 -> sube -> rollback de fase (EXM-4).
     if explosiones:
-        descontar_stock(db, explosiones)
+        if permitir_deficit:
+            _descontar_stock_tolerante(db, explosiones, report)
+        else:
+            descontar_stock(db, explosiones)
         res["destock"] = len(explosiones)
         if report:
             report.info(
@@ -479,7 +539,8 @@ def aplicar_ventas(db, plan: VentasPlan, report=None, canal_venta: str = "feria"
                 None,
                 None,
                 f"destock batch: {len(explosiones)} insumos consumidos "
-                f"(stock FOR UPDATE, unica transaccion)",
+                f"(stock FOR UPDATE, unica transaccion"
+                f"{', deficit permitido' if permitir_deficit else ''})",
             )
 
     if report:
@@ -527,7 +588,9 @@ def cargar_ventas(ctx: MigrationContext) -> VentasPlan:
     )
     if ctx.options.modo == "commit" and ctx.session is not None:
         with session_scope(ctx, ctx.session) as db:
-            aplicar_ventas(db, plan, report, canal_venta=canal)
+            # permitir_deficit=True: decision de negocio 2026-08 (el historico
+            # supera el inventario comprado; se registra todo con alerta WARN).
+            aplicar_ventas(db, plan, report, canal_venta=canal, permitir_deficit=True)
     return plan
 
 

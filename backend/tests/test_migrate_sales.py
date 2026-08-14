@@ -178,7 +178,9 @@ def _ventas_id_de_test(db):
         db.query(DetalleVenta.venta_id)
         .filter(
             DetalleVenta.producto_id.in_(
-                db.query(Producto.id).filter(Producto.nombre.in_([P_SET, P_TOTE]))
+                db.query(Producto.id).filter(
+                    Producto.nombre.in_([P_SET, P_TOTE, f"{P} Venta Combo"])
+                )
             )
         )
         .all()
@@ -204,18 +206,26 @@ def _limpiar_ventas_test(db) -> None:
 def _borrar_filas_test(db) -> None:
     """Remove rows this test module injected (exact-name matches only)."""
     _limpiar_ventas_test(db)
-    db.query(BomInsumo).filter(
-        BomInsumo.insumo_id.in_(db.query(Insumo.id).filter(Insumo.nombre == P_TELA))
-    ).delete(synchronize_session=False)
-    db.query(Insumo).filter(Insumo.nombre == P_TELA).delete(synchronize_session=False)
-    db.query(VarianteProducto).filter(
-        VarianteProducto.producto_id.in_(
-            db.query(Producto.id).filter(Producto.nombre.in_([P_SET, P_TOTE]))
-        )
-    ).delete(synchronize_session=False)
-    db.query(Producto).filter(Producto.nombre.in_([P_SET, P_TOTE])).delete(
+    ids_productos_test = [
+        i
+        for (i,) in db.query(Producto.id)
+        .filter(Producto.nombre.in_([P_SET, P_TOTE, f"{P} Venta Combo"]))
+        .all()
+    ]
+    db.query(BomInsumo).filter(BomInsumo.producto_id.in_(ids_productos_test)).delete(
         synchronize_session=False
     )
+    db.query(BomInsumo).filter(
+        BomInsumo.insumo_id.in_(
+            db.query(Insumo.id).filter(Insumo.nombre.in_([P_TELA, f"{P} Caja Empaque"]))
+        )
+    ).delete(synchronize_session=False)
+    db.query(Insumo).filter(Insumo.nombre == P_TELA).delete(synchronize_session=False)
+    db.query(Insumo).filter(Insumo.nombre == f"{P} Caja Empaque").delete(synchronize_session=False)
+    db.query(VarianteProducto).filter(VarianteProducto.producto_id.in_(ids_productos_test)).delete(
+        synchronize_session=False
+    )
+    db.query(Producto).filter(Producto.id.in_(ids_productos_test)).delete(synchronize_session=False)
     # Remove the canonical catalog tipos that bootstrap_catalogo() inserts.
     db.query(TipoProducto).filter(
         TipoProducto.nombre.in_(["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"])
@@ -453,6 +463,124 @@ def test_aplicar_ventas_stock_insuficiente_rollback(db, mini_ventas):
     # EXM-4: ninguna venta de la fase queda persistida (rollback de fase)
     assert db.query(Venta).count() == 0
     assert db.query(DetalleVenta).count() == 0
+
+
+def test_aplicar_ventas_no_descuenta_empaques_de_combo(db, tmp_path):
+    """Regression (2026-08): los empaques de los combos (Caja/Vela/Papel/Envio,
+    categoria Empaques) son consumibles SIN inventario rastreable: no estan en
+    OCT25 ni tienen compras WAC. F5 debe excluirlos del destock o la venta de
+    un combo (CAJA SACA LAS GARRAS) falla con InsufficientStockError aun con
+    stock real suficiente de los materiales."""
+    from migrate.catalog import upsert_insumo, upsert_producto
+    from migrate.sales import aplicar_ventas, plan_ventas
+
+    _preparar_catalogo(db)
+    # Combo con BOM: tela (stock 10) + empaque Caja (stock 0, categoria Empaques)
+    caja = upsert_insumo(db, f"{P} Caja Empaque", categoria_nombre="Empaques")
+    combo = upsert_producto(db, f"{P} Venta Combo", tipo="Combo")
+    db.flush()
+    tela = db.query(Insumo).filter(Insumo.nombre == P_TELA).one()
+    db.add(
+        BomInsumo(
+            producto_id=combo.id,
+            insumo_id=tela.id,
+            cantidad_requerida=Decimal("2"),
+            porcentaje_desperdicio=Decimal("0"),
+        )
+    )
+    db.add(
+        BomInsumo(
+            producto_id=combo.id,
+            insumo_id=caja.id,
+            cantidad_requerida=Decimal("1"),
+            porcentaje_desperdicio=Decimal("0"),
+        )
+    )
+    db.commit()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "VENTAS"
+    ws.append(
+        [
+            "Producto",
+            None,
+            None,
+            None,
+            None,
+            None,
+            "Precio Venta",
+            "Costo",
+            "Ganancias",
+            None,
+            None,
+            None,
+            "Fecha",
+            None,
+            None,
+            "Cliente",
+        ]
+    )
+    ws.append(
+        [
+            f"{P} Venta Combo",
+            None,
+            None,
+            None,
+            None,
+            None,
+            295000.0,
+            129388.0,
+            165612.0,
+            None,
+            None,
+            None,
+            datetime(2026, 7, 13),
+            None,
+            None,
+            "gaby",
+        ]
+    )
+    path = tmp_path / "mini-combo.xlsx"
+    wb.save(path)
+
+    with LibroMigracion(path) as libro:
+        plan = plan_ventas(libro)
+    aplicar_ventas(db, plan, canal_venta="feria")  # no debe lanzar
+    db.commit()
+
+    db.refresh(tela)
+    db.refresh(caja)
+    assert tela.stock_actual == Decimal("8")  # tela SI se descuenta
+    assert caja.stock_actual == Decimal("0")  # empaque NO se descuenta
+
+
+def test_aplicar_ventas_permitir_deficit_alerta_y_no_rollback(db, tmp_path):
+    """Decision de negocio (2026-08): el historico de ventas supera el
+    inventario comprado (Lino vertigo 4.8m vs 1.8m, Satin elastico 4.8 vs 2,
+    Tela a cuadros 1.8 vs 1) -- el negocio vendio de stock previo no
+    registrado. Con permitir_deficit=True F5 registra las ventas, descuenta
+    dejando stock NEGATIVO y reporta WARN por insumo deficitario, sin
+    rollback (EXM-4 relajado para la migracion historica)."""
+    from migrate.sales import aplicar_ventas, plan_ventas
+
+    _preparar_catalogo(db)
+    tela = db.query(Insumo).filter(Insumo.nombre == P_TELA).one()
+    tela.stock_actual = Decimal("1")  # BOM requiere 2 m -> deficit
+    db.commit()
+
+    path = tmp_path / "mini-ventas-deficit.xlsx"
+    _mini_workbook(path)
+    with LibroMigracion(path) as libro:
+        plan = plan_ventas(libro)
+    res = aplicar_ventas(db, plan, canal_venta="feria", permitir_deficit=True)
+    db.commit()
+
+    db.refresh(tela)
+    assert tela.stock_actual == Decimal("-1")  # deficit permitido (stock negativo)
+    assert db.query(Venta).count() == 2  # las ventas SI se persistieron
+    assert db.query(DetalleVenta).count() == 2
+    assert res["destock"] >= 1
 
 
 # --------------------------------------------------------------------------- #
