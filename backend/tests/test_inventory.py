@@ -19,11 +19,17 @@ import uuid
 from decimal import Decimal
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy import event, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import (
+    BomCycleDetectedError,
+    DomainError,
+    DomainValidationError,
+    EntityNotFoundError,
+    InsufficientStockError,
+)
 from app.db.session import SessionLocal, engine
 from app.models import (
     BomInsumo,
@@ -372,7 +378,7 @@ def test_explosion_variant_product_without_variante_raises_400():
     try:
         db = SessionLocal()
         try:
-            with pytest.raises(HTTPException) as excinfo:
+            with pytest.raises(DomainValidationError) as excinfo:
                 explosion_materiales(db, producto_id, None, Decimal("1"))
         finally:
             db.close()
@@ -399,7 +405,7 @@ def test_explosion_cycle_aborts_409():
     try:
         db = SessionLocal()
         try:
-            with pytest.raises(HTTPException) as excinfo:
+            with pytest.raises(BomCycleDetectedError) as excinfo:
                 explosion_materiales(db, a_id, None, Decimal("1"))
         finally:
             db.close()
@@ -444,7 +450,7 @@ def test_explosion_is_read_only_no_writes():
 def test_explosion_missing_producto_raises_404():
     db = SessionLocal()
     try:
-        with pytest.raises(HTTPException) as excinfo:
+        with pytest.raises(EntityNotFoundError) as excinfo:
             explosion_materiales(db, 99999999, None, Decimal("1"))
     finally:
         db.close()
@@ -463,7 +469,7 @@ def test_descontar_stock_insufficient_raises_409_no_change():
     try:
         db = SessionLocal()
         try:
-            with pytest.raises(HTTPException) as excinfo:
+            with pytest.raises(InsufficientStockError) as excinfo:
                 descontar_stock(db, {insumo_id: Decimal("6")})
         finally:
             db.rollback()
@@ -483,7 +489,7 @@ def test_descontar_stock_multiple_insumos_second_short_no_partial():
     try:
         db = SessionLocal()
         try:
-            with pytest.raises(HTTPException) as excinfo:
+            with pytest.raises(InsufficientStockError) as excinfo:
                 descontar_stock(db, {x_id: Decimal("1"), y_id: Decimal("3")})
         finally:
             db.rollback()
@@ -546,7 +552,7 @@ def test_registrar_venta_two_lines_second_short_rolls_back_all():
         db = SessionLocal()
         try:
             ventas_before = db.query(Venta).count()
-            with pytest.raises(HTTPException) as excinfo:
+            with pytest.raises(InsufficientStockError) as excinfo:
                 registrar_venta(db, payload)
         finally:
             db.rollback()
@@ -652,7 +658,7 @@ def test_registrar_venta_commit_integrity_error_returns_409(monkeypatch):
         db = SessionLocal()
         try:
             monkeypatch.setattr(Session, "commit", raising_commit)
-            with pytest.raises(HTTPException) as excinfo:
+            with pytest.raises(DomainValidationError) as excinfo:
                 registrar_venta(db, _venta_payload(producto_id, cantidad="1"))
         finally:
             monkeypatch.undo()
@@ -714,7 +720,7 @@ def test_reponer_stock_unknown_insumo_raises_404():
     """Unknown insumo_id -> 404, mirrors descontar_stock (S2.2)."""
     db = SessionLocal()
     try:
-        with pytest.raises(HTTPException) as excinfo:
+        with pytest.raises(EntityNotFoundError) as excinfo:
             reponer_stock(db, {99999999: Decimal("1")})
     finally:
         db.rollback()
@@ -786,38 +792,39 @@ def test_registrar_venta_concurrent_sales_serialize():
     tipo_id = _make_tipo()
     producto_id = _make_producto(tipo_id)
     _make_linea_insumo(producto_id, insumo_id, cantidad="1")
-    barrier = threading.Barrier(2)
-    outcomes: list[HTTPException | None] = [None, None]
-    created: list[int | None] = [None, None]
+    try:
+        barrier = threading.Barrier(2)
+        outcomes: list[DomainError | None] = [None, None]
+        created: list[int | None] = [None, None]
 
-    def sell(slot: int):
-        db = SessionLocal()
-        try:
-            barrier.wait(timeout=10)
-            venta = registrar_venta(db, _venta_payload(producto_id, cantidad="3"))
-            created[slot] = venta.id
-        except HTTPException as exc:  # expected: one serialized sale -> 409
-            outcomes[slot] = exc
-        finally:
-            db.close()
+        def sell(slot: int):
+            db = SessionLocal()
+            try:
+                barrier.wait(timeout=10)
+                venta = registrar_venta(db, _venta_payload(producto_id, cantidad="3"))
+                created[slot] = venta.id
+            except DomainError as exc:  # expected: one serialized sale -> 409
+                outcomes[slot] = exc
+            finally:
+                db.close()
 
-    t1 = threading.Thread(target=sell, args=(0,))
-    t2 = threading.Thread(target=sell, args=(1,))
-    t1.start()
-    t2.start()
-    t1.join(timeout=30)
-    t2.join(timeout=30)
+        t1 = threading.Thread(target=sell, args=(0,))
+        t2 = threading.Thread(target=sell, args=(1,))
+        t1.start()
+        t2.start()
+        t1.join(timeout=30)
+        t2.join(timeout=30)
 
-    ok_count = sum(1 for v in created if v is not None)
-    blocked_count = sum(1 for o in outcomes if o is not None and o.status_code == 409)
-    assert ok_count == 1
-    assert blocked_count == 1
-    # Stock 5 minus the one serialized sale of 3 = 2 (the loser saw 2 < 3 -> 409)
-    assert _read_stock(insumo_id) == Decimal("2")
-
-    # clean up the created sale so FK cleanup on the producto can proceed
-    _cleanup_ventas_for_producto(producto_id)
-    _cleanup_producto(producto_id)
-    _cleanup_insumo(insumo_id)
-    _cleanup_categoria(categoria_id)
-    _cleanup_tipo(tipo_id)
+        ok_count = sum(1 for v in created if v is not None)
+        blocked_count = sum(1 for o in outcomes if o is not None and o.status_code == 409)
+        assert ok_count == 1
+        assert blocked_count == 1
+        # Stock 5 minus the one serialized sale of 3 = 2 (the loser saw 2 < 3 -> 409)
+        assert _read_stock(insumo_id) == Decimal("2")
+    finally:
+        # clean up the created sale so FK cleanup on the producto can proceed
+        _cleanup_ventas_for_producto(producto_id)
+        _cleanup_producto(producto_id)
+        _cleanup_insumo(insumo_id)
+        _cleanup_categoria(categoria_id)
+        _cleanup_tipo(tipo_id)

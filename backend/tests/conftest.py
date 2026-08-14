@@ -18,6 +18,9 @@ TEST_DATABASE_URL = os.environ.get(
 
 # Must be set before importing any app module.
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+# Disable slowapi rate limiting in tests (conftest #1: many logins from the
+# same TestClient IP would otherwise hit 429). Must precede app imports.
+os.environ["ENVIRONMENT"] = "test"
 
 import pytest
 from fastapi.testclient import TestClient
@@ -172,3 +175,5 @@ def consulta_token(client, _consulta_user):
     )
     resp.raise_for_status()
     return resp.json()["access_token"]
+
+

@@ -18,11 +18,15 @@ def setup_logging(environment: str | None = None) -> None:
     env = (environment or settings.ENVIRONMENT).lower()
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(JsonFormatter() if env != "development" else ReadableFormatter())
+    # Marker so re-installs are idempotent without touching third-party
+    # handlers (e.g. pytest's caplog LogCaptureHandler on the root logger).
+    handler._arpia_logging_handler = True  # type: ignore[attr-defined]
 
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     for existing in list(root.handlers):
-        root.removeHandler(existing)
+        if getattr(existing, "_arpia_logging_handler", False):
+            root.removeHandler(existing)
     root.addHandler(handler)
 
     # Ensure the app namespace never sinks below INFO regardless of the root.

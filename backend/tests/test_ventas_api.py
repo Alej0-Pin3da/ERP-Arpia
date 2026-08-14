@@ -1041,7 +1041,7 @@ def test_put_venta_inexistente_404(client, operador_token):
         headers={"Authorization": f"Bearer {operador_token}"},
     )
     assert resp.status_code == 404
-    assert resp.json()["detail"] == "Venta no encontrada"
+    assert resp.json()["detail"] == "Venta 99999999 no encontrado"
 
 
 def test_put_venta_consulta_forbidden(client, consulta_token):
@@ -1146,7 +1146,7 @@ def test_delete_venta_inexistente_404(client, operador_token):
         headers={"Authorization": f"Bearer {operador_token}"},
     )
     assert resp.status_code == 404
-    assert resp.json()["detail"] == "Venta no encontrada"
+    assert resp.json()["detail"] == "Venta 99999999 no encontrado"
 
 
 def test_delete_venta_consulta_forbidden(client, consulta_token):

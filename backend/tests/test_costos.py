@@ -14,9 +14,9 @@ import uuid
 from decimal import Decimal
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy import event, or_
 
+from app.core.exceptions import BomCycleDetectedError
 from app.db.session import SessionLocal, engine
 from app.models import (
     BomInsumo,
@@ -415,7 +415,7 @@ def test_costo_ciclo_directo_409():
     try:
         db = SessionLocal()
         try:
-            with pytest.raises(HTTPException) as excinfo:
+            with pytest.raises(BomCycleDetectedError) as excinfo:
                 calcular_costo_produccion(db, a_id)
             assert excinfo.value.status_code == 409
         finally:

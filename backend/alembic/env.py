@@ -15,7 +15,8 @@ from app.models import *  # noqa: F401,F403,E402  # noqa: register all models
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Do not disable loggers configured by the app (e.g. ``arpia.api``).
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
