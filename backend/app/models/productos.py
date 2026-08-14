@@ -27,7 +27,7 @@ class Producto(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tipo_producto_id: Mapped[int] = mapped_column(
-        ForeignKey("Tipos_Producto.id", ondelete="RESTRICT"), nullable=False
+        ForeignKey("Tipos_Producto.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     nombre: Mapped[str] = mapped_column(String(255), nullable=False)
     requiere_fabricacion: Mapped[bool] = mapped_column(
@@ -62,7 +62,7 @@ class VarianteProducto(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     producto_id: Mapped[int] = mapped_column(
-        ForeignKey("Productos.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("Productos.id", ondelete="CASCADE"), nullable=False, index=True
     )
     nombre_variante: Mapped[str] = mapped_column(String(150), nullable=False)
     precio_venta: Mapped[Decimal | None] = mapped_column(
@@ -85,10 +85,10 @@ class BomInsumo(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     producto_id: Mapped[int] = mapped_column(
-        ForeignKey("Productos.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("Productos.id", ondelete="CASCADE"), nullable=False, index=True
     )
     insumo_id: Mapped[int] = mapped_column(
-        ForeignKey("Insumos.id", ondelete="RESTRICT"), nullable=False
+        ForeignKey("Insumos.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     variante_id: Mapped[int | None] = mapped_column(
         ForeignKey("Variantes_Producto.id", ondelete="CASCADE"), nullable=True
@@ -116,10 +116,10 @@ class BomProducto(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     combo_id: Mapped[int] = mapped_column(
-        ForeignKey("Productos.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("Productos.id", ondelete="CASCADE"), nullable=False, index=True
     )
     producto_incluido_id: Mapped[int] = mapped_column(
-        ForeignKey("Productos.id", ondelete="RESTRICT"), nullable=False
+        ForeignKey("Productos.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     cantidad: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
 

@@ -28,7 +28,7 @@ class Insumo(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     categoria_id: Mapped[int] = mapped_column(
-        ForeignKey("Categorias_Insumos.id", ondelete="RESTRICT"), nullable=False
+        ForeignKey("Categorias_Insumos.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     nombre: Mapped[str] = mapped_column(String(255), nullable=False)
     unidad_medida: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -56,13 +56,13 @@ class CompraInsumo(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     insumo_id: Mapped[int] = mapped_column(
-        ForeignKey("Insumos.id", ondelete="RESTRICT"), nullable=False
+        ForeignKey("Insumos.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     proveedor_id: Mapped[int | None] = mapped_column(
-        ForeignKey("Proveedores.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("Proveedores.id", ondelete="SET NULL"), nullable=True, index=True
     )
     fecha_compra: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )
     cantidad_comprada: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
     precio_unitario_compra: Mapped[Decimal] = mapped_column(

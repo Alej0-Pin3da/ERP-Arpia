@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Resolve .env relative to this file (backend/.env), never relative to the
@@ -35,6 +36,12 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.ENVIRONMENT in ("production", "staging") and self.JWT_SECRET_KEY == "dev_secret_change_me":
+            raise ValueError("JWT_SECRET_KEY must be configured with a secure secret in production/staging!")
+        return self
 
 
 @lru_cache

@@ -25,19 +25,19 @@ class Venta(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     fecha: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
+        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )
     cliente_id: Mapped[int | None] = mapped_column(
-        ForeignKey("Clientes.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("Clientes.id", ondelete="SET NULL"), nullable=True, index=True
     )
     canal_venta: Mapped[str] = mapped_column(
-        String(16), nullable=False, server_default="feria", default="feria"
+        String(16), nullable=False, server_default="feria", default="feria", index=True
     )
     descuento_porcentaje: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
     estado: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="completada"
+        String(20), nullable=False, default="completada", index=True
     )
     total_venta: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
@@ -60,13 +60,13 @@ class DetalleVenta(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     venta_id: Mapped[int] = mapped_column(
-        ForeignKey("Ventas.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("Ventas.id", ondelete="CASCADE"), nullable=False, index=True
     )
     producto_id: Mapped[int] = mapped_column(
-        ForeignKey("Productos.id", ondelete="RESTRICT"), nullable=False
+        ForeignKey("Productos.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     variante_id: Mapped[int | None] = mapped_column(
-        ForeignKey("Variantes_Producto.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("Variantes_Producto.id", ondelete="SET NULL"), nullable=True, index=True
     )
     cantidad: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
     precio_unitario_aplicado: Mapped[Decimal] = mapped_column(
@@ -95,7 +95,7 @@ class Devolucion(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     venta_id: Mapped[int] = mapped_column(
-        ForeignKey("Ventas.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("Ventas.id", ondelete="CASCADE"), nullable=False, index=True
     )
     fecha: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -106,7 +106,7 @@ class Devolucion(Base):
         String(16), nullable=False, server_default="parcial", default="parcial"
     )
     usuario_id: Mapped[int | None] = mapped_column(
-        ForeignKey("Usuarios.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("Usuarios.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
     venta: Mapped[Venta] = relationship()
@@ -123,13 +123,13 @@ class DevolucionItem(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     devolucion_id: Mapped[int] = mapped_column(
-        ForeignKey("Devoluciones.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("Devoluciones.id", ondelete="CASCADE"), nullable=False, index=True
     )
     producto_id: Mapped[int] = mapped_column(
-        ForeignKey("Productos.id", ondelete="RESTRICT"), nullable=False
+        ForeignKey("Productos.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     variante_id: Mapped[int | None] = mapped_column(
-        ForeignKey("Variantes_Producto.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("Variantes_Producto.id", ondelete="SET NULL"), nullable=True, index=True
     )
     cantidad: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
     precio_unitario: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
