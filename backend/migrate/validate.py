@@ -39,6 +39,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
+from pathlib import Path
 
 from app.models import (
     BomInsumo,
@@ -64,7 +65,7 @@ from migrate.context import MigrationContext
 from migrate.finanzas import SOCIOS, FinanzasPlan, plan_finanzas
 from migrate.loaders import LibroMigracion
 from migrate.purchases import ComprasPlan, plan_compras
-from migrate.sales import VentasPlan, plan_ventas
+from migrate.sales import VentasPlan, _resolver_csv_ventas, plan_ventas
 from migrate.stock import StockPlan, plan_stock
 
 # Historical rows live ~1 year before the server; anything within 1 day of
@@ -132,14 +133,18 @@ class PlanValidacion:
 # --------------------------------------------------------------------------- #
 
 
-def plan_para_validacion(libro: LibroMigracion, report=None) -> PlanValidacion:
-    """Run the phase plans that feed the N7 checks (read-only)."""
+def plan_para_validacion(libro: LibroMigracion, report=None, ruta_csv: Path | None = None) -> PlanValidacion:
+    """Run the phase plans that feed the N7 checks (read-only).
+
+    ``ruta_csv`` forwards the VENTAS CSV (sales.py) so F7 validates against the
+    SAME source F5 writes from; without it the recalculated workbook's broken
+    VENTAS sheet would make N7g report false "venta duplicada" errors."""
     return PlanValidacion(
         catalogo=plan_catalogo(libro, report),
         compras=plan_compras(libro, report),
         bom=plan_bom(libro, report),
         stock=plan_stock(libro, report),
-        ventas=plan_ventas(libro, report),
+        ventas=plan_ventas(libro, report, ruta_csv=ruta_csv),
         finanzas=plan_finanzas(libro, report),
     )
 
@@ -653,7 +658,9 @@ def cargar_validate(ctx: MigrationContext) -> PlanValidacion:
     """
     report = ctx.report
     with LibroMigracion(ctx.options.source) as libro:
-        plan = plan_para_validacion(libro, report)
+        plan = plan_para_validacion(
+            libro, report, ruta_csv=_resolver_csv_ventas(ctx.options.source)
+        )
 
     report.info(
         "F7",

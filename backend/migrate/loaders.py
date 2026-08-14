@@ -50,6 +50,13 @@ SHEET_BOUNDS: dict[str, tuple[int, int]] = {
     "BUSTIER": (3, 33),
     "BLUSAS": (3, 45),
     "TOTEBAG": (3, 44),
+    # Recalculated 16-sheet workbook (2026-08): BOM recipe sheets with the
+    # standard layout (header R2: Producto/Ancho/Alto/cantidad Cms/valor metro/
+    # valor total). Real data ends at the last bound row; junk/#VALUE!/totals
+    # rows live after it and are never read.
+    "SET AELO": (3, 21),
+    "SET OCIPETE": (3, 18),
+    "Corset Garras": (3, 10),
     "DESCUENTOS": (3, 21),  # header R2; block header repeats at R13
     "INVENTARIO OCT25": (9, 29),  # header R8; totals row R37
     "CAJAS": (4, 13),  # headers R2-3; totals R13-14

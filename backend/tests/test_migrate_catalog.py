@@ -379,7 +379,10 @@ def test_catalogar_dry_run_real_no_escribe():
         )
         # NFR-2: dry-run termina con 0 filas escritas
         assert antes == despues
-        assert plan.conteo_proveedores >= 4
+        # The recalculated 16-sheet workbook (2026-08) dropped the Proveedores
+        # sheet -> the plan carries 0 proveedores (the mini/contract workbooks
+        # still have that sheet, so plan_workbook_mini_* keeps the old asserts).
+        assert plan.conteo_proveedores == 0
         assert plan.conteo_insumos >= 20  # recetas BOM + herrajes reales
         assert plan.conteo_productos == len(PRODUCTOS_CATALOGO)
     finally:

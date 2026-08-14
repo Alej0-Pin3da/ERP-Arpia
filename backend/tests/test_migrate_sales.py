@@ -31,8 +31,8 @@ from pathlib import Path
 
 import openpyxl
 import pytest
-from fastapi import HTTPException
 
+from app.core.exceptions import InsufficientStockError
 from app.db.session import SessionLocal
 from app.models import (
     BomInsumo,
@@ -446,7 +446,7 @@ def test_aplicar_ventas_stock_insuficiente_rollback(db, mini_ventas):
 
     with LibroMigracion(mini_ventas) as libro:
         plan = plan_ventas(libro)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(InsufficientStockError) as exc:
         aplicar_ventas(db, plan, canal_venta="feria")
     assert exc.value.status_code == 409
     db.rollback()
@@ -480,10 +480,14 @@ def test_cargar_ventas_dry_run_real_no_escribe():
         antes_det = db.query(DetalleVenta).count()
         ctx = MigrationContext.para_fase(FaseOptions(source=REAL_XLSX, modo="dry-run"), "F5")
         plan = cargar_ventas(ctx)
+        # NFR-2: dry-run write nothing.
         assert db.query(Venta).count() == antes_ventas
         assert db.query(DetalleVenta).count() == antes_det
-        # 16 filas reales: 13 productos + 3 sin producto (scope out)
-        assert plan.conteo_ventas == 13
+        # The recalculated workbook's VENTAS sheet has #VALUE! on J/K/L and is
+        # NOT usable: F5 reads csv/ARPIA - VENTAS.csv as its source. The CSV
+        # has header at line 0 and 21 real data rows (lines 1..21), all with
+        # product -> 21 historical sales (was 13 from the legacy sheet).
+        assert plan.conteo_ventas == 21
         assert not ctx.report.tenga_errores
     finally:
         db.close()

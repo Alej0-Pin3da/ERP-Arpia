@@ -67,6 +67,10 @@ BLOQUES_BOM: dict[str, tuple[str, str | None]] = {
     "BUSTIER": ("Bustier", None),
     "BLUSAS": ("Blusa Manga Larga", "Blusa Arpia"),
     "TOTEBAG": ("Tote Bag Arpia", None),
+    # Recalculated 16-sheet workbook (2026-08): standard BOM recipe sheets.
+    "SET AELO": ("Set Aelo", None),
+    "SET OCIPETE": ("Set Ocipete", None),
+    "Corset Garras": ("Corset Garras", None),
 }
 
 # CAJAS sheet: each combo block is a (nombre, costo, precio) column triplet.
@@ -85,6 +89,18 @@ _COLS_COMBOS: tuple[tuple[str, str, str], ...] = (
 # Packaging names inside a combo block -> BOM_Insumos of the combo product
 # (catalog F1 considers them insumos too, design D4 / CAJAS sheet).
 _EMPAQUES_COMBO = frozenset({"caja", "vela", "papel", "envio", "bolsa", "etiqueta", "tarjeta"})
+
+# CAJAS combo members use the workbook's OLD product names, which the aligned
+# 16-sheet catalog no longer has: the generic "Corset" / "Bustier" recipes were
+# merged into "Set Aelo" / "Set Ocipete", and the "Noche y Dia" sheet defines
+# "Bralete". Map the read member to the current catalog name before building
+# ComboLinea so the combo references products that actually exist in the
+# catalog (F1). Packaging items (empaques) are left untouched.
+ALIASES_COMBO_A_CATALOGO: dict[str, str] = {
+    "corset": "Set Aelo",
+    "bustier": "Set Ocipete",
+    "noche y dia": "Bralete",
+}
 
 # Recipe-sheet material names that do NOT match the F1 catalog 1:1 (key
 # normalizada -> canonical catalog name). The recipe Excel uses short or
@@ -278,7 +294,10 @@ def _plan_combos(libro: LibroMigracion, plan: BomPlan, report=None) -> None:
                     ComboInsumoLinea(nombre_combo, item, Decimal("1"), "CAJAS", fila_idx)
                 )
             else:
-                plan.combos.append(ComboLinea(nombre_combo, item, Decimal("1"), "CAJAS", fila_idx))
+                item_catalogo = ALIASES_COMBO_A_CATALOGO.get(clave_normalizada(item), item)
+                plan.combos.append(
+                    ComboLinea(nombre_combo, item_catalogo, Decimal("1"), "CAJAS", fila_idx)
+                )
 
 
 def plan_bom(

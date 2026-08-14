@@ -21,16 +21,18 @@ Layout VENTAS (verified against ARPIA.xlsx, 2026-08-08):
     M  = Fecha real (TIMESTAMPTZ via coerce_aware; nunca now())
     N  = color; O = nota (e.g. 'DESC 25%' -> informativa, NO se re-aplica);
     P  = cliente (texto libre, D7) -> upsert Cliente por nombre normalizado
-Filas 18..28 son basura/totales (fuera de SHEET_BOUNDS); M37 celda suelta la
-reportan los loaders; las 3 filas R12..R14 sin columna A son SCOPE OUT
-(VTA-4): se reportan y no se cargan.
+La hoja VENTAS recalculada (2026-08) tiene #VALUE! en J/K/L en cada fila con
+datos -> NO es usable: la fuente real de las ventas historicas es
+csv/ARPIA - VENTAS.csv (ver ``_leer_ventas_csv``), usada cuando existe junto al
+source. Con la hoja legacy (libros mini/contrato) se respeta su layout; las 3
+filas R12..R14 sin columna A son SCOPE OUT (VTA-4): se reportan y no se cargan.
 
 Destock (VTA-3): tras insertar TODAS las ventas se computa una unica
 explosion agregada por producto/variante via ``explosion_materiales`` y se
 aplica ``descontar_stock`` en lote (SELECT ... FOR UPDATE, consistente con
-inventory.descarto_stock). Stock insuficiente -> HTTPException 409 propagada
--> la envoltura ``session_scope`` hace rollback de fase (EXM-4): cero ventas
-residuales, causa reportada.
+inventory.descarto_stock). Stock insuficiente -> DomainError propagada
+(InsufficientStockError 409) -> la envoltura ``session_scope`` hace rollback de
+fase (EXM-4): cero ventas residuales, causa reportada.
 
 Idempotencia (NFR-1/EXM-3): la fase es re-ejecutable sin duplicar.  La
 columna P del Excel contiene texto libre que puede repetirse (e.g.
@@ -46,10 +48,12 @@ El runner F5 se registra en ``migrate/__init__.py`` (FASES_IMPLEMENTADAS+F5).
 
 from __future__ import annotations
 
+import csv
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
+from pathlib import Path
 
 from sqlalchemy import func, select
 
@@ -77,6 +81,56 @@ ALIASES_VENTAS_A_CATALOGO: dict[str, str] = {
     "totebag": "Tote Bag Arpia",
     "blusa arpia manga larga": "Blusa Manga Larga",
 }
+
+# --- VENTAS from CSV (source of truth for the recalculated workbook) ---------
+# The recalculated 16-sheet workbook's VENTAS sheet has #VALUE! on J/K/L in
+# every data row, so historical sales come from csv/ARPIA - VENTAS.csv (next to
+# the workbook). Its columns A..P match the VENTAS sheet positionally; header
+# is file line 0, real data lines 1..21 (0-indexed after the header) and junk
+# ($0 / TOTAL ARPIA / empty) from line 22 on.
+NOMBRE_CSV_VENTAS = "ARPIA - VENTAS.csv"
+FILAS_CSV_VENTAS = 21
+_COLS_CSV_VENTAS = "ABCDEFGHIJKLMNOP"
+
+
+def _resolver_csv_ventas(source: Path) -> Path | None:
+    """csv/ARPIA - VENTAS.csv next to the workbook, when it exists."""
+    ruta = source.parent / "csv" / NOMBRE_CSV_VENTAS
+    return ruta if ruta.exists() else None
+
+
+def _leer_ventas_csv(ruta: Path) -> list[dict[str, object]]:
+    """Parse the VENTAS CSV into loader-shaped rows (col-letter keys A..P).
+
+    Precio/costo '$295.000' -> Decimal('295000') (strip '$' and spaces; the
+    Excel thousands dots are handled by normalizar_decimal); fecha '13/12/2025'
+    (dd/mm/yyyy) -> naive datetime; tallas/nota/cliente stay as text. Only
+    lines 1..21 (0-indexed after the header) are real; the rest is ignored.
+    """
+    filas: list[dict[str, object]] = []
+    with ruta.open(newline="", encoding="utf-8-sig") as fh:
+        reader = csv.reader(fh)
+        next(reader, None)  # header line 0
+        for idx, cells in enumerate(reader, start=1):
+            if idx > FILAS_CSV_VENTAS:
+                break
+            fila: dict[str, object] = {}
+            for col, valor in zip(_COLS_CSV_VENTAS, cells):
+                if valor is None or valor == "":
+                    continue
+                if col in (COL_PRECIO, COL_COSTO):
+                    fila[col] = normalizar_decimal(
+                        valor.strip().lstrip("$").replace(" ", "")
+                    )
+                elif col == COL_FECHA:
+                    try:
+                        fila[col] = datetime.strptime(valor.strip(), "%d/%m/%Y")
+                    except ValueError:
+                        fila[col] = None  # plan_ventas reports it as sin_fecha (D5)
+                else:
+                    fila[col] = valor.strip()
+            filas.append(fila)
+    return filas
 
 
 def resolver_nombre_producto(excel: object) -> str:
@@ -124,21 +178,32 @@ def _variante_de_fila(fila: dict[str, object]) -> str | None:
     return None
 
 
-def plan_ventas(libro, report=None) -> VentasPlan:
-    """Leer la hoja VENTAS en su rango acotado (EXM-1) y armar el plan (puro)."""
+def plan_ventas(libro, report=None, ruta_csv: Path | None = None) -> VentasPlan:
+    """Armar el plan (puro) desde la hoja VENTAS o, cuando existe, desde
+    csv/ARPIA - VENTAS.csv (la hoja recalculada tiene #VALUE! y no es usable).
+
+    Ambos orígenes devuelven filas con claves de letra de columna (A..P), asi
+    que el flujo de parseo es identico; el contrato de VentaPlanLinea se
+    mantiene (hoja='VENTAS', fila = indice real 1-based del origen)."""
     plan = VentasPlan()
-    if HOJA_VENTAS not in SHEET_BOUNDS:
-        return plan
-    try:
-        lectura = libro.leer_hoja(HOJA_VENTAS, report=report)
-    except HojaInexistenteError:
-        if report:
-            report.warn(
-                HOJA_VENTAS, None, None, "hoja ausente en este workbook; omitida (0 ventas)"
-            )
-        return plan
-    inicio = SHEET_BOUNDS[HOJA_VENTAS][0]
-    for fila_idx, fila in enumerate(lectura.filas, start=inicio):
+    if ruta_csv is not None and ruta_csv.exists():
+        # CSV is the source of truth for the historical sales.
+        filas = _leer_ventas_csv(ruta_csv)
+        inicio = 1  # fila 1-based del CSV (header = fila 0)
+    else:
+        if HOJA_VENTAS not in SHEET_BOUNDS:
+            return plan
+        try:
+            lectura = libro.leer_hoja(HOJA_VENTAS, report=report)
+        except HojaInexistenteError:
+            if report:
+                report.warn(
+                    HOJA_VENTAS, None, None, "hoja ausente en este workbook; omitida (0 ventas)"
+                )
+            return plan
+        filas = lectura.filas
+        inicio = SHEET_BOUNDS[HOJA_VENTAS][0]
+    for fila_idx, fila in enumerate(filas, start=inicio):
         producto_excel = fila.get(COL_PRODUCTO)
         if not isinstance(producto_excel, str) or not producto_excel.strip():
             # VTA-4: sin producto -> SCOPE OUT
@@ -440,8 +505,17 @@ def cargar_ventas(ctx: MigrationContext) -> VentasPlan:
     es 'feria' (decision de producto); --canal del CLI lo sobrescribe."""
     report = ctx.report
     canal = ctx.options.canal_venta or "feria"
+    ruta_csv = _resolver_csv_ventas(ctx.options.source)
+    if ruta_csv is not None:
+        report.info(
+            "F5",
+            None,
+            None,
+            f"ventas leidas desde {ruta_csv.name} (la hoja VENTAS del xlsx "
+            f"tiene #VALUE! y no es usable)",
+        )
     with LibroMigracion(ctx.options.source) as libro:
-        plan = plan_ventas(libro, report)
+        plan = plan_ventas(libro, report, ruta_csv=ruta_csv)
 
     report.info(
         "F5",

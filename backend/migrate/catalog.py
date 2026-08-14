@@ -86,24 +86,23 @@ HOJAS_BOM_RECETAS: tuple[str, ...] = (
     "BUSTIER",
     "BLUSAS",
     "TOTEBAG",
+    # Recalculated 16-sheet workbook (2026-08): standard BOM recipe sheets.
+    "SET AELO",
+    "SET OCIPETE",
+    "Corset Garras",
 )
 
 # Product universe derived from the workbook (fuente = provenance sheet).
 PRODUCTOS_CATALOGO: tuple[dict[str, object], ...] = (
-    {"nombre": "Braleth diseño 1", "tipo": "Lencería", "fuente": "hoja 'Braleth diseño 1'"},
     {"nombre": "Bralete", "tipo": "Lencería", "fuente": "'Noche y Dia' bloque BRALETE"},
-    {"nombre": "Cachetero", "tipo": "Lencería", "fuente": "'Noche y Dia CACHETERO'"},
-    {"nombre": "Corset", "tipo": "Corsetería", "fuente": "hoja 'CORSET'"},
-    {"nombre": "Corset Doble Cara", "tipo": "Corsetería", "fuente": "hoja 'CORSET DOBLE CARA'"},
     {"nombre": "Corset Artemisia", "tipo": "Corsetería", "fuente": "hoja 'CORSET ARTEMISIA'"},
     {"nombre": "Corset Hypatia", "tipo": "Corsetería", "fuente": "hoja 'Corset Hypatia'"},
-    {"nombre": "Bustier", "tipo": "Lencería", "fuente": "hoja 'BUSTIER'"},
+    {"nombre": "Corset Garras", "tipo": "Corsetería", "fuente": "hoja 'Corset Garras'"},
     {"nombre": "Falda Emily", "tipo": "Lencería", "fuente": "hoja 'FALDA EMILY'"},
     {"nombre": "Blusa Manga Larga", "tipo": "Blusa", "fuente": "hoja 'BLUSAS' bloque MANGA LARGA"},
     {"nombre": "Blusa Manga Corta", "tipo": "Blusa", "fuente": "hoja 'BLUSAS' bloque MANGA CORTA"},
     {"nombre": "Tote Bag Arpia", "tipo": "Accesorio", "fuente": "hoja 'TOTEBAG'"},
     {"nombre": "Set Aelo", "tipo": "Set", "fuente": "VENTAS/CAJAS sobre Corset"},
-    {"nombre": "Set Celeno", "tipo": "Set", "fuente": "VENTAS/CAJAS sobre conjunto bicolor"},
     {"nombre": "Set Ocipete", "tipo": "Set", "fuente": "VENTAS/CAJAS sobre Bustier"},
     {"nombre": "Caja Despertar", "tipo": "Combo", "fuente": "hoja 'CAJAS'"},
     {"nombre": "Caja Despertar V2", "tipo": "Combo", "fuente": "hoja 'CAJAS'"},
@@ -430,7 +429,15 @@ _CAJAS_EMPAQUES = frozenset({"caja", "vela", "papel", "envio", "bolsa", "etiquet
 def _leer_proveedores(libro: LibroMigracion, report) -> list[ProveedorPlan]:
     if "Proveedores" not in SHEET_BOUNDS:
         return []
-    filas = libro.leer_hoja("Proveedores", report=report).filas
+    # The recalculated 16-sheet workbook (2026-08) dropped the Proveedores
+    # sheet, so it may be absent even though SHEET_BOUNDS keeps its legacy
+    # range (mini/contract workbooks still have it). Same guard as _leer_materiales.
+    try:
+        filas = libro.leer_hoja("Proveedores", report=report).filas
+    except HojaInexistenteError:
+        if report:
+            report.warn("Proveedores", None, None, "hoja ausente en este workbook; omitida")
+        return []
     vistos: dict[str, ProveedorPlan] = {}
     for fila in filas:
         nombre = normalizar_nombre(fila.get("B"))
