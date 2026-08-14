@@ -11,8 +11,12 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.exceptions import DomainError
 from app.core.limiter import limiter
+from app.core.logging_config import setup_logging
+from app.core.logging_middleware import RequestContextMiddleware
 from app.db.session import engine
 from app.models import Base  # noqa: F401  # ensure all models are registered
+
+setup_logging()
 
 logger = logging.getLogger("arpia.api")
 
@@ -32,6 +36,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestContextMiddleware)
 
 
 @app.exception_handler(DomainError)
@@ -44,7 +49,13 @@ def domain_exception_handler(request: Request, exc: DomainError) -> JSONResponse
 
 @app.exception_handler(Exception)
 def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error("Unhandled exception processing request %s %s", request.method, request.url, exc_info=exc)
+    logger.error(
+        "Unhandled exception processing request %s %s",
+        request.method,
+        request.url,
+        exc_info=exc,
+        extra={"request_id": getattr(request.state, "request_id", None)},
+    )
     if settings.ENVIRONMENT in ("production", "staging"):
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
