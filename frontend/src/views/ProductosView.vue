@@ -39,8 +39,8 @@ const costo = useProductosCosto()
 // Flatten composable APIs into the template namespace for backward-compat.
 const {
   loading, error,
-  productos, productosTotal, productosPage, productosPageSize,
-  productoQ, filterTipoProductoId, productosSortBy, productosSortOrder,
+  productosTotal, productosPage, productosPageSize,
+  productoQ, filterTipoProductoId,
   productoRows, tipos, insumos, productosLookup,
   savingProducto, editingProducto, productoDialogVisible,
   selectedProducto, variantes, variantesLoading, savingVariante,
