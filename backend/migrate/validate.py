@@ -64,7 +64,12 @@ from migrate.context import MigrationContext
 from migrate.finanzas import SOCIOS, FinanzasPlan, plan_finanzas
 from migrate.loaders import LibroMigracion
 from migrate.purchases import ComprasPlan, plan_compras
-from migrate.sales import VentasPlan, _resolver_csv_ventas, plan_ventas
+from migrate.sales import (
+    VentasPlan,
+    _resolver_csv_ventas,
+    plan_ventas,
+    variante_coincide,
+)
 from migrate.stock import StockPlan, plan_stock
 
 # Historical rows live ~1 year before the server; anything within 1 day of
@@ -207,8 +212,11 @@ def _identidades_socios_db(db) -> dict[str, int]:
 
 
 def _productos_del_plan(plan: PlanValidacion) -> list[str]:
-    """Products the workbook actually references (BOM recetas + ventas)."""
-    nombres = {normalizar_nombre(item.producto_nombre) for item in plan.bom.insumos}
+    """Products the workbook references: the FULL F1 catalog (MIG-5: N7a counts
+    los 14 productos sembrados por F1, no solo los referenciados por recetas
+    BOM/ventas) + BOM recipes + sales."""
+    nombres = {normalizar_nombre(p.nombre) for p in plan.catalogo.productos}
+    nombres |= {normalizar_nombre(item.producto_nombre) for item in plan.bom.insumos}
     nombres |= {normalizar_nombre(item.producto_nombre) for item in plan.ventas.ventas}
     return sorted(n for n in nombres if n)
 
@@ -582,7 +590,15 @@ def _n7g_idempotencia(db, plan: PlanValidacion) -> CheckResult:
         if identidad in plan_bom_ids and cuenta > 1:
             errores.append(f"BOM_INSUMOS duplicado: {identidad}")
 
-    # ventas: count por clave natural > count del plan.
+    # ventas: count por clave natural > count del plan. MIG-5/D4: la clave del
+    # plan CON talla matchea filas DB con ESA talla O filas NULL historicas
+    # (variante_coincide unidireccional, la MISMA semantica que F5 — F5 y F7
+    # nunca driften). Los nombres de variante del lado DB se normalizan (antes
+    # quedaban crudos 'S' vs el plan 's' -> nunca matcheaban). Las lineas
+    # omitidas de F5 (producto tallado sin talla) NO se filtran del plan: se
+    # matchean 1:1 contra las filas NULL que el codigo viejo dejo; filtrarlas
+    # provocaria el falso positivo 'DB 1 > plan 0' que el WARNING de la spec
+    # anticipo (MIG-5, D4 opcion (a)).
     plan_ventas: dict[tuple, int] = defaultdict(int)
     for v in plan.ventas.ventas:
         plan_ventas[
@@ -594,9 +610,19 @@ def _n7g_idempotencia(db, plan: PlanValidacion) -> CheckResult:
                 _moneda(v.precio),
             )
         ] += 1
-    db_ventas: dict[tuple, int] = defaultdict(int)
-    filas = (
-        db.query(
+    variantes = {
+        vid: clave_normalizada(name)
+        for vid, name in db.query(VarianteProducto.id, VarianteProducto.nombre_variante).all()
+    }
+    filas_ventas_db: list[tuple] = [
+        (
+            fecha.date(),
+            clave_normalizada(producto),
+            variantes.get(vid),  # nombre normalizado; None si la fila es NULL
+            cantidad,
+            _moneda(precio),
+        )
+        for fecha, producto, vid, cantidad, precio in db.query(
             Venta.fecha,
             Producto.nombre,
             DetalleVenta.variante_id,
@@ -606,23 +632,23 @@ def _n7g_idempotencia(db, plan: PlanValidacion) -> CheckResult:
         .join(DetalleVenta, DetalleVenta.venta_id == Venta.id)
         .join(Producto, DetalleVenta.producto_id == Producto.id)
         .all()
-    )
-    variantes = {
-        vid: clave_normalizada(name)
-        for vid, name in db.query(VarianteProducto.id, VarianteProducto.nombre_variante).all()
-    }
-    for fecha, producto, vid, cantidad, precio in filas:
-        db_ventas[
-            (
-                fecha.date(),
-                clave_normalizada(producto),
-                variantes.get(vid),
-                cantidad,
-                _moneda(precio),
-            )
-        ] += 1
+    ]
+
+    def _cuenta_db(plan_clave: tuple) -> int:
+        """Filas DB que matchean la clave del plan por variante_coincide."""
+        fecha, prod, var, cant, prec = plan_clave
+        return sum(
+            1
+            for d_fecha, d_prod, d_var, d_cant, d_prec in filas_ventas_db
+            if d_fecha == fecha
+            and d_prod == prod
+            and d_cant == cant
+            and d_prec == prec
+            and variante_coincide(var, d_var)
+        )
+
     for clave, esperadas in plan_ventas.items():
-        if db_ventas.get(clave, 0) > esperadas:
+        if _cuenta_db(clave) > esperadas:
             errores.append(f"venta duplicada: {clave[1]} @ {clave[0]}")
 
     if errores:

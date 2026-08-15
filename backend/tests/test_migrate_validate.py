@@ -57,7 +57,9 @@ P = f"{PREFIX} Validate"
 
 # Names injected by tests; cleanup deletes exactly these, never catalog rows.
 P_TELA = f"{P} Tela"
-P_PROD = "Corset"  # bomb sheet product ('Corset' block of the real workbook)
+# MIG-5/N7a: el mini usa un producto CANONICO (Corset Garras, hoja BOM del
+# workbook real) sobre el catalogo completo sembrado por _preparar_entorno.
+P_PROD = "Corset Garras"
 P_VAR = "S"
 P_CLI = f"{P} Cliente"
 P_MOV = f"{P} Movimiento"
@@ -88,11 +90,11 @@ P_EXTRA = f"{P} Extra"  # snapshot insumo OUTSIDE the catalog (N7d precondicion)
 def _mini_workbook(path: Path, extra_oct25: tuple[str, str] | None = None) -> None:
     """Mini validate workbook.
 
-    - CORSET sheet: 1 material (the BOM universe for F2/F3 catalog).
+    - Corset Garras sheet: 1 material (the BOM universe for F2/F3 catalog).
     - INVENTARIO OCT25: snapshot stock for that material (10 mts).
     - INVERSION VALQUI: a BOM purchase row (-> F2 WAC) + an equipment row
       (non-BOM -> F6 movement).
-    - VENTAS: one historical sale of the product 'Corset'.
+    - VENTAS: one historical sale of the product 'Corset Garras'.
 
     ``extra_oct25`` adds a HERRAJES snapshot row (name, quantity) whose insumo
     is NOT created in the catalog (used to break the N7d precondition).
@@ -100,8 +102,8 @@ def _mini_workbook(path: Path, extra_oct25: tuple[str, str] | None = None) -> No
     wb = openpyxl.Workbook()
 
     bom = wb.active
-    bom.title = "CORSET"
-    bom.append(["CORSET", None, None, None, None, None, None, None, "TANGA"])
+    bom.title = "Corset Garras"
+    bom.append(["Corset Garras", None, None, None, None, None, None, None, "TANGA"])
     bom.append(["Producto", "Ancho", "Alto", "cantidad Cms", "valor metro", "valor total"])
     bom.append([P_TELA, 64, 37, 2368, 2.5, None])
 
@@ -213,6 +215,20 @@ def _borrar_detalles_ventas_p(db) -> None:
     db.query(Cliente).filter(Cliente.nombre == P_CLI).delete(synchronize_session=False)
 
 
+def _borrar_productos_canonicales(db) -> None:
+    """Quita los 14 productos canonicos que _preparar_entorno siembra (MIG-5:
+    la DB queda con el catalogo completo). Los Detalle_Ventas que los
+    referencian se borran primero (FK RESTRICT sobre Productos); las
+    Variante_Producto caen por CASCADE a nivel DB. DEBE correr antes de
+    _borrar_socios_y_tipos (FK RESTRICT de Productos sobre Tipos_Producto)."""
+    from migrate.catalog import PRODUCTOS_CATALOGO
+
+    _borrar_detalles_ventas_p(db)
+    nombres = {str(entry["nombre"]) for entry in PRODUCTOS_CATALOGO}
+    db.query(Producto).filter(Producto.nombre.in_(nombres)).delete(synchronize_session=False)
+    db.commit()
+
+
 def _borrar_test(db) -> None:
     """Borra SOLO filas de test por nombre exacto/parejas exactas."""
     _borrar_detalles_ventas_p(db)
@@ -230,7 +246,7 @@ def _borrar_test(db) -> None:
         BomInsumo.producto_id.in_(db.query(Producto.id).filter(Producto.nombre == P_PROD))
     ).delete(synchronize_session=False)
     db.query(Insumo).filter(Insumo.nombre == P_TELA).delete(synchronize_session=False)
-    db.query(Producto).filter(Producto.nombre == P_PROD).delete(synchronize_session=False)
+    _borrar_productos_canonicales(db)
     db.commit()
 
 
@@ -274,6 +290,7 @@ def _cleanup_after_module(db):
 def _preparar_entorno(db) -> None:
     """Estado coherente post-F0..F7 para el mini (usado como baseline PASS)."""
     from migrate.catalog import (
+        PRODUCTOS_CATALOGO,
         bootstrap_catalogo,
         upsert_insumo,
         upsert_producto,
@@ -283,6 +300,17 @@ def _preparar_entorno(db) -> None:
     _borrar_socios_y_tipos(db)
     bootstrap_catalogo(db)
     tela = upsert_insumo(db, P_TELA, unidad="m", categoria_nombre="Telas")
+    # MIG-5/N7a: la DB siembra el catalogo COMPLETO (14 productos; los 5
+    # tallados con sus 6 variantes) como si F1 hubiera corrido. P_PROD
+    # (Corset Garras, canonico sin variantes) recibe ENCIMA la variante P_VAR
+    # del mini para el BOM/venta del test (upsert_producto dedup por nombre).
+    for entry in PRODUCTOS_CATALOGO:
+        upsert_producto(
+            db,
+            str(entry["nombre"]),
+            tipo=str(entry["tipo"]),
+            variantes=tuple(entry.get("variantes", ())),
+        )
     producto = upsert_producto(db, P_PROD, tipo="Corsetería", variantes=(P_VAR,))
     db.flush()
 
@@ -387,6 +415,17 @@ def test_n7a_conteos_coinciden_con_el_plan(db, mini_libro):
     res = _controllers(db, mini_libro)
     n7a = _no_resultado(res, "N7a")
     assert n7a.estado == "OK"
+
+
+def test_n7a_productos_14_de_14(db, mini_libro):
+    """MIG-5: _productos_del_plan incluye el catalogo completo de F1 (14) ademas
+    de las recetas BOM y las ventas; con la DB sembrada la pieza N7a es
+    'productos 14/14' (sin el fix el plan cuenta solo 1 -> 1/1)."""
+    _preparar_entorno(db)
+    res = _controllers(db, mini_libro)
+    n7a = _no_resultado(res, "N7a")
+    assert n7a.estado == "OK"
+    assert "productos 14/14" in n7a.mensaje
 
 
 def test_n7a_conteo_faltante_es_warn(db, mini_libro):
@@ -673,6 +712,111 @@ def test_n7g_movimiento_duplicado_error(db, mini_libro):
     db.commit()
     res = _controllers(db, mini_libro)
     assert _no_resultado(res, "N7g").estado == "ERROR"
+
+
+def test_n7g_variante_null_matching_detecta_duplicado(db, mini_libro):
+    """MIG-5/D4: la clave del plan CON talla matchea la fila NULL historica
+    (variante_coincide unidireccional): S + NULL = 2 filas DB vs 1 esperada ->
+    N7g ERROR (un re-run habria duplicado). Con la comparacion por clave
+    EXACTA actual, el key "s" cuenta solo 1 == plan 1 -> pasa "de casualidad"
+    (el falso negativo que D4 corrige)."""
+    _preparar_entorno(db)
+    producto = db.query(Producto).filter(Producto.nombre == P_PROD).one()
+    cli = db.query(Cliente).filter(Cliente.nombre == P_CLI).first()
+    if cli is None:
+        cli = Cliente(nombre=P_CLI)
+        db.add(cli)
+        db.flush()
+    venta_null = Venta(
+        fecha=FECHA_VENTA,
+        canal_venta="feria",
+        descuento_porcentaje=Decimal("0"),
+        total_venta=PRECIO_VENTA,
+        estado="completada",
+        cliente=cli,
+    )
+    db.add(venta_null)
+    db.flush()
+    db.add(
+        DetalleVenta(
+            venta_id=venta_null.id,
+            producto_id=producto.id,
+            variante_id=None,  # fila historica sin variante (codigo viejo)
+            cantidad=Decimal("1"),
+            precio_unitario_aplicado=PRECIO_VENTA,
+            costo_unitario_aplicado=COSTO_VENTA,
+        )
+    )
+    db.commit()
+    res = _controllers(db, mini_libro)
+    n7g = _no_resultado(res, "N7g")
+    assert n7g.estado == "ERROR"
+    assert "venta duplicada" in n7g.mensaje
+
+
+def test_n7g_omitida_sin_talla_no_duplicada(db, tmp_path):
+    """MIG-5/D4 (guard): la linea del plan SIN talla (producto tallado) queda
+    EN el plan (las omitidas de F5 no se filtran) y matchea 1:1 la fila NULL
+    historica -> N7g OK, sin falso 'venta duplicada' (la trampa que el WARNING
+    de la spec anticipaba: plan 0 vs DB 1 -> 1 > 0)."""
+    _preparar_entorno(db)
+    blusa = db.query(Producto).filter(Producto.nombre == "Blusa Manga Larga").one()
+    cli = db.query(Cliente).filter(Cliente.nombre == P_CLI).first()
+    if cli is None:
+        cli = Cliente(nombre=P_CLI)
+        db.add(cli)
+        db.flush()
+    venta_null = Venta(
+        fecha=FECHA_VENTA,
+        canal_venta="feria",
+        descuento_porcentaje=Decimal("0"),
+        total_venta=PRECIO_VENTA,
+        estado="completada",
+        cliente=cli,
+    )
+    db.add(venta_null)
+    db.flush()
+    db.add(
+        DetalleVenta(
+            venta_id=venta_null.id,
+            producto_id=blusa.id,
+            variante_id=None,  # fila historica de la blusa sin talla
+            cantidad=Decimal("1"),
+            precio_unitario_aplicado=PRECIO_VENTA,
+            costo_unitario_aplicado=COSTO_VENTA,
+        )
+    )
+    db.commit()
+
+    # Mini con la fila de Blusa Manga Larga SIN talla ademas de la venta base
+    # (Corset Garras con talla) — las omitidas siguen en el plan.
+    path = tmp_path / "mini-validate-omision.xlsx"
+    _mini_workbook(path)
+    wb = openpyxl.load_workbook(path)
+    wb["VENTAS"].append(
+        [
+            "Blusa Manga Larga",
+            None,
+            None,
+            None,
+            None,
+            None,
+            71250.0,
+            COSTO_VENTA,
+            45141,
+            None,
+            None,
+            None,
+            datetime(2024, 10, 20),
+            None,
+            None,
+            P_CLI,
+        ]
+    )
+    wb.save(path)
+
+    res = _controllers(db, path)
+    assert _no_resultado(res, "N7g").estado == "OK"
 
 
 # --------------------------------------------------------------------------- #

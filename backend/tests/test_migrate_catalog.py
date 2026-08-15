@@ -17,11 +17,11 @@ real catalog data; the base tipos/categorias (Lenceria, Corseteria, ...) ARE
 the migration's canonical content and may persist across runs (idempotent).
 """
 
+from decimal import Decimal
 from pathlib import Path
 
 import openpyxl
 import pytest
-from decimal import Decimal
 
 from app.db.session import SessionLocal
 from app.models import Insumo, Producto, TipoProducto, VarianteProducto
