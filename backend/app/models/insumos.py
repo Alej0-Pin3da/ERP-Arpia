@@ -54,9 +54,6 @@ class CompraInsumo(Base):
     insumo_id: Mapped[int] = mapped_column(
         ForeignKey("Insumos.id", ondelete="RESTRICT"), nullable=False, index=True
     )
-    proveedor_id: Mapped[int | None] = mapped_column(
-        ForeignKey("Proveedores.id", ondelete="SET NULL"), nullable=True, index=True
-    )
     fecha_compra: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )
@@ -64,7 +61,6 @@ class CompraInsumo(Base):
     precio_unitario_compra: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
 
     insumo: Mapped[Insumo] = relationship(back_populates="compras")
-    proveedor: Mapped[Proveedor | None] = relationship()  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<CompraInsumo id={self.id} insumo_id={self.insumo_id}>"

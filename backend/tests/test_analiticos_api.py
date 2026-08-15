@@ -169,7 +169,6 @@ def _insertar_compra(insumo_id: int, cantidad: str) -> int:
     try:
         compra = CompraInsumo(
             insumo_id=insumo_id,
-            proveedor_id=None,
             cantidad_comprada=Decimal(cantidad),
             precio_unitario_compra=Decimal("10"),
         )

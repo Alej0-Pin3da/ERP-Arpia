@@ -11,7 +11,7 @@ from decimal import Decimal
 import pytest
 
 from app.db.session import SessionLocal
-from app.models import CompraInsumo, Insumo, Proveedor
+from app.models import CompraInsumo, Insumo
 
 URL = "/api/v1/compras-insumos"
 
@@ -19,19 +19,6 @@ URL = "/api/v1/compras-insumos"
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="module")
-def proveedor_fixture():
-    db = SessionLocal()
-    try:
-        proveedor = Proveedor(nombre="Proveedor Compras de Pruebas")
-        db.add(proveedor)
-        db.commit()
-        db.refresh(proveedor)
-        yield proveedor.id
-    finally:
-        db.close()
 
 
 def _make_insumo(categoria_id: int) -> int:
@@ -97,14 +84,13 @@ def test_post_consulta_403(client, consulta_token):
     assert resp.status_code == 403
 
 
-def test_post_operador_201(client, operador_token, categoria_fixture, proveedor_fixture):
+def test_post_operador_201(client, operador_token, categoria_fixture):
     insumo_id = _make_insumo(categoria_fixture["id"])
     try:
         resp = client.post(
             URL,
             json=_valid_payload(
                 insumo_id,
-                proveedor_id=proveedor_fixture,
                 cantidad_comprada=20,
                 precio_unitario_compra=7,
             ),
@@ -113,7 +99,6 @@ def test_post_operador_201(client, operador_token, categoria_fixture, proveedor_
         assert resp.status_code == 201
         data = resp.json()
         assert data["insumo_id"] == insumo_id
-        assert data["proveedor_id"] == proveedor_fixture
         assert Decimal(data["cantidad_comprada"]) == Decimal("20")
         assert Decimal(data["precio_unitario_compra"]) == Decimal("7")
         assert data["fecha_compra"]
@@ -121,7 +106,7 @@ def test_post_operador_201(client, operador_token, categoria_fixture, proveedor_
         _cleanup_insumo(insumo_id)
 
 
-def test_post_without_proveedor_201(client, operador_token, categoria_fixture):
+def test_post_basic_201(client, operador_token, categoria_fixture):
     insumo_id = _make_insumo(categoria_fixture["id"])
     try:
         resp = client.post(
@@ -130,7 +115,6 @@ def test_post_without_proveedor_201(client, operador_token, categoria_fixture):
             headers=_auth(operador_token),
         )
         assert resp.status_code == 201
-        assert resp.json()["proveedor_id"] is None
     finally:
         _cleanup_insumo(insumo_id)
 
@@ -159,19 +143,6 @@ def test_create_nonexistent_insumo_404(client, operador_token):
         headers=_auth(operador_token),
     )
     assert resp.status_code == 404
-
-
-def test_invalid_proveedor_400(client, operador_token, categoria_fixture):
-    insumo_id = _make_insumo(categoria_fixture["id"])
-    try:
-        resp = client.post(
-            URL,
-            json=_valid_payload(insumo_id, proveedor_id=99999999),
-            headers=_auth(operador_token),
-        )
-        assert resp.status_code == 400
-    finally:
-        _cleanup_insumo(insumo_id)
 
 
 @pytest.mark.parametrize(
@@ -298,16 +269,6 @@ def test_list_empty_y_out_of_range_no_404(client, operador_token):
     assert body["total"] >= 0
 
 
-def test_list_proveedor_id_422(client, operador_token):
-    """Typed filter with an invalid type -> 422 (API-3), nothing partial."""
-    resp = client.get(
-        URL,
-        params={"proveedor_id": "abc"},
-        headers=_auth(operador_token),
-    )
-    assert resp.status_code == 422
-
-
 # ---------------------------------------------------------------------------
 # Server-side sorting (sort_by/order)
 # ---------------------------------------------------------------------------
@@ -315,7 +276,7 @@ def test_list_proveedor_id_422(client, operador_token):
 
 def test_list_sorted_by_price_desc(client, operador_token, categoria_fixture):
     """sort_by=precio_unitario_compra&order=desc -> non-increasing prices; the
-    joined insumo/proveedor sort keys are also accepted."""
+    joined insumo sort key is also accepted."""
     insumo_id = _make_insumo(categoria_fixture["id"])
     try:
         for precio in ("5", "3", "9"):
@@ -365,41 +326,6 @@ def test_list_sorted_by_price_desc(client, operador_token, categoria_fixture):
         _cleanup_insumo(insumo_id)
 
 
-def test_list_nombre_proveedor_poblado(
-    client, operador_token, categoria_fixture, proveedor_fixture
-):
-    """GET list rows carry nombre_proveedor from the eager-loaded relationship
-    (None when proveedor_id is NULL, name otherwise)."""
-    insumo_id = _make_insumo(categoria_fixture["id"])
-    try:
-        with_prov = client.post(
-            URL,
-            json=_valid_payload(insumo_id, proveedor_id=proveedor_fixture),
-            headers=_auth(operador_token),
-        )
-        assert with_prov.status_code == 201
-        assert with_prov.json()["nombre_proveedor"] is None  # POST: no ORM attr
-
-        without_prov = client.post(
-            URL,
-            json=_valid_payload(insumo_id),
-            headers=_auth(operador_token),
-        )
-        assert without_prov.status_code == 201
-
-        resp = client.get(
-            URL,
-            params={"insumo_id": insumo_id},
-            headers=_auth(operador_token),
-        )
-        assert resp.status_code == 200
-        by_id = {r["id"]: r for r in resp.json()["items"]}
-        assert by_id[with_prov.json()["id"]]["nombre_proveedor"] == "Proveedor Compras de Pruebas"
-        assert by_id[without_prov.json()["id"]]["nombre_proveedor"] is None
-    finally:
-        _cleanup_insumo(insumo_id)
-
-
 # ---------------------------------------------------------------------------
 # Requirement: Response shape completeness
 # ---------------------------------------------------------------------------
@@ -417,7 +343,6 @@ def test_read_shape_completeness(client, operador_token, categoria_fixture):
         data = resp.json()
         assert data["id"] > 0
         assert data["insumo_id"] == insumo_id
-        assert "proveedor_id" in data
         assert "fecha_compra" in data and data["fecha_compra"]
         assert Decimal(data["cantidad_comprada"]) == Decimal("10")
         assert Decimal(data["precio_unitario_compra"]) == Decimal("9")

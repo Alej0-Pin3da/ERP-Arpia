@@ -10,44 +10,11 @@
 3. No ejecutar dos veces (duplica).
 4. Fechas formato 'YYYY-MM-DD HH:MM:SS+00'.
 
-## 1. TABLA Proveedores (34) — SQL
+## 1. TABLA Proveedores (34) — ELIMINADA
 
-```sql
-INSERT INTO "Proveedores" (nombre) VALUES ('Atenea bordados y encajes');
-INSERT INTO "Proveedores" (nombre) VALUES ('Boutique de los empaques');
-INSERT INTO "Proveedores" (nombre) VALUES ('C+basics');
-INSERT INTO "Proveedores" (nombre) VALUES ('CasaTextil');
-INSERT INTO "Proveedores" (nombre) VALUES ('ColombiaHosting');
-INSERT INTO "Proveedores" (nombre) VALUES ('Dollarcity');
-INSERT INTO "Proveedores" (nombre) VALUES ('Dora Estela');
-INSERT INTO "Proveedores" (nombre) VALUES ('Etsy');
-INSERT INTO "Proveedores" (nombre) VALUES ('Gerrajes');
-INSERT INTO "Proveedores" (nombre) VALUES ('Hilos y suministros Ltda');
-INSERT INTO "Proveedores" (nombre) VALUES ('HomeCenter');
-INSERT INTO "Proveedores" (nombre) VALUES ('ICOLTEX');
-INSERT INTO "Proveedores" (nombre) VALUES ('Kilotelas');
-INSERT INTO "Proveedores" (nombre) VALUES ('La guillotina');
-INSERT INTO "Proveedores" (nombre) VALUES ('Las 3BBB premium');
-INSERT INTO "Proveedores" (nombre) VALUES ('MercadoLibre');
-INSERT INTO "Proveedores" (nombre) VALUES ('Mil Adornos');
-INSERT INTO "Proveedores" (nombre) VALUES ('Mil Telas');
-INSERT INTO "Proveedores" (nombre) VALUES ('SINGER');
-INSERT INTO "Proveedores" (nombre) VALUES ('Teks');
-INSERT INTO "Proveedores" (nombre) VALUES ('Textiles F&M');
-INSERT INTO "Proveedores" (nombre) VALUES ('The lingerie Formula');
-INSERT INTO "Proveedores" (nombre) VALUES ('almacen de la 6ta');
-INSERT INTO "Proveedores" (nombre) VALUES ('amazon');
-INSERT INTO "Proveedores" (nombre) VALUES ('auratex');
-INSERT INTO "Proveedores" (nombre) VALUES ('brother');
-INSERT INTO "Proveedores" (nombre) VALUES ('corsetería');
-INSERT INTO "Proveedores" (nombre) VALUES ('facol');
-INSERT INTO "Proveedores" (nombre) VALUES ('grupo textil moda');
-INSERT INTO "Proveedores" (nombre) VALUES ('las 3 b');
-INSERT INTO "Proveedores" (nombre) VALUES ('sesgocolor');
-INSERT INTO "Proveedores" (nombre) VALUES ('telas Medellín');
-INSERT INTO "Proveedores" (nombre) VALUES ('temu');
-INSERT INTO "Proveedores" (nombre) VALUES ('zuretex');
-```
+> ⚠️ **ENTIDAD ELIMINADA (decisión de negocio 2026-08):** el negocio ya no maneja proveedores.
+> La tabla `Proveedores` fue eliminada del ERP (backend, frontend y base de datos). **NO cargar.**
+> Los 34 proveedores históricos quedan solo como referencia en el ANEXO A.
 
 ## 2. TABLA Categorias_Insumos (3) — SQL
 
@@ -263,6 +230,12 @@ INSERT INTO "Productos" (tipo_producto_id, nombre, requiere_fabricacion, costos_
 ```
 
 ## 8. TABLA Compras_Insumos (144) — SQL
+
+> ⚠️ **OBSOLETO (desde 2026-08):** la columna `proveedor_id` ya NO existe en `Compras_Insumos`
+> (quedan `insumo_id`, `fecha_compra`, `cantidad_comprada`, `precio_unitario_compra`), porque la
+> entidad `Proveedores` fue eliminada del ERP. Los INSERT de ejemplo de esta sección referencian
+> `"Proveedores"` y fallarían contra el esquema actual. La carga real hoy la hace el **pipeline de
+> migración (F0–F7)** desde `ARPIA.xlsx`; no ejecutar este SQL a mano.
 
 ```sql
 INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra) VALUES ((SELECT id FROM "Insumos" WHERE nombre = 'Cinta Térmica X 5' LIMIT 1), (SELECT id FROM "Proveedores" WHERE nombre = 'MercadoLibre' LIMIT 1), '2023-07-31 00:00:00+00', 1, 43830.0000);
@@ -594,7 +567,10 @@ INSERT INTO "Detalle_Ventas" (venta_id, producto_id, variante_id, cantidad, prec
 
 ## ANEXO A — Referencia
 
-### Proveedores (34)
+### Proveedores (34) — histórico (entidad eliminada 2026-08)
+
+> ⚠️ Lista histórica de los proveedores del workbook original. La entidad fue eliminada del ERP
+> (decisión 2026-08); estos nombres NO se cargan en ninguna tabla.
 - Atenea bordados y encajes
 - Boutique de los empaques
 - C+basics

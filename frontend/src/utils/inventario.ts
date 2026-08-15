@@ -55,15 +55,13 @@ export function compraCostoTotal(cantidad: string, precioUnitario: string): numb
   return qty * price
 }
 
-/** A compra list row with its joined insumo/proveedor labels and computed total (MOD-4). */
+/** A compra list row with its joined insumo label and computed total (MOD-4). */
 export interface CompraRow {
   id: number
   /** Raw ISO datetime (formatted at render time). */
   fecha: string
   /** Insumo name, or `Insumo #{id}` when the insumo is gone. */
   insumo: string
-  /** Proveedor name, or '—' when no proveedor was registered. */
-  proveedor: string
   /** Raw Decimal-as-string quantity (formatted at render time). */
   cantidad: string
   /** Raw Decimal-as-string unit price (formatted at render time). */
@@ -73,9 +71,9 @@ export interface CompraRow {
 }
 
 /**
- * MOD-4: join compras with insumo + (new) proveedor names, compute the line
- * total, and render newest first (the backend lists id ASC — a purchase log
- * reads better top-down).
+ * MOD-4: join compras with insumo names, compute the line total, and render
+ * newest first (the backend lists id ASC — a purchase log reads better
+ * top-down).
  */
 export function buildCompraRows(
   compras: CompraInsumoRead[],
@@ -89,7 +87,6 @@ export function buildCompraRows(
       id: c.id,
       fecha: c.fecha_compra,
       insumo: insumoNombre(insumosById, c.insumo_id),
-      proveedor: c.nombre_proveedor ?? '—',
       cantidad: c.cantidad_comprada,
       precio_unitario: c.precio_unitario_compra,
       costo_total: compraCostoTotal(c.cantidad_comprada, c.precio_unitario_compra),

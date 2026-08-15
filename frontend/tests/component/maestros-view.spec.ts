@@ -2,8 +2,8 @@
  * MaestrosView integration tests (PR11, spec MOD-5 maestros part).
  *
  * Mounts the REAL MaestrosView + the generic table/form components against
- * mocked clientesApi/proveedoresApi/tiposProductoApi/categoriasInsumosApi:
- * the four tabs (Clientes / Proveedores / Tipos de producto / Categorías de
+ * mocked clientesApi/tiposProductoApi/categoriasInsumosApi:
+ * the three tabs (Clientes / Tipos de producto / Categorías de
  * insumos), the config-driven lists, role visibility (all master-data writes
  * are require_admin server-side — operador/consulta see read-only lists,
  * admin owns every form/action) and the per-entity CRUD round-trips: create
@@ -26,10 +26,6 @@ const { apiMocks } = vi.hoisted(() => ({
     createCliente: vi.fn(),
     updateCliente: vi.fn(),
     deleteCliente: vi.fn(),
-    listProveedores: vi.fn(),
-    createProveedor: vi.fn(),
-    updateProveedor: vi.fn(),
-    deleteProveedor: vi.fn(),
     listTipos: vi.fn(),
     createTipo: vi.fn(),
     updateTipo: vi.fn(),
@@ -46,12 +42,6 @@ vi.mock('@/api/endpoints', () => ({
     create: apiMocks.createCliente,
     update: apiMocks.updateCliente,
     delete: apiMocks.deleteCliente,
-  },
-  proveedoresApi: {
-    list: apiMocks.listProveedores,
-    create: apiMocks.createProveedor,
-    update: apiMocks.updateProveedor,
-    delete: apiMocks.deleteProveedor,
   },
   tiposProductoApi: {
     list: apiMocks.listTipos,
@@ -70,10 +60,6 @@ vi.mock('@/api/endpoints', () => ({
 const CLIENTES = [
   { id: 1, nombre: 'Ana Torres', documento_identidad: 'CC 123', email: 'ana@arpia.com.co', telefono: '3001234567', created_at: '2026-01-01T10:00:00Z' },
   { id: 2, nombre: 'Luis Gómez', documento_identidad: null, email: null, telefono: null, created_at: '2026-01-02T10:00:00Z' },
-]
-const PROVEEDORES = [
-  { id: 1, nombre: 'Molino El Triunfo', ubicacion: 'Medellín', url: 'https://eltriunfo.com', contacto: 'Carlos' },
-  { id: 2, nombre: 'Distribuidora Andina', ubicacion: null, url: null, contacto: null },
 ]
 const TIPOS = [{ id: 1, nombre: 'Alimentos' }]
 const CATEGORIAS = [{ id: 1, nombre: 'Granos' }]
@@ -111,29 +97,16 @@ async function flushDialogTransition(): Promise<void> {
   await flushPromises()
 }
 
-/** The single inline EDIT form (all create forms have mode='create'). */
-function editForm(wrapper: VueWrapper): VueWrapper {
-  const form = wrapper
-    .findAllComponents({ name: 'MaestroForm' })
-    .find((c) => c.props('mode') === 'edit')
-  if (!form) throw new Error('edit MaestroForm not found')
-  return form
-}
-
 describe('MaestrosView (MOD-5 + T6)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // Every list uses the {items,total} contract now.
     apiMocks.listClientes.mockResolvedValue({ items: CLIENTES, total: 2 })
-    apiMocks.listProveedores.mockResolvedValue({ items: PROVEEDORES, total: 2 })
     apiMocks.listTipos.mockResolvedValue({ items: TIPOS, total: 1 })
     apiMocks.listCategorias.mockResolvedValue({ items: CATEGORIAS, total: 1 })
     apiMocks.createCliente.mockResolvedValue(CLIENTES[0])
     apiMocks.updateCliente.mockResolvedValue(CLIENTES[0])
     apiMocks.deleteCliente.mockResolvedValue(undefined)
-    apiMocks.createProveedor.mockResolvedValue(PROVEEDORES[0])
-    apiMocks.updateProveedor.mockResolvedValue(PROVEEDORES[0])
-    apiMocks.deleteProveedor.mockResolvedValue(undefined)
     apiMocks.createTipo.mockResolvedValue(TIPOS[0])
     apiMocks.updateTipo.mockResolvedValue(TIPOS[0])
     apiMocks.deleteTipo.mockResolvedValue(undefined)
@@ -147,18 +120,16 @@ describe('MaestrosView (MOD-5 + T6)', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders the four tabs and loads all four lists (paged) for an operador', async () => {
+  it('renders the three tabs and loads all three lists (paged) for an operador', async () => {
     const wrapper = await mountView('operador')
 
     const text = wrapper.text()
     expect(text).toContain('Clientes')
-    expect(text).toContain('Proveedores')
     expect(text).toContain('Tipos de producto')
     expect(text).toContain('Categorías de insumos')
 
     expect(text).toContain('Ana Torres')
     expect(text).toContain('Luis Gómez')
-    expect(text).toContain('Molino El Triunfo')
     expect(text).toContain('Alimentos')
     expect(text).toContain('Granos')
 
@@ -166,7 +137,6 @@ describe('MaestrosView (MOD-5 + T6)', () => {
     const PAGE1 = { limit: 20, offset: 0 }
     expect(apiMocks.listClientes).toHaveBeenCalledTimes(1)
     expect(apiMocks.listClientes).toHaveBeenCalledWith(PAGE1)
-    expect(apiMocks.listProveedores).toHaveBeenCalledWith(PAGE1)
     expect(apiMocks.listTipos).toHaveBeenCalledWith(PAGE1)
     expect(apiMocks.listCategorias).toHaveBeenCalledWith(PAGE1)
   })
@@ -214,10 +184,10 @@ describe('MaestrosView (MOD-5 + T6)', () => {
 
     // The forms live in el-dialogs — closed until a button opens them (FE-DLG-1).
     expect(wrapper.findAllComponents({ name: 'MaestroForm' })).toHaveLength(0)
-    expect(wrapper.findAll('[data-test^="nuevo-"]')).toHaveLength(4)
-    // 2 clientes + 2 proveedores + 1 tipo + 1 categoria = 6 rows with actions.
-    expect(wrapper.findAll('[data-test="edit-maestro"]')).toHaveLength(6)
-    expect(wrapper.findAll('[data-test="delete-maestro"]')).toHaveLength(6)
+    expect(wrapper.findAll('[data-test^="nuevo-"]')).toHaveLength(3)
+    // 2 clientes + 1 tipo + 1 categoria = 4 rows with actions.
+    expect(wrapper.findAll('[data-test="edit-maestro"]')).toHaveLength(4)
+    expect(wrapper.findAll('[data-test="delete-maestro"]')).toHaveLength(4)
   })
 
   it('creates a cliente via the dialog with the exact ClienteCreate payload and refreshes', async () => {
@@ -246,34 +216,6 @@ describe('MaestrosView (MOD-5 + T6)', () => {
     expect(wrapper.findComponent({ name: 'MaestroForm' }).exists()).toBe(false)
   })
 
-  it('edits a proveedor via the edit dialog and closes it on success', async () => {
-    const wrapper = await mountView('admin')
-    await activateTab(wrapper, 'Proveedores')
-
-    await wrapper.findAll('[data-test="edit-maestro"]')[2].trigger('click') // first proveedor row
-    await nextTick()
-
-    expect(wrapper.text()).toContain('Editar Proveedor')
-    const form = editForm(wrapper)
-    form.vm.$emit('submit', {
-      nombre: 'Molino El Triunfo SAS',
-      ubicacion: 'Medellín',
-      url: '',
-      contacto: 'Carlos Ramírez',
-    })
-    await flushPromises()
-
-    expect(apiMocks.updateProveedor).toHaveBeenCalledTimes(1)
-    expect(apiMocks.updateProveedor).toHaveBeenCalledWith(
-      { proveedor_id: 1 },
-      { nombre: 'Molino El Triunfo SAS', ubicacion: 'Medellín', url: null, contacto: 'Carlos Ramírez' },
-    )
-    expect(document.body.textContent).toContain('Se actualizó Proveedor correctamente')
-    expect(apiMocks.listProveedores).toHaveBeenCalledTimes(2)
-    // Success closes the dialog (FE-DLG-2).
-    expect(wrapper.findComponent({ name: 'MaestroForm' }).exists()).toBe(false)
-  })
-
   it('cancels a create dialog without submitting (FE-DLG-2/3)', async () => {
     const wrapper = await mountView('admin')
 
@@ -294,7 +236,7 @@ describe('MaestrosView (MOD-5 + T6)', () => {
     await activateTab(wrapper, 'Tipos de producto')
     expect(apiMocks.listTipos).toHaveBeenCalledTimes(1)
 
-    await wrapper.findAll('[data-test="delete-maestro"]')[4].trigger('click') // the only tipo row
+    await wrapper.findAll('[data-test="delete-maestro"]')[2].trigger('click') // the only tipo row
     await flushPromises()
 
     expect(apiMocks.deleteTipo).toHaveBeenCalledTimes(1)
@@ -311,7 +253,7 @@ describe('MaestrosView (MOD-5 + T6)', () => {
     const wrapper = await mountView('admin')
     await activateTab(wrapper, 'Tipos de producto')
 
-    await wrapper.findAll('[data-test="delete-maestro"]')[4].trigger('click')
+    await wrapper.findAll('[data-test="delete-maestro"]')[2].trigger('click')
     await flushPromises()
 
     expect(document.body.textContent).toContain('TipoProducto is in use and cannot be deleted')

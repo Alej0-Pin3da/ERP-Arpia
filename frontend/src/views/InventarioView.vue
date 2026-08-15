@@ -9,7 +9,7 @@
  *    pattern). Toolbar: global q + categoria_id filter (server-side, reset to
  *    page 1). The create/edit form + Editar/Eliminar actions are ADMIN ONLY.
  *  - Compras: server-side paginated GET /compras-insumos with q +
- *    proveedor_id + insumo_id filters. POST runs the WAC service server-side
+ *    insumo_id filters. POST runs the WAC service server-side
  *    (updates stock/cost), so a successful compra refreshes BOTH tabs.
  *
  * Lookup joins (ComprasForm options, filter select, compra name join) fetch
@@ -19,7 +19,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { categoriasInsumosApi, comprasApi, insumosApi, proveedoresApi } from '@/api/endpoints'
+import { categoriasInsumosApi, comprasApi, insumosApi } from '@/api/endpoints'
 import ComprasForm from '@/components/inventario/ComprasForm.vue'
 import ComprasTable from '@/components/inventario/ComprasTable.vue'
 import InsumoForm from '@/components/inventario/InsumoForm.vue'
@@ -62,15 +62,12 @@ const comprasPageSize = ref(20)
 const compraQ = ref('')
 /** Optional GET /compras-insumos?insumo_id filter (clearable select). */
 const filterInsumoId = ref<number | null>(null)
-const filterProveedorId = ref<number | null>(null)
 const comprasSortBy = ref<string | null>(null)
 const comprasSortOrder = ref<'asc' | 'desc' | null>(null)
 
 // --- lookups (full sets, limit:1000 — design D3) ---------------------------
 const insumosLookup = ref<InsumoRead[]>([])
 const categorias = ref<CategoriaInsumoRead[]>([])
-/** Full proveedor set for the compras table funnel + the form options. */
-const proveedores = ref<{ id: number; nombre: string }[]>([])
 
 /** Joined compra rows: insumo name + client-computed costo_total, newest first. */
 const compraRows = computed(() => buildCompraRows(compras.value, insumosLookup.value))
@@ -87,7 +84,7 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    const [insumosPage_, comprasPage_, categoriasList, insumosLookup_, proveedoresList] = await Promise.all([
+    const [insumosPage_, comprasPage_, categoriasList, insumosLookup_] = await Promise.all([
       insumosApi.list(
         buildListParams({
           page: insumosPage.value,
@@ -102,7 +99,7 @@ async function load(): Promise<void> {
         buildListParams({
           page: comprasPage.value,
           pageSize: comprasPageSize.value,
-          filtros: { insumo_id: filterInsumoId.value, proveedor_id: filterProveedorId.value },
+          filtros: { insumo_id: filterInsumoId.value },
           q: compraQ.value,
           sortBy: comprasSortBy.value ?? undefined,
           sortOrder: comprasSortOrder.value ?? undefined,
@@ -112,8 +109,6 @@ async function load(): Promise<void> {
       canManage.value ? categoriasInsumosApi.list() : Promise.resolve({ items: [] as CategoriaInsumoRead[], total: 0 }),
       // D3: join fetches keep the full set (no pagination on lookups).
       insumosApi.list({ limit: 1000 }),
-      // D3: proveedores options for the compras table funnel (full set).
-      proveedoresApi.list({ limit: 1000 }),
     ])
     insumos.value = insumosPage_.items
     insumosTotal.value = insumosPage_.total
@@ -121,7 +116,6 @@ async function load(): Promise<void> {
     comprasTotal.value = comprasPage_.total
     categorias.value = categoriasList.items
     insumosLookup.value = insumosLookup_.items
-    proveedores.value = proveedoresList.items.map((p) => ({ id: p.id, nombre: p.nombre }))
   } catch {
     error.value = 'No se pudo cargar la información del inventario. Verifica la conexión con el servidor.'
   } finally {
@@ -172,10 +166,9 @@ function onInsumosTableFilterChange(filters: { categoria_id?: number | null }): 
   onInsumosFilterChange()
 }
 
-/** Header column filter (ComprasTable) maps into the insumo/proveedor refs. */
-function onComprasTableFilterChange(filters: { insumo_id?: number | null; proveedor_id?: number | null }): void {
+/** Header column filter (ComprasTable) maps into the insumo ref. */
+function onComprasTableFilterChange(filters: { insumo_id?: number | null }): void {
   filterInsumoId.value = filters.insumo_id ?? null
-  filterProveedorId.value = filters.proveedor_id ?? null
   onComprasFilterChange()
 }
 
@@ -397,14 +390,6 @@ onMounted(load)
           >
             <el-option v-for="i in insumosLookup" :key="i.id" :label="i.nombre" :value="i.id" />
           </el-select>
-          <el-select
-            v-model="filterProveedorId"
-            clearable
-            filterable
-            placeholder="Filtrar por proveedor"
-            data-test="compra-proveedor-filter"
-            @change="onComprasFilterChange"
-          />
           <el-button v-if="canRegister" type="primary" data-test="nueva-compra" @click="openCreateCompra">
             Nueva compra
           </el-button>
@@ -414,7 +399,6 @@ onMounted(load)
           :rows="compraRows"
           :loading="loading"
           :insumos="insumosLookup"
-          :proveedores="proveedores"
           @filter-change="onComprasTableFilterChange"
           @sort-change="onComprasTableSortChange"
         />

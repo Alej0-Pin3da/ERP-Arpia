@@ -23,13 +23,10 @@ PREFIX = "MigraTraza"
 
 
 def _mini_workbook(path: Path) -> None:
-    """Mini workbook with Proveedores + CORSET (F1 plan with real counts)."""
+    """Mini workbook with CORSET (F1 plan with real counts)."""
     wb = openpyxl.Workbook()
-    prov = wb.active
-    prov.title = "Proveedores"
-    prov.append(["Proveedor", "URL", "Precio Unidad", "Ubicacion", "Contactado"])
-    prov.append(["", "Bexxhamel", None, "Cali", "SI"])  # B=nombre
-    bom = wb.create_sheet("CORSET")
+    bom = wb.active
+    bom.title = "CORSET"
     bom.append(["CORSET", None, None, None, None, None, None, None, "TANGA"])
     bom.append(["Producto", "Ancho", "Alto", "cantidad Cms", "valor metro", "valor total"])
     bom.append([f"{PREFIX} Tela", 64, 37, 2368, 2.5, None])  # A=material, D=cm2
@@ -104,8 +101,7 @@ def test_cli_emite_conteos_por_fase_en_stdout(tmp_path, capsys):
     _mini_workbook(mini)
     cli.ejecutar(FaseOptions(source=mini, modo="dry-run"), ["F1"], reports_dir=reports_dir)
     out = capsys.readouterr().out
-    # The runner's count line (plan catalogo: N proveedores, N insumos...).
+    # The runner's count line (plan catalogo: N insumos, N productos...).
     assert "plan catalogo" in out
-    assert "proveedores" in out
     # ASCII-only stdout: no unicode arrows anywhere.
     assert "\u2192" not in out

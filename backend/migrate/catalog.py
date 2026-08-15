@@ -1,4 +1,4 @@
-"""F0+F1 catalog phase: bootstrap + Tipos_Producto/Proveedores/Insumos/Productos.
+"""F0+F1 catalog phase: bootstrap + Tipos_Producto/Insumos/Productos.
 
 Scope of slice 3 (PR#3): ONLY the catalog phase (design #423 > catalog.py;
 tasks #424 T4; spec R-CAT / CAT-1..CAT-4, EXM-1..EXM-4, NFR-1/2).
@@ -12,8 +12,6 @@ idempotent (spec CAT-1). Runs inside the caller transaction (never commits).
 F1 ``catalogar``: builds a ``CatalogPlan`` from the bounded Excel readers and,
 in commit mode, upserts inside a single ``session_scope`` (EXM-4):
 
-- Proveedores: from the ``Proveedores`` sheet (B=nombre, C=url, E=ubicacion);
-  natural key = normalized name (dedup manual: no UNIQUE on Proveedores).
 - Insumos: union of BOM recipe materials (left A / right I blocks), the
   INVENTARIO OCT25 MATERIAL+HERRAJES blocks and the CAJAS packaging items.
   unidad_medida normalizada + categoria resuelta por nombre; stock_actual,
@@ -50,7 +48,6 @@ from app.models import (
     CategoriaInsumo,
     Insumo,
     Producto,
-    Proveedor,
     TipoProducto,
     VarianteProducto,
 )
@@ -396,13 +393,6 @@ def _es_material_valido(nombre: str) -> bool:
 
 
 @dataclass(frozen=True)
-class ProveedorPlan:
-    nombre: str
-    url: str | None = None
-    ubicacion: str | None = None
-
-
-@dataclass(frozen=True)
 class InsumoPlan:
     nombre: str
     unidad: str
@@ -421,17 +411,12 @@ class CatalogPlan:
     """What the phase would upsert (dry-run plan / commit input)."""
 
     tipos: list[str] = field(default_factory=lambda: list(TIPOS_CATALOGO))
-    proveedores: list[ProveedorPlan] = field(default_factory=list)
     insumos: list[InsumoPlan] = field(default_factory=list)
     productos: list[ProductoPlan] = field(default_factory=list)
 
     @property
     def conteo_tipos(self) -> int:
         return len(self.tipos)
-
-    @property
-    def conteo_proveedores(self) -> int:
-        return len(self.proveedores)
 
     @property
     def conteo_insumos(self) -> int:
@@ -447,40 +432,6 @@ class CatalogPlan:
 # --------------------------------------------------------------------------- #
 
 _CAJAS_EMPAQUES = frozenset({"caja", "vela", "papel", "envio", "bolsa", "etiqueta", "tarjeta"})
-
-
-def _leer_proveedores(libro: LibroMigracion, report) -> list[ProveedorPlan]:
-    if "Proveedores" not in SHEET_BOUNDS:
-        return []
-    # The recalculated 16-sheet workbook (2026-08) dropped the Proveedores
-    # sheet, so it may be absent even though SHEET_BOUNDS keeps its legacy
-    # range (mini/contract workbooks still have it). Same guard as _leer_materiales.
-    try:
-        filas = libro.leer_hoja("Proveedores", report=report).filas
-    except HojaInexistenteError:
-        if report:
-            report.warn("Proveedores", None, None, "hoja ausente en este workbook; omitida")
-        return []
-    vistos: dict[str, ProveedorPlan] = {}
-    for fila in filas:
-        nombre = normalizar_nombre(fila.get("B"))
-        if not nombre:
-            continue
-        url = fila.get("C")
-        ubicacion = fila.get("E")
-        if not normalizar_nombre(url) or clave_normalizada(url) == "url":
-            url = None
-        if not normalizar_nombre(ubicacion) or clave_normalizada(ubicacion) == "ubicacion":
-            ubicacion = None
-        vistos.setdefault(
-            clave_normalizada(nombre),
-            ProveedorPlan(
-                nombre=nombre,
-                url=str(url) if url else None,
-                ubicacion=str(ubicacion) if ubicacion else None,
-            ),
-        )
-    return sorted(vistos.values(), key=lambda p: p.nombre.casefold())
 
 
 def _leer_materiales(libro: LibroMigracion, report) -> dict[str, str]:
@@ -544,7 +495,6 @@ def leer_insumos_plan(nombres: dict[str, str]) -> list[InsumoPlan]:
 
 def plan_catalogo(libro: LibroMigracion, report=None) -> CatalogPlan:
     """Aggregate the catalog plan from the bounded workbook (read-only)."""
-    proveedores = _leer_proveedores(libro, report)
     materiales = _leer_materiales(libro, report)
     insumos = leer_insumos_plan(materiales)
     productos = [
@@ -556,7 +506,6 @@ def plan_catalogo(libro: LibroMigracion, report=None) -> CatalogPlan:
         for entry in PRODUCTOS_CATALOGO
     ]
     return CatalogPlan(
-        proveedores=proveedores,
         insumos=insumos,
         productos=productos,
     )
@@ -584,16 +533,6 @@ def bootstrap_catalogo(db, report=None) -> dict[str, int]:
     for nombre_tipo in TIPOS_CATALOGO:
         _get_or_create(db, TipoProducto, nombre_tipo)
     return {"categorias": len(BASE_CATEGORIAS), "tipos": len(TIPOS_CATALOGO)}
-
-
-def upsert_proveedor(db, nombre, url=None, ubicacion=None) -> Proveedor:
-    nombre_limpio = normalizar_nombre(nombre)
-    proveedor = db.scalar(select(Proveedor).where(Proveedor.nombre == nombre_limpio))
-    if proveedor is None:
-        proveedor = Proveedor(nombre=nombre_limpio, url=url, ubicacion=ubicacion)
-        db.add(proveedor)
-        db.flush()
-    return proveedor
 
 
 def upsert_insumo(
@@ -688,10 +627,7 @@ def upsert_producto(
 def aplicar_plan(db, plan: CatalogPlan, report=None) -> dict[str, int]:
     """Upsert everything in the plan inside the caller transaction (EXM-4)."""
     bootstrap_catalogo(db, report)
-    totales = {"proveedores": 0, "insumos": 0, "productos": 0, "variantes": 0}
-    for proveedor in plan.proveedores:
-        upsert_proveedor(db, proveedor.nombre, url=proveedor.url, ubicacion=proveedor.ubicacion)
-        totales["proveedores"] += 1
+    totales = {"insumos": 0, "productos": 0, "variantes": 0}
     for insumo in plan.insumos:
         upsert_insumo(db, insumo.nombre, unidad=insumo.unidad, categoria_nombre=insumo.categoria)
         totales["insumos"] += 1
@@ -704,8 +640,8 @@ def aplicar_plan(db, plan: CatalogPlan, report=None) -> dict[str, int]:
             "F1",
             None,
             None,
-            f"upsert aplicados: {totales['proveedores']} proveedores, "
-            f"{totales['insumos']} insumos, {totales['productos']} productos, "
+            f"upsert aplicados: {totales['insumos']} insumos, "
+            f"{totales['productos']} productos, "
             f"{totales['variantes']} variantes",
         )
     return totales
@@ -744,8 +680,8 @@ def catalogar(ctx: MigrationContext) -> CatalogPlan:
         "F1",
         None,
         None,
-        f"plan catalogo: {plan.conteo_proveedores} proveedores, "
-        f"{plan.conteo_insumos} insumos, {plan.conteo_productos} productos, "
+        f"plan catalogo: {plan.conteo_insumos} insumos, "
+        f"{plan.conteo_productos} productos, "
         f"{plan.conteo_tipos} tipos",
     )
     if ctx.options.modo == "commit" and ctx.session is not None:
@@ -763,14 +699,12 @@ __all__ = [
     "resolver_unidad",
     "clasificar_material",
     "filtrar_materiales_validos",
-    "ProveedorPlan",
     "InsumoPlan",
     "ProductoPlan",
     "CatalogPlan",
     "plan_catalogo",
     "bootstrap_catalogo",
     "bootstrap_catalog_phase",
-    "upsert_proveedor",
     "upsert_insumo",
     "upsert_producto",
     "aplicar_plan",

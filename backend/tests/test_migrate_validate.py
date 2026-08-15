@@ -3,7 +3,7 @@
 Covers STRICT TDD acceptance from tasks #424 T10 / design #423 validate.py +
 checks_n7 (spec EXM-5, NFR-1/2; user slice-8 contract N7a-g):
 
-- N7a "conteos": rows per domain (tipos, proveedores, insumos, productos,
+- N7a "conteos": rows per domain (tipos, insumos, productos,
   BOM_-insumos, compras, ventas, movimientos, socios) counted in the DB
   against the plan's expected rows (built from the source workbook's own
   plans). estado: OK flat; WARN when the DB has FEWER rows than the plan
@@ -44,7 +44,6 @@ from app.models import (
     Insumo,
     MovimientoFinanciero,
     Producto,
-    Proveedor,
     SociosConfiguracion,
     TipoProducto,
     Venta,
@@ -58,7 +57,6 @@ P = f"{PREFIX} Validate"
 
 # Names injected by tests; cleanup deletes exactly these, never catalog rows.
 P_TELA = f"{P} Tela"
-P_PROV = f"{P} Proveedor"
 P_PROD = "Corset"  # bomb sheet product ('Corset' block of the real workbook)
 P_VAR = "S"
 P_CLI = f"{P} Cliente"
@@ -95,19 +93,14 @@ def _mini_workbook(path: Path, extra_oct25: tuple[str, str] | None = None) -> No
     - INVERSION VALQUI: a BOM purchase row (-> F2 WAC) + an equipment row
       (non-BOM -> F6 movement).
     - VENTAS: one historical sale of the product 'Corset'.
-    - Proveedores: one supplier.
 
     ``extra_oct25`` adds a HERRAJES snapshot row (name, quantity) whose insumo
     is NOT created in the catalog (used to break the N7d precondition).
     """
     wb = openpyxl.Workbook()
 
-    prov = wb.active
-    prov.title = "Proveedores"
-    prov.append(["Proveedor", "URL", "Precio Unidad", "Ubicacion", "Contactado"])
-    prov.append(["", P_PROV, None, "Cali", "SI"])  # B=nombre
-
-    bom = wb.create_sheet("CORSET")
+    bom = wb.active
+    bom.title = "CORSET"
     bom.append(["CORSET", None, None, None, None, None, None, None, "TANGA"])
     bom.append(["Producto", "Ancho", "Alto", "cantidad Cms", "valor metro", "valor total"])
     bom.append([P_TELA, 64, 37, 2368, 2.5, None])
@@ -177,7 +170,6 @@ def _mini_workbook(path: Path, extra_oct25: tuple[str, str] | None = None) -> No
     inv.cell(row=3, column=2, value=P_TELA)
     inv.cell(row=3, column=4, value=200)
     inv.cell(row=3, column=5, value=datetime(2025, 9, 15))
-    inv.cell(row=3, column=6, value=P_PROV)
     # R4: non-BOM equipment -> movimiento F6.
     inv.cell(row=4, column=1, value=1)
     inv.cell(row=4, column=2, value=P_MOV)
@@ -239,7 +231,6 @@ def _borrar_test(db) -> None:
     ).delete(synchronize_session=False)
     db.query(Insumo).filter(Insumo.nombre == P_TELA).delete(synchronize_session=False)
     db.query(Producto).filter(Producto.nombre == P_PROD).delete(synchronize_session=False)
-    db.query(Proveedor).filter(Proveedor.nombre == P_PROV).delete(synchronize_session=False)
     db.commit()
 
 
@@ -286,13 +277,11 @@ def _preparar_entorno(db) -> None:
         bootstrap_catalogo,
         upsert_insumo,
         upsert_producto,
-        upsert_proveedor,
     )
 
     _borrar_test(db)
     _borrar_socios_y_tipos(db)
     bootstrap_catalogo(db)
-    proveedor = upsert_proveedor(db, P_PROV, url=None, ubicacion="Cali")
     tela = upsert_insumo(db, P_TELA, unidad="m", categoria_nombre="Telas")
     producto = upsert_producto(db, P_PROD, tipo="Corsetería", variantes=(P_VAR,))
     db.flush()
@@ -303,7 +292,6 @@ def _preparar_entorno(db) -> None:
     db.add(
         CompraInsumo(
             insumo_id=tela.id,
-            proveedor_id=proveedor.id,
             fecha_compra=FECHA_COMPRA,
             cantidad_comprada=Decimal("2"),
             precio_unitario_compra=Decimal("100"),
@@ -399,7 +387,6 @@ def test_n7a_conteos_coinciden_con_el_plan(db, mini_libro):
     res = _controllers(db, mini_libro)
     n7a = _no_resultado(res, "N7a")
     assert n7a.estado == "OK"
-    assert "proveedores" in n7a.mensaje
 
 
 def test_n7a_conteo_faltante_es_warn(db, mini_libro):
@@ -541,7 +528,6 @@ def test_n7d_compra_del_corte_no_se_suma(db, mini_libro):
     db.add(
         CompraInsumo(
             insumo_id=tela.id,
-            proveedor_id=None,
             fecha_compra=FECHA_CORTE_OCT25,
             cantidad_comprada=Decimal("10"),
             precio_unitario_compra=Decimal("100"),
@@ -561,7 +547,6 @@ def test_n7d_compra_post_corte_si_suma(db, mini_libro):
     db.add(
         CompraInsumo(
             insumo_id=tela.id,
-            proveedor_id=None,
             fecha_compra=FECHA_POST_CORTE,
             cantidad_comprada=Decimal("3"),
             precio_unitario_compra=Decimal("100"),
@@ -662,7 +647,6 @@ def test_n7g_compra_duplicada_error(db, mini_libro):
     db.add(
         CompraInsumo(
             insumo_id=compra.insumo_id,
-            proveedor_id=compra.proveedor_id,
             fecha_compra=compra.fecha_compra,
             cantidad_comprada=compra.cantidad_comprada,
             precio_unitario_compra=compra.precio_unitario_compra,

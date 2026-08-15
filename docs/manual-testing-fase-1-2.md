@@ -21,7 +21,7 @@ Interactive docs (Swagger): `http://localhost:8000/api/v1/docs` or `/redoc`.
 | Rol | Can do |
 |---|---|
 | `admin` | everything (CRUD + create purchases) |
-| `operador` | read + create purchases (NOT admin-only writes like create user/proveedor) |
+| `operador` | read + create purchases (NOT admin-only writes like create user) |
 | `consulta` | read-only (GET), NO POST purchases |
 
 ---
@@ -56,24 +56,15 @@ Interactive docs (Swagger): `http://localhost:8000/api/v1/docs` or `/redoc`.
 
 ---
 
-## 2. Proveedores (Phase 1)
+## 2. Proveedores (Phase 1) — ELIMINADO (2026-08)
 
-`GET /proveedores` → any authenticated role. `POST/PUT/DELETE` → `admin` only.
-
-- [ ] `POST /proveedores` (admin) → `201`
-```json
-{ "nombre": "Proveedor Test", "ubicacion": "CABA", "url": "https://x.com", "contacto": "Juan" }
-```
-- [ ] `GET /proveedores` → `200` list; shows the created provider with `id`
-- [ ] `GET /proveedores/{id}` → `200`; unknown id → `404` (`Proveedor not found`)
-- [ ] `PUT /proveedores/{id}` (admin) → `200` after changing `nombre`
-- [ ] `DELETE /proveedores/{id}` (admin) → `204`; subsequent GET → `404`
-- [ ] `POST /proveedores` as `consulta` → `403`
-- [ ] No token → `401`
+> ⚠️ **Entidad eliminada** (decisión de negocio 2026-08): el endpoint `/proveedores` ya no existe
+> en la API y la tabla `Proveedores` fue removida del esquema. Los casos CRUD de esta sección
+> (`POST/GET/PUT/DELETE /proveedores`) quedaron **obsoletos** — no probar.
 
 ## 3. Categorías de Insumos (Phase 1)
 
-Same role pattern as proveedores.
+Same role pattern as the other base entities.
 
 - [ ] `POST /categorias-insumos` (admin) → `201`
 ```json
@@ -149,26 +140,26 @@ Setup: insumo with `stock_actual=0`, `costo_promedio_actual=0`, id `1` (or your 
 
 1. `POST /compras-insumos` (admin) → `201`
 ```json
-{ "insumo_id": 1, "proveedor_id": 1, "cantidad_comprada": 10, "precio_unitario_compra": 5 }
+{ "insumo_id": 1, "cantidad_comprada": 10, "precio_unitario_compra": 5 }
 ```
-- [ ] Returns `201` with `id`, `insumo_id`, `proveedor_id`, `fecha_compra`, `cantidad_comprada`, `precio_unitario_compra`
+- [ ] Returns `201` with `id`, `insumo_id`, `fecha_compra`, `cantidad_comprada`, `precio_unitario_compra`
 - [ ] After: `GET /insumos/1` shows `stock_actual: 10`, `costo_promedio_actual: 5`
 
 2. `POST /compras-insumos` again, price 7:
 ```json
-{ "insumo_id": 1, "proveedor_id": 1, "cantidad_comprada": 10, "precio_unitario_compra": 7 }
+{ "insumo_id": 1, "cantidad_comprada": 10, "precio_unitario_compra": 7 }
 ```
 - [ ] New cost = `(10*5 + 10*7)/(10+10) = 120/20 = 6` → `GET /insumos/1` shows `costo_promedio_actual: 6`, `stock_actual: 20`
 
 3. `POST` third lot, price 8, qty 20:
 - [ ] New cost = `(20*6 + 20*8)/(20+20) = 280/40 = 7` → `costo_promedio_actual: 7`, `stock_actual: 40`
 
-### 7.2 Purchase without proveedor
-- [ ] `POST /compras-insumos` `{"insumo_id": 1, "cantidad_comprada": 5, "precio_unitario_compra": 10}` → `201` with `proveedor_id: null`
+### 7.2 Purchase without proveedor — OBSOLETO (2026-08)
+> ⚠️ El campo `proveedor_id` fue **eliminado en 2026-08** junto con la entidad `Proveedores`;
+> las compras ya no lo aceptan ni lo devuelven. Este caso de prueba quedó obsoleto.
 
 ### 7.3 Error cases
 - [ ] `insumo_id` nonexistent → `404` (`Insumo not found`)
-- [ ] `proveedor_id` nonexistent → `400` (`Proveedor does not exist`)
 - [ ] `cantidad_comprada: 0` or negative → `422` (validation)
 - [ ] `precio_unitario_compra: -1` → `422`
 - [ ] No token → `401`
@@ -200,7 +191,6 @@ Setup: insumo with `stock_actual=0`, `costo_promedio_actual=0`, id `1` (or your 
 | Area | Phase | Status |
 |---|---|---|
 | Auth (login/me/refresh/logout) | 1 | ✅ built |
-| Proveedores CRUD | 1 | ✅ built |
 | Categorías insumos CRUD | 1 | ✅ built |
 | Insumos CRUD | 1 | ✅ built |
 | Clientes CRUD | 1 | ✅ built |

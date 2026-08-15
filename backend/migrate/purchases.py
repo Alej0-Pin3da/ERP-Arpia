@@ -16,14 +16,14 @@ Movimientos_Financieros in a later phase (F6).
 
 Sub-tablas derechas (P1 fix de remediacion): ya NO se descartan todas. La
 sub-tabla derecha de VALQUI (J..N: Producto/Largo CMS/Ancho CMS/Valor) y la de
-MARGARA (H..L: Cantidad/Producto/Costo/Fecha/Provedor) son fuentes de compra
+MARGARA (H..L: Cantidad/Producto/Costo/Fecha) son fuentes de compra
 SOLO cuando el item de la derecha NO aparece en el bloque izquierdo de la
 MISMA hoja (es fuente unica, no duplicado). Cuando la derecha duplica algo ya
 comprado a la izquierda (mismo item en la misma hoja) se descarta como antes
 (duplicado). Cantidad derecha VALQUI: K es 'Largo CMS' -> en la unidad
 canonica del insumo (Herrajes 'un' -> K piezas; Telas 'm' -> K cm / 100;
-'cm2' -> K x L). Precio unitario = M / cantidad. Fecha/proveedor: los del
-bloque izquierdo de la misma fila (VALQUI) o propios K/L (MARGARA).
+'cm2' -> K x L). Precio unitario = M / cantidad. Fecha: la del bloque
+izquierdo de la misma fila (VALQUI) o la propia K (MARGARA).
 Caso real: 'Argolla 10 mm' R18 (J18) es fuente unica -> compra 100 un @ 72;
 'Ref 100 24 cm tul bordado negro' R34 duplica la compra izquierda B80 -> se
 descarta.
@@ -40,8 +40,8 @@ price semantics of CompraInsumo (cantidad_comprada * precio_unitario_compra).
 
 Fechas (D5 - never now()): the real Excel date is preserved (VALQUI col E /
 MARCARA col D). Empty date: inherited from the contiguous earlier row of the
-same (insumo, proveedor) via normalize.fecha_para_fila; if there is no such
-row the purchase is OMITTED + WARN (a purchase without a date would break the
+same insumo via normalize.fecha_para_fila; if there is no such row the
+purchase is OMITTED + WARN (a purchase without a date would break the
 chronological WAC cut at OCT25).
 
 Idempotencia (NFR-1/EXM-3): natural key (insumo_id, fecha_compra, cantidad,
@@ -60,7 +60,7 @@ from decimal import Decimal
 
 from sqlalchemy import select
 
-from app.models import CompraInsumo, Insumo, Proveedor
+from app.models import CompraInsumo, Insumo
 from app.services.wac import registrar_compra
 from migrate.catalog import (
     _es_material_valido,
@@ -80,18 +80,18 @@ from migrate.normalize import (
     unidad_canonica,
 )
 
-# Purchase sheets: (hoja, col_cantidad, col_nombre, col_costo, col_fecha, col_prov).
-HOJAS_COMPRAS: tuple[tuple[str, str, str, str, str, str], ...] = (
-    ("INVERSION VALQUI", "A", "B", "D", "E", "F"),
-    ("INVERSION MARGARA", "A", "B", "C", "D", "E"),
+# Purchase sheets: (hoja, col_cantidad, col_nombre, col_costo, col_fecha).
+HOJAS_COMPRAS: tuple[tuple[str, str, str, str, str], ...] = (
+    ("INVERSION VALQUI", "A", "B", "D", "E"),
+    ("INVERSION MARGARA", "A", "B", "C", "D"),
 )
 
 # Right-hand sub-tables (P1 fix). Layout real verificado en ARPIA.xlsx:
 # - VALQUI J..N: J=Producto, K=Largo CMS, L=Ancho CMS, M=Valor (N=Unitario).
 #   La cantidad K es 'Largo CMS': conteo (Herrajes 'un'), cm -> m (Telas) o
-#   K x L cm2. Fecha/proveedor = los del bloque izquierdo de la misma fila.
+#   K x L cm2. Fecha = la del bloque izquierdo de la misma fila.
 # - MARGARA H..L ('INVERSION MARZO/OCTUBRE MARGARA'): H=Cantidad (con o sin
-#   unidad), I=Producto, J=Costo, K=Fecha, L=Provedor (fechas propias).
+#   unidad), I=Producto, J=Costo, K=Fecha (fechas propias).
 _COLS_DERECHA: dict[str, dict[str, str]] = {
     "INVERSION VALQUI": {
         "nombre": "J",
@@ -99,7 +99,6 @@ _COLS_DERECHA: dict[str, dict[str, str]] = {
         "ancho": "L",
         "costo": "M",
         "fecha": "E",
-        "proveedor": "F",
     },
     "INVERSION MARGARA": {
         "nombre": "I",
@@ -107,7 +106,6 @@ _COLS_DERECHA: dict[str, dict[str, str]] = {
         "ancho": None,
         "costo": "J",
         "fecha": "K",
-        "proveedor": "L",
     },
 }
 
@@ -120,7 +118,6 @@ class CompraPlan:
     cantidad: Decimal
     precio_unitario: Decimal
     fecha: datetime | None
-    proveedor_nombre: str | None
     hoja: str
     fila: int
     fecha_heredada: bool = False
@@ -306,10 +303,8 @@ def _procesar_subtabla_derecha(
         return True
     precio_unitario = costo_total / cantidad
 
-    proveedor_raw = fila.get(config["proveedor"])
-    proveedor_nombre = normalizar_nombre(proveedor_raw) if proveedor_raw is not None else None
     fecha_raw = fila.get(config["fecha"])
-    clave_f = ClaveFecha(clave_ins, proveedor_nombre or "<sin-proveedor>")
+    clave_f = ClaveFecha(clave_ins)
     fecha = fecha_para_fila(fecha_raw, clave_f, ultima_fecha)
     if fecha is None:
         conteos.sin_fecha += 1
@@ -319,7 +314,7 @@ def _procesar_subtabla_derecha(
                 indx,
                 config["fecha"],
                 f"{nombre_display} (sub-tabla derecha): fecha vacia y sin fila "
-                f"contigua del mismo insumo+proveedor; omitida (D5, nunca now())",
+                f"contigua del mismo insumo; omitida (D5, nunca now())",
             )
         return True
     fecha = coerce_aware(fecha)
@@ -329,7 +324,6 @@ def _procesar_subtabla_derecha(
             cantidad=cantidad,
             precio_unitario=precio_unitario,
             fecha=fecha,
-            proveedor_nombre=proveedor_nombre,
             hoja=hoja,
             fila=indx,
             fecha_heredada=fecha_raw is None,
@@ -413,7 +407,7 @@ def plan_compras(libro, report=None) -> ComprasPlan:
     plan = ComprasPlan()
     universo = _universo_bom(libro, report)
 
-    for hoja, col_cant, col_nom, col_costo, col_fecha, col_prov in HOJAS_COMPRAS:
+    for hoja, col_cant, col_nom, col_costo, col_fecha in HOJAS_COMPRAS:
         if hoja not in SHEET_BOUNDS:
             continue
         try:
@@ -440,7 +434,6 @@ def plan_compras(libro, report=None) -> ComprasPlan:
                     col_cant,
                     col_costo,
                     col_fecha,
-                    col_prov,
                     cantidad_raw,
                     nombre,
                     universo,
@@ -468,7 +461,6 @@ def _procesar_fila_izquierda(
     col_cant: str,
     col_costo: str,
     col_fecha: str,
-    col_prov: str,
     cantidad_raw: object,
     nombre: str,
     universo: dict[str, str],
@@ -508,10 +500,8 @@ def _procesar_fila_izquierda(
         return
     precio_unitario = costo_total / cantidad
 
-    proveedor_raw = fila.get(col_prov)
-    proveedor_nombre = normalizar_nombre(proveedor_raw) if proveedor_raw is not None else None
     fecha_raw = fila.get(col_fecha)
-    clave_f = ClaveFecha(clave_ins, proveedor_nombre or "<sin-proveedor>")
+    clave_f = ClaveFecha(clave_ins)
     fecha = fecha_para_fila(fecha_raw, clave_f, ultima_fecha)
     if fecha is None:
         conteos.sin_fecha += 1
@@ -521,7 +511,7 @@ def _procesar_fila_izquierda(
                 indx,
                 col_fecha,
                 f"{nombre_display}: fecha vacia y sin fila contigua del mismo "
-                f"insumo+proveedor; omitida (D5, nunca now())",
+                f"insumo; omitida (D5, nunca now())",
             )
         return
     # Fecha del Excel (posible naive) -> aware (TIMESTAMPTZ, sin ambiguedad).
@@ -532,7 +522,6 @@ def _procesar_fila_izquierda(
             cantidad=cantidad,
             precio_unitario=precio_unitario,
             fecha=fecha,
-            proveedor_nombre=proveedor_nombre,
             hoja=hoja,
             fila=indx,
             fecha_heredada=fecha_raw is None,
@@ -561,18 +550,6 @@ def _clave_compra_existente(db, insumo_id: int, fecha, cantidad: Decimal, precio
     return fila is not None
 
 
-def _proveedor_id(db, nombre: str | None) -> int | None:
-    """ID del proveedor catalogado (por clave normalizada); None si aun no se
-    catalogo (F6 lo enriquece; aqua no se crea cat.-supplier)."""
-    if not nombre:
-        return None
-    clave = clave_normalizada(nombre)
-    for prov in db.scalars(select(Proveedor)).all():
-        if clave_normalizada(prov.nombre) == clave:
-            return prov.id
-    return None
-
-
 def aplicar_compras(db, plan: ComprasPlan, report=None) -> dict[str, int]:
     """Registra las compras a WAC por fila (commit=False, savepoint por fila).
 
@@ -592,7 +569,6 @@ def aplicar_compras(db, plan: ComprasPlan, report=None) -> dict[str, int]:
                     f"{compra.insumo_nombre}: insumo ausente en catalogo; no registrada",
                 )
             continue
-        proveedor_id = _proveedor_id(db, compra.proveedor_nombre)
         if _clave_compra_existente(
             db, insumo.id, compra.fecha, compra.cantidad, compra.precio_unitario
         ):
@@ -603,7 +579,6 @@ def aplicar_compras(db, plan: ComprasPlan, report=None) -> dict[str, int]:
                 registrar_compra(
                     db,
                     insumo.id,
-                    proveedor_id,
                     compra.cantidad,
                     compra.precio_unitario,
                     fecha_compra=compra.fecha,

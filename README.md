@@ -41,10 +41,8 @@ La base de datos usa un modelo **BOM Multinivel** (Bill of Materials) y el méto
     *   `created_at` (Timestamp)
 
 ### Módulo de Inventario y Suministros
-Gestiona materia prima, empaques y componentes adquiridos a proveedores.
+Gestiona materia prima, empaques y componentes.
 
-*   **`Proveedores`**
-    *   `id` (PK), `nombre`, `ubicacion`, `url`, `contacto`
 *   **`Categorias_Insumos`**
     *   `id` (PK), `nombre` (Telas, Herrajes, Empaques, Químicos)
 *   **`Insumos`** (Catálogo principal)
@@ -54,7 +52,7 @@ Gestiona materia prima, empaques y componentes adquiridos a proveedores.
     *   `stock_minimo` (NUMERIC) - *Umbral de reposición; alimenta el reporte de stock crítico.*
     *   `costo_promedio_actual` (NUMERIC) - *Se actualiza dentro de la misma transacción que registra la compra.*
 *   **`Compras_Insumos`** (Historial y motor WAC)
-    *   `id` (PK), `insumo_id` (FK), `proveedor_id` (FK)
+    *   `id` (PK), `insumo_id` (FK)
     *   `fecha_compra` (DateTime)
     *   `cantidad_comprada` (NUMERIC)
     *   `precio_unitario_compra` (NUMERIC)
@@ -119,7 +117,7 @@ Controla las salidas, calcula márgenes y distribuye utilidades.
 2.  **Modelos ORM:** Traducir el esquema relacional a clases de SQLAlchemy (incluye `Clientes` y `Usuarios`).
 3.  **Migraciones:** Configurar Alembic para manejar cambios de esquema de manera controlada.
 4.  **Autenticación y permisos:** Login JWT y roles (`admin`, `operador`, `consulta`); los endpoints protegidos según rol.
-5.  **CRUD Básico:** `Proveedores`, `Categorias_Insumos`, `Insumos` y `Clientes`.
+5.  **CRUD Básico:** `Categorias_Insumos`, `Insumos` y `Clientes`.
 
 ### Fase 2: Lógica Central de Costos - WAC (Semana 3) — ✅ COMPLETADA
 1.  **Endpoint de Compras:** Registrar `Compras_Insumos`.
@@ -261,7 +259,7 @@ Este anexo documenta cómo se almacenan actualmente los datos de ARPIA en el arc
 | --- | --- |
 | `VENTAS` | Ventas por fila: producto, talla, precio venta, costo, ganancias, reparto (Reinversión / Margara / Valqui), fecha, canal y cliente. |
 | `INVENTARIO OCT25` | Stock separado en **MATERIAL** (telas/empaques), **HERRAJES** (argolla, varillas, ganchos) y **PRENDAS** (terminadas con talla): `INICIAL / VENTAS / FINAL`. |
-| `Proveedores` | Tipo, nombre, URL, precio unitario, ubicación, contactado. |
+| ~~`Proveedores`~~ | Hoja eliminada (2026-08): el workbook recalculado ya no la tiene; la entidad fue removida del ERP. |
 | `DESCUENTOS` | Descuento en $ y %, venta neta, ganancia y reparto por socio. |
 | `GASTOS ARPIA` | Gastos, retiros y distribución por socio. |
 | Hojas de producto (`CORSET`, `BUSTIER`, `Braleth`, etc.) | **Receta BOM real**: por cada insumo (tela, varilla, fijaciones), dimensión (ancho x alto), `cantidad Cms`, `valor metro` y `valor total`. |

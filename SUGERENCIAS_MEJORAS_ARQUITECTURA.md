@@ -30,7 +30,7 @@
   - Agregar `index=True` en modelos SQLAlchemy y generar una migración de Alembic:
     - `Ventas.cliente_id`, `Ventas.fecha`, `Ventas.canal_venta`, `Ventas.estado`
     - `Detalle_Ventas.venta_id`, `Detalle_Ventas.producto_id`, `Detalle_Ventas.variante_id`
-    - `Compras_Insumos.insumo_id`, `Compras_Insumos.proveedor_id`, `Compras_Insumos.fecha_compra`
+    - `Compras_Insumos.insumo_id`, `Compras_Insumos.fecha_compra`
     - `BOM_Insumos.insumo_id`, `BOM_Insumos.producto_id`
     - `Insumos.categoria_id`
     - `Items_Devolucion.devolucion_id`, `Items_Devolucion.producto_id`

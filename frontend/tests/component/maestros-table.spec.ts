@@ -68,7 +68,7 @@ describe('MaestrosTable (MOD-5)', () => {
   })
 
   it('renders a single-column table for a name-only entity config', async () => {
-    const wrapper = await mountTable([{ id: 1, nombre: 'Alimentos' }], MAESTRO_ENTITIES[2].columns)
+    const wrapper = await mountTable([{ id: 1, nombre: 'Alimentos' }], MAESTRO_ENTITIES[1].columns)
 
     expect(wrapper.text()).toContain('Nombre')
     expect(wrapper.text()).toContain('Alimentos')

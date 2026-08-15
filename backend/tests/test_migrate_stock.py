@@ -254,7 +254,7 @@ def test_aplicar_stock_no_pisa_costo_wac(db, mini_stock):
     tela.stock_actual = Decimal("0")
     tela.costo_promedio_actual = Decimal("0")
     db.flush()
-    registrar_compra(db, tela.id, None, Decimal("5"), Decimal("100"), commit=False)
+    registrar_compra(db, tela.id, Decimal("5"), Decimal("100"), commit=False)
     db.commit()
     assert tela.costo_promedio_actual == Decimal("100")  # WAC de F2 dejado
 

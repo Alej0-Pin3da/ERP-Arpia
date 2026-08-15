@@ -4,9 +4,9 @@ Covers the STRICT TDD acceptance from tasks #424 T4 (spec R-CAT, design #423):
 
 - Pure: name normalization for dedup, unit resolution, category/unit
   classifier, BOM junk-material filtering, bounded plan building from a
-  workbook (proveedores + insumos + productos + tipos).
+  workbook (insumos + productos + tipos).
 - DB (real PostgreSQL via SessionLocal): idempotent upserts for Tipos,
-  Proveedores, Insumos (dedup por nombre), Productos (variante NULL / dedup
+  Insumos (dedup por nombre), Productos (variante NULL / dedup
   por (producto_id, nombre_variante)).
 - Integration: dry-run of the real ARPIA.xlsx writes 0 rows (NFR-2); plan
   counts match the workbook; a hand-built mini CatalogPlan commits atomically
@@ -23,7 +23,7 @@ import openpyxl
 import pytest
 
 from app.db.session import SessionLocal
-from app.models import Insumo, Producto, Proveedor, TipoProducto
+from app.models import Insumo, Producto, TipoProducto
 from migrate.context import FaseOptions, MigrationContext
 
 REAL_XLSX = Path(r"C:\wamp64\www\ERP-Arpia\ARPIA.xlsx")
@@ -38,16 +38,11 @@ PREFIX_TEST = "Migratest"
 
 
 def _mini_workbook(path: Path) -> None:
-    """Mini ARPIA-like workbook: Proveedores + two BOM sheets with junk rows +
-    a mini INVENTARIO OCT25 block (cross-sheet dup material)."""
+    """Mini ARPIA-like workbook: two BOM sheets with junk rows + a mini
+    INVENTARIO OCT25 block (cross-sheet dup material)."""
     wb = openpyxl.Workbook()
-    prov = wb.active
-    prov.title = "Proveedores"
-    prov.append(["TIPO", "URL", "Precio Unidad", "Ubicacion", "Contactado"])
-    for nombre in ["Bexxhamel", "JM Confecciones", "SEHA Text", "ZureTex"]:
-        prov.append(["Camisetas", nombre, 11500, "Cali", "SI"])
-
-    bom1 = wb.create_sheet("CORSET")
+    bom1 = wb.active
+    bom1.title = "CORSET"
     bom1.append(["CORSET", None, None, None, None, None, None, None, "TANGA"])  # R1
     bom1.append(["Producto", "Ancho", "Alto", "cantidad Cms", "valor metro", "valor total"])  # R2
     bom1.append(["Tela Maya Test 1", 64, 37, 2368, 2.5, None])  # R3
@@ -109,9 +104,6 @@ def _borrar_filas_test(db) -> None:
                 f"{PREFIX_TEST} Insumo A",
             ]
         )
-    ).delete(synchronize_session=False)
-    db.query(Proveedor).filter(
-        Proveedor.nombre.in_([f"{PREFIX_TEST} Proveedor", f"{PREFIX_TEST} Prov2"])
     ).delete(synchronize_session=False)
     db.query(Producto).filter(
         Producto.nombre.in_(
@@ -295,16 +287,12 @@ def test_filtrar_materiales_validos_excluye_junk():
 # --------------------------------------------------------------------------- #
 
 
-def test_plan_workbook_mini_proveedores_insumos_dedup(mini_libro):
+def test_plan_workbook_mini_insumos_dedup(mini_libro):
     from migrate.catalog import plan_catalogo
     from migrate.loaders import LibroMigracion
 
     with LibroMigracion(mini_libro) as libro:
         plan = plan_catalogo(libro)
-
-    assert plan.conteo_proveedores == 4
-    nombres_prov = {p.nombre for p in plan.proveedores}
-    assert {"Bexxhamel", "JM Confecciones", "SEHA Text", "ZureTex"} <= nombres_prov
 
     # CORSET(4) + BLUSAS adds Sesgo; OCT25 adds 2; CAJAS adds 4 empaques;
     # 'Tela Maya Test 1' dedup across sheets.
@@ -389,18 +377,6 @@ def test_bootstrap_categorias_y_tipos_idempotente(db):
         assert db.query(TipoProducto).filter(TipoProducto.nombre == nombre).count() == 1
 
 
-def test_upsert_proveedor_idempotente(db):
-    from migrate.catalog import bootstrap_catalogo, clave_normalizada, upsert_proveedor
-
-    bootstrap_catalogo(db)
-    nombre = f"{PREFIX_TEST} Proveedor"
-    primero = upsert_proveedor(db, nombre, url="https://test.local")
-    segundo = upsert_proveedor(db, nombre, url="https://test.local")
-    assert primero.id == segundo.id  # mismo proveedor, no duplicado
-    assert db.query(Proveedor).filter(Proveedor.nombre == nombre).count() == 1
-    assert clave_normalizada(primero.nombre) == clave_normalizada(nombre)  # se guarda normalizado
-
-
 def test_upsert_insumo_dedup_por_nombre(db):
     from migrate.catalog import bootstrap_catalogo, upsert_insumo
 
@@ -454,7 +430,6 @@ def test_catalogar_dry_run_real_no_escribe():
     try:
         antes = (
             db.query(TipoProducto).count(),
-            db.query(Proveedor).count(),
             db.query(Insumo).count(),
             db.query(Producto).count(),
         )
@@ -462,16 +437,11 @@ def test_catalogar_dry_run_real_no_escribe():
         plan = catalogar(ctx)
         despues = (
             db.query(TipoProducto).count(),
-            db.query(Proveedor).count(),
             db.query(Insumo).count(),
             db.query(Producto).count(),
         )
         # NFR-2: dry-run termina con 0 filas escritas
         assert antes == despues
-        # The recalculated 16-sheet workbook (2026-08) dropped the Proveedores
-        # sheet -> the plan carries 0 proveedores (the mini/contract workbooks
-        # still have that sheet, so plan_workbook_mini_* keeps the old asserts).
-        assert plan.conteo_proveedores == 0
         assert plan.conteo_insumos >= 20  # recetas BOM + herrajes reales
         assert plan.conteo_productos == len(PRODUCTOS_CATALOGO)
     finally:
@@ -542,13 +512,11 @@ def test_aplicar_plan_transaccional_y_cleanup(db):
         CatalogPlan,
         InsumoPlan,
         ProductoPlan,
-        ProveedorPlan,
         aplicar_plan,
     )
 
     plan = CatalogPlan(
         tipos=["Lencería"],
-        proveedores=[ProveedorPlan(nombre=f"{PREFIX_TEST} Prov2")],
         insumos=[InsumoPlan(nombre=f"{PREFIX_TEST} Insumo A", unidad="m", categoria="Telas")],
         productos=[
             ProductoPlan(nombre=f"{PREFIX_TEST} P1", tipo="Set"),
@@ -560,4 +528,3 @@ def test_aplicar_plan_transaccional_y_cleanup(db):
 
     assert db.query(Producto).filter(Producto.nombre == f"{PREFIX_TEST} P2").count() == 1
     assert db.query(Insumo).filter(Insumo.nombre == f"{PREFIX_TEST} Insumo A").count() == 1
-    assert db.query(Proveedor).filter(Proveedor.nombre == f"{PREFIX_TEST} Prov2").count() == 1

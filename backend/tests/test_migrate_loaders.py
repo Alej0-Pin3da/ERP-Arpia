@@ -13,7 +13,7 @@ from migrate.loaders import (
 
 
 def _crear_libro(path: Path) -> None:
-    """Mini ARPIA-like workbook: VENTAS + Proveedores-like inflated sheet."""
+    """Mini ARPIA-like workbook: VENTAS + STICKERS inflated sheet."""
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "VENTAS"
@@ -23,11 +23,11 @@ def _crear_libro(path: Path) -> None:
     ws.append(["TOTEBAG", 45000, 25765.09524, None, "Camila"])
     ws.append(["", 95000, 29826, None, "Olga"])
     ws["M37"] = 65618.01429  # loose junk cell (as in real VENTAS)
-    # Proveedores: header + 4 real rows, then formatted rows up to 1001.
-    prov = wb.create_sheet("Proveedores")
-    prov.append(["TIPO", "URL", "Precio Unidad", "Ubicacion", "Contactado"])
+    # STICKERS: header + 4 real rows.
+    st = wb.create_sheet("STICKERS")
+    st.append(["TIPO", "URL", "Precio Unidad", "Ubicacion", "Contactado"])
     for nombre in ["Bexxhamel", "JM Confecciones", "SEHA Text", "ZureTex"]:
-        prov.append(["Camisetas", nombre, 11500, "Cali", "SI"])
+        st.append(["Camisetas", nombre, 11500, "Cali", "SI"])
     wb.save(path)
 
 
@@ -56,10 +56,10 @@ def test_rango_acotado_no_lee_fuera_del_rango(mini_libro):
         assert not any("M37" in fila for fila in lect.filas)
 
 
-def test_proveedores_matriz_inflada_acotada(mini_libro):
+def test_stickers_matriz_acotada(mini_libro):
     with LibroMigracion(mini_libro) as libro:
-        lect = libro.leer_hoja("Proveedores")
-        # Aunque openpyxl reporta max_row=1001, los bounds acotan a R2..R5.
+        lect = libro.leer_hoja("STICKERS")
+        # Bounds (2..33) acotan la lectura: 4 filas reales, sin vacias que descartar.
         assert len(lect.filas) == 4
         assert lect.descartadas == 0
 

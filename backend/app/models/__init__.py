@@ -10,7 +10,6 @@ from app.models.productos import (
     TipoProducto,
     VarianteProducto,
 )
-from app.models.proveedores import Proveedor
 from app.models.refresh_token import RefreshToken
 from app.models.usuarios import Usuario
 from app.models.ventas import DetalleVenta, Devolucion, DevolucionItem, Venta
@@ -20,7 +19,6 @@ __all__ = [
     "Usuario",
     "Cliente",
     "RefreshToken",
-    "Proveedor",
     "CategoriaInsumo",
     "Insumo",
     "CompraInsumo",

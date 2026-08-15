@@ -1,9 +1,8 @@
 """Excel loaders: bounded, per-sheet reading of ARPIA.xlsx (openpyxl 3.1.5).
 
 Design (EXM-1): iterate ONLY the real used range per sheet. Several sheets have
-inflated max_row (e.g. Proveedores reaches row 1001 while real data ends at 5;
-BOM matrices have junk blocks and ghost sub-tables). Each sheet declares bounds
-via ``SHEET_BOUNDS`` and known traps:
+inflated max_row (BOM matrices have junk blocks and ghost sub-tables). Each
+sheet declares bounds via ``SHEET_BOUNDS`` and known traps:
 
 - M37 in VENTAS is a loose outlier cell -> reported with sheet/row/cell;
 - CAMISETAS INV rows R10-13 are junk (real data ends at R9);
@@ -35,7 +34,6 @@ SHEET_BOUNDS: dict[str, tuple[int, int]] = {
     "ARPIA": (2, 9),  # header R1; matrix R2-9; junk R10-14
     "INVERSION VALQUI": (3, 137),  # header R2; sub-tab herrajes J-N right
     "INVERSION MARGARA": (3, 70),  # header R2; multi-tab right H-J
-    "Proveedores": (2, 5),  # header R1; matrix to R1001, real R2-5
     "IDEAS": (0, 0),  # no data rows (single URL cell only)
     "STICKERS": (2, 33),  # header R1
     "CAMISETAS INV": (2, 9),  # header R1 (misaligned cols); junk R10-17

@@ -18,25 +18,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models import CompraInsumo, Insumo, Proveedor
+from app.models import CompraInsumo, Insumo
 from app.services.wac import registrar_compra
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="module")
-def proveedor_id_fixture():
-    db = SessionLocal()
-    try:
-        proveedor = Proveedor(nombre="Proveedor WAC de Pruebas")
-        db.add(proveedor)
-        db.commit()
-        db.refresh(proveedor)
-        yield proveedor.id
-    finally:
-        db.close()
 
 
 def _cleanup_insumo(insumo_id: int) -> None:
@@ -103,7 +90,6 @@ def test_purchase_atomic_write_commits_stock_and_cost(categoria_fixture):
             compra = registrar_compra(
                 db,
                 insumo_id=insumo_id,
-                proveedor_id=None,
                 cantidad="10",
                 precio_unitario="9",
             )
@@ -120,53 +106,6 @@ def test_purchase_atomic_write_commits_stock_and_cost(categoria_fixture):
         _cleanup_insumo(insumo_id)
 
 
-def test_rollback_on_error_leaves_unmodified(categoria_fixture):
-    """A rejected purchase (proveedor inexistente -> 400) writes nothing."""
-    insumo_id = _make_insumo(categoria_fixture["id"], stock="10", costo="5")
-    try:
-        db = SessionLocal()
-        try:
-            with pytest.raises(HTTPException) as exc_info:
-                registrar_compra(
-                    db,
-                    insumo_id=insumo_id,
-                    proveedor_id=99999999,
-                    cantidad="10",
-                    precio_unitario="9",
-                )
-        finally:
-            db.close()
-        assert exc_info.value.status_code == 400
-        stock, costo = _read_inventory(insumo_id)
-        assert stock == Decimal("10")
-        assert costo == Decimal("5")
-        assert _purchase_count(insumo_id) == 0
-    finally:
-        _cleanup_insumo(insumo_id)
-
-
-def test_purchase_with_valid_proveedor_commits(categoria_fixture, proveedor_id_fixture):
-    ins = _make_insumo(categoria_fixture["id"], stock="0", costo="0")
-    try:
-        db = SessionLocal()
-        try:
-            compra = registrar_compra(
-                db,
-                insumo_id=ins,
-                proveedor_id=proveedor_id_fixture,
-                cantidad="10",
-                precio_unitario="9",
-            )
-        finally:
-            db.close()
-        assert compra.proveedor_id == proveedor_id_fixture
-        stock, costo = _read_inventory(ins)
-        assert stock == Decimal("10")
-        assert costo == Decimal("9")
-    finally:
-        _cleanup_insumo(ins)
-
-
 # ---------------------------------------------------------------------------
 # Requirement: Weighted-average cost formula
 # ---------------------------------------------------------------------------
@@ -177,9 +116,7 @@ def test_wac_equal_prices_keeps_cost_stable(categoria_fixture):
     try:
         db = SessionLocal()
         try:
-            registrar_compra(
-                db, insumo_id=insumo_id, proveedor_id=None, cantidad="10", precio_unitario="5"
-            )
+            registrar_compra(db, insumo_id=insumo_id, cantidad="10", precio_unitario="5")
         finally:
             db.close()
         stock, costo = _read_inventory(insumo_id)
@@ -194,9 +131,7 @@ def test_wac_price_fluctuation_moves_average(categoria_fixture):
     try:
         db = SessionLocal()
         try:
-            registrar_compra(
-                db, insumo_id=ins, proveedor_id=None, cantidad="10", precio_unitario="9"
-            )
+            registrar_compra(db, insumo_id=ins, cantidad="10", precio_unitario="9")
         finally:
             db.close()
         stock, costo = _read_inventory(ins)
@@ -211,9 +146,7 @@ def test_wac_higher_priced_lot_raises_cost(categoria_fixture):
     try:
         db = SessionLocal()
         try:
-            registrar_compra(
-                db, insumo_id=ins, proveedor_id=None, cantidad="50", precio_unitario="8"
-            )
+            registrar_compra(db, insumo_id=ins, cantidad="50", precio_unitario="8")
         finally:
             db.close()
         stock, costo = _read_inventory(ins)
@@ -228,9 +161,7 @@ def test_wac_zero_stock_yields_unit_price(categoria_fixture):
     try:
         db = SessionLocal()
         try:
-            registrar_compra(
-                db, insumo_id=ins, proveedor_id=None, cantidad="20", precio_unitario="7"
-            )
+            registrar_compra(db, insumo_id=ins, cantidad="20", precio_unitario="7")
         finally:
             db.close()
         stock, costo = _read_inventory(ins)
@@ -251,9 +182,7 @@ def test_wac_precision_no_engine_rounding(categoria_fixture):
     try:
         db = SessionLocal()
         try:
-            registrar_compra(
-                db, insumo_id=ins, proveedor_id=None, cantidad="3", precio_unitario="4"
-            )
+            registrar_compra(db, insumo_id=ins, cantidad="3", precio_unitario="4")
         finally:
             db.close()
         stock, costo = _read_inventory(ins)
@@ -283,7 +212,6 @@ def test_integrity_error_maps_to_409(categoria_fixture, monkeypatch):
                 registrar_compra(
                     db,
                     insumo_id=ins,
-                    proveedor_id=None,
                     cantidad="10",
                     precio_unitario="9",
                 )
@@ -305,31 +233,10 @@ def test_nonexistent_insumo_returns_404(categoria_fixture):
     db = SessionLocal()
     with pytest.raises(HTTPException) as exc_info:
         try:
-            registrar_compra(
-                db, insumo_id=99999999, proveedor_id=None, cantidad="10", precio_unitario="9"
-            )
+            registrar_compra(db, insumo_id=99999999, cantidad="10", precio_unitario="9")
         finally:
             db.close()
     assert exc_info.value.status_code == 404
-
-
-def test_nonexistent_proveedor_returns_400(categoria_fixture):
-    ins = _make_insumo(categoria_fixture["id"], stock="0", costo="0")
-    try:
-        db = SessionLocal()
-        with pytest.raises(HTTPException) as exc_info:
-            try:
-                registrar_compra(
-                    db, insumo_id=ins, proveedor_id=99999999, cantidad="10", precio_unitario="9"
-                )
-            finally:
-                db.close()
-        assert exc_info.value.status_code == 400
-        stock, costo = _read_inventory(ins)
-        assert stock == Decimal("0")
-        assert costo == Decimal("0")
-    finally:
-        _cleanup_insumo(ins)
 
 
 # ---------------------------------------------------------------------------
@@ -351,7 +258,6 @@ def test_concurrent_purchases_same_insumo(categoria_fixture):
             registrar_compra(
                 db,
                 insumo_id=insumo_id,
-                proveedor_id=None,
                 cantidad=cantidad,
                 precio_unitario=precio,
             )
@@ -389,9 +295,7 @@ def test_different_insumos_run_in_parallel(categoria_fixture):
         db = SessionLocal()
         try:
             barrier.wait(timeout=10)
-            registrar_compra(
-                db, insumo_id=insumo_id, proveedor_id=None, cantidad="10", precio_unitario="9"
-            )
+            registrar_compra(db, insumo_id=insumo_id, cantidad="10", precio_unitario="9")
         except Exception as exc:  # noqa: BLE001
             results[slot] = exc
         finally:
@@ -442,7 +346,6 @@ def test_compra_fecha_explicita_persistida(categoria_fixture):
             compra = registrar_compra(
                 db,
                 insumo_id=ins,
-                proveedor_id=None,
                 cantidad="10",
                 precio_unitario="9",
                 fecha_compra=fecha,
@@ -470,7 +373,6 @@ def test_compra_fecha_none_usa_server_default(categoria_fixture):
             compra = registrar_compra(
                 db,
                 insumo_id=ins,
-                proveedor_id=None,
                 cantidad="10",
                 precio_unitario="9",
                 fecha_compra=None,
@@ -496,7 +398,6 @@ def test_compra_fecha_naive_rechazada(categoria_fixture):
                 registrar_compra(
                     db,
                     insumo_id=ins,
-                    proveedor_id=None,
                     cantidad="10",
                     precio_unitario="9",
                     fecha_compra=datetime(2025, 10, 25, 14, 30, 0),  # naive
@@ -520,7 +421,6 @@ def test_commit_false_rollback_deja_sin_efecto(categoria_fixture):
             registrar_compra(
                 db,
                 insumo_id=ins,
-                proveedor_id=None,
                 cantidad="10",
                 precio_unitario="9",
                 fecha_compra=datetime(2025, 10, 25, tzinfo=UTC),
@@ -546,7 +446,6 @@ def test_commit_false_transaccion_controlada_por_caller(categoria_fixture):
             compra = registrar_compra(
                 db,
                 insumo_id=ins,
-                proveedor_id=None,
                 cantidad="10",
                 precio_unitario="9",
                 fecha_compra=datetime(2025, 10, 25, tzinfo=UTC),

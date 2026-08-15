@@ -3,12 +3,12 @@
  * Maestros view (PR11, spec MOD-5 maestros part).
  *
  * One config-driven CRUD screen per master-data entity — Clientes,
- * Proveedores, Tipos de producto, Categorías de insumos — as four tabs.
+ * Tipos de producto, Categorías de insumos — as three tabs.
  * Every tab renders the SAME generic pattern (MaestroForm + MaestrosTable)
  * driven by its per-entity config (`MAESTRO_ENTITIES`), and every CRUD
  * round-trip shares one handler set keyed by entity:
  *
- *  - list: GET /{clientes,proveedores,tipos-producto,categorias-insumos}
+ *  - list: GET /{clientes,tipos-producto,categorias-insumos}
  *    with limit=1000 (the backend defaults to limit=50)
  *  - create/edit: POST/PUT with the exact schema payload built by the
  *    per-entity builders (utils/maestros) — nombre required, empty optional
@@ -26,7 +26,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   categoriasInsumosApi,
   clientesApi,
-  proveedoresApi,
   tiposProductoApi,
 } from '@/api/endpoints'
 import MaestroForm from '@/components/maestros/MaestroForm.vue'
@@ -38,8 +37,6 @@ import {
   buildCategoriaInsumoUpdatePayload,
   buildClientePayload,
   buildClienteUpdatePayload,
-  buildProveedorPayload,
-  buildProveedorUpdatePayload,
   buildTipoProductoPayload,
   buildTipoProductoUpdatePayload,
   MAESTRO_ENTITIES,
@@ -59,46 +56,39 @@ const error = ref<string | null>(null)
 
 const rows = ref<Record<EntityKey, MaestroRow[]>>({
   clientes: [],
-  proveedores: [],
   'tipos-producto': [],
   'categorias-insumos': [],
 })
 /** Server totals per entity (FE-1: total comes from the API). */
 const totals = ref<Record<EntityKey, number>>({
   clientes: 0,
-  proveedores: 0,
   'tipos-producto': 0,
   'categorias-insumos': 0,
 })
 const pages = ref<Record<EntityKey, number>>({
   clientes: 1,
-  proveedores: 1,
   'tipos-producto': 1,
   'categorias-insumos': 1,
 })
 const pageSize = 20
 const searchQ = ref<Record<EntityKey, string>>({
   clientes: '',
-  proveedores: '',
   'tipos-producto': '',
   'categorias-insumos': '',
 })
 const editing = ref<Record<EntityKey, MaestroRow | null>>({
   clientes: null,
-  proveedores: null,
   'tipos-producto': null,
   'categorias-insumos': null,
 })
 const saving = ref<Record<EntityKey, boolean>>({
   clientes: false,
-  proveedores: false,
   'tipos-producto': false,
   'categorias-insumos': false,
 })
 /** T8/FE-DLG-1: one el-dialog per entity, opened from the toolbar button. */
 const dialogVisible = ref<Record<EntityKey, boolean>>({
   clientes: false,
-  proveedores: false,
   'tipos-producto': false,
   'categorias-insumos': false,
 })
@@ -106,13 +96,12 @@ const dialogVisible = ref<Record<EntityKey, boolean>>({
 /** URL id param key per entity (backend path params). */
 const ID_KEYS: Record<EntityKey, string> = {
   clientes: 'cliente_id',
-  proveedores: 'proveedor_id',
   'tipos-producto': 'tipo_producto_id',
   'categorias-insumos': 'categoria_id',
 }
 
 /**
- * Uniform CRUD surface over the four APIs. The endpoints accept their own
+ * Uniform CRUD surface over the three APIs. The endpoints accept their own
  * generated body types (ClienteCreate etc.); the per-entity builders return
  * exactly those shapes, which are assignable to Record<string, string|null>
  * (all optionals are `string | null`), so the handlers stay generic.
@@ -126,7 +115,6 @@ interface EntityCrud {
 
 const crudApis: Record<EntityKey, EntityCrud> = {
   clientes: clientesApi as unknown as EntityCrud,
-  proveedores: proveedoresApi as unknown as EntityCrud,
   'tipos-producto': tiposProductoApi as unknown as EntityCrud,
   'categorias-insumos': categoriasInsumosApi as unknown as EntityCrud,
 }
@@ -139,7 +127,6 @@ const BUILDERS: Record<
   }
 > = {
   clientes: { create: buildClientePayload, update: buildClienteUpdatePayload },
-  proveedores: { create: buildProveedorPayload, update: buildProveedorUpdatePayload },
   'tipos-producto': { create: buildTipoProductoPayload, update: buildTipoProductoUpdatePayload },
   'categorias-insumos': { create: buildCategoriaInsumoPayload, update: buildCategoriaInsumoUpdatePayload },
 }
@@ -152,9 +139,6 @@ async function load(): Promise<void> {
       clientes: clientesApi.list(
         buildListParams({ page: pages.value.clientes, pageSize, q: searchQ.value.clientes }),
       ),
-      proveedores: proveedoresApi.list(
-        buildListParams({ page: pages.value.proveedores, pageSize, q: searchQ.value.proveedores }),
-      ),
       'tipos-producto': tiposProductoApi.list(
         buildListParams({ page: pages.value['tipos-producto'], pageSize, q: searchQ.value['tipos-producto'] }),
       ),
@@ -162,18 +146,15 @@ async function load(): Promise<void> {
         buildListParams({ page: pages.value['categorias-insumos'], pageSize, q: searchQ.value['categorias-insumos'] }),
       ),
     }
-    const [clientes, proveedores, tipos, categorias] = await Promise.all([
+    const [clientes, tipos, categorias] = await Promise.all([
       requests.clientes,
-      requests.proveedores,
       requests['tipos-producto'],
       requests['categorias-insumos'],
     ])
     rows.value.clientes = clientes.items
-    rows.value.proveedores = proveedores.items
     rows.value['tipos-producto'] = tipos.items
     rows.value['categorias-insumos'] = categorias.items
     totals.value.clientes = clientes.total
-    totals.value.proveedores = proveedores.total
     totals.value['tipos-producto'] = tipos.total
     totals.value['categorias-insumos'] = categorias.total
   } catch {

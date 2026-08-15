@@ -7,7 +7,7 @@ checks against the session the CLI provides and reports ERRORs/WARNs.
 
 Checks (spec EXM-5, NFR-1/2; design #423; slice-8 contract N7a-g):
 
-- N7a "conteos": rows per domain (tipos, proveedores, insumos, productos,
+- N7a "conteos": rows per domain (tipos, insumos, productos,
   BOM_-insumos, compras, ventas, movimientos, socios). Identity is the plan's
   own rows (normalized names / natural identifiers); the DB is checked for
   each expected identifier: missing -> WARN (with cause), duplicated rows of
@@ -48,7 +48,6 @@ from app.models import (
     Insumo,
     MovimientoFinanciero,
     Producto,
-    Proveedor,
     SociosConfiguracion,
     TipoProducto,
     VarianteProducto,
@@ -217,7 +216,6 @@ def _productos_del_plan(plan: PlanValidacion) -> list[str]:
 def _n7a_conteos(db, plan: PlanValidacion) -> CheckResult:
     """Dominios tipificados: esperado = filas del plan; DB = filas con identidad."""
     esperados_por_dominio: list[tuple[str, list[str]]] = [
-        ("proveedores", [normalizar_nombre(p.nombre) for p in plan.catalogo.proveedores]),
         ("insumos", [normalizar_nombre(i.nombre) for i in plan.catalogo.insumos]),
         ("tipos", [normalizar_nombre(t) for t in plan.catalogo.tipos]),
         ("productos", _productos_del_plan(plan)),
@@ -234,7 +232,6 @@ def _n7a_conteos(db, plan: PlanValidacion) -> CheckResult:
         ("socios", [normalizar_nombre(n) for n, _ in SOCIOS]),
     ]
     db_claves = {
-        "proveedores": _conteo_por_clave(db, Proveedor.nombre),
         "insumos": _conteo_por_clave(db, Insumo.nombre),
         "tipos": _conteo_por_clave(db, TipoProducto.nombre),
         "productos": _conteo_por_clave(db, Producto.nombre),
@@ -668,7 +665,7 @@ def cargar_validate(ctx: MigrationContext) -> PlanValidacion:
         "F7",
         None,
         None,
-        f"plan validacion: proveedores {len(plan.catalogo.proveedores)} | "
+        f"plan validacion: "
         f"insumos {len(plan.catalogo.insumos)} | productos {len(_productos_del_plan(plan))} "
         f"| bom {len(plan.bom.insumos)} | compras {len(plan.compras.compras)} "
         f"| ventas {len(plan.ventas.ventas)} | movimientos {len(plan.finanzas.movimientos)}",

@@ -350,27 +350,6 @@ export const clientesApi = {
   },
 }
 
-export const proveedoresApi = {
-  /** GET /proveedores — supports limit/offset (the backend defaults to limit=50). */
-  list(params?: Query<'/api/v1/proveedores', 'get'>): Promise<Res<'/api/v1/proveedores', 'get'>> {
-    return client.get('/proveedores', { params }).then((r) => r.data)
-  },
-  create(body: ReqBody<'/api/v1/proveedores', 'post'>): Promise<Res<'/api/v1/proveedores', 'post'>> {
-    return client.post('/proveedores', body).then((r) => r.data)
-  },
-  update(
-    params: PathParams<'/api/v1/proveedores/{proveedor_id}', 'put'>,
-    body: ReqBody<'/api/v1/proveedores/{proveedor_id}', 'put'>,
-  ): Promise<Res<'/api/v1/proveedores/{proveedor_id}', 'put'>> {
-    return client.put(`/proveedores/${params.proveedor_id}`, body).then((r) => r.data)
-  },
-  delete(
-    params: PathParams<'/api/v1/proveedores/{proveedor_id}', 'delete'>,
-  ): Promise<Res<'/api/v1/proveedores/{proveedor_id}', 'delete'>> {
-    return client.delete(`/proveedores/${params.proveedor_id}`).then((r) => r.data)
-  },
-}
-
 export const tiposProductoApi = {
   /** GET /tipos-producto — supports limit/offset (the backend defaults to limit=50). */
   list(params?: Query<'/api/v1/tipos-producto', 'get'>): Promise<Res<'/api/v1/tipos-producto', 'get'>> {
