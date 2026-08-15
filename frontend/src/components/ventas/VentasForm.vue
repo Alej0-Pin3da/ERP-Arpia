@@ -20,12 +20,18 @@ import {
   canalLabel,
   computeTotalPreview,
   createDetalleRow,
+  detallesSinVariante,
   hasValidDetalles,
   type CanalVenta,
   type VentaCreate,
   type VentasFormDetalle,
 } from '@/utils/ventas'
-import type { ClienteRead, ProductoRead, VarianteProductoRead, VentaRead } from '@/types/api.d'
+import type { components } from '@/types/api.d'
+
+type ClienteRead = components['schemas']['ClienteRead']
+type ProductoRead = components['schemas']['ProductoRead']
+type VarianteProductoRead = components['schemas']['VarianteProductoRead']
+type VentaRead = components['schemas']['VentaRead']
 
 const props = withDefaults(
   defineProps<{
@@ -62,11 +68,26 @@ function variantesDe(row: VentasFormDetalle): VarianteProductoRead[] {
   return row.producto_id === null ? [] : (variantesPorProducto.value[row.producto_id] ?? [])
 }
 
-/** Lazy-load (and cache) the variantes of a product. */
-async function loadVariantesFor(productoId: number): Promise<void> {
-  if (variantesPorProducto.value[productoId] !== undefined) return
-  const variantes = await props.loadVariantes(productoId)
-  variantesPorProducto.value = { ...variantesPorProducto.value, [productoId]: variantes }
+/** In-flight variant loads per product — concurrent callers share the same
+ *  promise so submit() can await the load that `onProductoChange` started
+ *  (D6: closes the submit-before-load race, VV-4). */
+const variantesEnVuelo = new Map<number, Promise<void>>()
+
+/** Lazy-load (and cache) the variantes of a product; idempotent per product. */
+function loadVariantesFor(productoId: number): Promise<void> {
+  if (variantesPorProducto.value[productoId] !== undefined) return Promise.resolve()
+  const enVuelo = variantesEnVuelo.get(productoId)
+  if (enVuelo) return enVuelo
+  const carga = props
+    .loadVariantes(productoId)
+    .then((variantes) => {
+      variantesPorProducto.value = { ...variantesPorProducto.value, [productoId]: variantes }
+    })
+    .finally(() => {
+      variantesEnVuelo.delete(productoId)
+    })
+  variantesEnVuelo.set(productoId, carga)
+  return carga
 }
 
 /**
@@ -116,10 +137,30 @@ function removeRow(index: number): void {
   detalles.value.splice(index, 1)
 }
 
-/** MOD-1: block empty detalles (client-side) before emitting the payload. */
-function submit(): void {
+/**
+ * MOD-1: block empty detalles (client-side) before emitting the payload.
+ * VV-1/D6: wait for any in-flight variant loads, then block (warning, no
+ * emit) while any sized row still lacks its variant — same path for create
+ * and edit (edit prefill feeds `detalles`, so a sized line prefilled with
+ * `variante_id: null` is blocked until a variant is chosen).
+ */
+async function submit(): Promise<void> {
   if (!hasValidDetalles(detalles.value)) {
     ElMessage.warning('Agrega al menos un detalle con producto y cantidad mayor a cero.')
+    return
+  }
+
+  const ids = [
+    ...new Set(
+      detalles.value
+        .map((d) => d.producto_id)
+        .filter((id): id is number => id !== null),
+    ),
+  ]
+  await Promise.all(ids.map(loadVariantesFor))
+
+  if (detallesSinVariante(detalles.value, variantesPorProducto.value).length > 0) {
+    ElMessage.warning('Los productos con talla requieren seleccionar una variante.')
     return
   }
   emit('submit', buildVentaPayload({
@@ -209,7 +250,7 @@ function submit(): void {
         v-model="row.variante_id"
         clearable
         placeholder="Variante (opcional)"
-        :disabled="row.producto_id === null"
+        :disabled="variantesDe(row).length === 0"
         class="venta-field"
         data-test="variante-select"
       >

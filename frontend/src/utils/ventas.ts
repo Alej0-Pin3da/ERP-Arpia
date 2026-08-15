@@ -168,6 +168,31 @@ export function hasValidDetalles(detalles: VentasFormDetalle[]): boolean {
   return detalles.some((d) => d.producto_id !== null && d.cantidad > 0)
 }
 
+/**
+ * VV-1: a row requires a variant when it has a product AND that product has
+ * at least one loaded variante (null product / empty list -> not required).
+ */
+export function requiereVariante(row: VentasFormDetalle, variantes: VarianteProductoRead[]): boolean {
+  return row.producto_id !== null && variantes.length > 0
+}
+
+/**
+ * VV-1: the rows that would be rejected by the backend 400 guard — a sized
+ * product (loaded variantes) whose row has no variante chosen. The variant
+ * cache is per product; unknown products degrade to "no variants".
+ */
+export function detallesSinVariante(
+  detalles: VentasFormDetalle[],
+  variantesPorProducto: Record<number, VarianteProductoRead[]>,
+): VentasFormDetalle[] {
+  return detalles.filter(
+    (d) =>
+      d.producto_id !== null &&
+      d.variante_id === null &&
+      (variantesPorProducto[d.producto_id] ?? []).length > 0,
+  )
+}
+
 /** Sum of cantidad * precio_unitario over the form rows (unparseable price = 0). */
 export function ventaSubtotal(detalles: VentasFormDetalle[]): number {
   return detalles.reduce((sum, d) => {
