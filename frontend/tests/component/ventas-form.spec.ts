@@ -16,6 +16,7 @@ import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import VentasForm from '@/components/ventas/VentasForm.vue'
+import type { VentaCreate } from '@/utils/ventas'
 import type { components } from '@/types/api.d'
 
 type ClienteRead = components['schemas']['ClienteRead']
@@ -40,6 +41,14 @@ const PRODUCTOS: ProductoRead[] = [
     costos_operativos_fijos: '0',
     precio_venta_sugerido: '8000',
   },
+  {
+    id: 3,
+    tipo_producto_id: 1,
+    nombre: 'Caja Saca Las Garras',
+    requiere_fabricacion: true,
+    costos_operativos_fijos: '0',
+    precio_venta_sugerido: '12000',
+  },
 ]
 
 const CLIENTES: ClienteRead[] = [
@@ -57,7 +66,11 @@ const VARIANTES: VarianteProductoRead[] = [
   { id: 5, producto_id: 1, nombre_variante: 'Grande', precio_venta: '6000' },
 ]
 
-const loadVariantes = vi.fn().mockResolvedValue(VARIANTES)
+/** Fixture variant loader: product 1 is sized (has variants); 2 and 3 load none. */
+const loadVariantes = vi.fn().mockImplementation(
+  (productoId: number): Promise<VarianteProductoRead[]> =>
+    Promise.resolve(productoId === 1 ? VARIANTES : []),
+)
 
 /** A completed venta used as the `initial` prefill for edit mode. */
 const VENTA_EDIT: VentaRead = {
@@ -74,6 +87,28 @@ const VENTA_EDIT: VentaRead = {
       id: 1,
       producto_id: 1,
       variante_id: 5,
+      cantidad: '2',
+      precio_unitario_aplicado: '5000.00',
+      costo_unitario_aplicado: '2000.00',
+    },
+  ],
+}
+
+/** VV-1 edit prefill: a sized product line whose stored variant is NULL. */
+const VENTA_EDIT_SIN_VARIANTE: VentaRead = {
+  id: 11,
+  fecha: '2026-08-02T10:30:00Z',
+  cliente_id: null,
+  canal_venta: 'web',
+  descuento_porcentaje: '0',
+  estado: 'completada',
+  es_regalo: false,
+  total_venta: '10000.00',
+  detalles: [
+    {
+      id: 2,
+      producto_id: 1,
+      variante_id: null,
       cantidad: '2',
       precio_unitario_aplicado: '5000.00',
       costo_unitario_aplicado: '2000.00',
@@ -218,6 +253,7 @@ describe('VentasForm (MOD-1 register)', () => {
     const wrapper = await mountForm()
 
     await pickOption(wrapper.find('[data-test="producto-select"]'), 'Arepa de huevo') // 5000
+    await pickOption(wrapper.find('[data-test="variante-select"]'), 'Grande') // VV-1: sized product
     await wrapper.find('[data-test="es-regalo-toggle"]').trigger('click')
     await nextTick()
 
@@ -232,7 +268,7 @@ describe('VentasForm (MOD-1 register)', () => {
       canal_venta: 'web',
       descuento_porcentaje: 0,
       es_regalo: true,
-      detalles: [{ producto_id: 1, cantidad: 1, precio_unitario: 5000 }],
+      detalles: [{ producto_id: 1, variante_id: 5, cantidad: 1, precio_unitario: 5000 }],
     })
   })
 
@@ -283,5 +319,99 @@ describe('VentasForm (MOD-1 register)', () => {
       es_regalo: true,
       detalles: [{ producto_id: 1, variante_id: 5, cantidad: 2, precio_unitario: 5000 }],
     })
+  })
+
+  it('VV-1: blocks a sized product without a variant and emits nothing', async () => {
+    const wrapper = await mountForm()
+
+    await pickOption(wrapper.find('[data-test="producto-select"]'), 'Arepa de huevo')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('requieren seleccionar una variante')
+    expect(wrapper.emitted('submit')).toBeUndefined()
+  })
+
+  it('VV-1: emits with variante_id once a variant is chosen for the sized product', async () => {
+    const wrapper = await mountForm()
+
+    await pickOption(wrapper.find('[data-test="producto-select"]'), 'Arepa de huevo')
+    await pickOption(wrapper.find('[data-test="variante-select"]'), 'Grande')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const emitted = wrapper.emitted<VentaCreate[]>('submit')
+    expect(emitted).toBeDefined()
+    expect(emitted![0][0].detalles[0]).toMatchObject({
+      producto_id: 1,
+      variante_id: 5,
+      cantidad: 1,
+      precio_unitario: 5000,
+    })
+  })
+
+  it('VV-2: a variant-less product submits without a variante', async () => {
+    const wrapper = await mountForm()
+
+    await pickOption(wrapper.find('[data-test="producto-select"]'), 'Jugo de naranja')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const emitted = wrapper.emitted<VentaCreate[]>('submit')
+    expect(emitted).toBeDefined()
+    expect(emitted![0][0].detalles[0]).toEqual({ producto_id: 2, cantidad: 1, precio_unitario: 8000 })
+    expect(emitted![0][0].detalles[0]).not.toHaveProperty('variante_id')
+  })
+
+  it('VV-2: the variant select is disabled on an empty line', async () => {
+    const wrapper = await mountForm()
+
+    expect(wrapper.find('[data-test="variante-select"] input').attributes('disabled')).toBeDefined()
+  })
+
+  it('VV-4: the select stays disabled when the loaded variant list is empty', async () => {
+    const wrapper = await mountForm()
+
+    await pickOption(wrapper.find('[data-test="producto-select"]'), 'Jugo de naranja')
+    expect(loadVariantes).toHaveBeenCalledWith(2)
+    expect(wrapper.find('[data-test="variante-select"] input').attributes('disabled')).toBeDefined()
+  })
+
+  it('VV-4: a sized product enables the select once its variants load', async () => {
+    const wrapper = await mountForm()
+
+    await pickOption(wrapper.find('[data-test="producto-select"]'), 'Arepa de huevo')
+    expect(loadVariantes).toHaveBeenCalledWith(1)
+    expect(wrapper.find('[data-test="variante-select"] input').attributes('disabled')).toBeUndefined()
+  })
+
+  it('VV-3: a combo sale submits one detail without a variante', async () => {
+    const wrapper = await mountForm()
+
+    await pickOption(wrapper.find('[data-test="producto-select"]'), 'Caja Saca Las Garras')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    const emitted = wrapper.emitted<VentaCreate[]>('submit')
+    expect(emitted).toBeDefined()
+    expect(emitted![0][0].detalles).toHaveLength(1)
+    expect(emitted![0][0].detalles[0]).toEqual({ producto_id: 3, cantidad: 1, precio_unitario: 12000 })
+    expect(emitted![0][0].detalles[0]).not.toHaveProperty('variante_id')
+  })
+
+  it('VV-1: edit prefill with a sized product and null variant is blocked until a variant is chosen', async () => {
+    const wrapper = await mountEditForm(VENTA_EDIT_SIN_VARIANTE)
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(document.body.textContent).toContain('requieren seleccionar una variante')
+    expect(wrapper.emitted('submit')).toBeUndefined()
+
+    await pickOption(wrapper.find('[data-test="variante-select"]'), 'Grande')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    const emitted = wrapper.emitted<VentaCreate[]>('submit')
+    expect(emitted).toBeDefined()
+    expect(emitted![0][0].detalles[0]).toMatchObject({ producto_id: 1, variante_id: 5 })
   })
 })
