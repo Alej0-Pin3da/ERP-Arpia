@@ -19,8 +19,10 @@ import {
   canalLabel,
   computeTotalPreview,
   createDetalleRow,
+  detallesSinVariante,
   estadoLabel,
   hasValidDetalles,
+  requiereVariante,
   sliceVentas,
   ventaSubtotal,
   type VentasFormDetalle,
@@ -251,6 +253,59 @@ describe('hasValidDetalles (MOD-1 min 1 detalle, cantidad > 0)', () => {
 
   it('accepts at least one complete row', () => {
     expect(hasValidDetalles([detalleRow({ producto_id: null }), detalleRow()])).toBe(true)
+  })
+})
+
+describe('requiereVariante (VV-1 variant-required predicate)', () => {
+  it('returns false when no product is selected', () => {
+    expect(requiereVariante(detalleRow({ producto_id: null }), [variante(5, 1, 'XL')])).toBe(false)
+  })
+
+  it('returns false when the product has zero loaded variantes', () => {
+    expect(requiereVariante(detalleRow({ producto_id: 1 }), [])).toBe(false)
+  })
+
+  it('returns true when the product has at least one variante', () => {
+    expect(requiereVariante(detalleRow({ producto_id: 1 }), [variante(5, 1, 'XL')])).toBe(true)
+  })
+})
+
+describe('detallesSinVariante (VV-1 block-list predicate)', () => {
+  const VARIANTES_POR_PRODUCTO: Record<number, VarianteProductoRead[]> = {
+    1: [variante(5, 1, 'XL'), variante(6, 1, 'M')],
+  }
+
+  it('returns a sized row missing its variante', () => {
+    const sin = detallesSinVariante(
+      [detalleRow({ producto_id: 1, variante_id: null })],
+      VARIANTES_POR_PRODUCTO,
+    )
+    expect(sin).toHaveLength(1)
+    expect(sin[0]).toMatchObject({ producto_id: 1, variante_id: null })
+  })
+
+  it('does not return a sized row that already has a variante chosen', () => {
+    const sin = detallesSinVariante(
+      [detalleRow({ producto_id: 1, variante_id: 5 })],
+      VARIANTES_POR_PRODUCTO,
+    )
+    expect(sin).toEqual([])
+  })
+
+  it('does not return a variant-less product row', () => {
+    const sin = detallesSinVariante(
+      [detalleRow({ producto_id: 2, variante_id: null })],
+      VARIANTES_POR_PRODUCTO,
+    )
+    expect(sin).toEqual([])
+  })
+
+  it('does not return a row without a product', () => {
+    const sin = detallesSinVariante(
+      [detalleRow({ producto_id: null, variante_id: null })],
+      VARIANTES_POR_PRODUCTO,
+    )
+    expect(sin).toEqual([])
   })
 })
 
