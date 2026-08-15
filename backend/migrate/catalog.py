@@ -90,17 +90,49 @@ HOJAS_BOM_RECETAS: tuple[str, ...] = (
 )
 
 # Product universe derived from the workbook (fuente = provenance sheet).
+# ``variantes`` tupled products seed one Variante_Producto per size (MIG-1):
+# sizes XXS..XL share the product price, so ``precio_venta`` stays NULL.
 PRODUCTOS_CATALOGO: tuple[dict[str, object], ...] = (
     {"nombre": "Bralete", "tipo": "Lencería", "fuente": "'Noche y Dia' bloque BRALETE"},
     {"nombre": "Corset Artemisia", "tipo": "Corsetería", "fuente": "hoja 'CORSET ARTEMISIA'"},
     {"nombre": "Corset Hypatia", "tipo": "Corsetería", "fuente": "hoja 'Corset Hypatia'"},
     {"nombre": "Corset Garras", "tipo": "Corsetería", "fuente": "hoja 'Corset Garras'"},
     {"nombre": "Falda Emily", "tipo": "Lencería", "fuente": "hoja 'FALDA EMILY'"},
-    {"nombre": "Blusa Manga Larga", "tipo": "Blusa", "fuente": "hoja 'BLUSAS' bloque MANGA LARGA"},
-    {"nombre": "Blusa Manga Corta", "tipo": "Blusa", "fuente": "hoja 'BLUSAS' bloque MANGA CORTA"},
+    {
+        "nombre": "Blusa Manga Larga",
+        "tipo": "Blusa",
+        "fuente": "hoja 'BLUSAS' bloque MANGA LARGA",
+        "variantes": ("XXS", "XS", "S", "M", "L", "XL"),
+    },
+    {
+        "nombre": "Blusa Manga Corta",
+        "tipo": "Blusa",
+        "fuente": "hoja 'BLUSAS' bloque MANGA CORTA",
+        "variantes": ("XXS", "XS", "S", "M", "L", "XL"),
+    },
     {"nombre": "Tote Bag Arpia", "tipo": "Accesorio", "fuente": "hoja 'TOTEBAG'"},
-    {"nombre": "Set Aelo", "tipo": "Set", "fuente": "VENTAS/CAJAS sobre Corset"},
-    {"nombre": "Set Ocipete", "tipo": "Set", "fuente": "VENTAS/CAJAS sobre Bustier"},
+    {
+        "nombre": "Set Aelo",
+        "tipo": "Set",
+        "fuente": "VENTAS/CAJAS sobre Corset",
+        "variantes": ("XXS", "XS", "S", "M", "L", "XL"),
+    },
+    {
+        "nombre": "Set Ocipete",
+        "tipo": "Set",
+        "fuente": "VENTAS/CAJAS sobre Bustier",
+        "variantes": ("XXS", "XS", "S", "M", "L", "XL"),
+    },
+    # MIG-2: Set Celeno @ 75000 (locked decision; el 65000 del workbook en un
+    # bloque CAJAS es descuento/malentrada). Sin receta BOM ni wiring de combo
+    # en este cambio. Cuenta canonica 13 -> 14.
+    {
+        "nombre": "Set Celeno",
+        "tipo": "Set",
+        "fuente": "VENTAS sobre bicolor (PRENDAS 'Conjunto bicolor' @75000)",
+        "precio_venta_sugerido": 75000,
+        "variantes": ("XXS", "XS", "S", "M", "L", "XL"),
+    },
     {"nombre": "Caja Despertar", "tipo": "Combo", "fuente": "hoja 'CAJAS'"},
     {"nombre": "Caja Despertar V2", "tipo": "Combo", "fuente": "hoja 'CAJAS'"},
     {"nombre": "Caja Saca Las Garras", "tipo": "Combo", "fuente": "hoja 'CAJAS' / VENTAS"},
@@ -404,6 +436,7 @@ class ProductoPlan:
     nombre: str
     tipo: str
     variantes: tuple[str, ...] = ()
+    precio_sugerido: Decimal | None = None
 
 
 @dataclass
@@ -502,6 +535,11 @@ def plan_catalogo(libro: LibroMigracion, report=None) -> CatalogPlan:
             nombre=normalizar_nombre(entry["nombre"]),
             tipo=str(entry["tipo"]),
             variantes=tuple(v for v in entry.get("variantes", ()) if v),
+            precio_sugerido=(
+                Decimal(entry["precio_venta_sugerido"])
+                if entry.get("precio_venta_sugerido") is not None
+                else None
+            ),
         )
         for entry in PRODUCTOS_CATALOGO
     ]
@@ -603,6 +641,12 @@ def upsert_producto(
     elif producto.tipo_producto_id != tipo_objeto.id:
         producto.tipo_producto_id = tipo_objeto.id
         db.flush()
+    # D1: el plan es la fuente de verdad del precio; solo un caller que lo
+    # pase explicitamente refresca el valor (los callers viejos sin precio no
+    # pisan el precio_venta_sugerido del catalogo).
+    if precio_sugerido is not None and producto.precio_venta_sugerido != precio_sugerido:
+        producto.precio_venta_sugerido = precio_sugerido
+        db.flush()
 
     existentes = {
         v.nombre_variante: v
@@ -632,9 +676,22 @@ def aplicar_plan(db, plan: CatalogPlan, report=None) -> dict[str, int]:
         upsert_insumo(db, insumo.nombre, unidad=insumo.unidad, categoria_nombre=insumo.categoria)
         totales["insumos"] += 1
     for producto in plan.productos:
-        upsert_producto(db, producto.nombre, producto.tipo, producto.variantes)
+        upsert_producto(
+            db,
+            producto.nombre,
+            producto.tipo,
+            producto.variantes,
+            precio_sugerido=producto.precio_sugerido,
+        )
         totales["productos"] += 1
         totales["variantes"] += len(producto.variantes)
+        if producto.precio_sugerido is not None and report:
+            report.info(
+                "F1",
+                None,
+                None,
+                f"precio sugerido {producto.nombre}: {producto.precio_sugerido}",
+            )
     if report:
         report.info(
             "F1",

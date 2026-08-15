@@ -21,9 +21,10 @@ from pathlib import Path
 
 import openpyxl
 import pytest
+from decimal import Decimal
 
 from app.db.session import SessionLocal
-from app.models import Insumo, Producto, TipoProducto
+from app.models import Insumo, Producto, TipoProducto, VarianteProducto
 from migrate.context import FaseOptions, MigrationContext
 
 REAL_XLSX = Path(r"C:\wamp64\www\ERP-Arpia\ARPIA.xlsx")
@@ -112,6 +113,9 @@ def _borrar_filas_test(db) -> None:
                 f"{PREFIX_TEST} Set",
                 f"{PREFIX_TEST} P1",
                 f"{PREFIX_TEST} P2",
+                f"{PREFIX_TEST} Variantes",
+                f"{PREFIX_TEST} Precio",
+                "Set Celeno",  # producto canonico MIG-2 creado por este modulo
             ]
         )
     ).delete(synchronize_session=False)
@@ -528,3 +532,114 @@ def test_aplicar_plan_transaccional_y_cleanup(db):
 
     assert db.query(Producto).filter(Producto.nombre == f"{PREFIX_TEST} P2").count() == 1
     assert db.query(Insumo).filter(Insumo.nombre == f"{PREFIX_TEST} Insumo A").count() == 1
+
+
+# --------------------------------------------------------------------------- #
+# Variantes XXS-XL + Set Celeno (MIG-1/MIG-2, tallas desde la XXS hasta la XL)
+# --------------------------------------------------------------------------- #
+
+TALLAS_XXS_XL = ("XXS", "XS", "S", "M", "L", "XL")
+
+
+def test_plan_catalogo_real_30_variantes_y_14_productos():
+    """MIG-1/MIG-2: 5 productos tallados x 6 tallas = 30 variantes; el catalogo
+    crece a 14 con Set Celeno @ 75000 (locked decision, precio_venta NULL en
+    las variantes porque comparten el precio del producto)."""
+    from migrate.catalog import plan_catalogo
+    from migrate.loaders import LibroMigracion
+
+    if not REAL_XLSX.exists():
+        pytest.skip("ARPIA.xlsx no disponible")
+
+    with LibroMigracion(REAL_XLSX) as libro:
+        plan = plan_catalogo(libro)
+
+    assert plan.conteo_productos == 14
+    por_nombre = {p.nombre: p for p in plan.productos}
+    for tallado in (
+        "Set Aelo",
+        "Set Ocipete",
+        "Set Celeno",
+        "Blusa Manga Larga",
+        "Blusa Manga Corta",
+    ):
+        assert por_nombre[tallado].variantes == TALLAS_XXS_XL, tallado
+    assert sum(len(p.variantes) for p in plan.productos) == 30
+    celeno = por_nombre["Set Celeno"]
+    assert celeno.precio_sugerido == Decimal("75000")
+
+
+def test_plan_catalogo_real_sin_variantes_en_corset_garras_y_combos():
+    """MIG-1: un producto sin tupla variantes (Corset Garras, combos) NUNCA
+    recibe filas de variante (tampoco una variante NULL fantasma)."""
+    from migrate.catalog import plan_catalogo
+    from migrate.loaders import LibroMigracion
+
+    if not REAL_XLSX.exists():
+        pytest.skip("ARPIA.xlsx no disponible")
+
+    with LibroMigracion(REAL_XLSX) as libro:
+        plan = plan_catalogo(libro)
+    por_nombre = {p.nombre: p for p in plan.productos}
+    for sin_tallas in ("Corset Garras", "Caja Despertar", "Caja Saca Las Garras"):
+        assert por_nombre[sin_tallas].variantes == ()
+
+
+def test_aplicar_plan_set_celeno_precio_y_reapply(db):
+    """MIG-2: aplicar_plan persiste Set Celeno @ 75000 y un re-apply lo
+    mantiene (D1: el plan/catalogo es la fuente de verdad del precio)."""
+    from migrate.catalog import CatalogPlan, ProductoPlan, aplicar_plan
+
+    plan = CatalogPlan(
+        tipos=["Set"],
+        productos=[
+            ProductoPlan(
+                nombre="Set Celeno",
+                tipo="Set",
+                variantes=TALLAS_XXS_XL,
+                precio_sugerido=Decimal("75000"),
+            )
+        ],
+    )
+    aplicar_plan(db, plan)
+    db.commit()
+    p = db.query(Producto).filter(Producto.nombre == "Set Celeno").one()
+    assert p.precio_venta_sugerido == Decimal("75000")
+    assert len(p.variantes) == 6
+
+    aplicar_plan(db, plan)  # re-run: idempotente, precio estable
+    db.commit()
+    db.refresh(p)
+    assert p.precio_venta_sugerido == Decimal("75000")
+    assert db.query(VarianteProducto).filter(VarianteProducto.producto_id == p.id).count() == 6
+
+
+def test_upsert_producto_variantes_duplicadas_6_filas(db):
+    """MIG-1: dedup por (producto_id, nombre_variante): re-upsert de las 6
+    tallas NO duplica filas (guard manual antes del UNIQUE)."""
+    from migrate.catalog import bootstrap_catalogo, upsert_producto
+
+    bootstrap_catalogo(db)
+    nombre = f"{PREFIX_TEST} Variantes"
+    a = upsert_producto(db, nombre, tipo="Set", variantes=TALLAS_XXS_XL)
+    b = upsert_producto(db, nombre, tipo="Set", variantes=TALLAS_XXS_XL)
+    assert b.id == a.id
+    assert {v.nombre_variante for v in a.variantes} == set(TALLAS_XXS_XL)
+    assert db.query(VarianteProducto).filter(VarianteProducto.producto_id == a.id).count() == 6
+
+
+def test_upsert_producto_refresca_precio_solo_cuando_no_none(db):
+    """D1: upsert_producto refresca precio_venta_sugerido en el producto
+    existente SOLO cuando precio_sugerido != None; un caller viejo que no
+    pasa precio nunca pisa el valor del catalogo."""
+    from migrate.catalog import bootstrap_catalogo, upsert_producto
+
+    bootstrap_catalogo(db)
+    nombre = f"{PREFIX_TEST} Precio"
+    p1 = upsert_producto(db, nombre, tipo="Accesorio")
+    assert p1.precio_venta_sugerido == Decimal("0")
+    p2 = upsert_producto(db, nombre, tipo="Accesorio", precio_sugerido=Decimal("75000"))
+    assert p2.id == p1.id
+    assert p2.precio_venta_sugerido == Decimal("75000")
+    p3 = upsert_producto(db, nombre, tipo="Accesorio")  # sin precio: no pisa
+    assert p3.precio_venta_sugerido == Decimal("75000")
