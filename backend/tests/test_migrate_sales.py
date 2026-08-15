@@ -596,6 +596,263 @@ def test_f5_registrada_en_runner():
     assert "F5" in FASES_IMPLEMENTADAS
 
 
+# --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# 5. Variantes XXS-XL: omit talla-less sized rows (MIG-3) + NULL-matching (MIG-4)
+# --------------------------------------------------------------------------- #
+
+
+def test_aplicar_ventas_omitida_sin_talla_no_estalla(tmp_path):
+    """MIG-3/D2: una venta de un producto TALLADO sin talla en la fila NO se
+    inserta (res['omitidas'] == 1), la otra fila si, y la fase NO estalla con
+    DomainValidationError (el omit ocurre ANTES de la explosion de inventory)."""
+    from migrate.sales import aplicar_ventas, plan_ventas
+
+    db = SessionLocal()
+    try:
+        _preparar_catalogo(db)  # P_SET con variantes ("S",), P_TOTE sin variantes
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "VENTAS"
+        ws.append(
+            [
+                "Producto",
+                None,
+                None,
+                None,
+                None,
+                None,
+                "Precio Venta",
+                "Costo",
+                "Ganancias",
+                None,
+                None,
+                None,
+                "Fecha",
+                None,
+                None,
+                "Cliente",
+            ]
+        )
+        # P_SET (producto tallado) SIN talla -> omitida MIG-3.
+        ws.append(
+            [
+                P_SET,
+                None,
+                None,
+                None,
+                None,
+                None,
+                71250.0,
+                26109,
+                45141,
+                None,
+                None,
+                None,
+                datetime(2026, 3, 20),
+                None,
+                "DESC 25%",
+                P_CLI,
+            ]
+        )
+        # P_TOTE (sin variantes) sin talla -> se inserta igual.
+        ws.append(
+            [
+                P_TOTE,
+                None,
+                None,
+                None,
+                None,
+                None,
+                45000.0,
+                25765.09524,
+                19234.90476,
+                None,
+                None,
+                None,
+                datetime(2026, 4, 24),
+                None,
+                None,
+                P_CLI2,
+            ]
+        )
+        path = tmp_path / "mini-sin-talla.xlsx"
+        wb.save(path)
+
+        with LibroMigracion(path) as libro:
+            plan = plan_ventas(libro)
+        res = aplicar_ventas(db, plan, canal_venta="feria")  # no debe lanzar
+        db.commit()
+
+        assert res["omitidas"] == 1
+        assert res["insertadas"] == 1  # solo P_TOTE
+        set_prod = db.query(Producto).filter(Producto.nombre == P_SET).one()
+        assert (
+            db.query(DetalleVenta).filter(DetalleVenta.producto_id == set_prod.id).count() == 0
+        )
+        assert db.query(Venta).count() == 1
+    finally:
+        db.rollback()
+        db.close()
+
+
+def test_aplicar_ventas_rerun_matchea_fila_null_historica(tmp_path):
+    """MIG-4/D3: idempotencia unidireccional — una linea del plan CON talla
+    matchea la fila NULL historica (insertada por el codigo viejo sin
+    variantes): re-run -> ya_presentes, 0 duplicados."""
+    from migrate.sales import aplicar_ventas, plan_ventas
+
+    db = SessionLocal()
+    try:
+        _preparar_catalogo(db)
+        set_prod = db.query(Producto).filter(Producto.nombre == P_SET).one()
+        cli = Cliente(nombre=P_CLI)
+        db.add(cli)
+        db.flush()
+        venta_historica = Venta(
+            fecha=datetime(2026, 3, 20, tzinfo=UTC),
+            cliente_id=cli.id,
+            canal_venta="feria",
+            descuento_porcentaje=Decimal("0"),
+            estado="completada",
+            total_venta=Decimal("71250.00"),
+        )
+        db.add(venta_historica)
+        db.flush()
+        db.add(
+            DetalleVenta(
+                venta_id=venta_historica.id,
+                producto_id=set_prod.id,
+                variante_id=None,  # fila historica sin variante
+                cantidad=Decimal("1"),
+                precio_unitario_aplicado=Decimal("71250.00"),
+                costo_unitario_aplicado=Decimal("26109"),
+            )
+        )
+        db.commit()
+
+        path = tmp_path / "mini-null.xlsx"
+        _mini_workbook(path)  # P_SET CON talla "S" + P_TOTE
+        with LibroMigracion(path) as libro:
+            plan = plan_ventas(libro)
+        res = aplicar_ventas(db, plan, canal_venta="feria")
+        db.commit()
+
+        assert res["insertadas"] == 1  # solo P_TOTE
+        assert res["ya_presentes"] == 1  # la linea "S" matcheo la NULL historica
+        assert db.query(Venta).count() == 2  # sin duplicados
+        assert db.query(DetalleVenta).count() == 2
+    finally:
+        db.rollback()
+        db.close()
+
+
+def test_aplicar_ventas_combo_sin_variante_no_matchea_fila_con_variante(tmp_path):
+    """MIG-4/D3 (guard unidireccional): un combo sin talla (plan None) NO
+    matchea una fila DB que SI tiene variante -> el combo se inserta; y el
+    omit MIG-3 NO aplica a combos (tipo == 'Combo')."""
+    from migrate.catalog import upsert_producto
+    from migrate.sales import aplicar_ventas, plan_ventas
+
+    db = SessionLocal()
+    try:
+        _preparar_catalogo(db)
+        set_prod = db.query(Producto).filter(Producto.nombre == P_SET).one()
+        set_var = (
+            db.query(VarianteProducto)
+            .filter(
+                VarianteProducto.producto_id == set_prod.id,
+                VarianteProducto.nombre_variante == "S",
+            )
+            .one()
+        )
+        combo = upsert_producto(db, f"{P} Venta Combo", tipo="Combo")
+        db.flush()
+        cli = Cliente(nombre=P_CLI)
+        db.add(cli)
+        db.flush()
+        venta_rara = Venta(
+            fecha=datetime(2026, 7, 13, tzinfo=UTC),
+            cliente_id=cli.id,
+            canal_venta="feria",
+            descuento_porcentaje=Decimal("0"),
+            estado="completada",
+            total_venta=Decimal("295000"),
+        )
+        db.add(venta_rara)
+        db.flush()
+        db.add(
+            DetalleVenta(
+                venta_id=venta_rara.id,
+                producto_id=combo.id,
+                variante_id=set_var.id,  # dato historico raro: fila de combo con variante
+                cantidad=Decimal("1"),
+                precio_unitario_aplicado=Decimal("295000"),
+                costo_unitario_aplicado=Decimal("129388"),
+            )
+        )
+        db.commit()
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "VENTAS"
+        ws.append(
+            [
+                "Producto",
+                None,
+                None,
+                None,
+                None,
+                None,
+                "Precio Venta",
+                "Costo",
+                "Ganancias",
+                None,
+                None,
+                None,
+                "Fecha",
+                None,
+                None,
+                "Cliente",
+            ]
+        )
+        ws.append(
+            [
+                f"{P} Venta Combo",
+                None,
+                None,
+                None,
+                None,
+                None,
+                295000.0,
+                129388.0,
+                165612.0,
+                None,
+                None,
+                None,
+                datetime(2026, 7, 13),
+                None,
+                None,
+                P_CLI,
+            ]
+        )
+        path = tmp_path / "mini-combo-variante.xlsx"
+        wb.save(path)
+
+        with LibroMigracion(path) as libro:
+            plan = plan_ventas(libro)
+        res = aplicar_ventas(db, plan, canal_venta="feria")
+        db.commit()
+
+        assert res["insertadas"] == 1  # el combo se re-inserta (None != variante)
+        assert res["ya_presentes"] == 0
+        assert res["omitidas"] == 0  # combos nunca se omiten por MIG-3
+    finally:
+        db.rollback()
+        db.close()
+
+
 def test_cargar_ventas_dry_run_real_no_escribe():
     from migrate.sales import cargar_ventas
 
@@ -619,3 +876,4 @@ def test_cargar_ventas_dry_run_real_no_escribe():
         assert not ctx.report.tenga_errores
     finally:
         db.close()
+

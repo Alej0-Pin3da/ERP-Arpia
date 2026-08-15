@@ -55,7 +55,7 @@ from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from app.core.exceptions import EntityNotFoundError
 from app.models import (
@@ -324,6 +324,17 @@ def _upsert_cliente(db, nombre: str | None) -> int | None:
     return cli.id
 
 
+def variante_coincide(plan: int | str | None, db: int | str | None) -> bool:
+    """One-direction NULL-matching (MIG-4/MIG-5, single source of truth shared
+    with N7g): a plan line that resolves a variant matches an existing NULL row
+    (historical rows inserted before variants existed); a NULL plan line
+    matches ONLY NULL rows (a combo without size is never matched by a row
+    that carries a variant)."""
+    if plan is None:
+        return db is None
+    return db is None or db == plan
+
+
 def _clave_venta(
     venta: VentaPlanLinea, producto_id: int, variante_id: int | None, cliente_id: int | None
 ) -> tuple:
@@ -364,7 +375,15 @@ def _contar_existentes(db, clave) -> int:
     if variante_id is None:
         stmt = stmt.where(DetalleVenta.variante_id.is_(None))
     else:
-        stmt = stmt.where(DetalleVenta.variante_id == variante_id)
+        # MIG-4/D3: una linea del plan CON variante matchea filas con esa
+        # variante O filas NULL historicas (mismo criterio unidireccional que
+        # ``variante_coincide``, compartido con N7g para que F5/F7 no driften).
+        stmt = stmt.where(
+            or_(
+                DetalleVenta.variante_id == variante_id,
+                DetalleVenta.variante_id.is_(None),
+            )
+        )
     return db.scalar(stmt) or 0
 
 
@@ -469,6 +488,30 @@ def aplicar_ventas(
             continue
         cliente_id = _upsert_cliente(db, venta.cliente_nombre)
         variante_id = _variante_por_nombre(db, producto.id, venta.variante_nombre)
+        # MIG-3/D2 (omit): venta de un producto TALLADO sin talla en la fila ->
+        # se omite y se reporta ANTES de entrar a esperadas/resueltas, asi la
+        # explosion de inventory (guard root variante_id=None) nunca la ve.
+        # Los combos se excluyen: no tienen variantes y su fila lleva tallas
+        # en B..F que resuelven None (guard explicito, future-proof).
+        if (
+            variante_id is None
+            and producto.variantes
+            and not (
+                producto.tipo_producto is not None
+                and producto.tipo_producto.nombre == "Combo"
+            )
+        ):
+            res["omitidas"] += 1
+            if report:
+                report.warn(
+                    venta.hoja,
+                    venta.fila,
+                    COL_PRODUCTO,
+                    f"{venta.producto_nombre}: sin talla fecha {venta.fecha.date()} "
+                    f"qty {venta.cantidad} -> omitida (MIG-3: producto con "
+                    f"variantes, fila sin talla)",
+                )
+            continue  # nunca entra a esperadas/resueltas -> nunca explota
         esperadas[_clave_venta(venta, producto.id, variante_id, cliente_id)] += 1
         resueltas.append((venta, producto.id, variante_id, cliente_id))
 
@@ -600,4 +643,5 @@ __all__ = [
     "plan_ventas",
     "aplicar_ventas",
     "cargar_ventas",
+    "variante_coincide",
 ]
