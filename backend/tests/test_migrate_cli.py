@@ -41,12 +41,13 @@ def _omisiones_tabla_limpia():
 
 
 def _mini_workbook(path: Path) -> None:
-    """Minimal workbook (Proveedores sheet) so the infra read never fails."""
+    """Minimal workbook so the infra read never fails."""
     wb = openpyxl.Workbook()
-    prov = wb.active
-    prov.title = "Proveedores"
-    prov.append(["Proveedor", "URL", "Precio Unidad", "Ubicacion", "Contactado"])
-    prov.append(["", "Bexxhamel", None, "Cali", "SI"])
+    bom = wb.active
+    bom.title = "CORSET"
+    bom.append(["CORSET", None, None, None, None, None, None, None, "TANGA"])
+    bom.append(["Producto", "Ancho", "Alto", "cantidad Cms", "valor metro", "valor total"])
+    bom.append(["", None, None, None, None, None])
     wb.save(path)
 
 

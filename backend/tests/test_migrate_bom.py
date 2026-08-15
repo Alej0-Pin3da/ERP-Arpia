@@ -47,12 +47,14 @@ P_CORSET = f"{P} BOM Corset"
 P_BLUSA_ML = f"{P} BOM Blusa ML"
 P_BLUSA_MC = f"{P} BOM Blusa MC"
 P_COMBO = f"{P} BOM Combo"
+P_CADENA = f"{P} BOM Cadena"
 
-# Canonical catalog insumos that recipe names resolve to via ALIASES_BOM_A_CATALOGO
-# (the orchestrator creates these in the real DB; tests create them in the fixture).
-P_ALIAS_ARG = "Argolla numero 10 mm"
-P_ALIAS_TIRA = "Tira de Brasier negro 10 mts"
-P_ALIAS_POWERNET = "Powernet negro delgado"
+# Canonical catalog insumos (recalculated 2026-08 workbook) that recipe names
+# resolve to via ALIASES_BOM_A_CATALOGO (now mostly exact match / identity).
+# The orchestrator creates these in the real DB; tests create them in the fixture.
+P_ALIAS_ARG = "Argolla 10 mm"
+P_ALIAS_TIRA = "Tira de brasier"
+P_ALIAS_POWERNET = "Powernet negro delgado (corsets)"
 # Recipe material with neither alias nor catalog match -> omitted.
 P_FANTASMA = f"{P} BOM Material Fantasma"
 
@@ -70,7 +72,8 @@ def _mini_workbook(path: Path) -> None:
     corset = wb.active
     corset.title = "CORSET"
     corset.append(["CORSET", None, None, None, None, None, None, None, "TANGA"])
-    corset.append(["Producto", "Ancho", "Alto", "cantidad Cms", "valor metro", "valor total"])
+    corset.append(["Producto", "cantidad Cms", "Ancho", "area", "valor metro", "valor total"])
+    # Layout REAL alineado (2026-08): B=cantidad lineal, C=ancho, D=area=B*C.
     # R3..R5: left block (CORSET product). R9: right TANGA ghost (skipped).
     corset.append([P_TELA, 64, 37, 2368, 2.576888889, None])
     corset.append([P_ARG, 2, 1, 2, 72, None])
@@ -84,10 +87,11 @@ def _mini_workbook(path: Path) -> None:
 
     blusas = wb.create_sheet("BLUSAS")
     blusas.append(["MANGA LARGA", None] * 4 + ["MANGA CORTA"])
-    blusas.append(["Producto", "Ancho", "Alto", "cantidad Cms", "valor metro", "valor total"])
-    blusas.append([P_TELA, 45, 54, 2430, 2.5, None])  # R3 left (ML)
-    blusas.append([P_ARG, 4, 1, 4, 72, None])  # R4 left (ML)
-    blusas.cell(row=3, column=9, value=P_TELA)  # I3 right (MC)
+    blusas.append(["Producto", "cantidad Cms", "Ancho", "area", "valor metro", "valor total"])
+    # Layout REAL: izquierda A/B (nombre/cantidad), derecha I/J (nombre/cantidad).
+    blusas.append([P_TELA, 45, 54, 2430, 2.5, None])  # R3 left (ML): 45 cm
+    blusas.append([P_ARG, 4, 1, 4, 72, None])  # R4 left (ML): 4 piezas
+    blusas.cell(row=3, column=9, value=P_TELA)  # I3 right (MC): 60 cm
     blusas.cell(row=3, column=10, value=60)
     blusas.cell(row=3, column=11, value=120)
     blusas.cell(row=3, column=12, value=7200)
@@ -312,14 +316,16 @@ def test_plan_bom_cantidades_convertidas_exactas(mini_bom):
         plan = plan_bom(libro, bloques=_bloques_mini())
 
     por = {(item.producto_nombre, item.insumo_nombre): item.cantidad for item in plan.insumos}
-    # Corset Tul: 432 cm lineales / 100 = 4.32 m (el ancho ya no participa)
-    assert por[(P_CORSET, P_TUL)] == Decimal("4.32")
-    # Corset Tela: 2368 cm lineales / 100 = 23.68 m
-    assert por[(P_CORSET, P_TELA)] == Decimal("23.68")
-    # Blusa ML (bloque izquierdo): 2430 / 100 = 24.3 m
-    assert por[(P_BLUSA_ML, P_TELA)] == Decimal("24.3")
-    # Blusa MC (bloque derecho): 7200 / 100 = 72 m
-    assert por[(P_BLUSA_MC, P_TELA)] == Decimal("72")
+    # Layout real (2026-08): cantidad LINEAL en col B -> Corset Tul 24 cm / 100 = 0.24 m
+    assert por[(P_CORSET, P_TUL)] == Decimal("0.24")
+    # Corset Tela: 64 cm lineales / 100 = 0.64 m (el ancho ya no participa)
+    assert por[(P_CORSET, P_TELA)] == Decimal("0.64")
+    # Corset Argolla (un): 2 piezas
+    assert por[(P_CORSET, P_ARG)] == Decimal("2")
+    # Blusa ML (bloque izquierdo): 45 / 100 = 0.45 m
+    assert por[(P_BLUSA_ML, P_TELA)] == Decimal("0.45")
+    # Blusa MC (bloque derecho, col J): 60 / 100 = 0.6 m
+    assert por[(P_BLUSA_MC, P_TELA)] == Decimal("0.6")
 
 
 def test_plan_bom_combos_cajas(mini_bom):
@@ -331,6 +337,49 @@ def test_plan_bom_combos_cajas(mini_bom):
     combos = [c for c in plan.combos if c.combo_nombre == P_COMBO]
     assert len(combos) == 2  # Corset + Blusa ML del mini CAJAS
     assert {c.producto_incluido for c in combos} == {P_CORSET, P_BLUSA_ML}
+
+
+def _mini_workbook_lote(path: Path) -> None:
+    """Mini TOTEBAG con lote de 6 (layout real: 'UNIDAD | TOTAL 6 totebag').
+    El consumo de la hoja es para el LOTE COMPLETO, no por unidad.
+    SHEET_BOUNDS lee TOTEBAG desde R3, asi que los datos van en R3+.
+    Layout real: B = cantidad lineal (cm)."""
+    wb = openpyxl.Workbook()
+    tot = wb.active
+    tot.title = "TOTEBAG"
+    tot.cell(row=3, column=1, value=P_TELA)
+    tot.cell(row=3, column=2, value=53)  # 53 cm tela para 6 totebags
+    tot.cell(row=4, column=1, value=P_ARG)
+    tot.cell(row=4, column=2, value=12)  # 12 argollas para 6 totebags
+    tot.cell(row=5, column=1, value="UNIDAD")
+    tot.cell(row=5, column=2, value="TOTAL 6 totebag")
+    tot.cell(row=6, column=1, value="COSTO TOTAL CONJUNTO")
+    wb.save(path)
+
+
+def test_plan_bom_lote_divido_cantidad_por_unidad(tmp_path):
+    """Regression (2026-08, workbook real): las hojas BOM expresan consumo por
+    LOTE ('UNIDAD | TOTAL 6 totebag', 'TOTAL 12/15 Prendas', 'TOTAL 8
+    Prendas'), no por unidad. Antes del fix el BOM de Tote Bag quedaba 6x
+    inflado (Cadena gris 53 cm -> 0.53 m por totebag), el destock F5 pedia
+    6x lo real y fallaba con InsufficientStockError. Con lote 6: 53 cm / 6
+    = 8.833 cm = 0.08833 m por unidad."""
+    from migrate.bom import plan_bom
+
+    path = tmp_path / "mini-lote.xlsx"
+    _mini_workbook_lote(path)
+    with LibroMigracion(path) as libro:
+        plan = plan_bom(
+            libro,
+            bloques={"TOTEBAG": ("Tote Bag Arpia", None)},
+            _lotes={"TOTEBAG": (6, None)},
+        )
+
+    por = {(i.producto_nombre, i.insumo_nombre): i.cantidad for i in plan.insumos}
+    # Tela: 53 cm / 100 = 0.53 m, dividido por lote 6 -> 0.088333 m por unidad
+    assert por[("Tote Bag Arpia", P_TELA)] == Decimal("0.08833333333333333333333333333")
+    # Argolla (un): 12 piezas para 6 totebags -> 2 por unidad
+    assert por[("Tote Bag Arpia", P_ARG)] == Decimal("2")
 
 
 # --------------------------------------------------------------------------- #
@@ -351,8 +400,9 @@ def test_aplicar_bom_crea_insumos_con_cantidades(db, mini_bom):
     lineas = db.query(BomInsumo).filter(BomInsumo.producto_id == corset.id).all()
     assert len(lineas) == 3
     por = {item.insumo.nombre: item for item in lineas}
-    assert por[P_TUL].cantidad_requerida == Decimal("4.32")
-    assert por[P_TELA].cantidad_requerida == Decimal("23.68")
+    # Layout real (2026-08): cantidad LINEAL en col B -> Tul 24 cm = 0.24 m
+    assert por[P_TUL].cantidad_requerida == Decimal("0.24")
+    assert por[P_TELA].cantidad_requerida == Decimal("0.64")
     assert all(item.variante_id is None for item in lineas)  # variante NULL
 
 
@@ -424,11 +474,11 @@ def test_aplicar_bom_alias_resuelve_insumos_canonicos(db, mini_bom_aliases):
         item.insumo.nombre: item
         for item in db.query(BomInsumo).filter(BomInsumo.producto_id == corset.id).all()
     }
-    # 'Argolla 10 mm' -> 'Argolla numero 10 mm' (insumo canonico del fixture)
+    # 'Argolla 10 mm' recipe -> 'Argolla 10 mm' catalog insumo (now identity)
     assert P_ALIAS_ARG in por and por[P_ALIAS_ARG].insumo_id == ids[P_ALIAS_ARG]
-    # 'Tira de brasier' -> 'Tira de Brasier negro 10 mts'
+    # 'Tira de brasier' recipe -> 'Tira de brasier' catalog insumo (now identity)
     assert P_ALIAS_TIRA in por and por[P_ALIAS_TIRA].insumo_id == ids[P_ALIAS_TIRA]
-    # 'Powernet negro delgado (corsets)' -> 'Powernet negro delgado'
+    # 'Powernet negro delgado (corsets)' recipe -> same-name catalog insumo (now identity)
     assert P_ALIAS_POWERNET in por and por[P_ALIAS_POWERNET].insumo_id == ids[P_ALIAS_POWERNET]
 
 

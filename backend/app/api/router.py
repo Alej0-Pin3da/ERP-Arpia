@@ -13,7 +13,6 @@ from app.api.routes import (
     insumos,
     omisiones,
     productos,
-    proveedores,
     tipos_productos,
     usuarios,
     ventas,
@@ -21,7 +20,6 @@ from app.api.routes import (
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
-api_router.include_router(proveedores.router)
 api_router.include_router(categorias_insumos.router)
 api_router.include_router(insumos.router)
 api_router.include_router(compras_insumos.router)

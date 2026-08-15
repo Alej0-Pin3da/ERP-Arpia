@@ -11,8 +11,8 @@ Covers (EXM-2):
   inferred (EXM-2 error scenario).
 
 Date policy (design D5): empty dates are inherited from the contiguous previous
-row with the same (insumo, proveedor); a row without a previous match is left
-None so the phase can decide (omit + WARN). never now().
+row with the same insumo; a row without a previous match is left None so the
+phase can decide (omit + WARN). never now().
 """
 
 from __future__ import annotations
@@ -202,7 +202,6 @@ def ancho_desde_nombre(
 @dataclass(frozen=True)
 class ClaveFecha:
     insumo: object
-    proveedor: object
 
 
 def fecha_para_fila(
@@ -213,8 +212,8 @@ def fecha_para_fila(
     """Effective date for a row under policy D5.
 
     Own date wins (and seeds the cache). Empty inherits from the contiguous
-    previous row with the SAME (insumo, proveedor). No match -> None (caller
-    omits + WARN). Never now().
+    previous row with the SAME insumo. No match -> None (caller omits + WARN).
+    Never now().
     """
     if fecha_actual is not None:
         ultima_por_clave[clave] = fecha_actual

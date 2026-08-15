@@ -6,6 +6,7 @@ from decimal import Decimal
 import pytest
 
 from migrate.normalize import (
+    ClaveFecha,
     ancho_desde_nombre,
     coerce_aware,
     convertir_cantidad,
@@ -109,17 +110,17 @@ def test_ancho_default_con_warn():
     assert ancho_desde_nombre("Velcro sin medida", report=report) == Decimal("100")
 
 
-def test_fecha_heredada_mismo_insumo_proveedor():
-    # Fila contigua previa: misma clave (insumo, proveedor) -> hereda.
+def test_fecha_heredada_mismo_insumo():
+    # Fila contigua previa: misma clave (insumo) -> hereda.
     fecha_base = datetime(2025, 10, 25, tzinfo=UTC)
-    clave = ("Encaje negro", "Kilotelas")
+    clave = ClaveFecha("Encaje negro")
     ultima = {clave: fecha_base}
     assert fecha_para_fila(None, clave, ultima) == fecha_base
 
 
 def test_fecha_no_heredada_sin_contigua():
-    # Sin contigua del mismo (insumo, proveedor) -> None, NUNCA now().
-    assert fecha_para_fila(None, ("Velo", "Las 3BBB"), {}) is None
+    # Sin contigua del mismo insumo -> None, NUNCA now().
+    assert fecha_para_fila(None, ClaveFecha("Velo"), {}) is None
 
 
 @pytest.mark.parametrize(

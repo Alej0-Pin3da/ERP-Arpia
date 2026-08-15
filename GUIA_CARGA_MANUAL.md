@@ -6,7 +6,7 @@
 
 ## RESUMEN EN 30 SEGUNDOS
 
-**Desde la app** (mantienen consistencia automática): Tipos de producto, Categorías de insumos, Proveedores, Clientes, Socios, Insumos (con stock y costo inicial), Productos, Variantes, BOM, Compras (fecha de hoy), Ventas (actuales), Movimientos de finanzas (y editar la fecha después), Devoluciones, Usuarios.
+**Desde la app** (mantienen consistencia automática): Tipos de producto, Categorías de insumos, Clientes, Socios, Insumos (con stock y costo inicial), Productos, Variantes, BOM, Compras (fecha de hoy), Ventas (actuales), Movimientos de finanzas (y editar la fecha después), Devoluciones, Usuarios.
 
 **Solo desde DBeaver** (la app NO permite): compras con fecha histórica, ventas con fecha histórica, editar/eliminar compras, editar/eliminar ventas, editar/eliminar devoluciones. ⚠️ Al insertar compras/ventas directo en DBeaver hay que **ajustar el stock/costo del insumo a mano** (la app lo hace sola; DBeaver no).
 
@@ -43,18 +43,17 @@ Por las claves foráneas, este orden es obligatorio:
 1. Tipos_Producto          (sin dependencias)
 2. Categorias_Insumos      (sin dependencias)
 3. Socios_Configuracion    (sin dependencias — pero la suma de % debe ser 100)
-4. Proveedores             (sin dependencias)
-5. Clientes                (sin dependencias)
-6. Usuarios                (sin dependencias — opcional, ya hay admin)
-7. Insumos                 (depende de Categorias_Insumos)
-8. Productos               (depende de Tipos_Producto)
-9. Variantes_Producto      (depende de Productos)
-10. BOM_Insumos            (depende de Productos + Insumos + Variantes)
-11. BOM_Productos          (depende de Productos — combos)
-12. Compras_Insumos        (depende de Insumos + Proveedores)
-13. Ventas + Detalle_Ventas (depende de Clientes + Productos + Variantes)
-14. Movimientos_Financieros (depende de Socios_Configuracion)
-15. Devoluciones + Items   (depende de Ventas + Productos)
+4. Clientes                (sin dependencias)
+5. Usuarios                (sin dependencias — opcional, ya hay admin)
+6. Insumos                 (depende de Categorias_Insumos)
+7. Productos               (depende de Tipos_Producto)
+8. Variantes_Producto      (depende de Productos)
+9. BOM_Insumos             (depende de Productos + Insumos + Variantes)
+10. BOM_Productos          (depende de Productos — combos)
+11. Compras_Insumos        (depende de Insumos)
+12. Ventas + Detalle_Ventas (depende de Clientes + Productos + Variantes)
+13. Movimientos_Financieros (depende de Socios_Configuracion)
+14. Devoluciones + Items   (depende de Ventas + Productos)
 ```
 
 ---
@@ -68,7 +67,6 @@ Por las claves foráneas, este orden es obligatorio:
 | Tipos de producto | ✅ App | ✅ App | ✅ App | — |
 | Categorías de insumos | ✅ App | ✅ App | ✅ App | — |
 | Socios | ✅ App | ✅ App (solo %) | ✅ App | — |
-| Proveedores | ✅ App | ✅ App | ✅ App | — |
 | Clientes | ✅ App | ✅ App | ✅ App | — |
 | Usuarios | ✅ App | ✅ App | ✅ App | — |
 | Insumos (incl. stock/costo) | ✅ App | ✅ App | ✅ App | — |
@@ -86,7 +84,7 @@ Por las claves foráneas, este orden es obligatorio:
 
 | Pantalla | Qué permite |
 |---|---|
-| **Maestros** | CRUD completo de Clientes, Proveedores, Tipos de producto, Categorías de insumos |
+| **Maestros** | CRUD completo de Clientes, Tipos de producto, Categorías de insumos |
 | **Inventario** | CRUD de Insumos (incluye `stock_actual`, `stock_minimo`, `costo_promedio_actual` al crear/editar) + registrar compras |
 | **Productos** | CRUD de Productos, Variantes, BOM de insumos y BOM de combos |
 | **Ventas** | Registrar venta (elige cliente, canal, detalles) |
@@ -132,12 +130,10 @@ VALUES ('Valqui', 40.0);
 -- ⚠️ LA SUMA DE TODOS LOS SOCIOS DEBE DAR EXACTAMENTE 100 (la app lo valida)
 ```
 
-### Proveedores
-```sql
-INSERT INTO "Proveedores" (nombre, ubicacion, url, contacto)
-VALUES ('Bexxhamel', 'Cali', 'https://...', 'Ana');
--- columnas: id (auto), nombre (obligatorio); ubicacion/url/contacto opcionales
-```
+### Proveedores — ELIMINADO (2026-08)
+
+> ⚠️ La entidad `Proveedores` fue eliminada del ERP (decisión de negocio 2026-08): la tabla ya no
+> existe y la app no tiene pantalla de proveedores. **No cargar.**
 
 ### Clientes
 ```sql
@@ -198,10 +194,11 @@ VALUES (5, 2, 1.0);
 
 ### Compras_Insumos (solo DBeaver si querés fecha histórica)
 ```sql
-INSERT INTO "Compras_Insumos" (insumo_id, proveedor_id, fecha_compra, cantidad_comprada, precio_unitario_compra)
-VALUES (3, 1, '2025-10-25 10:00:00+00', 40.0, 12500.0);
+INSERT INTO "Compras_Insumos" (insumo_id, fecha_compra, cantidad_comprada, precio_unitario_compra)
+VALUES (3, '2025-10-25 10:00:00+00', 40.0, 12500.0);
 -- columnas: insumo_id (FK), fecha_compra (obligatoria — TIMESTAMPTZ),
---           cantidad_comprada, precio_unitario_compra; proveedor_id opcional
+--           cantidad_comprada, precio_unitario_compra
+-- ⚠️ proveedor_id fue ELIMINADO en 2026-08 junto con la entidad Proveedores: ya no existe
 -- ⚠️ la app NO permite editar/eliminar compras ni setear fecha; todo esto es DBeaver
 -- ⚠️ al INSERTAR directo NO se actualiza automáticamente el stock/costo del insumo:
 --    hay que ajustar "Insumos".stock_actual y costo_promedio_actual a mano
@@ -273,7 +270,7 @@ VALUES (1, '2026-01-05 10:00:00+00', 'Cambio de talla', 95000.0, 'total', 1);
 
 ## 6. PLAN SUGERIDO DE TRABAJO (desde la app primero)
 
-1. **App → Maestros**: cargar Tipos de producto, Categorías, Proveedores, Clientes.
+1. **App → Maestros**: cargar Tipos de producto, Categorías, Clientes.
 2. **App → Finanzas → Socios**: cargar los 3 socios (la suma debe dar 100).
 3. **App → Inventario**: cargar insumos con su stock y costo inicial.
 4. **App → Productos**: cargar productos, variantes y BOM (recetas/combos).
@@ -309,14 +306,9 @@ VALUES (1, '2026-01-05 10:00:00+00', 'Cambio de talla', 95000.0, 'total', 1);
 | Herrajes |
 | Telas |
 
-### 7.3 Proveedores (4)
+### 7.3 Proveedores — ELIMINADO (2026-08)
 
-| nombre |
-|---|
-| Bexxhamel |
-| JM Confecciones |
-| SEHA Text |
-| ZureTex |
+> ⚠️ Entidad eliminada (decisión de negocio 2026-08): no hay proveedores que cargar.
 
 ### 7.4 Socios_Configuracion (3) — ⚠️ la suma debe dar 100
 
@@ -407,18 +399,20 @@ VALUES (1, '2026-01-05 10:00:00+00', 'Cambio de talla', 95000.0, 'total', 1);
 
 Las 40 compras completas están en `DATOS_REFERENCIA_CARGA.json` (sección `compras`). Ejemplos:
 
-| fecha | insumo | cantidad | precio_u | proveedor |
-|---|---|---|---|---|
-| 2024-02-17 | Elastico de Contorno | 4 | 2000.0 | Kilotelas |
-| 2024-02-17 | Tensor 8 de 10mm | 100.0 | 70 | Kilotelas |
-| 2024-02-17 | Zeta de 10 mm | 100.0 | 102 | Kilotelas |
-| 2024-02-17 | Argolla 10 mm | 100.0 | 72 | Las 3BBB premium |
-| 2024-02-17 | Sesgo Elastico 10 mts | 10.00 | 630 | Las 3BBB premium |
-| 2024-02-17 | Argolla 10 mm | 12.0 | 166.67 | Gerrajes |
-| 2024-02-17 | Gafete de 3 | 1.0 | 800 | Gerrajes |
-| 2024-02-17 | Tira de brasier | 1.000 | 800 | Gerrajes |
-| 2024-02-17 | Franela Lycra | 1.000 | 30000 | Gerrajes |
-| 2024-02-17 | Tela Maya Ilustrada | 15.000 | 38653.33 | |
+> ⚠️ La columna `proveedor` ya no existe: se eliminó en 2026-08 junto con la entidad `Proveedores`.
+
+| fecha | insumo | cantidad | precio_u |
+|---|---|---|---|
+| 2024-02-17 | Elastico de Contorno | 4 | 2000.0 |
+| 2024-02-17 | Tensor 8 de 10mm | 100.0 | 70 |
+| 2024-02-17 | Zeta de 10 mm | 100.0 | 102 |
+| 2024-02-17 | Argolla 10 mm | 100.0 | 72 |
+| 2024-02-17 | Sesgo Elastico 10 mts | 10.00 | 630 |
+| 2024-02-17 | Argolla 10 mm | 12.0 | 166.67 |
+| 2024-02-17 | Gafete de 3 | 1.0 | 800 |
+| 2024-02-17 | Tira de brasier | 1.000 | 800 |
+| 2024-02-17 | Franela Lycra | 1.000 | 30000 |
+| 2024-02-17 | Tela Maya Ilustrada | 15.000 | 38653.33 |
 
 > ⚠️ Al cargar compras históricas en DBeaver, acordate de **sumar el stock y recalcular el costo promedio** del insumo en la tabla `"Insumos"` (la app lo hace automáticamente; DBeaver no).
 
@@ -453,12 +447,11 @@ Las 107 líneas de recetas (producto → insumo + cantidad) están en `DATOS_REF
 |---|---|
 | `tipos` | 6 tipos de producto |
 | `categorias` | 3 categorías de insumos |
-| `proveedores` | 4 proveedores |
 | `socios` | 3 socios (Valqui, Margarita, ARPIA) |
 | `productos` | 18 productos con su tipo |
 | `insumos` | 82 insumos con categoría y unidad |
 | `stock_oct25` | 31 insumos con stock inicial |
-| `compras` | 40 compras históricas (fecha, cantidad, precio, proveedor) |
+| `compras` | 40 compras históricas (fecha, cantidad, precio) |
 | `bom_insumos` | 107 líneas de receta BOM |
 | `ventas` | 13 ventas históricas (fecha, producto, variante, precio, cliente) |
 | `movimientos` | 106 movimientos financieros (fecha, tipo, descripción, monto, socio) |

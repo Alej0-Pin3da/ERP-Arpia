@@ -22,7 +22,7 @@ import {
 } from '@/utils/maestros'
 
 const CLIENTE_CONFIG = MAESTRO_ENTITIES[0]
-const TIPO_CONFIG = MAESTRO_ENTITIES[2]
+const TIPO_CONFIG = MAESTRO_ENTITIES[1]
 
 const CLIENTE_ROW: MaestroRow = {
   id: 1,

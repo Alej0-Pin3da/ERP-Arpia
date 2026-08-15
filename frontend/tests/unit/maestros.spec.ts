@@ -3,13 +3,12 @@
  *
  * Pure functions only, zero mocks:
  *  - `MAESTRO_ENTITIES` drives the generic CRUD table + form (per-entity
- *    column/field config for clientes / proveedores / tipos-producto /
- *    categorias-insumos)
+ *    column/field config for clientes / tipos-producto / categorias-insumos)
  *  - `buildMaestroPayload` (generic core): required fields always included,
  *    EMPTY optional fields serialize as `null` — needed so an edit that
  *    CLEARS an optional field actually nulls it server-side (the update
  *    schemas use exclude_unset, so omitting would silently keep the value)
- *  - the 8 per-entity typed builders (create + update) that the view uses to
+ *  - the 6 per-entity typed builders (create + update) that the view uses to
  *    send the exact schema shapes
  */
 import { describe, expect, it } from 'vitest'
@@ -20,8 +19,6 @@ import {
   buildClientePayload,
   buildClienteUpdatePayload,
   buildMaestroPayload,
-  buildProveedorPayload,
-  buildProveedorUpdatePayload,
   buildTipoProductoPayload,
   buildTipoProductoUpdatePayload,
   MAESTRO_ENTITIES,
@@ -39,16 +36,14 @@ const CLIENTE_FIELDS: MaestroField[] = [
 ]
 
 describe('MAESTRO_ENTITIES config (MOD-5)', () => {
-  it('defines the four maestros entities with es-CO titles', () => {
+  it('defines the three maestros entities with es-CO titles', () => {
     expect(MAESTRO_ENTITIES.map((e) => e.key)).toEqual([
       'clientes',
-      'proveedores',
       'tipos-producto',
       'categorias-insumos',
     ])
     expect(MAESTRO_ENTITIES.map((e) => e.title)).toEqual([
       'Clientes',
-      'Proveedores',
       'Tipos de producto',
       'Categorías de insumos',
     ])
@@ -71,12 +66,6 @@ describe('MAESTRO_ENTITIES config (MOD-5)', () => {
       'email',
       'telefono',
     ])
-  })
-
-  it('proveedores config mirrors ProveedorCreate (nombre + ubicacion/url/contacto)', () => {
-    const proveedor = maestroEntityConfig('proveedores')
-    expect(proveedor?.fields.map((f) => f.key)).toEqual(['nombre', 'ubicacion', 'url', 'contacto'])
-    expect(proveedor?.emptyText).toBe('Sin proveedores registrados')
   })
 
   it('tipos-producto and categorias-insumos are name-only entities', () => {
@@ -157,23 +146,6 @@ describe('per-entity typed payload builders', () => {
       documento_identidad: 'CC 123',
       email: null,
       telefono: '3001234567',
-    })
-  })
-
-  it('buildProveedorPayload / buildProveedorUpdatePayload match Proveedor schemas', () => {
-    expect(
-      buildProveedorPayload({
-        nombre: 'Molino El Triunfo',
-        ubicacion: 'Medellín',
-        url: '',
-        contacto: '',
-      }),
-    ).toEqual({ nombre: 'Molino El Triunfo', ubicacion: 'Medellín', url: null, contacto: null })
-    expect(buildProveedorUpdatePayload({ nombre: 'Molino El Triunfo', ubicacion: '', url: '', contacto: 'Carlos' })).toEqual({
-      nombre: 'Molino El Triunfo',
-      ubicacion: null,
-      url: null,
-      contacto: 'Carlos',
     })
   })
 

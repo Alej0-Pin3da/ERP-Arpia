@@ -1,20 +1,20 @@
 /**
  * Maestros mappers + entity config (PR11, spec MOD-5 maestros part).
  *
- * The four master-data entities (clientes, proveedores, tipos-producto,
- * categorias-insumos) share one shape — `{nombre, ...optional text fields}`
- * — so ONE config-driven CRUD pattern serves them all:
+ * The master-data entities (clientes, tipos-producto, categorias-insumos)
+ * share one shape — `{nombre, ...optional text fields}` — so ONE
+ * config-driven CRUD pattern serves them all:
  *
  *  - `MAESTRO_ENTITIES` is the per-entity column/field config that drives the
  *    generic table (MaestrosTable) and form (MaestroForm). Mirrors the
- *    backend schemas exactly (verified app/schemas/{cliente,proveedor,
- *    producto,categoria_insumo}.py): nombre is the only required field, the
- *    rest are optional strings.
+ *    backend schemas exactly (verified app/schemas/{cliente,producto,
+ *    categoria_insumo}.py): nombre is the only required field, the rest are
+ *    optional strings.
  *  - `buildMaestroPayload` (generic core): required fields always included;
  *    EMPTY optional fields serialize as `null`. The update schemas use
  *    `exclude_unset`, so omitting a cleared optional field would silently
  *    keep the old value — an explicit null is what actually clears it.
- *  - the 8 per-entity builders are thin, typed wrappers over the generic
+ *  - the 6 per-entity builders are thin, typed wrappers over the generic
  *    core so the view sends the exact Create/Update schema shapes.
  *
  * Writes are ADMIN ONLY server-side (require_admin on every POST/PUT/DELETE,
@@ -25,8 +25,6 @@ import type { components } from '@/types/api.d'
 
 type ClienteCreate = components['schemas']['ClienteCreate']
 type ClienteUpdate = components['schemas']['ClienteUpdate']
-type ProveedorCreate = components['schemas']['ProveedorCreate']
-type ProveedorUpdate = components['schemas']['ProveedorUpdate']
 type TipoProductoCreate = components['schemas']['TipoProductoCreate']
 type TipoProductoUpdate = components['schemas']['TipoProductoUpdate']
 type CategoriaInsumoCreate = components['schemas']['CategoriaInsumoCreate']
@@ -58,7 +56,7 @@ export interface MaestroColumn {
 }
 
 /**
- * A list row from any of the four maestros entities: every Read schema is
+ * A list row from any of the three maestros entities: every Read schema is
  * `{id, ...}` plus strings/nullables, so this loose shape types the generic
  * table/form/rows without losing safety at the API boundary.
  */
@@ -98,24 +96,6 @@ export const MAESTRO_ENTITIES: MaestroEntityConfig[] = [
       { key: 'documento_identidad', label: 'Documento de identidad', placeholder: 'Ej: CC 123456789' },
       { key: 'email', label: 'Email', inputType: 'email', placeholder: 'Ej: ana@arpia.com.co' },
       { key: 'telefono', label: 'Teléfono', placeholder: 'Ej: 3001234567' },
-    ],
-  },
-  {
-    key: 'proveedores',
-    title: 'Proveedores',
-    singular: 'Proveedor',
-    emptyText: 'Sin proveedores registrados',
-    columns: [
-      { key: 'nombre', label: 'Nombre', minWidth: 200 },
-      { key: 'ubicacion', label: 'Ubicación', minWidth: 160 },
-      { key: 'url', label: 'Sitio web', minWidth: 180 },
-      { key: 'contacto', label: 'Contacto', minWidth: 150 },
-    ],
-    fields: [
-      { key: 'nombre', label: 'Nombre', required: true, placeholder: 'Ej: Molino El Triunfo' },
-      { key: 'ubicacion', label: 'Ubicación', placeholder: 'Ej: Medellín' },
-      { key: 'url', label: 'Sitio web', placeholder: 'Ej: https://eltriunfo.com' },
-      { key: 'contacto', label: 'Contacto', placeholder: 'Ej: Carlos Ramírez' },
     ],
   },
   {
@@ -173,32 +153,17 @@ export function buildClienteUpdatePayload(values: Record<string, string>): Clien
   ) as unknown as ClienteUpdate
 }
 
-/** ProveedorCreate / ProveedorUpdate — nombre required; ubicacion/url/contacto. */
-export function buildProveedorPayload(values: Record<string, string>): ProveedorCreate {
-  return buildMaestroPayload(
-    MAESTRO_ENTITIES[1].fields,
-    values,
-  ) as unknown as ProveedorCreate
-}
-
-export function buildProveedorUpdatePayload(values: Record<string, string>): ProveedorUpdate {
-  return buildMaestroPayload(
-    MAESTRO_ENTITIES[1].fields,
-    values,
-  ) as unknown as ProveedorUpdate
-}
-
 /** TipoProductoCreate / Update — name only (409 on duplicate name server-side). */
 export function buildTipoProductoPayload(values: Record<string, string>): TipoProductoCreate {
   return buildMaestroPayload(
-    MAESTRO_ENTITIES[2].fields,
+    MAESTRO_ENTITIES[1].fields,
     values,
   ) as unknown as TipoProductoCreate
 }
 
 export function buildTipoProductoUpdatePayload(values: Record<string, string>): TipoProductoUpdate {
   return buildMaestroPayload(
-    MAESTRO_ENTITIES[2].fields,
+    MAESTRO_ENTITIES[1].fields,
     values,
   ) as unknown as TipoProductoUpdate
 }
@@ -206,7 +171,7 @@ export function buildTipoProductoUpdatePayload(values: Record<string, string>): 
 /** CategoriaInsumoCreate / Update — name only. */
 export function buildCategoriaInsumoPayload(values: Record<string, string>): CategoriaInsumoCreate {
   return buildMaestroPayload(
-    MAESTRO_ENTITIES[3].fields,
+    MAESTRO_ENTITIES[2].fields,
     values,
   ) as unknown as CategoriaInsumoCreate
 }
@@ -215,7 +180,7 @@ export function buildCategoriaInsumoUpdatePayload(
   values: Record<string, string>,
 ): CategoriaInsumoUpdate {
   return buildMaestroPayload(
-    MAESTRO_ENTITIES[3].fields,
+    MAESTRO_ENTITIES[2].fields,
     values,
   ) as unknown as CategoriaInsumoUpdate
 }

@@ -72,43 +72,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/proveedores": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Proveedores */
-        get: operations["list_proveedores_api_v1_proveedores_get"];
-        put?: never;
-        /** Create Proveedor */
-        post: operations["create_proveedor_api_v1_proveedores_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/proveedores/{proveedor_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Proveedor */
-        get: operations["get_proveedor_api_v1_proveedores__proveedor_id__get"];
-        /** Update Proveedor */
-        put: operations["update_proveedor_api_v1_proveedores__proveedor_id__put"];
-        post?: never;
-        /** Delete Proveedor */
-        delete: operations["delete_proveedor_api_v1_proveedores__proveedor_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/categorias-insumos": {
         parameters: {
             query?: never;
@@ -500,18 +463,38 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Venta */
+        /**
+         * Update Venta
+         * @description Full update of a venta (PUT /ventas/{id}).
+         *
+         *     Accepts the SAME body as POST /ventas (VentaCreate): cliente_id,
+         *     canal_venta, descuento_porcentaje, es_regalo and detalles[]. The service
+         *     recalculates total_venta and rebalances stock atomically — the old detail
+         *     explosion is restored and the new one deducted in a single commit (409 if
+         *     the new quantities exceed available stock). 404 when the venta does not
+         *     exist, 400 when it is already anulada.
+         */
         put: operations["update_venta_api_v1_ventas__venta_id__put"];
         post?: never;
-        /** Anular Venta */
+        /**
+         * Anular Venta
+         * @description Anular (soft-cancel) a venta — NOT a physical delete.
+         *
+         *     Marks ``estado='anulada'`` and restores the sold BOM stock (reponer) in a
+         *     single atomic commit, keeping the historical record (consistent with the
+         *     es_regalo flag philosophy). Returns the anulada venta so the UI can
+         *     refresh. 404 when the venta does not exist, 400 when already anulada.
+         */
         delete: operations["anular_venta_api_v1_ventas__venta_id__delete"];
         options?: never;
         head?: never;
         /**
          * Update Venta Es Regalo
-         * @description Mark/unmark a venta as a gift (es_regalo). Only es_regalo is
-         *     updatable; total_venta is never changed here (the historical price is kept
-         *     as a reference and reports exclude gifts via the flag). 404 when missing.
+         * @description Mark/unmark a venta as a gift (es_regalo).
+         *
+         *     Only ``es_regalo`` is updatable for now. ``total_venta`` is NEVER changed
+         *     here: the historical price is kept as a reference and money reports
+         *     exclude gifts via the flag. 404 when the venta does not exist.
          */
         patch: operations["update_venta_es_regalo_api_v1_ventas__venta_id__patch"];
         trace?: never;
@@ -990,8 +973,6 @@ export interface components {
         CompraInsumoCreate: {
             /** Insumo Id */
             insumo_id: number;
-            /** Proveedor Id */
-            proveedor_id?: number | null;
             /** Cantidad Comprada */
             cantidad_comprada: number | string;
             /** Precio Unitario Compra */
@@ -1003,8 +984,6 @@ export interface components {
             id: number;
             /** Insumo Id */
             insumo_id: number;
-            /** Proveedor Id */
-            proveedor_id: number | null;
             /**
              * Fecha Compra
              * Format: date-time
@@ -1014,8 +993,6 @@ export interface components {
             cantidad_comprada: string;
             /** Precio Unitario Compra */
             precio_unitario_compra: string;
-            /** Nombre Proveedor */
-            nombre_proveedor?: string | null;
         };
         /** CostoLineaRead */
         CostoLineaRead: {
@@ -1396,13 +1373,6 @@ export interface components {
             /** Total */
             total: number;
         };
-        /** Paginated[ProveedorRead] */
-        Paginated_ProveedorRead_: {
-            /** Items */
-            items: components["schemas"]["ProveedorRead"][];
-            /** Total */
-            total: number;
-        };
         /** Paginated[SocioConfiguracionRead] */
         Paginated_SocioConfiguracionRead_: {
             /** Items */
@@ -1489,41 +1459,6 @@ export interface components {
             costos_operativos_fijos?: number | string | null;
             /** Precio Venta Sugerido */
             precio_venta_sugerido?: number | string | null;
-        };
-        /** ProveedorCreate */
-        ProveedorCreate: {
-            /** Nombre */
-            nombre: string;
-            /** Ubicacion */
-            ubicacion?: string | null;
-            /** Url */
-            url?: string | null;
-            /** Contacto */
-            contacto?: string | null;
-        };
-        /** ProveedorRead */
-        ProveedorRead: {
-            /** Nombre */
-            nombre: string;
-            /** Ubicacion */
-            ubicacion?: string | null;
-            /** Url */
-            url?: string | null;
-            /** Contacto */
-            contacto?: string | null;
-            /** Id */
-            id: number;
-        };
-        /** ProveedorUpdate */
-        ProveedorUpdate: {
-            /** Nombre */
-            nombre?: string | null;
-            /** Ubicacion */
-            ubicacion?: string | null;
-            /** Url */
-            url?: string | null;
-            /** Contacto */
-            contacto?: string | null;
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -1695,7 +1630,10 @@ export interface components {
              * @default 0
              */
             descuento_porcentaje: number | string;
-            /** Es Regalo */
+            /**
+             * Es Regalo
+             * @default false
+             */
             es_regalo: boolean;
             /** Detalles */
             detalles: components["schemas"]["DetalleVentaCreate"][];
@@ -1863,169 +1801,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UsuarioRead"];
-                };
-            };
-        };
-    };
-    list_proveedores_api_v1_proveedores_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-                q?: string | null;
-                sort_by?: string | null;
-                order?: "asc" | "desc";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Paginated_ProveedorRead_"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_proveedor_api_v1_proveedores_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProveedorCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProveedorRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_proveedor_api_v1_proveedores__proveedor_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                proveedor_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProveedorRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_proveedor_api_v1_proveedores__proveedor_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                proveedor_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProveedorUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProveedorRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_proveedor_api_v1_proveedores__proveedor_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                proveedor_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2361,7 +2136,6 @@ export interface operations {
                 limit?: number;
                 offset?: number;
                 insumo_id?: number | null;
-                proveedor_id?: number | null;
                 q?: string | null;
                 sort_by?: string | null;
                 order?: "asc" | "desc";
@@ -3511,6 +3285,7 @@ export interface operations {
                 offset?: number;
                 canal_venta?: ("web" | "whatsapp" | "instagram" | "feria") | null;
                 estado?: ("completada" | "anulada") | null;
+                producto_id?: number | null;
                 sort_by?: string | null;
                 order?: "asc" | "desc";
             };
@@ -3555,41 +3330,6 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VentaRead"];
-                };
-            };
-             /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_venta_es_regalo_api_v1_ventas__venta_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                venta_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VentaUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3653,6 +3393,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VentaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_venta_es_regalo_api_v1_ventas__venta_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                venta_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VentaUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

@@ -4,9 +4,9 @@ Covers the STRICT TDD acceptance from tasks #424 T4 (spec R-CAT, design #423):
 
 - Pure: name normalization for dedup, unit resolution, category/unit
   classifier, BOM junk-material filtering, bounded plan building from a
-  workbook (proveedores + insumos + productos + tipos).
+  workbook (insumos + productos + tipos).
 - DB (real PostgreSQL via SessionLocal): idempotent upserts for Tipos,
-  Proveedores, Insumos (dedup por nombre), Productos (variante NULL / dedup
+  Insumos (dedup por nombre), Productos (variante NULL / dedup
   por (producto_id, nombre_variante)).
 - Integration: dry-run of the real ARPIA.xlsx writes 0 rows (NFR-2); plan
   counts match the workbook; a hand-built mini CatalogPlan commits atomically
@@ -17,13 +17,14 @@ real catalog data; the base tipos/categorias (Lenceria, Corseteria, ...) ARE
 the migration's canonical content and may persist across runs (idempotent).
 """
 
+from decimal import Decimal
 from pathlib import Path
 
 import openpyxl
 import pytest
 
 from app.db.session import SessionLocal
-from app.models import Insumo, Producto, Proveedor, TipoProducto
+from app.models import Insumo, Producto, TipoProducto, VarianteProducto
 from migrate.context import FaseOptions, MigrationContext
 
 REAL_XLSX = Path(r"C:\wamp64\www\ERP-Arpia\ARPIA.xlsx")
@@ -38,16 +39,11 @@ PREFIX_TEST = "Migratest"
 
 
 def _mini_workbook(path: Path) -> None:
-    """Mini ARPIA-like workbook: Proveedores + two BOM sheets with junk rows +
-    a mini INVENTARIO OCT25 block (cross-sheet dup material)."""
+    """Mini ARPIA-like workbook: two BOM sheets with junk rows + a mini
+    INVENTARIO OCT25 block (cross-sheet dup material)."""
     wb = openpyxl.Workbook()
-    prov = wb.active
-    prov.title = "Proveedores"
-    prov.append(["TIPO", "URL", "Precio Unidad", "Ubicacion", "Contactado"])
-    for nombre in ["Bexxhamel", "JM Confecciones", "SEHA Text", "ZureTex"]:
-        prov.append(["Camisetas", nombre, 11500, "Cali", "SI"])
-
-    bom1 = wb.create_sheet("CORSET")
+    bom1 = wb.active
+    bom1.title = "CORSET"
     bom1.append(["CORSET", None, None, None, None, None, None, None, "TANGA"])  # R1
     bom1.append(["Producto", "Ancho", "Alto", "cantidad Cms", "valor metro", "valor total"])  # R2
     bom1.append(["Tela Maya Test 1", 64, 37, 2368, 2.5, None])  # R3
@@ -76,6 +72,18 @@ def _mini_workbook(path: Path) -> None:
     oct.cell(row=9, column=4, value="25 mts")
     oct.cell(row=10, column=6, value="Argolla Migra Test")
     oct.cell(row=10, column=8, value="34")
+
+    # CAJAS combo block: members live in the (nombre, costo, precio) name
+    # columns B/F/J (design F3 / bom.py); packaging items (Caja, Vela,
+    # Papel, Envio) are insumos too (F1, design D4). Column A does NOT
+    # exist on the real sheet, so reading it must not be the F1 path.
+    # SHEET_BOUNDS reads CAJAS rows 4..13, so members go on R4+ (col B).
+    cajas = wb.create_sheet("CAJAS")
+    cajas.cell(row=1, column=2, value="Caja Despertar")  # block header (R1)
+    cajas.cell(row=3, column=2, value="Producto")  # header (R3)
+    empaques = ["Caja", "Vela", "Papel", "Envio"]
+    for i, nombre in enumerate(empaques):
+        cajas.cell(row=4 + i, column=2, value=nombre)
     wb.save(path)
 
 
@@ -98,9 +106,6 @@ def _borrar_filas_test(db) -> None:
             ]
         )
     ).delete(synchronize_session=False)
-    db.query(Proveedor).filter(
-        Proveedor.nombre.in_([f"{PREFIX_TEST} Proveedor", f"{PREFIX_TEST} Prov2"])
-    ).delete(synchronize_session=False)
     db.query(Producto).filter(
         Producto.nombre.in_(
             [
@@ -108,6 +113,9 @@ def _borrar_filas_test(db) -> None:
                 f"{PREFIX_TEST} Set",
                 f"{PREFIX_TEST} P1",
                 f"{PREFIX_TEST} P2",
+                f"{PREFIX_TEST} Variantes",
+                f"{PREFIX_TEST} Precio",
+                "Set Celeno",  # producto canonico MIG-2 creado por este modulo
             ]
         )
     ).delete(synchronize_session=False)
@@ -203,6 +211,45 @@ def test_clasificar_material_categoria_y_unidad_final():
     assert clasificar_material("Argolla Migra Test", "34") == ("Herrajes", "un")
 
 
+def test_clasificar_barilla_poliester_es_tela_no_herraje():
+    """Regression (2026-08, catalogo alineado 16 hojas): 'Barilla poliester
+    corset negro 8mm' es un textil continuo que se compra/consume en METROS
+    (compra VALQUI '45 mts', BOM 90 cm -> 0.9 m por corset). La keyword
+    'barilla' en Herrajes lo clasificaba como Herrajes/un: la compra '45 mts'
+    se excluia (EXM-2) y F5 fallaba con InsufficientStockError. Las varillas
+    de herraje reales se escriben 'varilla' (Varilla copa brasier talla 30).
+    """
+    from migrate.catalog import clasificar_material
+
+    assert clasificar_material("Barilla poliester corset negro 8mm", None) == ("Telas", "m")
+    # Los herrajes reales con 'varilla' NO cambian de categoria.
+    assert clasificar_material("Varilla copa brasier talla 30", None) == ("Herrajes", "un")
+    assert clasificar_material("Tapa varilla Negro #1", None) == ("Herrajes", "un")
+
+
+def test_clasificar_materiales_continuos_por_metro_son_telas():
+    """Regression (2026-08): materiales continuos que el workbook compra en
+    METROS ('1 mts', '10 mts') y consume en cm en el BOM (Tote Bag usa 48/53
+    cm de cadena, 40 cm de cremallera; el corset 30 cm de sesgo rigido).
+    Antes caian en Herrajes/un por keywords genericas, la compra se excluia
+    (EXM-2) y F5 fallaba con InsufficientStockError. Los herrajes POR PIEZA
+    que comparten keyword (deslizadores, ojales, terminales) NO cambian.
+    """
+    from migrate.catalog import clasificar_material
+
+    assert clasificar_material("Cadena plateada gruesa totebag", None) == ("Telas", "m")
+    assert clasificar_material("Cadena gris delgada totebag", None) == ("Telas", "m")
+    assert clasificar_material("Cremallera num 3", None) == ("Telas", "m")
+    assert clasificar_material("Sesgo rigido para ojales corset", None) == ("Telas", "m")
+    # Tapavarilla: nombre '10 mts' explicito -> textil continuo por metro.
+    assert clasificar_material("Tapavarilla negro 10 mts", None) == ("Telas", "m")
+    # Herrajes por pieza reales (misma keyword) NO cambian.
+    assert clasificar_material("deslizadores cremallera num 3", None) == ("Herrajes", "un")
+    assert clasificar_material("ojales metalicos 3/8 (grandes)", None) == ("Herrajes", "un")
+    assert clasificar_material("Terminales de cordon", None) == ("Herrajes", "un")
+    assert clasificar_material("Tapa varilla Negro #1", None) == ("Herrajes", "un")
+
+
 def test_filtrar_materiales_validos_excluye_junk():
     from migrate.catalog import filtrar_materiales_validos
 
@@ -214,6 +261,10 @@ def test_filtrar_materiales_validos_excluye_junk():
         {"A": 4.0},
         {"A": "VENTA"},
         {"A": 0},
+        {"A": "VLQ"},  # etiqueta de distribucion (Valqui), no material
+        {"A": "MAR"},  # etiqueta de distribucion (Margarita)
+        {"A": "ARPIA"},  # etiqueta de distribucion
+        {"A": "TOTAL BLUSA MANGA CORTA"},  # etiqueta de totales de hoja
         {"I": "Argolla 90 mm"},  # right-block material counts too
     ]
     efectivas = filtrar_materiales_validos(filas)
@@ -221,7 +272,17 @@ def test_filtrar_materiales_validos_excluye_junk():
     assert "Argolla 90 mm" in efectivas
     assert not any(
         m in efectivas
-        for m in ["Horas trabajo", "COSTO TOTAL CONJUNTO", "GANANCIA", "VENTA", "4.0"]
+        for m in [
+            "Horas trabajo",
+            "COSTO TOTAL CONJUNTO",
+            "GANANCIA",
+            "VENTA",
+            "4.0",
+            "VLQ",
+            "MAR",
+            "ARPIA",
+            "TOTAL BLUSA MANGA CORTA",
+        ]
     )
 
 
@@ -230,19 +291,16 @@ def test_filtrar_materiales_validos_excluye_junk():
 # --------------------------------------------------------------------------- #
 
 
-def test_plan_workbook_mini_proveedores_insumos_dedup(mini_libro):
+def test_plan_workbook_mini_insumos_dedup(mini_libro):
     from migrate.catalog import plan_catalogo
     from migrate.loaders import LibroMigracion
 
     with LibroMigracion(mini_libro) as libro:
         plan = plan_catalogo(libro)
 
-    assert plan.conteo_proveedores == 4
-    nombres_prov = {p.nombre for p in plan.proveedores}
-    assert {"Bexxhamel", "JM Confecciones", "SEHA Text", "ZureTex"} <= nombres_prov
-
-    # CORSET(4) + BLUSAS adds Sesgo; OCT25 adds 2; 'Tela Maya Test 1' dedup across sheets.
-    assert plan.conteo_insumos == 6
+    # CORSET(4) + BLUSAS adds Sesgo; OCT25 adds 2; CAJAS adds 4 empaques;
+    # 'Tela Maya Test 1' dedup across sheets.
+    assert plan.conteo_insumos == 10
     nombres = {i.nombre for i in plan.insumos}
     assert {
         "Tela Maya Test 1",
@@ -251,7 +309,30 @@ def test_plan_workbook_mini_proveedores_insumos_dedup(mini_libro):
         "Sesgo Elastico 10 mts",
         "Material Migra Test",
         "Argolla Migra Test",
+        "Caja",
+        "Vela",
+        "Papel",
+        "Envio",
     } <= nombres
+
+
+def test_plan_catalogo_empaques_cajas_entran_al_universo(mini_libro):
+    """Regression (2026-08): F1 must read the CAJAS combo member columns
+    (B/F/J, design F3 / bom.py) -- NOT column A, which does not exist on the
+    sheet -- so the packaging insumos (Caja/Vela/Papel/Envio) enter the F1
+    universe. Before this fix F3 silently omitted the 12 combo packaging
+    rows because the insumo was never created."""
+    from migrate.catalog import plan_catalogo
+    from migrate.loaders import LibroMigracion
+
+    with LibroMigracion(mini_libro) as libro:
+        plan = plan_catalogo(libro)
+
+    por_categoria: dict[str, list[str]] = {}
+    for insumo in plan.insumos:
+        por_categoria.setdefault(insumo.categoria, []).append(insumo.nombre)
+    empaques = set(por_categoria.get("Empaques", []))
+    assert {"Caja", "Vela", "Papel", "Envio"} <= empaques
 
 
 def test_plan_catalogo_unidades_normalizadas(mini_libro):
@@ -298,18 +379,6 @@ def test_bootstrap_categorias_y_tipos_idempotente(db):
     assert {"Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"} <= tipos
     for nombre in ["Lencería", "Corsetería", "Set"]:
         assert db.query(TipoProducto).filter(TipoProducto.nombre == nombre).count() == 1
-
-
-def test_upsert_proveedor_idempotente(db):
-    from migrate.catalog import bootstrap_catalogo, clave_normalizada, upsert_proveedor
-
-    bootstrap_catalogo(db)
-    nombre = f"{PREFIX_TEST} Proveedor"
-    primero = upsert_proveedor(db, nombre, url="https://test.local")
-    segundo = upsert_proveedor(db, nombre, url="https://test.local")
-    assert primero.id == segundo.id  # mismo proveedor, no duplicado
-    assert db.query(Proveedor).filter(Proveedor.nombre == nombre).count() == 1
-    assert clave_normalizada(primero.nombre) == clave_normalizada(nombre)  # se guarda normalizado
 
 
 def test_upsert_insumo_dedup_por_nombre(db):
@@ -365,7 +434,6 @@ def test_catalogar_dry_run_real_no_escribe():
     try:
         antes = (
             db.query(TipoProducto).count(),
-            db.query(Proveedor).count(),
             db.query(Insumo).count(),
             db.query(Producto).count(),
         )
@@ -373,16 +441,11 @@ def test_catalogar_dry_run_real_no_escribe():
         plan = catalogar(ctx)
         despues = (
             db.query(TipoProducto).count(),
-            db.query(Proveedor).count(),
             db.query(Insumo).count(),
             db.query(Producto).count(),
         )
         # NFR-2: dry-run termina con 0 filas escritas
         assert antes == despues
-        # The recalculated 16-sheet workbook (2026-08) dropped the Proveedores
-        # sheet -> the plan carries 0 proveedores (the mini/contract workbooks
-        # still have that sheet, so plan_workbook_mini_* keeps the old asserts).
-        assert plan.conteo_proveedores == 0
         assert plan.conteo_insumos >= 20  # recetas BOM + herrajes reales
         assert plan.conteo_productos == len(PRODUCTOS_CATALOGO)
     finally:
@@ -453,13 +516,11 @@ def test_aplicar_plan_transaccional_y_cleanup(db):
         CatalogPlan,
         InsumoPlan,
         ProductoPlan,
-        ProveedorPlan,
         aplicar_plan,
     )
 
     plan = CatalogPlan(
         tipos=["Lencería"],
-        proveedores=[ProveedorPlan(nombre=f"{PREFIX_TEST} Prov2")],
         insumos=[InsumoPlan(nombre=f"{PREFIX_TEST} Insumo A", unidad="m", categoria="Telas")],
         productos=[
             ProductoPlan(nombre=f"{PREFIX_TEST} P1", tipo="Set"),
@@ -471,4 +532,114 @@ def test_aplicar_plan_transaccional_y_cleanup(db):
 
     assert db.query(Producto).filter(Producto.nombre == f"{PREFIX_TEST} P2").count() == 1
     assert db.query(Insumo).filter(Insumo.nombre == f"{PREFIX_TEST} Insumo A").count() == 1
-    assert db.query(Proveedor).filter(Proveedor.nombre == f"{PREFIX_TEST} Prov2").count() == 1
+
+
+# --------------------------------------------------------------------------- #
+# Variantes XXS-XL + Set Celeno (MIG-1/MIG-2, tallas desde la XXS hasta la XL)
+# --------------------------------------------------------------------------- #
+
+TALLAS_XXS_XL = ("XXS", "XS", "S", "M", "L", "XL")
+
+
+def test_plan_catalogo_real_30_variantes_y_14_productos():
+    """MIG-1/MIG-2: 5 productos tallados x 6 tallas = 30 variantes; el catalogo
+    crece a 14 con Set Celeno @ 75000 (locked decision, precio_venta NULL en
+    las variantes porque comparten el precio del producto)."""
+    from migrate.catalog import plan_catalogo
+    from migrate.loaders import LibroMigracion
+
+    if not REAL_XLSX.exists():
+        pytest.skip("ARPIA.xlsx no disponible")
+
+    with LibroMigracion(REAL_XLSX) as libro:
+        plan = plan_catalogo(libro)
+
+    assert plan.conteo_productos == 14
+    por_nombre = {p.nombre: p for p in plan.productos}
+    for tallado in (
+        "Set Aelo",
+        "Set Ocipete",
+        "Set Celeno",
+        "Blusa Manga Larga",
+        "Blusa Manga Corta",
+    ):
+        assert por_nombre[tallado].variantes == TALLAS_XXS_XL, tallado
+    assert sum(len(p.variantes) for p in plan.productos) == 30
+    celeno = por_nombre["Set Celeno"]
+    assert celeno.precio_sugerido == Decimal("75000")
+
+
+def test_plan_catalogo_real_sin_variantes_en_corset_garras_y_combos():
+    """MIG-1: un producto sin tupla variantes (Corset Garras, combos) NUNCA
+    recibe filas de variante (tampoco una variante NULL fantasma)."""
+    from migrate.catalog import plan_catalogo
+    from migrate.loaders import LibroMigracion
+
+    if not REAL_XLSX.exists():
+        pytest.skip("ARPIA.xlsx no disponible")
+
+    with LibroMigracion(REAL_XLSX) as libro:
+        plan = plan_catalogo(libro)
+    por_nombre = {p.nombre: p for p in plan.productos}
+    for sin_tallas in ("Corset Garras", "Caja Despertar", "Caja Saca Las Garras"):
+        assert por_nombre[sin_tallas].variantes == ()
+
+
+def test_aplicar_plan_set_celeno_precio_y_reapply(db):
+    """MIG-2: aplicar_plan persiste Set Celeno @ 75000 y un re-apply lo
+    mantiene (D1: el plan/catalogo es la fuente de verdad del precio)."""
+    from migrate.catalog import CatalogPlan, ProductoPlan, aplicar_plan
+
+    plan = CatalogPlan(
+        tipos=["Set"],
+        productos=[
+            ProductoPlan(
+                nombre="Set Celeno",
+                tipo="Set",
+                variantes=TALLAS_XXS_XL,
+                precio_sugerido=Decimal("75000"),
+            )
+        ],
+    )
+    aplicar_plan(db, plan)
+    db.commit()
+    p = db.query(Producto).filter(Producto.nombre == "Set Celeno").one()
+    assert p.precio_venta_sugerido == Decimal("75000")
+    assert len(p.variantes) == 6
+
+    aplicar_plan(db, plan)  # re-run: idempotente, precio estable
+    db.commit()
+    db.refresh(p)
+    assert p.precio_venta_sugerido == Decimal("75000")
+    assert db.query(VarianteProducto).filter(VarianteProducto.producto_id == p.id).count() == 6
+
+
+def test_upsert_producto_variantes_duplicadas_6_filas(db):
+    """MIG-1: dedup por (producto_id, nombre_variante): re-upsert de las 6
+    tallas NO duplica filas (guard manual antes del UNIQUE)."""
+    from migrate.catalog import bootstrap_catalogo, upsert_producto
+
+    bootstrap_catalogo(db)
+    nombre = f"{PREFIX_TEST} Variantes"
+    a = upsert_producto(db, nombre, tipo="Set", variantes=TALLAS_XXS_XL)
+    b = upsert_producto(db, nombre, tipo="Set", variantes=TALLAS_XXS_XL)
+    assert b.id == a.id
+    assert {v.nombre_variante for v in a.variantes} == set(TALLAS_XXS_XL)
+    assert db.query(VarianteProducto).filter(VarianteProducto.producto_id == a.id).count() == 6
+
+
+def test_upsert_producto_refresca_precio_solo_cuando_no_none(db):
+    """D1: upsert_producto refresca precio_venta_sugerido en el producto
+    existente SOLO cuando precio_sugerido != None; un caller viejo que no
+    pasa precio nunca pisa el valor del catalogo."""
+    from migrate.catalog import bootstrap_catalogo, upsert_producto
+
+    bootstrap_catalogo(db)
+    nombre = f"{PREFIX_TEST} Precio"
+    p1 = upsert_producto(db, nombre, tipo="Accesorio")
+    assert p1.precio_venta_sugerido == Decimal("0")
+    p2 = upsert_producto(db, nombre, tipo="Accesorio", precio_sugerido=Decimal("75000"))
+    assert p2.id == p1.id
+    assert p2.precio_venta_sugerido == Decimal("75000")
+    p3 = upsert_producto(db, nombre, tipo="Accesorio")  # sin precio: no pisa
+    assert p3.precio_venta_sugerido == Decimal("75000")

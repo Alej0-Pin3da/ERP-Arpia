@@ -1,4 +1,4 @@
-"""F0+F1 catalog phase: bootstrap + Tipos_Producto/Proveedores/Insumos/Productos.
+"""F0+F1 catalog phase: bootstrap + Tipos_Producto/Insumos/Productos.
 
 Scope of slice 3 (PR#3): ONLY the catalog phase (design #423 > catalog.py;
 tasks #424 T4; spec R-CAT / CAT-1..CAT-4, EXM-1..EXM-4, NFR-1/2).
@@ -12,8 +12,6 @@ idempotent (spec CAT-1). Runs inside the caller transaction (never commits).
 F1 ``catalogar``: builds a ``CatalogPlan`` from the bounded Excel readers and,
 in commit mode, upserts inside a single ``session_scope`` (EXM-4):
 
-- Proveedores: from the ``Proveedores`` sheet (B=nombre, C=url, E=ubicacion);
-  natural key = normalized name (dedup manual: no UNIQUE on Proveedores).
 - Insumos: union of BOM recipe materials (left A / right I blocks), the
   INVENTARIO OCT25 MATERIAL+HERRAJES blocks and the CAJAS packaging items.
   unidad_medida normalizada + categoria resuelta por nombre; stock_actual,
@@ -50,7 +48,6 @@ from app.models import (
     CategoriaInsumo,
     Insumo,
     Producto,
-    Proveedor,
     TipoProducto,
     VarianteProducto,
 )
@@ -93,17 +90,49 @@ HOJAS_BOM_RECETAS: tuple[str, ...] = (
 )
 
 # Product universe derived from the workbook (fuente = provenance sheet).
+# ``variantes`` tupled products seed one Variante_Producto per size (MIG-1):
+# sizes XXS..XL share the product price, so ``precio_venta`` stays NULL.
 PRODUCTOS_CATALOGO: tuple[dict[str, object], ...] = (
     {"nombre": "Bralete", "tipo": "Lencería", "fuente": "'Noche y Dia' bloque BRALETE"},
     {"nombre": "Corset Artemisia", "tipo": "Corsetería", "fuente": "hoja 'CORSET ARTEMISIA'"},
     {"nombre": "Corset Hypatia", "tipo": "Corsetería", "fuente": "hoja 'Corset Hypatia'"},
     {"nombre": "Corset Garras", "tipo": "Corsetería", "fuente": "hoja 'Corset Garras'"},
     {"nombre": "Falda Emily", "tipo": "Lencería", "fuente": "hoja 'FALDA EMILY'"},
-    {"nombre": "Blusa Manga Larga", "tipo": "Blusa", "fuente": "hoja 'BLUSAS' bloque MANGA LARGA"},
-    {"nombre": "Blusa Manga Corta", "tipo": "Blusa", "fuente": "hoja 'BLUSAS' bloque MANGA CORTA"},
+    {
+        "nombre": "Blusa Manga Larga",
+        "tipo": "Blusa",
+        "fuente": "hoja 'BLUSAS' bloque MANGA LARGA",
+        "variantes": ("XXS", "XS", "S", "M", "L", "XL"),
+    },
+    {
+        "nombre": "Blusa Manga Corta",
+        "tipo": "Blusa",
+        "fuente": "hoja 'BLUSAS' bloque MANGA CORTA",
+        "variantes": ("XXS", "XS", "S", "M", "L", "XL"),
+    },
     {"nombre": "Tote Bag Arpia", "tipo": "Accesorio", "fuente": "hoja 'TOTEBAG'"},
-    {"nombre": "Set Aelo", "tipo": "Set", "fuente": "VENTAS/CAJAS sobre Corset"},
-    {"nombre": "Set Ocipete", "tipo": "Set", "fuente": "VENTAS/CAJAS sobre Bustier"},
+    {
+        "nombre": "Set Aelo",
+        "tipo": "Set",
+        "fuente": "VENTAS/CAJAS sobre Corset",
+        "variantes": ("XXS", "XS", "S", "M", "L", "XL"),
+    },
+    {
+        "nombre": "Set Ocipete",
+        "tipo": "Set",
+        "fuente": "VENTAS/CAJAS sobre Bustier",
+        "variantes": ("XXS", "XS", "S", "M", "L", "XL"),
+    },
+    # MIG-2: Set Celeno @ 75000 (locked decision; el 65000 del workbook en un
+    # bloque CAJAS es descuento/malentrada). Sin receta BOM ni wiring de combo
+    # en este cambio. Cuenta canonica 13 -> 14.
+    {
+        "nombre": "Set Celeno",
+        "tipo": "Set",
+        "fuente": "VENTAS sobre bicolor (PRENDAS 'Conjunto bicolor' @75000)",
+        "precio_venta_sugerido": 75000,
+        "variantes": ("XXS", "XS", "S", "M", "L", "XL"),
+    },
     {"nombre": "Caja Despertar", "tipo": "Combo", "fuente": "hoja 'CAJAS'"},
     {"nombre": "Caja Despertar V2", "tipo": "Combo", "fuente": "hoja 'CAJAS'"},
     {"nombre": "Caja Saca Las Garras", "tipo": "Combo", "fuente": "hoja 'CAJAS' / VENTAS"},
@@ -209,7 +238,6 @@ _CATEGORIA_KEYWORDS: dict[str, tuple[str, ...]] = {
         "tensor",
         "aro",
         "varilla",
-        "barilla",
         "gancho",
         "ocho",
         "zeta",
@@ -262,6 +290,23 @@ _UNIDAD_FINAL_POR_CATEGORIA: dict[str, str] = {
     "Químicos": "kg",
 }
 
+# Continuous materials the workbook buys in METROS and consumes in cm in the
+# BOM, but whose names hit a generic Herrajes keyword (cadena/cremallera/
+# ojal). Key: clave_normalizada -> (categoria, unidad). Herrajes by piece
+# sharing the same keyword (deslizadores cremallera, ojales metalicos,
+# Terminales de cordon) are NOT overridden. Verified against ARPIA.xlsx
+# 2026-08: 'Cadena plateada gruesa totebag' 1 mts / BOM 48 cm, 'Cremallera
+# num 3' 10 mts / BOM 40 cm, 'Sesgo rigido para ojales corset' 10 mts / BOM
+# 30 cm. Before this override the purchases were excluded (EXM-2), the
+# insumo kept stock 0 and F5 failed with InsufficientStockError.
+_CLASIFICACION_FORZADA: dict[str, tuple[str, str]] = {
+    clave_normalizada("Cadena plateada gruesa totebag"): ("Telas", "m"),
+    clave_normalizada("Cadena gris delgada totebag"): ("Telas", "m"),
+    clave_normalizada("Cremallera num 3"): ("Telas", "m"),
+    clave_normalizada("Sesgo rigido para ojales corset"): ("Telas", "m"),
+    clave_normalizada("Tapavarilla negro 10 mts"): ("Telas", "m"),
+}
+
 
 def _categoria_por_nombre(nombre: str) -> str | None:
     texto = clave_normalizada(nombre)
@@ -281,6 +326,11 @@ def clasificar_material(nombre: object, cantidad: object = None) -> tuple[str, s
     """
     texto = normalizar_nombre(nombre)
     unidad_hint = resolver_unidad(texto) or _unidad_de_cantidad(cantidad)
+    # Forzado por nombre: materiales continuos por metro que las keywords
+    # genericas de Herrajes pondrian en Herrajes/un (ver _CLASIFICACION_FORZADA).
+    forzada = _CLASIFICACION_FORZADA.get(clave_normalizada(texto))
+    if forzada is not None:
+        return forzada
     categoria = _categoria_por_nombre(texto)
     if categoria is None:
         if unidad_hint in ("m", "cm"):
@@ -306,6 +356,7 @@ _JUNK_SUBCADENA = (
     "precio",
     "venta",
     "total conjunto",
+    "total blusa",
     "hora de trabajo",
     "horas de trabajo",
     "trabajo",
@@ -319,6 +370,7 @@ _JUNK_EXACTOS = frozenset(
         "costo",
         "arpia",
         "mar",
+        "vlq",
         "material",
         "herrajes",
         "prendas",
@@ -373,13 +425,6 @@ def _es_material_valido(nombre: str) -> bool:
 
 
 @dataclass(frozen=True)
-class ProveedorPlan:
-    nombre: str
-    url: str | None = None
-    ubicacion: str | None = None
-
-
-@dataclass(frozen=True)
 class InsumoPlan:
     nombre: str
     unidad: str
@@ -391,6 +436,7 @@ class ProductoPlan:
     nombre: str
     tipo: str
     variantes: tuple[str, ...] = ()
+    precio_sugerido: Decimal | None = None
 
 
 @dataclass
@@ -398,17 +444,12 @@ class CatalogPlan:
     """What the phase would upsert (dry-run plan / commit input)."""
 
     tipos: list[str] = field(default_factory=lambda: list(TIPOS_CATALOGO))
-    proveedores: list[ProveedorPlan] = field(default_factory=list)
     insumos: list[InsumoPlan] = field(default_factory=list)
     productos: list[ProductoPlan] = field(default_factory=list)
 
     @property
     def conteo_tipos(self) -> int:
         return len(self.tipos)
-
-    @property
-    def conteo_proveedores(self) -> int:
-        return len(self.proveedores)
 
     @property
     def conteo_insumos(self) -> int:
@@ -424,40 +465,6 @@ class CatalogPlan:
 # --------------------------------------------------------------------------- #
 
 _CAJAS_EMPAQUES = frozenset({"caja", "vela", "papel", "envio", "bolsa", "etiqueta", "tarjeta"})
-
-
-def _leer_proveedores(libro: LibroMigracion, report) -> list[ProveedorPlan]:
-    if "Proveedores" not in SHEET_BOUNDS:
-        return []
-    # The recalculated 16-sheet workbook (2026-08) dropped the Proveedores
-    # sheet, so it may be absent even though SHEET_BOUNDS keeps its legacy
-    # range (mini/contract workbooks still have it). Same guard as _leer_materiales.
-    try:
-        filas = libro.leer_hoja("Proveedores", report=report).filas
-    except HojaInexistenteError:
-        if report:
-            report.warn("Proveedores", None, None, "hoja ausente en este workbook; omitida")
-        return []
-    vistos: dict[str, ProveedorPlan] = {}
-    for fila in filas:
-        nombre = normalizar_nombre(fila.get("B"))
-        if not nombre:
-            continue
-        url = fila.get("C")
-        ubicacion = fila.get("E")
-        if not normalizar_nombre(url) or clave_normalizada(url) == "url":
-            url = None
-        if not normalizar_nombre(ubicacion) or clave_normalizada(ubicacion) == "ubicacion":
-            ubicacion = None
-        vistos.setdefault(
-            clave_normalizada(nombre),
-            ProveedorPlan(
-                nombre=nombre,
-                url=str(url) if url else None,
-                ubicacion=str(ubicacion) if ubicacion else None,
-            ),
-        )
-    return sorted(vistos.values(), key=lambda p: p.nombre.casefold())
 
 
 def _leer_materiales(libro: LibroMigracion, report) -> dict[str, str]:
@@ -494,13 +501,18 @@ def _leer_materiales(libro: LibroMigracion, report) -> dict[str, str]:
                     continue
                 nombres.setdefault(clave_normalizada(nombre), nombre)
     if "CAJAS" in SHEET_BOUNDS:
+        # CAJAS has no column A: combo members live in the (nombre, costo,
+        # precio) name columns B/F/J (design F3, same columns bom.py reads).
+        # Only the packaging items enter the F1 insumo universe; the combo
+        # products (Bralete/Set Aelo/...) come from PRODUCTOS_CATALOGO.
         for fila in filas_de("CAJAS"):
-            valor = fila.get("A")
-            if not isinstance(valor, str):
-                continue
-            nombre = normalizar_nombre(valor)
-            if clave_normalizada(nombre) in _CAJAS_EMPAQUES:
-                nombres.setdefault(clave_normalizada(nombre), nombre)
+            for col_nombre in ("B", "F", "J"):
+                valor = fila.get(col_nombre)
+                if not isinstance(valor, str):
+                    continue
+                nombre = normalizar_nombre(valor)
+                if clave_normalizada(nombre) in _CAJAS_EMPAQUES:
+                    nombres.setdefault(clave_normalizada(nombre), nombre)
     return nombres
 
 
@@ -516,7 +528,6 @@ def leer_insumos_plan(nombres: dict[str, str]) -> list[InsumoPlan]:
 
 def plan_catalogo(libro: LibroMigracion, report=None) -> CatalogPlan:
     """Aggregate the catalog plan from the bounded workbook (read-only)."""
-    proveedores = _leer_proveedores(libro, report)
     materiales = _leer_materiales(libro, report)
     insumos = leer_insumos_plan(materiales)
     productos = [
@@ -524,11 +535,15 @@ def plan_catalogo(libro: LibroMigracion, report=None) -> CatalogPlan:
             nombre=normalizar_nombre(entry["nombre"]),
             tipo=str(entry["tipo"]),
             variantes=tuple(v for v in entry.get("variantes", ()) if v),
+            precio_sugerido=(
+                Decimal(entry["precio_venta_sugerido"])
+                if entry.get("precio_venta_sugerido") is not None
+                else None
+            ),
         )
         for entry in PRODUCTOS_CATALOGO
     ]
     return CatalogPlan(
-        proveedores=proveedores,
         insumos=insumos,
         productos=productos,
     )
@@ -556,16 +571,6 @@ def bootstrap_catalogo(db, report=None) -> dict[str, int]:
     for nombre_tipo in TIPOS_CATALOGO:
         _get_or_create(db, TipoProducto, nombre_tipo)
     return {"categorias": len(BASE_CATEGORIAS), "tipos": len(TIPOS_CATALOGO)}
-
-
-def upsert_proveedor(db, nombre, url=None, ubicacion=None) -> Proveedor:
-    nombre_limpio = normalizar_nombre(nombre)
-    proveedor = db.scalar(select(Proveedor).where(Proveedor.nombre == nombre_limpio))
-    if proveedor is None:
-        proveedor = Proveedor(nombre=nombre_limpio, url=url, ubicacion=ubicacion)
-        db.add(proveedor)
-        db.flush()
-    return proveedor
 
 
 def upsert_insumo(
@@ -636,6 +641,12 @@ def upsert_producto(
     elif producto.tipo_producto_id != tipo_objeto.id:
         producto.tipo_producto_id = tipo_objeto.id
         db.flush()
+    # D1: el plan es la fuente de verdad del precio; solo un caller que lo
+    # pase explicitamente refresca el valor (los callers viejos sin precio no
+    # pisan el precio_venta_sugerido del catalogo).
+    if precio_sugerido is not None and producto.precio_venta_sugerido != precio_sugerido:
+        producto.precio_venta_sugerido = precio_sugerido
+        db.flush()
 
     existentes = {
         v.nombre_variante: v
@@ -660,24 +671,34 @@ def upsert_producto(
 def aplicar_plan(db, plan: CatalogPlan, report=None) -> dict[str, int]:
     """Upsert everything in the plan inside the caller transaction (EXM-4)."""
     bootstrap_catalogo(db, report)
-    totales = {"proveedores": 0, "insumos": 0, "productos": 0, "variantes": 0}
-    for proveedor in plan.proveedores:
-        upsert_proveedor(db, proveedor.nombre, url=proveedor.url, ubicacion=proveedor.ubicacion)
-        totales["proveedores"] += 1
+    totales = {"insumos": 0, "productos": 0, "variantes": 0}
     for insumo in plan.insumos:
         upsert_insumo(db, insumo.nombre, unidad=insumo.unidad, categoria_nombre=insumo.categoria)
         totales["insumos"] += 1
     for producto in plan.productos:
-        upsert_producto(db, producto.nombre, producto.tipo, producto.variantes)
+        upsert_producto(
+            db,
+            producto.nombre,
+            producto.tipo,
+            producto.variantes,
+            precio_sugerido=producto.precio_sugerido,
+        )
         totales["productos"] += 1
         totales["variantes"] += len(producto.variantes)
+        if producto.precio_sugerido is not None and report:
+            report.info(
+                "F1",
+                None,
+                None,
+                f"precio sugerido {producto.nombre}: {producto.precio_sugerido}",
+            )
     if report:
         report.info(
             "F1",
             None,
             None,
-            f"upsert aplicados: {totales['proveedores']} proveedores, "
-            f"{totales['insumos']} insumos, {totales['productos']} productos, "
+            f"upsert aplicados: {totales['insumos']} insumos, "
+            f"{totales['productos']} productos, "
             f"{totales['variantes']} variantes",
         )
     return totales
@@ -716,8 +737,8 @@ def catalogar(ctx: MigrationContext) -> CatalogPlan:
         "F1",
         None,
         None,
-        f"plan catalogo: {plan.conteo_proveedores} proveedores, "
-        f"{plan.conteo_insumos} insumos, {plan.conteo_productos} productos, "
+        f"plan catalogo: {plan.conteo_insumos} insumos, "
+        f"{plan.conteo_productos} productos, "
         f"{plan.conteo_tipos} tipos",
     )
     if ctx.options.modo == "commit" and ctx.session is not None:
@@ -735,14 +756,12 @@ __all__ = [
     "resolver_unidad",
     "clasificar_material",
     "filtrar_materiales_validos",
-    "ProveedorPlan",
     "InsumoPlan",
     "ProductoPlan",
     "CatalogPlan",
     "plan_catalogo",
     "bootstrap_catalogo",
     "bootstrap_catalog_phase",
-    "upsert_proveedor",
     "upsert_insumo",
     "upsert_producto",
     "aplicar_plan",

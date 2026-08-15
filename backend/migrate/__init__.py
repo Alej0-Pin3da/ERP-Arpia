@@ -31,7 +31,7 @@ class Fase:
 # Order is strict (EXM-3); F0-F7 as defined by design #423 / tasks #424.
 FASES: tuple[Fase, ...] = (
     Fase("F0", "Bootstrap", "Seeder base + Tipos_Producto", "catalog"),
-    Fase("F1", "Catalogo", "Proveedores, categorias, insumos, productos+variantes", "catalog"),
+    Fase("F1", "Catalogo", "Categorias, insumos, productos+variantes", "catalog"),
     Fase("F2", "Compras-WAC", "Compras historicas WAC (insumos BOM-only, fecha real)", "purchases"),
     Fase("F3", "BOM", "BOM_Insumos + BOM_Productos (combos CAJAS)", "bom"),
     Fase("F4", "Stock-OCT25", "Snapshot stock inicial INVENTARIO OCT25", "stock"),

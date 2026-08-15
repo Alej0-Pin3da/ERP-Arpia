@@ -254,7 +254,7 @@ def test_aplicar_stock_no_pisa_costo_wac(db, mini_stock):
     tela.stock_actual = Decimal("0")
     tela.costo_promedio_actual = Decimal("0")
     db.flush()
-    registrar_compra(db, tela.id, None, Decimal("5"), Decimal("100"), commit=False)
+    registrar_compra(db, tela.id, Decimal("5"), Decimal("100"), commit=False)
     db.commit()
     assert tela.costo_promedio_actual == Decimal("100")  # WAC de F2 dejado
 
@@ -353,6 +353,38 @@ def test_aplicar_stock_sin_alias_ni_match_exacto_se_omite(db, tmp_path):
     assert res["omitidos"] == 1
     assert res["seteados"] == 0
     assert db.query(Insumo).filter(Insumo.nombre == nombre_faltante).count() == 0
+
+
+def test_aplicar_stock_exacto_primero_no_usa_alias_equivocado(db, tmp_path):
+    """Regression (2026-08, catalogo alineado 16 hojas): F1 crea los insumos
+    con los nombres OCT25 reales, asi que el match exacto gana. El alias
+    anterior apuntaba a nombres viejos ('Framilon elastico plano 20 mts',
+    'ARCO METALICO 2001 30') que YA NO existen, y en el peor caso pisaba el
+    stock de OTRO insumo que si existia (Elastico plano negro -> Framilon).
+    """
+    from migrate.catalog import upsert_insumo
+    from migrate.stock import aplicar_stock, plan_stock
+
+    _preparar_insumos(db)
+    real = upsert_insumo(db, "Elastico plano negro", categoria_nombre="Telas")
+    # El antiguo destino del alias tambien existe en el catalogo viejo; el
+    # stock OCT25 debe ir al insumo con el nombre real, NO al alias viejo.
+    otro = upsert_insumo(db, "Framilon elastico plano 20 mts", categoria_nombre="Telas")
+    db.commit()
+
+    path = tmp_path / "exacto-gana.xlsx"
+    _mini_workbook_una_fila(path, 2, "Elastico plano negro", 4, "10 mts")
+    with LibroMigracion(path) as libro:
+        plan = plan_stock(libro)
+    res = aplicar_stock(db, plan)
+    db.commit()
+
+    assert res["seteados"] == 1
+    assert res["omitidos"] == 0
+    db.refresh(real)
+    db.refresh(otro)
+    assert real.stock_actual == Decimal("10")
+    assert otro.stock_actual == Decimal("0")  # el alias viejo NO recibe el stock
 
 
 # --------------------------------------------------------------------------- #

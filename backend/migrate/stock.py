@@ -202,9 +202,22 @@ def plan_stock(libro, report=None) -> StockPlan:
 
 
 def _insumo_por_nombre(db, nombre: str):
-    """Insumo del catalogo por nombre canonico (alias primero, luego exacto)."""
-    nombre = ALIASES_STOCK_A_CATALOGO.get(clave_normalizada(nombre), nombre)
-    return db.scalar(select(Insumo).where(Insumo.nombre == nombre))
+    """Insumo del catalogo por nombre canonico (exacto primero, luego alias).
+
+    With the aligned 16-sheet catalog (2026-08), F1 creates insumos with the
+    real OCT25 names (the 20 materiales + 14 herrajes enter the F1 universe),
+    so an exact match wins. The alias table only resolves names that still
+    diverge from the catalog (legacy mappings); it must NOT redirect an
+    existing catalog insumo to an old/other insumo.
+    """
+    nombre = normalizar_nombre(nombre)
+    insumo = db.scalar(select(Insumo).where(Insumo.nombre == nombre))
+    if insumo is not None:
+        return insumo
+    alias = ALIASES_STOCK_A_CATALOGO.get(clave_normalizada(nombre))
+    if alias is None:
+        return None
+    return db.scalar(select(Insumo).where(Insumo.nombre == alias))
 
 
 def aplicar_stock(db, plan: StockPlan, report=None) -> dict[str, int]:

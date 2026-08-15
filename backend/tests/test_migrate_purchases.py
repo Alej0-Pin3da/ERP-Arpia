@@ -8,8 +8,8 @@ NFR-1/2):
 - Workbook -> plan: ONLY catalog (BOM) insumos become WAC purchases; non-BOM
   rows (equipo, gastos) are excluded (-> finanzas F6); right-hand price
   sub-tables (J..N / H..L) that duplicate left blocks are never loaded; empty
-  células de fecha follow D5 (inherit contiguous same insumo+proveedor,
-  otherwise omit + WARN), never now().
+  células de fecha follow D5 (inherit contiguous same insumo, otherwise omit +
+  WARN), never now().
 - DB (real PostgreSQL): applying the plan registers CompraInsumo rows with the
   REAL excel fecha, updates insumo stock_actual + costo_promedio_actual via
   wac.registrar_compra (WAC formula), is idempotent on re-run (natural key
@@ -86,12 +86,10 @@ def _mini_workbook(path: Path) -> None:
     inv.cell(row=6, column=1, value="5 mts")
     inv.cell(row=6, column=2, value=f"{PREFIX_TEST} Encaje")
     inv.cell(row=6, column=4, value=1200)
-    # R7: BOM compra SIN fecha pero mismo insumo (Tela) + mismo proveedor que R3 -> hereda DIA
+    # R7: BOM compra SIN fecha pero mismo insumo (Tela) que R3 -> hereda DIA
     inv.cell(row=7, column=1, value="2 mts")
     inv.cell(row=7, column=2, value=f"{PREFIX_TEST} Tela")
     inv.cell(row=7, column=4, value=60)
-    inv.cell(row=7, column=6, value=f"{PREFIX_TEST} Prov")
-    inv.cell(row=3, column=6, value=f"{PREFIX_TEST} Prov")
     # Derecha: la sub-tabla de precios duplica la compra (400cm x 1cm = 4 mts a M=200)
     inv.cell(row=14, column=10, value=f"{PREFIX_TEST} Tela")  # J
     inv.cell(row=14, column=11, value=400)  # K Largo CMS
@@ -115,8 +113,8 @@ def _plan_de(mini_libro):
 
 
 def _preparar_catalogo(db) -> dict[str, int]:
-    """F1 bootstrap + insumos BOM del mini: insumos y proveedor de prueba."""
-    from migrate.catalog import bootstrap_catalogo, upsert_insumo, upsert_proveedor
+    """F1 bootstrap + insumos BOM del mini: insumos de prueba."""
+    from migrate.catalog import bootstrap_catalogo, upsert_insumo
 
     bootstrap_catalogo(db)
     db.flush()
@@ -130,14 +128,13 @@ def _preparar_catalogo(db) -> dict[str, int]:
     ids[PREFIX_TEST + " Encaje"] = upsert_insumo(
         db, f"{PREFIX_TEST} Encaje", categoria_nombre="Telas"
     ).id
-    ids[PREFIX_TEST + " Prov"] = upsert_proveedor(db, f"{PREFIX_TEST} Prov").id
     db.commit()
     return ids
 
 
 def _borrar_filas_test(db) -> None:
     """Remove rows injected by this test module (exact-name matches only)."""
-    from app.models import CompraInsumo, Insumo, Proveedor, TipoProducto
+    from app.models import CompraInsumo, Insumo, TipoProducto
 
     nombres_insumo = [f"{PREFIX_TEST} Tela", f"{PREFIX_TEST} Argolla", f"{PREFIX_TEST} Encaje"]
     insumos = db.query(Insumo).filter(Insumo.nombre.in_(nombres_insumo)).all()
@@ -146,9 +143,6 @@ def _borrar_filas_test(db) -> None:
             synchronize_session=False
         )
     db.query(Insumo).filter(Insumo.nombre.in_(nombres_insumo)).delete(synchronize_session=False)
-    db.query(Proveedor).filter(Proveedor.nombre == f"{PREFIX_TEST} Prov").delete(
-        synchronize_session=False
-    )
     # Remove the canonical catalog tipos that bootstrap_catalogo() inserts.
     # They are migration content, not app seed data; leaving them pollutes the
     # shared per-sheet DB and breaks pagination tests that assume an empty table.
@@ -253,7 +247,7 @@ def test_plan_compras_calcula_precio_unitario(mini_libro):
 
 def test_plan_compras_fecha_heredada_contigua(mini_libro):
     plan = _plan_de(mini_libro)
-    # R7 hereda la fecha DIA de la compra R3 (mismo insumo Tela + mismo proveedor)
+    # R7 hereda la fecha DIA de la compra R3 (mismo insumo Tela)
     tela_2m = [c for c in plan.compras if c.insumo_nombre == f"{PREFIX_TEST} Tela"]
     heredada = [c for c in tela_2m if c.fecha_heredada]
     assert len(heredada) == 1
@@ -326,11 +320,13 @@ def _mini_workbook_derecha(path: Path) -> None:
     inv.cell(row=15, column=12, value=1)
     inv.cell(row=15, column=13, value=7200)
     inv.cell(row=15, column=5, value=datetime(2026, 2, 17))
-    # R16: derecha duplica izquierda (Tela Derecha ya comprada en R5) -> descarte
+    # R16: derecha duplica izquierda (Tela Derecha ya comprada en R5 con la
+    # MISMA fecha de operacion) -> descarte
     inv.cell(row=16, column=10, value=f"{PREFIX_TEST} Tela Derecha")
     inv.cell(row=16, column=11, value=400)
     inv.cell(row=16, column=12, value=1)
     inv.cell(row=16, column=13, value=200)
+    inv.cell(row=16, column=5, value=datetime(2026, 2, 17))
     wb.save(path)
 
 
@@ -352,6 +348,41 @@ def test_plan_compras_derecha_fuente_unica_genera_compra(mini_libro_derecha):
     assert compra.precio_unitario == 72  # M/K = 7200/100
     assert compra.fecha == DIA  # fecha del left E de la misma fila
     assert compra.hoja == "INVERSION VALQUI"
+
+
+def test_plan_compras_derecha_misma_fecha_duplica_se_descarta(mini_libro_derecha):
+    """Regression (2026-08): la sub-tabla derecha duplica la izquierda SOLO
+    cuando el item se compro a la izquierda con la MISMA fecha de operacion
+    (mismo registro en dos bloques). Aqui R16 'Tela Derecha' no tiene fecha
+    propia -> hereda la de la compra izquierda contigua (R5, DIA) -> es la
+    MISMA compra -> se descarta como duplicado (el workbook pone el mismo
+    item en ambos bloques de una misma operacion)."""
+    plan = _plan_de(mini_libro_derecha)
+    telas_derecha = [c for c in plan.compras if c.insumo_nombre == f"{PREFIX_TEST} Tela Derecha"]
+    assert len(telas_derecha) == 1  # solo la compra izquierda R5, la derecha se descarta
+    assert telas_derecha[0].fila == 5
+
+
+def test_plan_compras_derecha_fecha_distinta_no_es_duplicado():
+    """Regression (2026-08, workbook real): 'Cadena plateada gruesa totebag'
+    aparece a la izquierda (F96, 2026-03-27, 1 mts) y en la sub-tabla derecha
+    (F54, 2024-07-23, 100 mts). Son DOS compras legitimas en fechas distintas.
+    El criterio anterior descartaba la derecha por nombre -> 35 compras de
+    2024 se perdian y F5 fallaba con InsufficientStockError. La derecha solo
+    duplica cuando la fecha coincide."""
+    from migrate.purchases import plan_compras
+
+    if not REAL_XLSX.exists():
+        pytest.skip("ARPIA.xlsx no disponible")
+
+    with LibroMigracion(REAL_XLSX) as libro:
+        plan = plan_compras(libro)
+
+    cadenas = [c for c in plan.compras if "Cadena plateada gruesa" in c.insumo_nombre]
+    fechas = sorted(str(c.fecha.date()) for c in cadenas)
+    # La compra derecha F54 (2024) ya no se pierde.
+    assert any(f.startswith("2024-") for f in fechas), f"cadena 2024 perdida: {fechas}"
+    assert len(cadenas) >= 2
 
 
 def test_plan_compras_derecha_duplicada_se_descarta(mini_libro_derecha):
@@ -424,7 +455,7 @@ def test_rollback_no_persiste_nada(db):
         synchronize_session=False
     )
     db.commit()
-    registrar_compra(db, tela_id, None, 10, 25, fecha_compra=DIA, commit=False)
+    registrar_compra(db, tela_id, 10, 25, fecha_compra=DIA, commit=False)
     db.rollback()
     assert db.query(CompraInsumo).filter(CompraInsumo.insumo_id == tela_id).count() == 0
 

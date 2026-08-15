@@ -19,30 +19,23 @@ const props = defineProps<{
   loading?: boolean
   /** Insumo options for the header funnel filter (lookup set, design D3). */
   insumos?: { id: number; nombre: string }[]
-  /** Proveedor options for the header funnel filter (lookup set, design D3). */
-  proveedores?: { id: number; nombre: string }[]
 }>()
 
 const emit = defineEmits<{
-  'filter-change': [filters: { insumo_id?: number | null; proveedor_id?: number | null }]
+  'filter-change': [filters: { insumo_id?: number | null }]
   'sort-change': [sort: { prop: string; order: 'asc' | 'desc' | null }]
 }>()
 
-/** Header funnel options for the Insumo/Proveedor columns; empty -> no funnel. */
+/** Header funnel options for the Insumo column; empty -> no funnel. */
 const insumoFilters = computed(() =>
   (props.insumos ?? []).map((i) => ({ text: i.nombre, value: i.id })),
-)
-const proveedorFilters = computed(() =>
-  (props.proveedores ?? []).map((p) => ({ text: p.nombre, value: p.id })),
 )
 
 /** Normalize el-table's filter-change into a typed single-value emit. */
 function onColumnFilterChange(elFilters: Record<string, unknown[]>): void {
   const insumo_id = parseColumnFilter(elFilters.insumo)
-  const proveedor_id = parseColumnFilter(elFilters.proveedor)
   emit('filter-change', {
     insumo_id: typeof insumo_id === 'number' ? insumo_id : null,
-    proveedor_id: typeof proveedor_id === 'number' ? proveedor_id : null,
   })
 }
 
@@ -67,7 +60,6 @@ function onSortChange(s: {
       <template #default="{ row }">{{ formatDateTime(row.fecha) }}</template>
     </el-table-column>
     <el-table-column prop="insumo" label="Insumo" column-key="insumo" :filters="insumoFilters" sortable min-width="180" />
-    <el-table-column prop="proveedor" label="Proveedor" column-key="proveedor" :filters="proveedorFilters" sortable min-width="140" />
     <el-table-column label="Cantidad" column-key="cantidad_comprada" sortable width="120" align="right">
       <template #default="{ row }">{{ formatQty(row.cantidad) }}</template>
     </el-table-column>

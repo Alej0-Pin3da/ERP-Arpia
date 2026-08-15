@@ -5,7 +5,7 @@
  * insumosApi/comprasApi/categoriasInsumosApi: the two tabs (Insumos /
  * Compras), server-side pagination ({items,total} + el-pagination driving
  * limit/offset refetches), toolbar filters (q + categoria_id insumos,
- * proveedor_id compras) that reset to page 1, the server-joined insumos list,
+ * insumo_id compras) that reset to page 1, the server-joined insumos list,
  * below-minimum row highlighting, role visibility, the compras register flow
  * and the admin insumo create/edit/delete flows. Lookup joins keep limit:1000
  * against `.items` (design D3).
@@ -33,7 +33,6 @@ const { apiMocks } = vi.hoisted(() => ({
     listCompras: vi.fn(),
     createCompra: vi.fn(),
     listCategorias: vi.fn(),
-    listProveedores: vi.fn(),
   },
 }))
 vi.mock('@/api/endpoints', () => ({
@@ -49,9 +48,6 @@ vi.mock('@/api/endpoints', () => ({
   },
   categoriasInsumosApi: {
     list: apiMocks.listCategorias,
-  },
-  proveedoresApi: {
-    list: apiMocks.listProveedores,
   },
 }))
 
@@ -92,8 +88,6 @@ const COMPRAS: CompraInsumoRead[] = [
   {
     id: 1,
     insumo_id: 1,
-    proveedor_id: null,
-    nombre_proveedor: null,
     fecha_compra: '2026-08-01T09:00:00Z',
     cantidad_comprada: '3.00',
     precio_unitario_compra: '2500.00',
@@ -103,11 +97,6 @@ const COMPRAS: CompraInsumoRead[] = [
 const CATEGORIAS: CategoriaInsumoRead[] = [
   { id: 1, nombre: 'Granos' },
   { id: 2, nombre: 'Abarrotes' },
-]
-
-const PROVEEDORES: { id: number; nombre: string }[] = [
-  { id: 7, nombre: 'Distribuidora El Trébol' },
-  { id: 8, nombre: 'Granos Andinos' },
 ]
 
 /** Page default for the table fetch (page 1, pageSize 20). */
@@ -153,7 +142,6 @@ describe('InventarioView (MOD-4 + T6)', () => {
     apiMocks.listInsumos.mockResolvedValue({ items: INSUMOS, total: 3 })
     apiMocks.listCompras.mockResolvedValue({ items: COMPRAS, total: 1 })
     apiMocks.listCategorias.mockResolvedValue({ items: CATEGORIAS, total: 2 })
-    apiMocks.listProveedores.mockResolvedValue({ items: PROVEEDORES, total: 2 })
     apiMocks.createInsumo.mockResolvedValue(INSUMOS[0])
     apiMocks.updateInsumo.mockResolvedValue({ ...INSUMOS[0], nombre: 'Harina premium' })
     apiMocks.deleteInsumo.mockResolvedValue(undefined)
@@ -298,30 +286,17 @@ describe('InventarioView (MOD-4 + T6)', () => {
     expect(apiMocks.listInsumos).toHaveBeenCalledWith({ ...PAGE1, categoria_id: 1 })
   })
 
-  it('passes insumos and proveedores to the compras table and wires its header filter', async () => {
+  it('passes insumos to the compras table and wires its header filter', async () => {
     const wrapper = await mountView('operador')
     await activateTab(wrapper, 'Compras')
 
     const comprasTable = wrapper.findComponent({ name: 'ComprasTable' })
     expect(comprasTable.props('insumos')).toEqual(INSUMOS)
-    expect(comprasTable.props('proveedores')).toEqual(PROVEEDORES)
 
-    comprasTable.vm.$emit('filter-change', { insumo_id: 2, proveedor_id: null })
+    comprasTable.vm.$emit('filter-change', { insumo_id: 2 })
     await flushPromises()
 
     expect(apiMocks.listCompras).toHaveBeenLastCalledWith({ ...PAGE1, insumo_id: 2 })
-  })
-
-  it('filters compras by proveedor from the compras table funnel', async () => {
-    const wrapper = await mountView('operador')
-    await activateTab(wrapper, 'Compras')
-    expect(apiMocks.listCompras).toHaveBeenCalledWith(PAGE1)
-
-    wrapper.findComponent({ name: 'ComprasTable' }).vm.$emit('filter-change', { insumo_id: null, proveedor_id: 7 })
-    await flushPromises()
-
-    expect(apiMocks.listCompras).toHaveBeenCalledTimes(2)
-    expect(apiMocks.listCompras).toHaveBeenLastCalledWith({ ...PAGE1, proveedor_id: 7 })
   })
 
   it('wires the insumos table sort-change into the API call and resets the page', async () => {
