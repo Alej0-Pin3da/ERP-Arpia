@@ -12,9 +12,13 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import Paginator from 'primevue/paginator'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import FinanzasView from '@/views/FinanzasView.vue'
 import type { components } from '@/types/api.d'
@@ -92,7 +96,14 @@ async function mountView(rol: string): Promise<VueWrapper> {
     user: { id: 2, nombre: 'Pepe Operador', email: 'pepe@arpia.com.co', rol },
   })
   const wrapper = mount(FinanzasView, {
-    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+    global: {
+      plugins: [
+        pinia,
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+      stubs: { transition: false },
+    },
   })
   await nextTick()
   await flushPromises()
@@ -164,17 +175,17 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     expect(wrapper.find('[data-test="nuevo-socio"]').exists()).toBe(true)
   })
 
-  it('renders el-pagination on both lists and pages with new offsets', async () => {
+  it('renders Paginator on both lists and pages with new offsets', async () => {
     const wrapper = await mountView('operador')
-    // Movimientos table paginator (first ElPagination in the pane).
-    const paginators = wrapper.findAllComponents({ name: 'ElPagination' })
+    // Movimientos table paginator (first Paginator in the pane).
+    const paginators = wrapper.findAllComponents(Paginator)
     expect(paginators.length).toBeGreaterThanOrEqual(1)
     expect(apiMocks.listMovimientos).toHaveBeenCalledWith({ limit: 20, offset: 0 })
 
     // Two paginators exist (movimientos + socios); drive the movimientos one.
-    const movPaginador = paginators.find((p) => p.props('total') === 2)
+    const movPaginador = paginators.find((p) => p.props('totalRecords') === 2)
     expect(movPaginador).toBeDefined()
-    movPaginador!.vm.$emit('current-change', 2)
+    movPaginador!.vm.$emit('page', { first: 20, rows: 20 })
     await flushPromises()
     expect(apiMocks.listMovimientos).toHaveBeenCalledWith({ limit: 20, offset: 20 })
   })

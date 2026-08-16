@@ -9,10 +9,16 @@
  * Edit/delete actions are hidden for read-only roles (can-edit=false); when
  * shown they emit `edit`/`delete` with the row — the parent owns the PATCH,
  * the DELETE (409 when the socio has payouts) and the refresh.
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1b: column sort re-emits the
+ * SAME typed event via the parsePrimeVueSort adapter (no header funnels here).
+ * The el-progress and el-button cells stay until slice 2a/2b.
  */
 import { computed } from 'vue'
-
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import { formatQty } from '@/utils/format'
+import { parsePrimeVueSort } from '@/utils/table-filters'
 import { sumaParticipacion } from '@/utils/finanzas'
 import type { components } from '@/types/api.d'
 
@@ -34,17 +40,9 @@ const emit = defineEmits<{
 /** Sum-to-100 progress: current participation vs the 100 target. */
 const sum = computed(() => sumaParticipacion(props.rows))
 
-/** Normalize el-table's sort-change into a typed {prop, order} emit. */
-function onSortChange(s: {
-  column: { key?: string; property?: string }
-  prop: string
-  order: 'ascending' | 'descending' | null
-}): void {
-  const prop = s.column.key ?? s.column.property ?? s.prop
-  emit('sort-change', {
-    prop,
-    order: s.order === 'ascending' ? 'asc' : s.order === 'descending' ? 'desc' : null,
-  })
+/** Normalize DataTable's @sort payload into the typed {prop, order} emit. */
+function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
+  emit('sort-change', parsePrimeVueSort(s))
 }
 </script>
 
@@ -62,14 +60,14 @@ function onSortChange(s: {
       />
     </div>
 
-    <el-table :data="rows" v-loading="loading" @sort-change="onSortChange">
-      <el-table-column prop="id" label="#" column-key="id" sortable width="70" />
-      <el-table-column prop="nombre" label="Nombre" column-key="nombre" sortable min-width="220" />
-      <el-table-column label="Participación" column-key="porcentaje_participacion" sortable width="160" align="right">
-        <template #default="{ row }">{{ formatQty(row.porcentaje_participacion) }}%</template>
-      </el-table-column>
-      <el-table-column v-if="canEdit" label="Acciones" width="160" align="center">
-        <template #default="{ row }">
+    <DataTable :value="rows" lazy :loading="loading" @sort="onDataTableSort">
+      <Column field="id" header="#" sortable style="width: 70px" />
+      <Column field="nombre" header="Nombre" sortable style="min-width: 220px" />
+      <Column field="porcentaje_participacion" header="Participación" sortable style="width: 160px" align="right">
+        <template #body="{ data }">{{ formatQty(data.porcentaje_participacion) }}%</template>
+      </Column>
+      <Column v-if="canEdit" header="Acciones" style="width: 160px" align="center">
+        <template #body="{ data: row }">
           <el-button link type="primary" size="small" data-test="edit-socio" @click="emit('edit', row)">
             Editar
           </el-button>
@@ -77,12 +75,12 @@ function onSortChange(s: {
             Eliminar
           </el-button>
         </template>
-      </el-table-column>
+      </Column>
 
       <template #empty>
-        <el-empty description="Sin socios configurados" :image-size="80" />
+        <div class="socio-empty">Sin socios configurados</div>
       </template>
-    </el-table>
+    </DataTable>
   </div>
 </template>
 
@@ -101,5 +99,11 @@ function onSortChange(s: {
 
 .socios-progress-bar {
   width: 100%;
+}
+
+.socio-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
 }
 </style>

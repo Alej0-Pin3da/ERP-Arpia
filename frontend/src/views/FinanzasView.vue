@@ -27,6 +27,9 @@ import MovimientosForm from '@/components/finanzas/MovimientosForm.vue'
 import MovimientosTable from '@/components/finanzas/MovimientosTable.vue'
 import SociosForm from '@/components/finanzas/SociosForm.vue'
 import SociosTable from '@/components/finanzas/SociosTable.vue'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/utils/format'
 import { buildListParams } from '@/utils/pagination'
@@ -391,14 +394,13 @@ onMounted(load)
           @filter-change="onMovimientoTableFilterChange"
           @sort-change="onMovimientoTableSortChange"
         />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="movimientosTotal"
-          :page-size="movimientosPageSize"
-          :current-page="movimientosPage"
-          @current-change="(p: number) => { movimientosPage = p; load() }"
+          :total-records="movimientosTotal"
+          :rows="movimientosPageSize"
+          :first="(movimientosPage - 1) * movimientosPageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="(e: { first: number; rows: number }) => { movimientosPage = Math.floor(e.first / e.rows) + 1; load() }"
         />
 
         <el-dialog
@@ -426,12 +428,12 @@ onMounted(load)
 
         <div v-if="liquidacionRows.length > 0" class="liquidacion-result" data-test="liquidacion-result">
           <h3>Resultado de la liquidación</h3>
-          <el-table :data="liquidacionRows">
-            <el-table-column prop="socio" label="Socio" min-width="220" />
-            <el-table-column label="Monto" width="180" align="right">
-              <template #default="{ row }">{{ formatMoney(row.monto) }}</template>
-            </el-table-column>
-          </el-table>
+          <DataTable :value="liquidacionRows">
+            <Column field="socio" header="Socio" style="min-width: 220px" />
+            <Column header="Monto" style="width: 180px" align="right">
+              <template #body="{ data }">{{ formatMoney(data.monto) }}</template>
+            </Column>
+          </DataTable>
         </div>
       </el-tab-pane>
 
@@ -449,14 +451,13 @@ onMounted(load)
           @delete="onDeleteSocio"
           @sort-change="onSociosTableSortChange"
         />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="sociosTotal"
-          :page-size="sociosPageSize"
-          :current-page="sociosPage"
-          @current-change="(p: number) => { sociosPage = p; load() }"
+          :total-records="sociosTotal"
+          :rows="sociosPageSize"
+          :first="(sociosPage - 1) * sociosPageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="(e: { first: number; rows: number }) => { sociosPage = Math.floor(e.first / e.rows) + 1; load() }"
         />
 
         <el-dialog

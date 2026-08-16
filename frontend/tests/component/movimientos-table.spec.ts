@@ -1,16 +1,25 @@
 /**
  * MovimientosTable component tests (PR8, spec MOD-3).
  *
- * Mounts the REAL MovimientosTable with Element Plus: renders the joined
- * rows es-CO (fecha, tipo tag, descripcion, socio name/'—', monto, settlement
- * id), hides the delete action for read-only roles (can-delete=false), emits
- * `delete` with the row, and shows the empty state.
+ * Mounts the REAL MovimientosTable with Element Plus + PrimeVue (slice 1b):
+ * renders the joined rows es-CO (fecha, tipo tag, descripcion, socio name/'—',
+ * monto, settlement id), hides the delete action for read-only roles
+ * (can-delete=false), emits `delete` with the row, and shows the empty state.
+ * The tipo header funnel is a DataTable filter menu hosting a Select
+ * (`filterDisplay="menu"`), and the filter/sort payloads are normalized by
+ * the parsePrimeVueFilters/parsePrimeVueSort adapters. el-tag/el-button cells
+ * still need the ElementPlus plugin until slice 2b.
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
+import DataTable from 'primevue/datatable'
+import Select from 'primevue/select'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import MovimientosTable from '@/components/finanzas/MovimientosTable.vue'
 import type { MovimientoRow } from '@/utils/finanzas'
 
@@ -47,10 +56,21 @@ const ROWS: MovimientoRow[] = [
 async function mountTable(rows: MovimientoRow[], canDelete = true, canEdit = false): Promise<VueWrapper> {
   const wrapper = mount(MovimientosTable, {
     props: { rows, canDelete, canEdit },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
+}
+
+/** Let the funnel overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await nextTick()
 }
 
 describe('MovimientosTable (MOD-3)', () => {
@@ -113,56 +133,64 @@ describe('MovimientosTable (MOD-3)', () => {
     expect(wrapper.text()).toContain('Sin movimientos registrados')
   })
 
-  it('declares a header funnel filter on the tipo column with labeled options', async () => {
+  it('declares the tipo header funnel with labeled options', async () => {
     const wrapper = await mountTable(ROWS)
 
-    const tipoColumn = wrapper
-      .findAllComponents({ name: 'ElTableColumn' })
-      .find((c) => c.props('columnKey') === 'tipo')
+    // Config-level: one 'equals' constraint per column and the funnel renders.
+    expect(wrapper.findComponent(DataTable).props('filters')).toEqual({
+      tipo: { value: null, matchMode: 'equals' },
+    })
+    expect(wrapper.findAll('.p-datatable-column-filter-button')).toHaveLength(1)
 
-    expect(tipoColumn!.props('filters')).toEqual([
+    // Behavioral: opening the funnel mounts the Select with the tipo options.
+    await wrapper.find('.p-datatable-column-filter-button').trigger('click')
+    await flushOverlay()
+
+    const tipoSelect = wrapper.findComponent(Select)
+    expect(tipoSelect.exists()).toBe(true)
+    expect(tipoSelect.props('options')).toEqual([
       { text: 'Gasto', value: 'Gasto' },
       { text: 'Inversión', value: 'Inversion' },
       { text: 'Retiro', value: 'Retiro' },
     ])
   })
 
-  it('normalizes an el-table filter-change on tipo into a typed emit', async () => {
+  it('normalizes a PrimeVue filter payload on tipo into a typed emit', async () => {
     const wrapper = await mountTable(ROWS)
 
-    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { tipo: ['Gasto'] })
+    wrapper.findComponent(DataTable).vm.$emit('filter', {
+      filters: { tipo: { value: 'Gasto', matchMode: 'equals' } },
+    })
     await nextTick()
 
     expect(wrapper.emitted('filter-change')).toBeDefined()
     expect(wrapper.emitted('filter-change')![0][0]).toEqual({ tipo: 'Gasto' })
   })
 
-  it('emits null when the tipo column filter is cleared', async () => {
+  it('emits null when the tipo column filter is cleared (null constraint)', async () => {
     const wrapper = await mountTable(ROWS)
 
-    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { tipo: [] })
+    wrapper.findComponent(DataTable).vm.$emit('filter', {
+      filters: { tipo: { value: null, matchMode: 'equals' } },
+    })
     await nextTick()
 
     expect(wrapper.emitted('filter-change')![0][0]).toEqual({ tipo: null })
   })
 
-  it('maps an el-table sort-change into a typed {prop, order} emit', async () => {
+  it('maps a PrimeVue sort payload into a typed {prop, order} emit', async () => {
     const wrapper = await mountTable(ROWS)
 
-    wrapper
-      .findComponent({ name: 'ElTable' })
-      .vm.$emit('sort-change', { column: { key: 'monto' }, order: 'descending' })
+    wrapper.findComponent(DataTable).vm.$emit('sort', { sortField: 'monto', sortOrder: -1 })
     await nextTick()
 
     expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'monto', order: 'desc' })
   })
 
-  it('maps a cleared sort (null order) for a prop column', async () => {
+  it('maps a cleared sort (order 0) for a prop column', async () => {
     const wrapper = await mountTable(ROWS)
 
-    wrapper
-      .findComponent({ name: 'ElTable' })
-      .vm.$emit('sort-change', { column: { property: 'socio' }, order: null })
+    wrapper.findComponent(DataTable).vm.$emit('sort', { sortField: 'socio', sortOrder: 0 })
     await nextTick()
 
     expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'socio', order: null })
