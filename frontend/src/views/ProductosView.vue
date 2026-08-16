@@ -20,6 +20,7 @@ import ProductoForm from '@/components/productos/ProductoForm.vue'
 import ProductosTable from '@/components/productos/ProductosTable.vue'
 import VarianteForm from '@/components/productos/VarianteForm.vue'
 import VariantesTable from '@/components/productos/VariantesTable.vue'
+import Paginator from 'primevue/paginator'
 import { useProductosBom } from '@/composables/useProductosBom'
 import { useProductosCatalog } from '@/composables/useProductosCatalog'
 import { useProductosCosto } from '@/composables/useProductosCosto'
@@ -124,14 +125,13 @@ onMounted(load)
           @select-variantes="onSelectVariantes"
           @sort-change="onProductosTableSortChange"
         />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="productosTotal"
-          :page-size="productosPageSize"
-          :current-page="productosPage"
-          @current-change="(p: number) => { productosPage = p; load() }"
+          :total-records="productosTotal"
+          :rows="productosPageSize"
+          :first="(productosPage - 1) * productosPageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="(e: { first: number; rows: number }) => { productosPage = Math.floor(e.first / e.rows) + 1; load() }"
         />
 
         <el-dialog

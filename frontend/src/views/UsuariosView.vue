@@ -21,6 +21,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { usuariosApi } from '@/api/endpoints'
 import UsuarioForm from '@/components/usuarios/UsuarioForm.vue'
 import UsuariosTable from '@/components/usuarios/UsuariosTable.vue'
+import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
 import type { UsuarioCreate, UsuarioRead, UsuarioUpdate } from '@/types/api.d'
@@ -221,14 +222,13 @@ onMounted(load)
       @edit="onEdit"
       @delete="onDelete"
     />
-    <el-pagination
+    <Paginator
       class="tabla-paginacion"
-      background
-      layout="total, prev, pager, next"
-      :total="total"
-      :page-size="pageSize"
-      :current-page="page"
-      @current-change="(p: number) => { page = p; load() }"
+      :total-records="total"
+      :rows="pageSize"
+      :first="(page - 1) * pageSize"
+      template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+      @page="(e: { first: number; rows: number }) => { page = Math.floor(e.first / e.rows) + 1; load() }"
     />
 
     <el-dialog

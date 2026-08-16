@@ -65,10 +65,10 @@ Decision resolved during design: **PrimeVue 4.5.5 MIT** (pinned); chain strategy
 - [ ] **S1-T8** PR1b views: `InventarioView`, `FinanzasView`, `DevolucionesView`, `AnalisisView` — DataTable + Paginator parts (AnalisisView 2 direct tables; FinanzasView liquidacion table); tabs/dialogs stay S2. Deps: S1-T7.
 - [ ] **S1-T9** PR1b migrate specs: insumos-table, movimientos-table, socios-table, devoluciones-table, devoluciones-view, inventario-view, finanzas-view (table selectors only; `.el-tabs__item` stays S2). Deps: S1-T7/T8.
 - [ ] **S1-T10** PR1b gate: `npm test` green.
-- [ ] **S1-T11** PR1c tables: `ComprasTable` (adapter), `ProductosTable`, `VariantesTable`, `BomProductosTable`, `BomInsumosTable`, `UsuariosTable`, `MaestrosTable`, `OmisionesTable`, `BajoStockTable`, `MargenTable` → DataTable (`:loading`, `#empty`, `@sort` adapter where wired). Deps: S1-T2. Verify: per-table specs.
-- [ ] **S1-T12** PR1c views: `ProductosView`, `UsuariosView`, `MaestrosView`, `OmisionesView`, `DashboardView` — table/paginator parts; tabs/dialogs stay S2. Deps: S1-T11.
-- [ ] **S1-T13** PR1c migrate specs: compras-table, productos-table, productos-view (table parts), variantes-table, bom-productos-table, bom-insumos-table, maestros-table, maestros-view, omisiones-view, usuarios-table, usuarios-view, dashboard-view, dashboard-panels (table parts). Deps: S1-T11/T12.
-- [ ] **S1-T14** PR1c gate: `npm test` green.
+- [x] **S1-T11** PR1c tables: `ComprasTable` (adapter), `ProductosTable`, `VariantesTable`, `BomProductosTable`, `BomInsumosTable`, `UsuariosTable`, `MaestrosTable`, `OmisionesTable`, `BajoStockTable`, `MargenTable` → DataTable (`:loading`, `#empty`, `@sort` adapter where wired). Deps: S1-T2. Verify: per-table specs.
+- [x] **S1-T12** PR1c views: `ProductosView`, `UsuariosView`, `MaestrosView`, `OmisionesView`, `DashboardView` — table/paginator parts; tabs/dialogs stay S2. Deps: S1-T11.
+- [x] **S1-T13** PR1c migrate specs: compras-table, productos-table, productos-view (table parts), variantes-table, bom-productos-table, bom-insumos-table, maestros-table, maestros-view, omisiones-view, usuarios-table, usuarios-view, dashboard-view, dashboard-panels (table parts). Deps: S1-T11/T12.
+- [x] **S1-T14** PR1c gate: `npm test` green.
 
 ## Phase 3 — Slice 2: 1:1 Components (PRs 2a / 2b)
 

@@ -5,7 +5,12 @@
  * Renders /analiticos/insumos-bajo-stock rows with es-CO quantities and a
  * severity tag per row (every row is below its minimum by definition; how
  * far below decides Crítico vs Bajo). Row tint follows the same severity.
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. el-tag cells stay until
+ * slice 2b.
  */
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import { formatQty } from '@/utils/format'
 import { stockSeverity, type StockSeverity } from '@/utils/dashboard'
 import type { InsumoBajoStockRead } from '@/types/api.d'
@@ -31,31 +36,40 @@ function criticalityOf(row: InsumoBajoStockRead): Criticality {
   return stockSeverity(row.stock_actual, row.stock_minimo) as Criticality
 }
 
-/** el-table row class hook — severity drives the row background tint. */
-function rowClass({ row }: { row: InsumoBajoStockRead }): string {
+/** DataTable row class hook — severity drives the row background tint. */
+function rowClass(row: InsumoBajoStockRead): string {
   return stockSeverity(row.stock_actual, row.stock_minimo)
 }
 </script>
 
 <template>
-  <el-table :data="rows" :row-class-name="rowClass" v-loading="loading">
-    <el-table-column prop="nombre" label="Insumo" min-width="160" />
-    <el-table-column prop="unidad_medida" label="Unidad" width="90" />
-    <el-table-column label="Stock actual" width="120" align="right">
-      <template #default="{ row }">{{ formatQty(row.stock_actual) }}</template>
-    </el-table-column>
-    <el-table-column label="Stock mínimo" width="120" align="right">
-      <template #default="{ row }">{{ formatQty(row.stock_minimo) }}</template>
-    </el-table-column>
-    <el-table-column label="Estado" width="110" align="center">
-      <template #default="{ row }">
-        <el-tag :type="SEVERITY_TAG[criticalityOf(row)]" size="small">
-          {{ SEVERITY_LABEL[criticalityOf(row)] }}
+  <DataTable :value="rows" lazy :loading="loading" :row-class="rowClass">
+    <Column field="nombre" header="Insumo" style="min-width: 160px" />
+    <Column field="unidad_medida" header="Unidad" style="width: 90px" />
+    <Column field="stock_actual" header="Stock actual" style="width: 120px" align="right">
+      <template #body="{ data }">{{ formatQty(data.stock_actual) }}</template>
+    </Column>
+    <Column field="stock_minimo" header="Stock mínimo" style="width: 120px" align="right">
+      <template #body="{ data }">{{ formatQty(data.stock_minimo) }}</template>
+    </Column>
+    <Column header="Estado" style="width: 110px" align="center">
+      <template #body="{ data }">
+        <el-tag :type="SEVERITY_TAG[criticalityOf(data)]" size="small">
+          {{ SEVERITY_LABEL[criticalityOf(data)] }}
         </el-tag>
       </template>
-    </el-table-column>
+    </Column>
+
     <template #empty>
-      <el-empty description="Sin insumos bajo stock" :image-size="80" />
+      <div class="bajo-stock-empty">Sin insumos bajo stock</div>
     </template>
-  </el-table>
+  </DataTable>
 </template>
+
+<style scoped>
+.bajo-stock-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
+}
+</style>

@@ -6,12 +6,19 @@
  * rol-colored tag. Editar emits the row; Eliminar is HIDDEN for the current
  * user's own row ("can't delete self" — the backend also rejects it with
  * 400 "Cannot delete your own user").
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. el-tag/el-button cells
+ * still need the ElementPlus plugin until slice 2b.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
+import DataTable from 'primevue/datatable'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import UsuariosTable from '@/components/usuarios/UsuariosTable.vue'
 import type { components } from '@/types/api.d'
 
@@ -29,7 +36,12 @@ async function mountTable(
 ): Promise<VueWrapper> {
   const wrapper = mount(UsuariosTable, {
     props: { rows, currentUserId },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   await flushPromises()
@@ -54,6 +66,13 @@ describe('UsuariosTable (MOD-5 usuarios)', () => {
     expect(text).toContain('Administrador')
     expect(text).toContain('Operador')
     expect(text).toContain('Consulta')
+  })
+
+  it('renders one DataTable row per user', async () => {
+    const wrapper = await mountTable()
+
+    expect(wrapper.findComponent(DataTable).exists()).toBe(true)
+    expect(wrapper.findAll('tbody tr')).toHaveLength(3)
   })
 
   it('emits edit and delete with the row for other users', async () => {

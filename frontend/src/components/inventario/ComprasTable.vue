@@ -8,10 +8,23 @@
  * precio_unitario as raw Decimal strings formatted es-CO, and the line total
  * computed client-side (`cantidad x precio` — the backend CompraInsumoRead has
  * no costo_total field). The parent owns the register form and the POST.
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c: the insumo header funnel
+ * and column sort re-emit the SAME typed events the view consumes, via the
+ * parsePrimeVueFilters/parsePrimeVueSort adapters. The funnel only renders
+ * when lookups exist (mirroring the old el-table `:filters=[]` behavior).
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import Select from 'primevue/select'
 import { formatDateTime, formatMoney, formatQty } from '@/utils/format'
-import { parseColumnFilter } from '@/utils/table-filters'
+import {
+  parseColumnFilter,
+  parsePrimeVueFilters,
+  parsePrimeVueSort,
+  type PrimeVueFilterConstraint,
+} from '@/utils/table-filters'
 import type { CompraRow } from '@/utils/inventario'
 
 const props = defineProps<{
@@ -31,47 +44,85 @@ const insumoFilters = computed(() =>
   (props.insumos ?? []).map((i) => ({ text: i.nombre, value: i.id })),
 )
 
-/** Normalize el-table's filter-change into a typed single-value emit. */
-function onColumnFilterChange(elFilters: Record<string, unknown[]>): void {
-  const insumo_id = parseColumnFilter(elFilters.insumo)
+/** DataTable lazy filter state (server-side filtering, single constraint per column). */
+const filters = ref<Record<string, PrimeVueFilterConstraint>>({
+  insumo: { value: null, matchMode: 'equals' },
+})
+
+/** Normalize DataTable's @filter payload into the typed single-value emit. */
+function onDataTableFilter(e: {
+  filters: Record<string, PrimeVueFilterConstraint | PrimeVueFilterConstraint[]>
+}): void {
+  const normalized = parsePrimeVueFilters(e.filters)
+  const insumo_id = parseColumnFilter(normalized.insumo)
   emit('filter-change', {
     insumo_id: typeof insumo_id === 'number' ? insumo_id : null,
   })
 }
 
-/** Normalize el-table's sort-change into a typed {prop, order} emit. */
-function onSortChange(s: {
-  column: { key?: string; property?: string }
-  prop: string
-  order: 'ascending' | 'descending' | null
-}): void {
-  const prop = s.column.key ?? s.column.property ?? s.prop
-  emit('sort-change', {
-    prop,
-    order: s.order === 'ascending' ? 'asc' : s.order === 'descending' ? 'desc' : null,
-  })
+/** Normalize DataTable's @sort payload into the typed {prop, order} emit. */
+function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
+  emit('sort-change', parsePrimeVueSort(s))
 }
 </script>
 
 <template>
-  <el-table :data="rows" v-loading="loading" @filter-change="onColumnFilterChange" @sort-change="onSortChange">
-    <el-table-column prop="id" label="#" column-key="id" sortable width="70" />
-    <el-table-column label="Fecha" column-key="fecha_compra" sortable width="110">
-      <template #default="{ row }">{{ formatDateTime(row.fecha) }}</template>
-    </el-table-column>
-    <el-table-column prop="insumo" label="Insumo" column-key="insumo" :filters="insumoFilters" sortable min-width="180" />
-    <el-table-column label="Cantidad" column-key="cantidad_comprada" sortable width="120" align="right">
-      <template #default="{ row }">{{ formatQty(row.cantidad) }}</template>
-    </el-table-column>
-    <el-table-column label="Precio unitario" column-key="precio_unitario_compra" sortable width="150" align="right">
-      <template #default="{ row }">{{ formatMoney(row.precio_unitario) }}</template>
-    </el-table-column>
-    <el-table-column label="Costo total" width="150" align="right">
-      <template #default="{ row }">{{ formatMoney(row.costo_total) }}</template>
-    </el-table-column>
+  <DataTable
+    :value="rows"
+    lazy
+    filterDisplay="menu"
+    :loading="loading"
+    :filters="filters"
+    @filter="onDataTableFilter"
+    @sort="onDataTableSort"
+  >
+    <Column field="id" header="#" sortable style="width: 70px" />
+    <Column field="fecha_compra" header="Fecha" sortable style="width: 110px">
+      <template #body="{ data }">{{ formatDateTime(data.fecha) }}</template>
+    </Column>
+    <Column
+      field="insumo"
+      header="Insumo"
+      sortable
+      :show-filter-operator="false"
+      :show-filter-match-modes="false"
+      :show-filter-add-button="false"
+      :show-filter-apply-button="false"
+      :show-clear-button="false"
+      style="min-width: 180px"
+    >
+      <template v-if="insumoFilters.length > 0" #filter="{ filterModel, filterCallback }">
+        <Select
+          v-model="filterModel.value"
+          :options="insumoFilters"
+          optionLabel="text"
+          optionValue="value"
+          placeholder="Insumo"
+          :show-clear="true"
+          @change="filterCallback()"
+        />
+      </template>
+    </Column>
+    <Column field="cantidad_comprada" header="Cantidad" sortable style="width: 120px" align="right">
+      <template #body="{ data }">{{ formatQty(data.cantidad) }}</template>
+    </Column>
+    <Column field="precio_unitario_compra" header="Precio unitario" sortable style="width: 150px" align="right">
+      <template #body="{ data }">{{ formatMoney(data.precio_unitario) }}</template>
+    </Column>
+    <Column field="costo_total" header="Costo total" style="width: 150px" align="right">
+      <template #body="{ data }">{{ formatMoney(data.costo_total) }}</template>
+    </Column>
 
     <template #empty>
-      <el-empty description="Sin compras registradas" :image-size="80" />
+      <div class="compra-empty">Sin compras registradas</div>
     </template>
-  </el-table>
+  </DataTable>
 </template>
+
+<style scoped>
+.compra-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
+}
+</style>

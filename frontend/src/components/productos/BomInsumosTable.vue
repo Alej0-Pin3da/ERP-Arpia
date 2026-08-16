@@ -8,7 +8,12 @@
  * admin-only via `canEdit`.
  *
  * Presentational: emits `edit` / `delete` with the clicked row.
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. el-button cells stay
+ * until slice 2b.
  */
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import type { BomInsumoRow } from '@/utils/productos'
 import { formatQty } from '@/utils/format'
 
@@ -25,25 +30,34 @@ defineEmits<{
 </script>
 
 <template>
-  <el-table :data="rows" v-loading="loading">
-    <el-table-column prop="insumo" label="Insumo" min-width="180" />
-    <el-table-column prop="unidad_medida" label="Unidad" width="100" />
-    <el-table-column label="Cantidad requerida" width="150" align="right">
-      <template #default="{ row }">{{ formatQty(row.cantidad_requerida) }}</template>
-    </el-table-column>
-    <el-table-column label="Desperdicio" width="120" align="right">
-      <template #default="{ row }">{{ formatQty(row.porcentaje_desperdicio) }} %</template>
-    </el-table-column>
-    <el-table-column v-if="canEdit" label="Acciones" width="180" fixed="right">
-      <template #default="{ row }">
+  <DataTable :value="rows" lazy :loading="loading">
+    <Column field="insumo" header="Insumo" style="min-width: 180px" />
+    <Column field="unidad_medida" header="Unidad" style="width: 100px" />
+    <Column field="cantidad_requerida" header="Cantidad requerida" style="width: 150px" align="right">
+      <template #body="{ data }">{{ formatQty(data.cantidad_requerida) }}</template>
+    </Column>
+    <Column field="porcentaje_desperdicio" header="Desperdicio" style="width: 120px" align="right">
+      <template #body="{ data }">{{ formatQty(data.porcentaje_desperdicio) }} %</template>
+    </Column>
+    <Column v-if="canEdit" header="Acciones" style="width: 180px">
+      <template #body="{ data: row }">
         <el-button size="small" data-test="edit-bom-insumo" @click="$emit('edit', row)">Editar</el-button>
         <el-button size="small" type="danger" data-test="delete-bom-insumo" @click="$emit('delete', row)">
           Eliminar
         </el-button>
       </template>
-    </el-table-column>
+    </Column>
+
     <template #empty>
-      <el-empty description="Sin insumos en la receta" />
+      <div class="bom-insumo-empty">Sin insumos en la receta</div>
     </template>
-  </el-table>
+  </DataTable>
 </template>
+
+<style scoped>
+.bom-insumo-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
+}
+</style>

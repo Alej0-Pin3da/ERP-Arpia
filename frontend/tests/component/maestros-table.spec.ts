@@ -1,18 +1,23 @@
 /**
  * MaestrosTable component tests (PR11, spec MOD-5).
  *
- * The generic el-table is driven by the per-entity column config:
+ * The generic DataTable is driven by the per-entity column config:
  *  - renders each configured column with the row value; empty/null optionals
  *    render an em dash ('—')
  *  - canEdit=false hides the Editar/Eliminar actions (operador/consulta are
  *    read-only — writes are admin-only server-side)
  *  - Editar/Eliminar emit the row to the parent (view owns the API calls)
  *  - the entity's emptyText renders in the empty state
+ * el-button cells still need the ElementPlus plugin until slice 2b.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
+import DataTable from 'primevue/datatable'
+import PrimeVue from 'primevue/config'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import MaestrosTable from '@/components/maestros/MaestrosTable.vue'
 import { MAESTRO_ENTITIES, type MaestroColumn, type MaestroRow } from '@/utils/maestros'
 
@@ -30,7 +35,12 @@ async function mountTable(
 ): Promise<VueWrapper> {
   const wrapper = mount(MaestrosTable, {
     props: { rows, columns, emptyText: 'Sin clientes registrados', canEdit },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   await flushPromises()
@@ -72,6 +82,13 @@ describe('MaestrosTable (MOD-5)', () => {
 
     expect(wrapper.text()).toContain('Nombre')
     expect(wrapper.text()).toContain('Alimentos')
+  })
+
+  it('renders one DataTable row per maestro row', async () => {
+    const wrapper = await mountTable(CLIENTES)
+
+    expect(wrapper.findComponent(DataTable).exists()).toBe(true)
+    expect(wrapper.findAll('tbody tr')).toHaveLength(2)
   })
 
   it('shows the entity emptyText when there are no rows', async () => {

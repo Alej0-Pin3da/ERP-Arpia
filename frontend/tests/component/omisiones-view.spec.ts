@@ -5,19 +5,25 @@
  * omisionesApi:
  *  - list renders corrida/fase/hoja/nivel/mensaje/resuelta and requests the
  *    paged list {items, total} (FE-1)
- *  - el-pagination pages with the new offset (FE-1)
+ *  - PrimeVue Paginator pages with the new offset (FE-1)
  *  - q + fase/nivel/hoja/resuelta filters reset to page 1 and refetch with
  *    the params; resuelta=false IS sent (FE-2)
  *  - admin-only "Marcar resuelta"/"Reabrir" (D9, MIG-4) PATCHes and
  *    refreshes; consulta sees NO action button
- *  - network error renders the error state (FE-3); empty renders el-empty
+ *  - network error renders the error state (FE-3); empty renders the
+ *    DataTable #empty template
+ * OmisionesTable migrated to PrimeVue DataTable in slice 1c.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus, { ElMessage } from 'element-plus'
+import Paginator from 'primevue/paginator'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import OmisionesView from '@/views/OmisionesView.vue'
 
@@ -72,7 +78,15 @@ async function mountView(rol = 'admin'): Promise<VueWrapper> {
     refreshToken: 'ref-1',
     user: { id: 1, nombre: 'Ana Admin', email: 'ana@arpia.com.co', rol },
   })
-  const wrapper = mount(OmisionesView, { global: { plugins: [pinia, ElementPlus] } })
+  const wrapper = mount(OmisionesView, {
+    global: {
+      plugins: [
+        pinia,
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
+  })
   await nextTick()
   await flushPromises()
   await flushPromises()
@@ -104,15 +118,18 @@ describe('OmisionesView (MIG-3/MIG-4 + T10)', () => {
     expect(text).toContain('Sí') // resuelta row
     expect(text).toContain('No') // pending row
 
+    // The OmisionesTable renders one DataTable row per omission.
+    expect(wrapper.findAll('tbody tr')).toHaveLength(2)
+
     expect(apiMocks.listOmisiones).toHaveBeenCalledTimes(1)
     expect(apiMocks.listOmisiones).toHaveBeenCalledWith({ limit: 20, offset: 0 })
   })
 
-  it('renders el-pagination and pages with the new offset', async () => {
+  it('renders Paginator and pages with the new offset', async () => {
     const wrapper = await mountView()
-    expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(true)
+    expect(wrapper.findComponent(Paginator).exists()).toBe(true)
 
-    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    wrapper.findComponent(Paginator).vm.$emit('page', { first: 20, rows: 20 })
     await flushPromises()
     expect(apiMocks.listOmisiones).toHaveBeenLastCalledWith({ limit: 20, offset: 20 })
   })
