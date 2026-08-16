@@ -13,6 +13,7 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import Paginator from 'primevue/paginator'
 
 import { clientesApi, productosApi, ventasApi } from '@/api/endpoints'
 import VentasForm from '@/components/ventas/VentasForm.vue'
@@ -111,6 +112,12 @@ async function load(): Promise<void> {
 /** FE-2: filter changes reset to page 1 and refetch. */
 function onFilterChange(): void {
   page.value = 1
+  load()
+}
+
+/** Paginator @page: recompute the 1-based page from the 0-based first index. */
+function onPage(e: { first: number; rows: number }): void {
+  page.value = Math.floor(e.first / e.rows) + 1
   load()
 }
 
@@ -325,14 +332,13 @@ onMounted(load)
           @editar="openEditVenta"
           @anular="onAnular"
         />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="total"
-          :page-size="pageSize"
-          :current-page="page"
-          @current-change="(p: number) => { page = p; load() }"
+          :total-records="total"
+          :rows="pageSize"
+          :first="(page - 1) * pageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="onPage"
         />
 
         <el-dialog

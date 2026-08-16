@@ -1,4 +1,4 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, type GlobalMountOptions } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { defineComponent, h } from 'vue'
 import PrimeVue from 'primevue/config'
@@ -11,7 +11,11 @@ import { ArpiaPreset } from '@/styles/arpia-preset'
 import esCO from '@/utils/locales/es-CO'
 import ConfirmDialog from 'primevue/confirmdialog'
 
-const primeVuePlugins = [
+/** The PrimeVue plugin tuple must be declared with the mount plugins type or
+ *  TS rejects the mixed [plugin, options] | plugin array (TS2322). */
+type Plugins = NonNullable<GlobalMountOptions['plugins']>
+
+const primeVuePlugins: Plugins = [
   [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
   ToastService,
   ConfirmationService,

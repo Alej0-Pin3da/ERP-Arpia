@@ -7,10 +7,56 @@
  * values`), and an EMPTY array means the column filter was cleared. These
  * helpers normalize one column's array to a single value so the views can map
  * it onto their existing server-side filter refs.
+ *
+ * PrimeVue DataTable (lazy mode) emits a different shape: `@filter` carries
+ * `Record<columnKey, { value, matchMode } | { value, matchMode }[]>`. The
+ * `parsePrimeVueFilters`/`parsePrimeVueSort` adapters below normalize those
+ * payloads back to the shapes the rest of the app already consumes, so the
+ * `parseColumnFilter` semantics (first-selected-value, `{text,value}` unwrap,
+ * empty/cleared → null) survive untouched for all existing callers.
  */
 
 /** A value a column-header filter can carry (enum string, numeric id, bool). */
 export type ColumnFilterValue = string | number | boolean
+
+/** A single constraint emitted by a PrimeVue DataTable `@filter` payload. */
+export interface PrimeVueFilterConstraint {
+  value: unknown
+  matchMode?: string
+}
+
+/**
+ * Normalize a PrimeVue DataTable `@filter` payload to the el-table column
+ * array shape: `Record<col, unknown[]>` of raw constraint values. Each column
+ * keeps its values (single constraint or array) verbatim — a `{ value: null }`
+ * constraint becomes `[null]` and a `{ text, value }` option value stays
+ * wrapped so the existing `parseColumnFilter` unwrap/empty semantics apply
+ * unchanged downstream.
+ */
+export function parsePrimeVueFilters(
+  filters: Record<string, PrimeVueFilterConstraint | PrimeVueFilterConstraint[]>,
+): Record<string, unknown[]> {
+  const normalized: Record<string, unknown[]> = {}
+  for (const [field, constraint] of Object.entries(filters)) {
+    normalized[field] = Array.isArray(constraint)
+      ? constraint.map((c) => c.value)
+      : [constraint.value]
+  }
+  return normalized
+}
+
+/**
+ * Normalize a PrimeVue DataTable `@sort` payload to the view sort shape:
+ * `{ prop, order }` where order is 'asc' | 'desc' | null. PrimeVue emits
+ * `sortOrder` 1 (asc), -1 (desc), 0/null (no sort).
+ */
+export function parsePrimeVueSort(s: {
+  sortField?: string
+  sortOrder?: number
+}): { prop: string; order: 'asc' | 'desc' | null } {
+  const order = s.sortOrder === 1 ? 'asc' : s.sortOrder === -1 ? 'desc' : null
+  return { prop: s.sortField ?? '', order }
+}
 
 /**
  * Normalize the `filter-change` payload for one column to a single value:
