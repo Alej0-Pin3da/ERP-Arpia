@@ -1,22 +1,32 @@
 /**
- * Layout shell component tests (task 1.7, spec SHELL-5).
+ * Layout shell component tests (task 1.7, spec SHELL-5; S0-T7 pilot, MIG-4).
  *
  * Mounts the REAL AppLayout + SidebarMenu + auth store + router guard
  * against a mocked HTTP layer (jsdom): the persistent shell an
  * authenticated user experiences — header with nombre/rol, a role-aware
  * sidebar (Usuarios hidden for operador/consulta), active-route
  * highlighting, and logout that clears the session and returns to /login.
+ *
+ * Slice-0 pilot (S0-T7): proves per-component PrimeVue imports (Tag/Button in
+ * AppLayout), Teleported Toast/ConfirmDialog hosts (attachTo: document.body),
+ * and hybrid dual-registration — ElementPlus plugin stays registered ONLY for
+ * the el-menu assertions until S3-T4 replaces SidebarMenu.
  */
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory } from 'vue-router'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus from 'element-plus'
+import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
+import ConfirmationService from 'primevue/confirmationservice'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from '@/App.vue'
 import { createAppRouter } from '@/router'
 import { useAuthStore } from '@/stores/auth'
 import { authApi } from '@/api/endpoints'
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 
 vi.mock('@/api/endpoints', () => ({
   authApi: {
@@ -39,6 +49,11 @@ const OPERADOR = { id: 2, nombre: 'Pepe Operador', email: 'pepe@arpia.com.co', r
  * role: App -> router-view -> AppLayout (the shell under test) ->
  * router-view -> active route. Mounting the shell directly would double it,
  * because the active route (/dashboard) resolves to AppLayout itself.
+ *
+ * attachTo: document.body — App.vue mounts Toast/ConfirmDialog hosts which
+ * Teleport to <body>; without an attached root the teleported hosts are
+ * dropped. ElementPlus stays registered for el-menu until S3 (MIG-4 pilot);
+ * PrimeVue + services mirror main.ts dual registration.
  */
 async function mountLayout(rol: string) {
   const pinia = createPinia()
@@ -50,7 +65,19 @@ async function mountLayout(rol: string) {
     user: { ...OPERADOR, rol },
   })
   const router = createAppRouter(createMemoryHistory())
-  const wrapper = mount(App, { global: { plugins: [pinia, router, ElementPlus] } })
+  const wrapper = mount(App, {
+    attachTo: document.body,
+    global: {
+      plugins: [
+        pinia,
+        router,
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+        ToastService,
+        ConfirmationService,
+      ],
+    },
+  })
   await router.isReady()
   await flushPromises()
   return { wrapper, router, auth }
@@ -77,6 +104,22 @@ describe('AppLayout (spec SHELL-5)', () => {
     const { wrapper } = await mountLayout('admin')
 
     expect(wrapper.text()).toContain('Administrador')
+  })
+
+  it('renders the role badge as a per-component PrimeVue Tag (S0-T7 pilot)', async () => {
+    const { wrapper } = await mountLayout('operador')
+
+    const badge = wrapper.find('.p-tag')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('Operador')
+  })
+
+  it('renders the logout control as a per-component PrimeVue Button (S0-T7 pilot)', async () => {
+    const { wrapper } = await mountLayout('operador')
+
+    const logout = wrapper.find('.p-button')
+    expect(logout.exists()).toBe(true)
+    expect(logout.text()).toContain('Cerrar sesión')
   })
 
   it('renders every section including Usuarios for an admin', async () => {
