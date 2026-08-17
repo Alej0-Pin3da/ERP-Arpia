@@ -1,7 +1,7 @@
 /**
  * InsumoForm component tests (PR9, spec MOD-4).
  *
- * Mounts the REAL InsumoForm with Element Plus in both modes:
+ * Mounts the REAL InsumoForm with PrimeVue in both modes:
  *  - create: nombre, categoria select (GET /categorias-insumos), unidad_medida
  *    and the three stock/cost number fields; empty nombre / no categoria /
  *    empty unidad each block submission with a warning
@@ -13,9 +13,12 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus, { ElMessage } from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import InsumoForm from '@/components/inventario/InsumoForm.vue'
 import type { components } from '@/types/api.d'
 
@@ -44,23 +47,42 @@ async function mountForm(
 ): Promise<VueWrapper> {
   const wrapper = mount(InsumoForm, {
     props: { mode, initial, categorias: CATEGORIAS },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
 }
 
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
 async function pickCategoria(wrapper: VueWrapper, label: string): Promise<void> {
   const select = wrapper.find('[data-test="categoria-insumo-select"]')
   await select.trigger('click')
-  await nextTick()
-  const item = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
     (el) => el.textContent?.trim() === label,
   )
   if (!item) throw new Error(`categoria option not found: "${label}"`)
-  item.click()
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
   await nextTick()
-  await flushPromises()
+}
+
+/** PrimeVue InputNumber commits the model on blur — type then blur like a user. */
+async function setNumber(wrapper: VueWrapper, testId: string, value: string): Promise<void> {
+  const input = wrapper.find(`[data-test="${testId}"] input`)
+  await input.setValue(value)
+  await input.trigger('blur')
+  await nextTick()
 }
 
 afterEach(() => {
@@ -80,8 +102,8 @@ describe('InsumoForm (MOD-4)', () => {
     expect(text).toContain('Costo promedio')
 
     await wrapper.find('[data-test="categoria-insumo-select"]').trigger('click')
-    await nextTick()
-    const options = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')]
+    await flushOverlay()
+    const options = [...document.querySelectorAll<HTMLElement>('.p-select-option')]
     expect(options.map((o) => o.textContent?.trim())).toEqual(['Granos', 'Abarrotes'])
   })
 
@@ -126,9 +148,9 @@ describe('InsumoForm (MOD-4)', () => {
     await wrapper.find('[data-test="nombre-insumo-input"]').setValue('Harina de maíz')
     await pickCategoria(wrapper, 'Granos')
     await wrapper.find('[data-test="unidad-insumo-input"]').setValue('kg')
-    await wrapper.find('[data-test="stock-actual-input"] input').setValue('10')
-    await wrapper.find('[data-test="stock-minimo-input"] input').setValue('5')
-    await wrapper.find('[data-test="costo-promedio-input"] input').setValue('3200')
+    await setNumber(wrapper, 'stock-actual-input', '10')
+    await setNumber(wrapper, 'stock-minimo-input', '5')
+    await setNumber(wrapper, 'costo-promedio-input', '3200')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

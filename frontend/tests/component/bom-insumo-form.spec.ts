@@ -1,7 +1,7 @@
 /**
  * BomInsumoForm component tests (PR10, spec MOD-5).
  *
- * Mounts the REAL BomInsumoForm with Element Plus in both modes — the BOM
+ * Mounts the REAL BomInsumoForm with PrimeVue in both modes — the BOM
  * insumo line create/edit form for the selected product:
  *  - create: insumo select (insumos prop), cantidad_requerida + optional
  *    porcentaje_desperdicio (0..100); empty insumo / empty cantidad each
@@ -13,9 +13,12 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus, { ElMessage } from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import BomInsumoForm from '@/components/productos/BomInsumoForm.vue'
 import type { components } from '@/types/api.d'
 import type { BomInsumoRow } from '@/utils/productos'
@@ -59,28 +62,46 @@ async function mountForm(
 ): Promise<VueWrapper> {
   const wrapper = mount(BomInsumoForm, {
     props: { mode, initial, insumos: INSUMOS },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
 }
 
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
 async function pickInsumo(wrapper: VueWrapper, label: string): Promise<void> {
   const select = wrapper.find('[data-test="bom-insumo-select"]')
   await select.trigger('click')
-  await nextTick()
-  const item = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
     (el) => el.textContent?.trim() === label,
   )
   if (!item) throw new Error(`insumo option not found: "${label}"`)
-  item.click()
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
   await nextTick()
-  await flushPromises()
+}
+
+/** PrimeVue InputNumber commits the model on blur — type then blur like a user. */
+async function setNumber(wrapper: VueWrapper, testId: string, value: string): Promise<void> {
+  const input = wrapper.find(`[data-test="${testId}"] input`)
+  await input.setValue(value)
+  await input.trigger('blur')
+  await nextTick()
 }
 
 afterEach(() => {
   ElMessage.closeAll()
-  document.body.innerHTML = ''
 })
 
 describe('BomInsumoForm (MOD-5)', () => {
@@ -92,8 +113,8 @@ describe('BomInsumoForm (MOD-5)', () => {
     expect(wrapper.text()).toContain('Desperdicio (%)')
 
     await wrapper.find('[data-test="bom-insumo-select"]').trigger('click')
-    await nextTick()
-    const options = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')]
+    await flushOverlay()
+    const options = [...document.querySelectorAll<HTMLElement>('.p-select-option')]
     expect(options.map((o) => o.textContent?.trim())).toEqual(['Harina de maíz', 'Aceite'])
   })
 
@@ -122,8 +143,8 @@ describe('BomInsumoForm (MOD-5)', () => {
     const wrapper = await mountForm('create')
 
     await pickInsumo(wrapper, 'Harina de maíz')
-    await wrapper.find('[data-test="cantidad-bom-insumo-input"] input').setValue('2')
-    await wrapper.find('[data-test="desperdicio-bom-insumo-input"] input').setValue('5')
+    await setNumber(wrapper, 'cantidad-bom-insumo-input', '2')
+    await setNumber(wrapper, 'desperdicio-bom-insumo-input', '5')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -139,7 +160,7 @@ describe('BomInsumoForm (MOD-5)', () => {
 
     expect(wrapper.text()).toContain('Harina de maíz') // insumo select prefilled
 
-    await wrapper.find('[data-test="cantidad-bom-insumo-input"] input').setValue('2.5')
+    await setNumber(wrapper, 'cantidad-bom-insumo-input', '2.5')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

@@ -2,17 +2,19 @@
 /**
  * BOM insumo line form (PR10, spec MOD-5).
  *
- * Dual-mode ElForm (create -> BomInsumoCreate / edit -> BomInsumoUpdate):
- * insumo select (insumos prop), cantidad_requerida (> 0) and
- * porcentaje_desperdicio (0..100). Client gates es-CO: insumo and cantidad
- * are required. Edit prefills from the row (the backend PUT schema accepts
- * the full field set).
+ * Dual-mode PrimeVue form (create -> BomInsumoCreate / edit ->
+ * BomInsumoUpdate): insumo select (insumos prop), cantidad_requerida (> 0)
+ * and porcentaje_desperdicio (0..100). Client gates es-CO: insumo and
+ * cantidad are required. Edit prefills from the row (the backend PUT schema
+ * accepts the full field set).
  *
  * Emits the API-ready payload via buildBomInsumoPayload/Update — variante_id
  * is omitted when null (the base rule row applies to all variants).
  */
 import { computed, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import InputNumber from 'primevue/inputnumber'
+import Select from 'primevue/select'
 
 import type { components } from '@/types/api.d'
 import { parseDecimal } from '@/utils/format'
@@ -73,38 +75,99 @@ function onSubmit(): void {
 </script>
 
 <template>
-  <el-form label-position="top" @submit.prevent="onSubmit">
-    <el-form-item label="Insumo">
-      <el-select
-        v-model="form.insumo_id"
-        data-test="bom-insumo-select"
-        placeholder="Selecciona el insumo"
-        style="width: 100%"
-      >
-        <el-option v-for="i in insumos" :key="i.id" :label="i.nombre" :value="i.id" />
-      </el-select>
-    </el-form-item>
-    <el-form-item label="Cantidad requerida">
-      <el-input-number
-        v-model="form.cantidad_requerida"
-        data-test="cantidad-bom-insumo-input"
-        :min="0.01"
-        :precision="2"
-        style="width: 100%"
-      />
-    </el-form-item>
-    <el-form-item label="Desperdicio (%)">
-      <el-input-number
-        v-model="form.porcentaje_desperdicio"
-        data-test="desperdicio-bom-insumo-input"
-        :min="0"
-        :max="100"
-        :precision="2"
-        style="width: 100%"
-      />
-    </el-form-item>
-    <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-bom-insumo">
-      {{ submitLabel }}
-    </el-button>
-  </el-form>
+  <form class="bom-insumo-form" @submit.prevent="onSubmit">
+    <div class="form-grid">
+      <div class="form-col" style="--md: 10">
+        <div class="form-item">
+          <label class="form-label">Insumo</label>
+          <Select
+            v-model="form.insumo_id"
+            :options="insumos"
+            option-label="nombre"
+            option-value="id"
+            data-test="bom-insumo-select"
+            placeholder="Selecciona el insumo"
+            class="bom-insumo-field"
+          />
+        </div>
+      </div>
+      <div class="form-col" style="--md: 7">
+        <div class="form-item">
+          <label class="form-label">Cantidad requerida</label>
+          <InputNumber
+            v-model="form.cantidad_requerida"
+            data-test="cantidad-bom-insumo-input"
+            :min="0.01"
+            :min-fraction-digits="2"
+            :max-fraction-digits="2"
+            :use-grouping="false"
+            class="bom-insumo-field"
+          />
+        </div>
+      </div>
+      <div class="form-col" style="--md: 7">
+        <div class="form-item">
+          <label class="form-label">Desperdicio (%)</label>
+          <InputNumber
+            v-model="form.porcentaje_desperdicio"
+            data-test="desperdicio-bom-insumo-input"
+            :min="0"
+            :max="100"
+            :min-fraction-digits="2"
+            :max-fraction-digits="2"
+            :use-grouping="false"
+            class="bom-insumo-field"
+          />
+        </div>
+      </div>
+      <div class="form-col submit-col" style="--md: 24">
+        <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-bom-insumo">
+          {{ submitLabel }}
+        </el-button>
+      </div>
+    </div>
+  </form>
 </template>
+
+<style scoped>
+.bom-insumo-form {
+  max-width: 56rem;
+}
+
+.bom-insumo-field {
+  width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.form-col {
+  grid-column: span 24;
+}
+
+@media (min-width: 768px) {
+  .form-col {
+    grid-column: span var(--md, 24);
+  }
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--el-text-color-primary);
+}
+
+.submit-col {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 0.15rem;
+}
+</style>

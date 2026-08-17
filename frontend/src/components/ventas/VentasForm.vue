@@ -2,7 +2,7 @@
 /**
  * Ventas register form (task 2.2, spec MOD-1).
  *
- * Element Plus form that maps to POST /ventas (VentaCreate): optional
+ * PrimeVue form that maps to POST /ventas (VentaCreate): optional
  * cliente, canal_venta select, descuento_porcentaje, and dynamic line items
  * (producto, optional variante, cantidad > 0, precio_unitario >= 0 defaulted
  * from producto.precio_venta_sugerido). The client blocks empty detalles
@@ -12,6 +12,9 @@
  */
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import InputNumber from 'primevue/inputnumber'
+import Select from 'primevue/select'
+import ToggleSwitch from 'primevue/toggleswitch'
 
 import { formatMoney, parseDecimal } from '@/utils/format'
 import {
@@ -174,58 +177,57 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <el-form label-position="top" class="venta-form" @submit.prevent="submit">
-    <el-row :gutter="16">
-      <el-col :xs="24" :md="10">
-        <el-form-item label="Cliente">
-          <el-select
+  <form class="venta-form" @submit.prevent="submit">
+    <div class="form-grid">
+      <div class="form-col" style="--md: 10">
+        <div class="form-item">
+          <label class="form-label">Cliente</label>
+          <Select
             v-model="clienteId"
-            clearable
-            filterable
+            :options="clientes"
+            option-label="nombre"
+            option-value="id"
+            show-clear
+            filter
             placeholder="Sin cliente"
             class="venta-field"
             data-test="cliente-select"
-          >
-            <el-option v-for="c in clientes" :key="c.id" :label="c.nombre" :value="c.id" />
-          </el-select>
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="7">
-        <el-form-item label="Canal de venta">
-          <el-select v-model="canalVenta" class="venta-field" data-test="canal-select">
-            <el-option
-              v-for="canal in CANAL_VENTAS"
-              :key="canal"
-              :label="canalLabel(canal)"
-              :value="canal"
-            />
-          </el-select>
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="7">
-        <el-form-item label="Descuento (%)">
-          <el-input-number
+          />
+        </div>
+      </div>
+      <div class="form-col" style="--md: 7">
+        <div class="form-item">
+          <label class="form-label">Canal de venta</label>
+          <Select
+            v-model="canalVenta"
+            :options="CANAL_VENTAS"
+            :option-label="canalLabel"
+            class="venta-field"
+            data-test="canal-select"
+          />
+        </div>
+      </div>
+      <div class="form-col" style="--md: 7">
+        <div class="form-item">
+          <label class="form-label">Descuento (%)</label>
+          <InputNumber
             v-model="descuento"
             :min="0"
             :max="100"
             :step="1"
+            :use-grouping="false"
             class="venta-field"
             data-test="descuento-input"
           />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="7">
-        <el-form-item label="Es regalo" data-test="es-regalo-field">
-          <el-switch
-            v-model="esRegalo"
-            data-test="es-regalo-toggle"
-            inline-prompt
-            active-text="Sí"
-            inactive-text="No"
-          />
-        </el-form-item>
-      </el-col>
-    </el-row>
+        </div>
+      </div>
+      <div class="form-col" style="--md: 7">
+        <div class="form-item" data-test="es-regalo-field">
+          <label class="form-label">Es regalo</label>
+          <ToggleSwitch v-model="esRegalo" data-test="es-regalo-toggle" />
+        </div>
+      </div>
+    </div>
 
     <div class="detalles-header">
       <span>Detalles de la venta</span>
@@ -235,40 +237,44 @@ async function submit(): Promise<void> {
     </div>
 
     <div v-for="(row, index) in detalles" :key="index" class="detalle-row" data-test="detalle-row">
-      <el-select
+      <Select
         v-model="row.producto_id"
-        filterable
+        :options="productos"
+        option-label="nombre"
+        option-value="id"
+        filter
         placeholder="Producto"
         class="venta-field"
         data-test="producto-select"
         @change="onProductoChange(row)"
-      >
-        <el-option v-for="p in productos" :key="p.id" :label="p.nombre" :value="p.id" />
-      </el-select>
+      />
 
-      <el-select
+      <Select
         v-model="row.variante_id"
-        clearable
+        :options="variantesDe(row)"
+        option-label="nombre_variante"
+        option-value="id"
+        show-clear
         placeholder="Variante (opcional)"
         :disabled="variantesDe(row).length === 0"
         class="venta-field"
         data-test="variante-select"
-      >
-        <el-option v-for="v in variantesDe(row)" :key="v.id" :label="v.nombre_variante" :value="v.id" />
-      </el-select>
+      />
 
-      <el-input-number
+      <InputNumber
         v-model="row.cantidad"
         :min="1"
         :step="1"
+        :use-grouping="false"
         class="venta-field"
         data-test="cantidad-input"
       />
 
-      <el-input-number
+      <InputNumber
         v-model="row.precio_unitario"
         :min="0"
         :step="100"
+        :use-grouping="false"
         class="venta-field"
         data-test="precio-input"
       />
@@ -284,7 +290,7 @@ async function submit(): Promise<void> {
         {{ mode === 'edit' ? 'Guardar cambios' : 'Registrar venta' }}
       </el-button>
     </div>
-  </el-form>
+  </form>
 </template>
 
 <style scoped>
@@ -294,6 +300,33 @@ async function submit(): Promise<void> {
 
 .venta-field {
   width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.form-col {
+  grid-column: span 24;
+}
+
+@media (min-width: 768px) {
+  .form-col {
+    grid-column: span var(--md, 24);
+  }
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--el-text-color-primary);
 }
 
 .detalles-header {

@@ -2,7 +2,7 @@
 /**
  * Movimientos form (PR8, spec MOD-3; T9 edit mode).
  *
- * Element Plus form that maps to POST /finanzas/movimientos
+ * PrimeVue form that maps to POST /finanzas/movimientos
  * (MovimientoCreate): required tipo (Gasto|Inversion|Retiro), descripcion
  * and monto > 0; the socio select is OPTIONAL for every tipo — the backend
  * does not require socio_id even for a Retiro (schema default None; the
@@ -17,10 +17,18 @@
  * real protection is the server-side guard (FIN-2 -> 422); the UI is
  * reinforcement only.
  *
+ * The DatePicker works on a Date while the payload contract keeps the
+ * "YYYY-MM-DDTHH:mm:ss" string (no timezone suffix): `fecha` stays a string
+ * and a computed get/set converts to/from Date for the picker.
+ *
  * The view owns the POST/PATCH, the success message and the list refresh.
  */
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import DatePicker from 'primevue/datepicker'
+import InputNumber from 'primevue/inputnumber'
+import InputText from 'primevue/inputtext'
+import Select from 'primevue/select'
 
 import {
   TIPO_MOVIMIENTO,
@@ -57,6 +65,8 @@ const descripcion = ref('')
 const monto = ref<number | null>(null)
 const socioId = ref<number | null>(null)
 
+const tipoOptions = computed(() => TIPO_MOVIMIENTO.map((t) => ({ label: tipoMovimientoLabel(t), value: t })))
+
 /** T9/FIN-2: liquidacion-born rows freeze monto+socio (UI reinforcement only —
  *  the server 422s any attempt to change them). */
 const frozenMontoSocio = computed(
@@ -67,7 +77,7 @@ watch(
   () => props.initial,
   (mov) => {
     if (mov) {
-      // The date picker works on "YYYY-MM-DDTHH:mm:ss" (no timezone suffix).
+      // The payload contract works on "YYYY-MM-DDTHH:mm:ss" (no timezone suffix).
       fecha.value = mov.fecha ? mov.fecha.replace('Z', '') : null
       tipo.value = mov.tipo as MovimientoTipo
       descripcion.value = mov.descripcion
@@ -77,6 +87,31 @@ watch(
   },
   { immediate: true },
 )
+
+/** "YYYY-MM-DDTHH:mm:ss" -> Date (parsed as UTC so the round-trip is exact). */
+function parseFecha(value: string): Date {
+  const [datePart, timePart] = value.split('T')
+  const [y, m, d] = datePart.split('-').map(Number)
+  const [hh, mm, ss] = timePart.split(':').map(Number)
+  return new Date(Date.UTC(y, m - 1, d, hh, mm, ss))
+}
+
+/** Date -> "YYYY-MM-DDTHH:mm:ss" (UTC components, zero-padded). */
+function formatFecha(date: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return (
+    `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}` +
+    `T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`
+  )
+}
+
+/** Bridge between the string payload contract and the Date-based DatePicker. */
+const fechaModel = computed<Date | null>({
+  get: () => (fecha.value ? parseFecha(fecha.value) : null),
+  set: (date: Date | null) => {
+    fecha.value = date ? formatFecha(date) : null
+  },
+})
 
 /** MOD-3/T9: client gates — tipo and descripcion required; monto required
  *  whenever it is part of the payload (create + edit of non-liquidacion rows). */
@@ -120,67 +155,76 @@ function submit(): void {
 </script>
 
 <template>
-  <el-form label-position="top" class="movimiento-form" @submit.prevent="submit">
-    <el-row :gutter="16">
-      <el-col v-if="mode === 'edit'" :xs="24" :md="6">
-        <el-form-item label="Fecha">
-          <el-date-picker
-            v-model="fecha"
-            type="datetime"
-            value-format="YYYY-MM-DDTHH:mm:ss"
+  <form class="movimiento-form" @submit.prevent="submit">
+    <div class="form-grid">
+      <div v-if="mode === 'edit'" class="form-col" style="--md: 6">
+        <div class="form-item">
+          <label class="form-label">Fecha</label>
+          <DatePicker
+            v-model="fechaModel"
+            show-time
+            hour-format="24"
+            date-format="dd/mm/yy"
             placeholder="Selecciona la fecha"
             class="movimiento-field"
             data-test="fecha-picker"
           />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="6">
-        <el-form-item label="Tipo de movimiento">
-          <el-select v-model="tipo" class="movimiento-field" data-test="tipo-movimiento-select">
-            <el-option
-              v-for="t in TIPO_MOVIMIENTO"
-              :key="t"
-              :label="tipoMovimientoLabel(t)"
-              :value="t"
-            />
-          </el-select>
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="10">
-        <el-form-item label="Descripción">
-          <el-input v-model="descripcion" placeholder="Ej: Compra de insumos" data-test="descripcion-input" />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="4">
-        <el-form-item label="Monto">
-          <el-input-number
+        </div>
+      </div>
+      <div class="form-col" style="--md: 6">
+        <div class="form-item">
+          <label class="form-label">Tipo de movimiento</label>
+          <Select
+            v-model="tipo"
+            :options="tipoOptions"
+            option-label="label"
+            option-value="value"
+            class="movimiento-field"
+            data-test="tipo-movimiento-select"
+          />
+        </div>
+      </div>
+      <div class="form-col" style="--md: 10">
+        <div class="form-item">
+          <label class="form-label">Descripción</label>
+          <InputText v-model="descripcion" placeholder="Ej: Compra de insumos" data-test="descripcion-input" />
+        </div>
+      </div>
+      <div class="form-col" style="--md: 4">
+        <div class="form-item">
+          <label class="form-label">Monto</label>
+          <InputNumber
             v-model="monto"
             :min="0.01"
-            :precision="2"
+            :min-fraction-digits="2"
+            :max-fraction-digits="2"
             :step="1000"
-            :controls="false"
+            :use-grouping="false"
+            :show-buttons="false"
             :disabled="frozenMontoSocio"
             class="movimiento-field"
             data-test="monto-input"
           />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="4">
-        <el-form-item label="Socio (opcional)">
-          <el-select
+        </div>
+      </div>
+      <div class="form-col" style="--md: 4">
+        <div class="form-item">
+          <label class="form-label">Socio (opcional)</label>
+          <Select
             v-model="socioId"
-            clearable
-            filterable
+            :options="socios"
+            option-label="nombre"
+            option-value="id"
+            show-clear
+            filter
             placeholder="Sin socio"
             :disabled="frozenMontoSocio"
             class="movimiento-field"
             data-test="socio-select"
-          >
-            <el-option v-for="s in socios" :key="s.id" :label="s.nombre" :value="s.id" />
-          </el-select>
-        </el-form-item>
-      </el-col>
-    </el-row>
+          />
+        </div>
+      </div>
+    </div>
 
     <div class="form-footer">
       <span class="form-hint">
@@ -196,7 +240,7 @@ function submit(): void {
         {{ mode === 'edit' ? 'Guardar cambios' : 'Registrar movimiento' }}
       </el-button>
     </div>
-  </el-form>
+  </form>
 </template>
 
 <style scoped>
@@ -206,6 +250,33 @@ function submit(): void {
 
 .movimiento-field {
   width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.form-col {
+  grid-column: span 24;
+}
+
+@media (min-width: 768px) {
+  .form-col {
+    grid-column: span var(--md, 24);
+  }
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--el-text-color-primary);
 }
 
 .form-footer {

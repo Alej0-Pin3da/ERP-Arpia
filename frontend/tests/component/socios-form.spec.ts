@@ -1,7 +1,7 @@
 /**
  * SociosForm component tests (PR8, spec MOD-3).
  *
- * Mounts the REAL SociosForm with Element Plus in both modes:
+ * Mounts the REAL SociosForm with PrimeVue in both modes:
  *  - create: nombre + porcentaje fields; empty nombre and empty porcentaje
  *    each block submission with a warning
  *  - edit: percentage only (the backend SocioConfiguracionUpdate schema has
@@ -12,9 +12,12 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus, { ElMessage } from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import SociosForm from '@/components/finanzas/SociosForm.vue'
 import type { components } from '@/types/api.d'
 
@@ -25,10 +28,23 @@ const SOCIO: SocioConfiguracionRead = { id: 1, nombre: 'Ana María', porcentaje_
 async function mountForm(mode: 'create' | 'edit' = 'create', initial: SocioConfiguracionRead | null = null): Promise<VueWrapper> {
   const wrapper = mount(SociosForm, {
     props: { mode, initial },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
+}
+
+/** PrimeVue InputNumber commits the model on blur — type then blur like a user. */
+async function setNumber(wrapper: VueWrapper, testId: string, value: string): Promise<void> {
+  const input = wrapper.find(`[data-test="${testId}"] input`)
+  await input.setValue(value)
+  await input.trigger('blur')
+  await nextTick()
 }
 
 afterEach(() => {
@@ -47,7 +63,7 @@ describe('SociosForm (MOD-3)', () => {
   it('blocks create submission with an empty nombre', async () => {
     const wrapper = await mountForm('create')
 
-    await wrapper.find('[data-test="porcentaje-socio-input"] input').setValue('25')
+    await setNumber(wrapper, 'porcentaje-socio-input', '25')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -70,7 +86,7 @@ describe('SociosForm (MOD-3)', () => {
     const wrapper = await mountForm('create')
 
     await wrapper.find('[data-test="nombre-socio-input"]').setValue('Luis Vega')
-    await wrapper.find('[data-test="porcentaje-socio-input"] input').setValue('25')
+    await setNumber(wrapper, 'porcentaje-socio-input', '25')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -84,7 +100,7 @@ describe('SociosForm (MOD-3)', () => {
     expect(text).toContain('Ana María')
     expect(wrapper.find('[data-test="nombre-socio-input"]').exists()).toBe(false)
 
-    await wrapper.find('[data-test="porcentaje-socio-input"] input').setValue('20')
+    await setNumber(wrapper, 'porcentaje-socio-input', '20')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -95,10 +111,10 @@ describe('SociosForm (MOD-3)', () => {
     const wrapper = await mountForm('edit', SOCIO)
 
     // Edit mode prefills the share from the row — the gate fires only after
-    // the user clears the field (el-input-number empties to null).
+    // the user clears the field (InputNumber empties to null on blur).
     const input = wrapper.find('[data-test="porcentaje-socio-input"] input')
     await input.setValue('')
-    await input.trigger('change')
+    await input.trigger('blur')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

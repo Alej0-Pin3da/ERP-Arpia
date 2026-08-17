@@ -10,9 +10,12 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus, { ElMessage } from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import UsuarioForm from '@/components/usuarios/UsuarioForm.vue'
 import type { components } from '@/types/api.d'
 
@@ -31,29 +34,46 @@ async function mountForm(
 ): Promise<VueWrapper> {
   const wrapper = mount(UsuarioForm, {
     props: { mode, initial },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   await flushPromises()
   return wrapper
 }
 
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
 async function pickRol(wrapper: VueWrapper, label: string): Promise<void> {
   const select = wrapper.find('[data-test="usuario-rol-select"]')
   await select.trigger('click')
-  await nextTick()
-  const item = [...document.querySelectorAll<HTMLElement>('.usuario-rol-popper .el-select-dropdown__item')].find(
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.usuario-rol-popper .p-select-option')].find(
     (el) => el.textContent?.trim() === label,
   )
   if (!item) throw new Error(`rol option not found: "${label}"`)
-  item.click()
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
   await nextTick()
-  await flushPromises()
+}
+
+/** PrimeVue Password keeps the secret in an inner input — target it for typing. */
+async function setPassword(wrapper: VueWrapper, value: string): Promise<void> {
+  const input = wrapper.find('[data-test="usuario-password-input"] input')
+  await input.setValue(value)
+  await nextTick()
 }
 
 afterEach(() => {
   ElMessage.closeAll()
-  document.body.innerHTML = ''
 })
 
 describe('UsuarioForm (MOD-5 usuarios)', () => {
@@ -70,8 +90,8 @@ describe('UsuarioForm (MOD-5 usuarios)', () => {
     expect(wrapper.find('[data-test="usuario-password-input"]').exists()).toBe(true)
 
     await wrapper.find('[data-test="usuario-rol-select"]').trigger('click')
-    await nextTick()
-    const options = [...document.querySelectorAll<HTMLElement>('.usuario-rol-popper .el-select-dropdown__item')]
+    await flushOverlay()
+    const options = [...document.querySelectorAll<HTMLElement>('.usuario-rol-popper .p-select-option')]
     expect(options.map((o) => o.textContent?.trim())).toEqual(['Administrador', 'Operador', 'Consulta'])
   })
 
@@ -80,7 +100,7 @@ describe('UsuarioForm (MOD-5 usuarios)', () => {
 
     await wrapper.find('[data-test="usuario-email-input"]').setValue('ana@arpia.com.co')
     await pickRol(wrapper, 'Operador')
-    await wrapper.find('[data-test="usuario-password-input"]').setValue('clave123')
+    await setPassword(wrapper, 'clave123')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -93,7 +113,7 @@ describe('UsuarioForm (MOD-5 usuarios)', () => {
 
     await wrapper.find('[data-test="usuario-nombre-input"]').setValue('Ana')
     await pickRol(wrapper, 'Operador')
-    await wrapper.find('[data-test="usuario-password-input"]').setValue('clave123')
+    await setPassword(wrapper, 'clave123')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -106,7 +126,7 @@ describe('UsuarioForm (MOD-5 usuarios)', () => {
 
     await wrapper.find('[data-test="usuario-nombre-input"]').setValue('Ana')
     await wrapper.find('[data-test="usuario-email-input"]').setValue('ana@arpia.com.co')
-    await wrapper.find('[data-test="usuario-password-input"]').setValue('clave123')
+    await setPassword(wrapper, 'clave123')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -133,7 +153,7 @@ describe('UsuarioForm (MOD-5 usuarios)', () => {
     await wrapper.find('[data-test="usuario-nombre-input"]').setValue('Ana')
     await wrapper.find('[data-test="usuario-email-input"]').setValue('ana@arpia.com.co')
     await pickRol(wrapper, 'Operador')
-    await wrapper.find('[data-test="usuario-password-input"]').setValue('abc12')
+    await setPassword(wrapper, 'abc12')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -147,7 +167,7 @@ describe('UsuarioForm (MOD-5 usuarios)', () => {
     await wrapper.find('[data-test="usuario-nombre-input"]').setValue('  María Pérez ')
     await wrapper.find('[data-test="usuario-email-input"]').setValue('maria@arpia.com.co')
     await pickRol(wrapper, 'Operador')
-    await wrapper.find('[data-test="usuario-password-input"]').setValue('clave123')
+    await setPassword(wrapper, 'clave123')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

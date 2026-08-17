@@ -1,7 +1,7 @@
 /**
  * ComprasForm component tests (PR9, spec MOD-4).
  *
- * Mounts the REAL ComprasForm with Element Plus: insumo select fed by the
+ * Mounts the REAL ComprasForm with PrimeVue: insumo select fed by the
  * insumos catalog, cantidad and precio_unitario number fields, the WAC hint,
  * client gates (no insumo / empty cantidad / empty precio each block with a
  * warning), and the exact CompraInsumoCreate payload on a valid submit
@@ -10,9 +10,12 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus, { ElMessage } from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import ComprasForm from '@/components/inventario/ComprasForm.vue'
 import type { components } from '@/types/api.d'
 
@@ -44,23 +47,42 @@ const INSUMOS: InsumoRead[] = [
 async function mountForm(saving = false): Promise<VueWrapper> {
   const wrapper = mount(ComprasForm, {
     props: { insumos: INSUMOS, saving },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
 }
 
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
 async function pickInsumo(wrapper: VueWrapper, label: string): Promise<void> {
   const select = wrapper.find('[data-test="compra-insumo-select"]')
   await select.trigger('click')
-  await nextTick()
-  const item = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
     (el) => el.textContent?.trim() === label,
   )
   if (!item) throw new Error(`insumo option not found: "${label}"`)
-  item.click()
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
   await nextTick()
-  await flushPromises()
+}
+
+/** PrimeVue InputNumber commits the model on blur — type then blur like a user. */
+async function setNumber(wrapper: VueWrapper, testId: string, value: string): Promise<void> {
+  const input = wrapper.find(`[data-test="${testId}"] input`)
+  await input.setValue(value)
+  await input.trigger('blur')
+  await nextTick()
 }
 
 afterEach(() => {
@@ -78,16 +100,16 @@ describe('ComprasForm (MOD-4)', () => {
     expect(text).toContain('stock') // WAC hint mentions the stock/cost update
 
     await wrapper.find('[data-test="compra-insumo-select"]').trigger('click')
-    await nextTick()
-    const options = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')]
+    await flushOverlay()
+    const options = [...document.querySelectorAll<HTMLElement>('.p-select-option')]
     expect(options.map((o) => o.textContent?.trim())).toEqual(['Harina de maíz', 'Aceite'])
   })
 
   it('blocks submission without an insumo', async () => {
     const wrapper = await mountForm()
 
-    await wrapper.find('[data-test="compra-cantidad-input"] input').setValue('3')
-    await wrapper.find('[data-test="compra-precio-input"] input').setValue('2500')
+    await setNumber(wrapper, 'compra-cantidad-input', '3')
+    await setNumber(wrapper, 'compra-precio-input', '2500')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -99,7 +121,7 @@ describe('ComprasForm (MOD-4)', () => {
     const wrapper = await mountForm()
 
     await pickInsumo(wrapper, 'Harina de maíz')
-    await wrapper.find('[data-test="compra-precio-input"] input').setValue('2500')
+    await setNumber(wrapper, 'compra-precio-input', '2500')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -111,7 +133,7 @@ describe('ComprasForm (MOD-4)', () => {
     const wrapper = await mountForm()
 
     await pickInsumo(wrapper, 'Harina de maíz')
-    await wrapper.find('[data-test="compra-cantidad-input"] input').setValue('3')
+    await setNumber(wrapper, 'compra-cantidad-input', '3')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -123,8 +145,8 @@ describe('ComprasForm (MOD-4)', () => {
     const wrapper = await mountForm()
 
     await pickInsumo(wrapper, 'Harina de maíz')
-    await wrapper.find('[data-test="compra-cantidad-input"] input').setValue('2.5')
-    await wrapper.find('[data-test="compra-precio-input"] input').setValue('4500')
+    await setNumber(wrapper, 'compra-cantidad-input', '2.5')
+    await setNumber(wrapper, 'compra-precio-input', '4500')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

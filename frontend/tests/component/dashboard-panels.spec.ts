@@ -7,7 +7,7 @@
  * sales chart receives (vue-echarts mocked — jsdom has no canvas).
  *
  * BajoStockTable/MargenTable migrated to PrimeVue DataTable in slice 1c;
- * KpiCards/VentasMensualesChart keep their el-* panels until slice 2a.
+ * KpiCards/VentasMensualesChart migrated to PrimeVue in slice 2a.
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
@@ -94,7 +94,7 @@ describe('KpiCards (DASH-1)', () => {
       loading: true,
     })
 
-    expect(wrapper.find('.el-skeleton').exists()).toBe(true)
+    expect(wrapper.find('.p-skeleton').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('$5.000,00')
   })
 })
