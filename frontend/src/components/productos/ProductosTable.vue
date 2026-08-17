@@ -12,10 +12,12 @@
  *
  * Migrated to PrimeVue DataTable (lazy) in slice 1c: column sort re-emits the
  * SAME typed event via the parsePrimeVueSort adapter (no header funnels here).
- * el-tag/el-button cells stay until slice 2b.
+ * Tag/Button cells were migrated in slice 2b.
  */
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import Tag from 'primevue/tag'
 import type { ProductoRow } from '@/utils/productos'
 import { formatMoney } from '@/utils/format'
 import { parsePrimeVueSort } from '@/utils/table-filters'
@@ -46,9 +48,9 @@ function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
     <Column field="nombre" header="Nombre" sortable style="min-width: 180px" />
     <Column field="requiere_fabricacion" header="Requiere fabricación" sortable style="width: 160px">
       <template #body="{ data }">
-        <el-tag :type="data.requiere_fabricacion ? 'primary' : 'info'">
+        <Tag :severity="data.requiere_fabricacion ? 'primary' : 'info'">
           {{ data.requiere_fabricacion ? 'Sí' : 'No' }}
-        </el-tag>
+        </Tag>
       </template>
     </Column>
     <Column field="precio_venta_sugerido" header="Precio venta sugerido" sortable style="width: 170px" align="right">
@@ -59,13 +61,13 @@ function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
     </Column>
     <Column v-if="canEdit" header="Acciones" style="width: 240px">
       <template #body="{ data: row }">
-        <el-button size="small" data-test="producto-variantes" @click="$emit('select-variantes', row)">
+        <Button size="small" severity="secondary" data-test="producto-variantes" @click="$emit('select-variantes', row)">
           Variantes
-        </el-button>
-        <el-button size="small" data-test="edit-producto" @click="$emit('edit', row)">Editar</el-button>
-        <el-button size="small" type="danger" data-test="delete-producto" @click="$emit('delete', row)">
+        </Button>
+        <Button size="small" severity="secondary" data-test="edit-producto" @click="$emit('edit', row)">Editar</Button>
+        <Button size="small" severity="danger" data-test="delete-producto" @click="$emit('delete', row)">
           Eliminar
-        </el-button>
+        </Button>
       </template>
     </Column>
 

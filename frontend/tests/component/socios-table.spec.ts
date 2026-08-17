@@ -6,8 +6,8 @@
  * (current sum vs 100, with a success state at exactly 100), hides
  * edit/delete actions for read-only roles (can-edit=false), emits
  * `edit`/`delete` with the row, and shows the empty state. Column sort is a
- * DataTable lazy `@sort` normalized by parsePrimeVueSort. The el-progress and
- * el-button cells still need the ElementPlus plugin until slice 2a/2b.
+ * DataTable lazy `@sort` normalized by parsePrimeVueSort. Buttons migrated to
+ * PrimeVue in slice 2b; el-progress stays until a later slice (plugin kept).
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'

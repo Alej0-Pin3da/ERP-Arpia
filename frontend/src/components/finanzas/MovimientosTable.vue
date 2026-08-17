@@ -4,7 +4,7 @@
  *
  * Renders the client-side joined rows (buildMovimientoRows output): es-CO
  * formatted fecha/monto, tipo label with a colored tag (Gasto danger,
- * Inversion primary, Retiro warning), the description, the linked socio name
+ * Inversion primary, Retiro warn), the description, the linked socio name
  * (or an em dash), and the settlement key for liquidacion-born rows. The
  * delete action is hidden for read-only roles (can-delete=false); when shown
  * it emits `delete` with the row — the parent owns the confirm dialog, the
@@ -14,13 +14,15 @@
  *
  * Migrated to PrimeVue DataTable (lazy) in slice 1b: the tipo header funnel
  * and column sort re-emit the SAME typed events the view consumes, via the
- * parsePrimeVueFilters/parsePrimeVueSort adapters. el-tag/el-button cells
- * stay until slice 2b.
+ * parsePrimeVueFilters/parsePrimeVueSort adapters. Tag/Button cells were
+ * migrated in slice 2b.
  */
 import { ref } from 'vue'
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Select from 'primevue/select'
+import Tag from 'primevue/tag'
 import { formatDateTime, formatMoney } from '@/utils/format'
 import {
   parseColumnFilter,
@@ -104,7 +106,7 @@ function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
       style="width: 120px"
     >
       <template #body="{ data }">
-        <el-tag :type="tipoMovimientoTagType(data.tipo)" size="small">{{ tipoMovimientoLabel(data.tipo) }}</el-tag>
+        <Tag :severity="tipoMovimientoTagType(data.tipo)">{{ tipoMovimientoLabel(data.tipo) }}</Tag>
       </template>
       <template #filter="{ filterModel, filterCallback }">
         <Select
@@ -128,26 +130,25 @@ function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
     </Column>
     <Column v-if="canEdit || canDelete" header="Acciones" style="width: 150px" align="center">
       <template #body="{ data: row }">
-        <el-button
+        <Button
           v-if="canEdit"
           link
-          type="primary"
           size="small"
           data-test="edit-movimiento"
           @click="emit('edit', row)"
         >
           Editar
-        </el-button>
-        <el-button
+        </Button>
+        <Button
           v-if="canDelete"
-          link
-          type="danger"
+          text
+          severity="danger"
           size="small"
           data-test="delete-movimiento"
           @click="emit('delete', row)"
         >
           Eliminar
-        </el-button>
+        </Button>
       </template>
     </Column>
 

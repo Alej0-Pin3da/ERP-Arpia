@@ -30,7 +30,13 @@ import {
 } from '@/api/endpoints'
 import MaestroForm from '@/components/maestros/MaestroForm.vue'
 import MaestrosTable from '@/components/maestros/MaestrosTable.vue'
+import Button from 'primevue/button'
 import Paginator from 'primevue/paginator'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
 import {
@@ -276,7 +282,7 @@ onMounted(load)
   <section class="maestros">
     <header class="maestros-header">
       <h2>Maestros</h2>
-      <el-button :loading="loading" data-test="refresh-maestros" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-maestros" @click="load">Actualizar</Button>
     </header>
 
     <el-alert
@@ -288,8 +294,14 @@ onMounted(load)
       class="maestros-error"
     />
 
-    <el-tabs v-model="activeTab">
-      <el-tab-pane v-for="entity in MAESTRO_ENTITIES" :key="entity.key" :label="entity.title" :name="entity.key">
+    <Tabs v-model:value="activeTab">
+      <TabList>
+        <Tab v-for="entity in MAESTRO_ENTITIES" :key="entity.key" :value="entity.key">
+          {{ entity.title }}
+        </Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel v-for="entity in MAESTRO_ENTITIES" :key="entity.key" :value="entity.key">
         <div class="maestro-toolbar">
           <el-input
             v-model="searchQ[entity.key]"
@@ -300,14 +312,13 @@ onMounted(load)
             @keyup.enter="onSearch(entity.key)"
             @clear="onSearch(entity.key)"
           />
-          <el-button
+          <Button
             v-if="canManage"
-            type="primary"
             :data-test="`nuevo-${entity.key}`"
             @click="openCreate(entity.key)"
           >
             Nuevo {{ entity.singular }}
-          </el-button>
+          </Button>
         </div>
 
         <MaestrosTable
@@ -347,8 +358,9 @@ onMounted(load)
             @submit="(values) => submitEntity(entity.key, values)"
           />
         </el-dialog>
-      </el-tab-pane>
-    </el-tabs>
+      </TabPanel>
+      </TabPanels>
+    </Tabs>
   </section>
 </template>
 

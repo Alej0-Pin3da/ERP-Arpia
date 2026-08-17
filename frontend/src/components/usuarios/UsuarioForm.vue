@@ -15,6 +15,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Select from 'primevue/select'
@@ -149,9 +150,9 @@ function submit(): void {
       </div>
     </div>
     <div class="submit-row">
-      <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-usuario">
+      <Button type="submit" :loading="saving" data-test="submit-usuario">
         {{ mode === 'edit' ? 'Guardar cambios' : 'Crear usuario' }}
-      </el-button>
+      </Button>
     </div>
   </form>
 </template>

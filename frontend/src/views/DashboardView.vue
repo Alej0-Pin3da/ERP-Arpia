@@ -18,6 +18,7 @@ import BajoStockTable from '@/components/dashboard/BajoStockTable.vue'
 import KpiCards from '@/components/dashboard/KpiCards.vue'
 import MargenTable from '@/components/dashboard/MargenTable.vue'
 import VentasMensualesChart from '@/components/dashboard/VentasMensualesChart.vue'
+import Button from 'primevue/button'
 import {
   buildMargenRows,
   fillMissingMonths,
@@ -78,7 +79,7 @@ onMounted(load)
   <section class="dashboard">
     <header class="dashboard-header">
       <h2>Dashboard</h2>
-      <el-button :loading="loading" data-test="refresh-dashboard" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-dashboard" @click="load">Actualizar</Button>
     </header>
 
     <el-alert

@@ -8,10 +8,9 @@
  * 400 "Cannot delete your own user").
  *
  * Migrated to PrimeVue DataTable (lazy) in slice 1c. el-tag/el-button cells
- * still need the ElementPlus plugin until slice 2b.
+ * el-button cells migrated to PrimeVue in slice 2b.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
 import DataTable from 'primevue/datatable'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -38,7 +37,6 @@ async function mountTable(
     props: { rows, currentUserId },
     global: {
       plugins: [
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
     },

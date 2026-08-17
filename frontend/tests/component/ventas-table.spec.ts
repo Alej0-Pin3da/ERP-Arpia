@@ -13,7 +13,6 @@
  * the v-tooltip gift action needs the PrimeVue Tooltip directive.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
 import DataTable from 'primevue/datatable'
 import Select from 'primevue/select'
 import PrimeVue from 'primevue/config'
@@ -98,7 +97,6 @@ async function mountTable(rows: VentaRow[], loading = false, canMarkRegalo = fal
     props: { rows, loading, canMarkRegalo },
     global: {
       plugins: [
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
       directives: { tooltip: Tooltip },

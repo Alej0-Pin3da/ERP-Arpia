@@ -9,9 +9,10 @@
  *
  * Presentational: emits `edit` / `delete` with the clicked row.
  *
- * Migrated to PrimeVue DataTable (lazy) in slice 1c. el-button cells stay
- * until slice 2b.
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. Button cells were
+ * migrated in slice 2b.
  */
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import type { BomInsumoRow } from '@/utils/productos'
@@ -41,10 +42,10 @@ defineEmits<{
     </Column>
     <Column v-if="canEdit" header="Acciones" style="width: 180px">
       <template #body="{ data: row }">
-        <el-button size="small" data-test="edit-bom-insumo" @click="$emit('edit', row)">Editar</el-button>
-        <el-button size="small" type="danger" data-test="delete-bom-insumo" @click="$emit('delete', row)">
+        <Button size="small" severity="secondary" data-test="edit-bom-insumo" @click="$emit('edit', row)">Editar</Button>
+        <Button size="small" severity="danger" data-test="delete-bom-insumo" @click="$emit('delete', row)">
           Eliminar
-        </el-button>
+        </Button>
       </template>
     </Column>
 

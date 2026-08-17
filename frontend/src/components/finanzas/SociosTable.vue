@@ -12,9 +12,11 @@
  *
  * Migrated to PrimeVue DataTable (lazy) in slice 1b: column sort re-emits the
  * SAME typed event via the parsePrimeVueSort adapter (no header funnels here).
- * The el-progress and el-button cells stay until slice 2a/2b.
+ * The el-progress stays until a later slice; the Button cells were migrated
+ * in slice 2b.
  */
 import { computed } from 'vue'
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import { formatQty } from '@/utils/format'
@@ -68,12 +70,12 @@ function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
       </Column>
       <Column v-if="canEdit" header="Acciones" style="width: 160px" align="center">
         <template #body="{ data: row }">
-          <el-button link type="primary" size="small" data-test="edit-socio" @click="emit('edit', row)">
+          <Button link size="small" data-test="edit-socio" @click="emit('edit', row)">
             Editar
-          </el-button>
-          <el-button link type="danger" size="small" data-test="delete-socio" @click="emit('delete', row)">
+          </Button>
+          <Button text severity="danger" size="small" data-test="delete-socio" @click="emit('delete', row)">
             Eliminar
-          </el-button>
+          </Button>
         </template>
       </Column>
 

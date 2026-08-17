@@ -82,7 +82,7 @@ describe('finanzas mappers (MOD-3)', () => {
 
     expect(tipoMovimientoTagType('Gasto')).toBe('danger')
     expect(tipoMovimientoTagType('Inversion')).toBe('primary')
-    expect(tipoMovimientoTagType('Retiro')).toBe('warning')
+    expect(tipoMovimientoTagType('Retiro')).toBe('warn')
     expect(tipoMovimientoTagType('Otro')).toBe('info')
   })
 

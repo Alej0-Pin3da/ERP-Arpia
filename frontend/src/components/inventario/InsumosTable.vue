@@ -16,12 +16,14 @@
  * funnel and column sort re-emit the SAME typed events the view consumes, via
  * the parsePrimeVueFilters/parsePrimeVueSort adapters. The funnel only renders
  * when categorias exist (mirroring the old el-table `:filters=[]` behavior).
- * el-tag/el-button cells stay until slice 2b.
+ * Tag/Button cells were migrated in slice 2b.
  */
 import { computed, ref } from 'vue'
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Select from 'primevue/select'
+import Tag from 'primevue/tag'
 import { formatMoney, formatQty } from '@/utils/format'
 import {
   parseColumnFilter,
@@ -81,9 +83,9 @@ const SEVERITY_LABEL: Record<BelowMin, string> = {
   warning: 'Bajo',
 }
 
-const SEVERITY_TAG: Record<BelowMin, 'danger' | 'warning'> = {
+const SEVERITY_TAG: Record<BelowMin, 'danger' | 'warn'> = {
   danger: 'danger',
-  warning: 'warning',
+  warning: 'warn',
 }
 
 function severityOf(row: InsumoRead): StockSeverity {
@@ -144,19 +146,19 @@ function rowClass(row: InsumoRead): string {
     </Column>
     <Column header="Estado" style="width: 100px" align="center">
       <template #body="{ data }">
-        <el-tag v-if="severityOf(data) !== 'ok'" :type="SEVERITY_TAG[severityOf(data) as BelowMin]" size="small">
+        <Tag v-if="severityOf(data) !== 'ok'" :severity="SEVERITY_TAG[severityOf(data) as BelowMin]">
           {{ SEVERITY_LABEL[severityOf(data) as BelowMin] }}
-        </el-tag>
+        </Tag>
       </template>
     </Column>
     <Column v-if="canEdit" header="Acciones" style="width: 150px" align="center">
       <template #body="{ data: row }">
-        <el-button link type="primary" size="small" data-test="edit-insumo" @click="emit('edit', row)">
+        <Button link size="small" data-test="edit-insumo" @click="emit('edit', row)">
           Editar
-        </el-button>
-        <el-button link type="danger" size="small" data-test="delete-insumo" @click="emit('delete', row)">
+        </Button>
+        <Button text severity="danger" size="small" data-test="delete-insumo" @click="emit('delete', row)">
           Eliminar
-        </el-button>
+        </Button>
       </template>
     </Column>
 

@@ -12,6 +12,7 @@
  */
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 
@@ -107,9 +108,9 @@ function submit(): void {
       <span class="form-hint">
         {{ mode === 'edit' ? 'Solo se puede ajustar el porcentaje.' : 'La suma de participaciones debe ser exactamente 100%.' }}
       </span>
-      <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-socio">
+      <Button type="submit" :loading="saving" data-test="submit-socio">
         {{ mode === 'edit' ? 'Guardar cambios' : 'Crear socio' }}
-      </el-button>
+      </Button>
     </div>
   </form>
 </template>

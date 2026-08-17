@@ -24,7 +24,13 @@ import ComprasForm from '@/components/inventario/ComprasForm.vue'
 import ComprasTable from '@/components/inventario/ComprasTable.vue'
 import InsumoForm from '@/components/inventario/InsumoForm.vue'
 import InsumosTable from '@/components/inventario/InsumosTable.vue'
+import Button from 'primevue/button'
 import Paginator from 'primevue/paginator'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
 import {
@@ -291,7 +297,7 @@ onMounted(load)
   <section class="inventario">
     <header class="inventario-header">
       <h2>Inventario</h2>
-      <el-button :loading="loading" data-test="refresh-inventario" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-inventario" @click="load">Actualizar</Button>
     </header>
 
     <el-alert
@@ -303,8 +309,13 @@ onMounted(load)
       class="inventario-error"
     />
 
-    <el-tabs v-model="activeTab">
-      <el-tab-pane label="Insumos" name="insumos">
+    <Tabs v-model:value="activeTab">
+      <TabList>
+        <Tab value="insumos">Insumos</Tab>
+        <Tab value="compras">Compras</Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="insumos">
         <div class="insumo-toolbar">
           <el-input
             v-model="insumoQ"
@@ -325,9 +336,9 @@ onMounted(load)
           >
             <el-option v-for="c in categorias" :key="c.id" :label="c.nombre" :value="c.id" />
           </el-select>
-          <el-button v-if="canManage" type="primary" data-test="nuevo-insumo" @click="openCreateInsumo">
+          <Button v-if="canManage" data-test="nuevo-insumo" @click="openCreateInsumo">
             Nuevo insumo
-          </el-button>
+          </Button>
         </div>
 
         <InsumosTable
@@ -367,9 +378,9 @@ onMounted(load)
             @submit="submitInsumo"
           />
         </el-dialog>
-      </el-tab-pane>
+      </TabPanel>
 
-      <el-tab-pane label="Compras" name="compras">
+      <TabPanel value="compras">
         <div class="compras-filtro">
           <el-input
             v-model="compraQ"
@@ -390,9 +401,9 @@ onMounted(load)
           >
             <el-option v-for="i in insumosLookup" :key="i.id" :label="i.nombre" :value="i.id" />
           </el-select>
-          <el-button v-if="canRegister" type="primary" data-test="nueva-compra" @click="openCreateCompra">
+          <Button v-if="canRegister" data-test="nueva-compra" @click="openCreateCompra">
             Nueva compra
-          </el-button>
+          </Button>
         </div>
 
         <ComprasTable
@@ -426,8 +437,9 @@ onMounted(load)
             @submit="onCreateCompra"
           />
         </el-dialog>
-      </el-tab-pane>
-    </el-tabs>
+      </TabPanel>
+      </TabPanels>
+    </Tabs>
   </section>
 </template>
 

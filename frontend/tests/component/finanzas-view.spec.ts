@@ -111,9 +111,9 @@ async function mountView(rol: string): Promise<VueWrapper> {
   return wrapper
 }
 
-/** Click the el-tabs item with the given label (pane content mounts on visit). */
+/** Click the PrimeVue Tab with the given label (panels stay mounted via v-show). */
 async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
-  const item = wrapper.findAll('.el-tabs__item').find((i) => i.text().trim() === label)
+  const item = wrapper.findAll('.p-tab').find((i) => i.text().trim() === label)
   if (!item) throw new Error(`tab not found: "${label}"`)
   await item.trigger('click')
   await nextTick()

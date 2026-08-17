@@ -4,17 +4,18 @@
  *
  * Renders the client-side joined rows (buildDevolucionRows output): es-CO
  * formatted fecha/monto, venta_id, tipo label with a colored tag (total
- * danger — cancels the sale; parcial warning), motivo (or an em dash), the
+ * danger — cancels the sale; parcial warn), motivo (or an em dash), the
  * items count, and expandable item lines with the product name and the
  * sale-time snapshot subtotal. Missing products degrade to "Producto #{id}".
  *
  * Migrated to PrimeVue DataTable in slice 1b: the expander column opens the
- * `#expansion` nested DataTable (BEH-6 row expansion preserved). el-tag cells
- * stay until slice 2b.
+ * `#expansion` nested DataTable (BEH-6 row expansion preserved). The Tag cell
+ * was migrated in slice 2b.
  */
 import { ref } from 'vue'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import Tag from 'primevue/tag'
 import { formatDateTime, formatMoney, formatQty } from '@/utils/format'
 import { tipoLabel, tipoTagType, type DevolucionRow } from '@/utils/devoluciones'
 
@@ -55,7 +56,7 @@ const expandedRows = ref<Record<string, boolean>>({})
     <Column field="venta_id" header="Venta" style="width: 90px" align="right" />
     <Column header="Tipo" style="width: 110px">
       <template #body="{ data }">
-        <el-tag :type="tipoTagType(data.tipo)" size="small">{{ tipoLabel(data.tipo) }}</el-tag>
+        <Tag :severity="tipoTagType(data.tipo)">{{ tipoLabel(data.tipo) }}</Tag>
       </template>
     </Column>
     <Column field="motivo" header="Motivo" style="min-width: 220px" />

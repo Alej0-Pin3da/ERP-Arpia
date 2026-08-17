@@ -8,10 +8,9 @@
  * The tipo header funnel is a DataTable filter menu hosting a Select
  * (`filterDisplay="menu"`), and the filter/sort payloads are normalized by
  * the parsePrimeVueFilters/parsePrimeVueSort adapters. el-tag/el-button cells
- * still need the ElementPlus plugin until slice 2b.
+ * el-button cells migrated to PrimeVue in slice 2b.
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
 import DataTable from 'primevue/datatable'
 import Select from 'primevue/select'
 import PrimeVue from 'primevue/config'
@@ -58,7 +57,6 @@ async function mountTable(rows: MovimientoRow[], canDelete = true, canEdit = fal
     props: { rows, canDelete, canEdit },
     global: {
       plugins: [
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
     },

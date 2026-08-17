@@ -12,6 +12,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
@@ -231,9 +232,9 @@ async function submit(): Promise<void> {
 
     <div class="detalles-header">
       <span>Detalles de la venta</span>
-      <el-button size="small" type="primary" plain data-test="add-detalle" @click="addRow">
+      <Button size="small" text data-test="add-detalle" @click="addRow">
         Agregar producto
-      </el-button>
+      </Button>
     </div>
 
     <div v-for="(row, index) in detalles" :key="index" class="detalle-row" data-test="detalle-row">
@@ -279,16 +280,16 @@ async function submit(): Promise<void> {
         data-test="precio-input"
       />
 
-      <el-button size="small" type="danger" plain data-test="remove-detalle" @click="removeRow(index)">
+      <Button size="small" text severity="danger" data-test="remove-detalle" @click="removeRow(index)">
         Quitar
-      </el-button>
+      </Button>
     </div>
 
     <div class="form-footer">
       <span class="total-preview" data-test="total-preview">Total: {{ formatMoney(totalPreview) }}</span>
-      <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-venta">
+      <Button type="submit" :loading="saving" data-test="submit-venta">
         {{ mode === 'edit' ? 'Guardar cambios' : 'Registrar venta' }}
-      </el-button>
+      </Button>
     </div>
   </form>
 </template>

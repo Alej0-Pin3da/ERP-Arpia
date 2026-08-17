@@ -25,6 +25,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -236,9 +237,9 @@ function submit(): void {
             : 'El socio se asocia a un retiro o gasto puntual; es opcional.'
         }}
       </span>
-      <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-movimiento">
+      <Button type="submit" :loading="saving" data-test="submit-movimiento">
         {{ mode === 'edit' ? 'Guardar cambios' : 'Registrar movimiento' }}
-      </el-button>
+      </Button>
     </div>
   </form>
 </template>

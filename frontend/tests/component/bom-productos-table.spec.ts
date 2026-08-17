@@ -9,10 +9,9 @@
  *  - the empty state renders
  * NOTE: the backend BomProducto schema has NO desperdicio field — only
  * producto_incluido_id + cantidad (verified backend schemas/bom.py).
- * el-button cells still need the ElementPlus plugin until slice 2b.
+ * el-button cells migrated to PrimeVue in slice 2b.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
 import DataTable from 'primevue/datatable'
 import PrimeVue from 'primevue/config'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -32,7 +31,6 @@ async function mountTable(canEdit = true, rows: BomProductoRow[] = ROWS): Promis
     props: { rows, loading: false, canEdit },
     global: {
       plugins: [
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
     },

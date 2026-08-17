@@ -21,6 +21,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { usuariosApi } from '@/api/endpoints'
 import UsuarioForm from '@/components/usuarios/UsuarioForm.vue'
 import UsuariosTable from '@/components/usuarios/UsuariosTable.vue'
+import Button from 'primevue/button'
 import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
@@ -177,7 +178,7 @@ onMounted(load)
   <section class="usuarios">
     <header class="usuarios-header">
       <h2>Usuarios</h2>
-      <el-button :loading="loading" data-test="refresh-usuarios" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-usuarios" @click="load">Actualizar</Button>
     </header>
 
     <el-alert
@@ -210,9 +211,9 @@ onMounted(load)
         <el-option label="Operador" value="operador" />
         <el-option label="Consulta" value="consulta" />
       </el-select>
-      <el-button type="primary" data-test="nuevo-usuario" @click="openCreateUsuario">
+      <Button data-test="nuevo-usuario" @click="openCreateUsuario">
         Nuevo usuario
-      </el-button>
+      </Button>
     </div>
 
     <UsuariosTable

@@ -13,6 +13,7 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import Button from 'primevue/button'
 import Paginator from 'primevue/paginator'
 
 import { clientesApi, productosApi, ventasApi } from '@/api/endpoints'
@@ -266,7 +267,7 @@ onMounted(load)
   <section class="ventas">
     <header class="ventas-header">
       <h2>Ventas</h2>
-      <el-button :loading="loading" data-test="refresh-ventas" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-ventas" @click="load">Actualizar</Button>
     </header>
 
     <el-alert
@@ -318,9 +319,9 @@ onMounted(load)
               :value="producto.id"
             />
           </el-select>
-          <el-button v-if="canRegister" type="primary" data-test="nueva-venta" @click="openCreateVenta">
+          <Button v-if="canRegister" data-test="nueva-venta" @click="openCreateVenta">
             Nueva venta
-          </el-button>
+          </Button>
         </div>
         <VentasTable
           :rows="rows"

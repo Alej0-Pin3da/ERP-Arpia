@@ -15,6 +15,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import { analiticosApi, productosApi } from '@/api/endpoints'
 import FinanzasMensualesChart from '@/components/dashboard/FinanzasMensualesChart.vue'
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import { fillFinanzasMonths, type FinanzasMonthRow } from '@/utils/dashboard'
@@ -75,7 +76,7 @@ onMounted(load)
   <section class="analisis">
     <header class="analisis-header">
       <h2>Análisis</h2>
-      <el-button :loading="loading" data-test="refresh-analisis" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-analisis" @click="load">Actualizar</Button>
     </header>
 
     <el-alert

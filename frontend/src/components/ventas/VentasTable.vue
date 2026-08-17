@@ -9,13 +9,15 @@
  *
  * Migrated to PrimeVue DataTable (lazy) in slice 1a: header funnels and sort
  * re-emit the SAME typed events the view already consumes, via the
- * parsePrimeVueFilters/parsePrimeVueSort adapters. el-tag/el-button cells stay
- * until slice 2b; only the gift tooltip uses the PrimeVue v-tooltip directive.
+ * parsePrimeVueFilters/parsePrimeVueSort adapters. Tag/Button cells and the
+ * gift tooltip use PrimeVue components (slice 2b).
  */
 import { ref } from 'vue'
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Select from 'primevue/select'
+import Tag from 'primevue/tag'
 import { formatDateTime, formatMoney, formatQty } from '@/utils/format'
 import {
   parseColumnFilter,
@@ -79,7 +81,7 @@ function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
   emit('sort-change', parsePrimeVueSort(s))
 }
 
-/** el-tag type per estado: completada success, anulada danger, rest info. */
+/** PrimeVue Tag severity per estado: completada success, anulada danger, rest info. */
 function estadoTagType(estado: string): 'success' | 'danger' | 'info' {
   if (estado === 'completada') return 'success'
   if (estado === 'anulada') return 'danger'
@@ -159,8 +161,8 @@ function productSummary(row: VentaRow): string {
     >
       <template #body="{ data }">
         <div class="venta-estado-cell">
-          <el-tag :type="estadoTagType(data.estado)" size="small">{{ estadoLabel(data.estado) }}</el-tag>
-          <el-tag v-if="data.es_regalo" type="warning" size="small" data-test="tag-regalo">Regalo</el-tag>
+          <Tag :severity="estadoTagType(data.estado)">{{ estadoLabel(data.estado) }}</Tag>
+          <Tag v-if="data.es_regalo" severity="warn" data-test="tag-regalo">Regalo</Tag>
         </div>
       </template>
       <template #filter="{ filterModel, filterCallback }">
@@ -189,39 +191,38 @@ function productSummary(row: VentaRow): string {
     </Column>
     <Column v-if="canMarkRegalo" header="Acciones" style="width: 210px" align="center">
       <template #body="{ data: row }">
-        <el-button
+        <Button
           v-if="!row.es_regalo"
           v-tooltip="{ value: 'Marcar como regalo', position: 'top' }"
           size="small"
-          circle
-          plain
-          type="warning"
+          rounded
+          text
+          severity="warn"
           aria-label="Marcar como regalo"
           data-test="marcar-regalo"
           @click="emit('marcar-regalo', row.id)"
         >
           🎁
-        </el-button>
-        <el-button
+        </Button>
+        <Button
           v-if="row.estado !== 'anulada'"
           link
-          type="primary"
           size="small"
           data-test="editar-venta"
           @click="emit('editar', row)"
         >
           Editar
-        </el-button>
-        <el-button
+        </Button>
+        <Button
           v-if="!row.es_regalo && row.estado !== 'anulada'"
-          link
-          type="danger"
+          text
+          severity="danger"
           size="small"
           data-test="anular-venta"
           @click="emit('anular', row.id)"
         >
           Anular
-        </el-button>
+        </Button>
       </template>
     </Column>
 
