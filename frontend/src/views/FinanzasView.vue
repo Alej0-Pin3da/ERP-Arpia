@@ -30,6 +30,7 @@ import SociosTable from '@/components/finanzas/SociosTable.vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
@@ -363,14 +364,9 @@ onMounted(load)
       <Button :loading="loading" data-test="refresh-finanzas" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="finanzas-error"
-    />
+    <div v-if="error" class="finanzas-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
     <Tabs v-model:value="activeTab">
       <TabList>

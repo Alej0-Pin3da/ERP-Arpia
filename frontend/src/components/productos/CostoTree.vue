@@ -11,6 +11,7 @@
  * passes the mapped tree.
  */
 import type { CostoTree as CostoTreeType } from '@/utils/productos'
+import Skeleton from 'primevue/skeleton'
 import { formatMoney, formatQty } from '@/utils/format'
 
 defineProps<{
@@ -20,7 +21,11 @@ defineProps<{
 </script>
 
 <template>
-  <div v-loading="loading">
+  <div>
+    <div v-if="loading" class="costo-skeleton" data-test="costo-loading">
+      <Skeleton v-for="n in 3" :key="n" />
+    </div>
+    <template v-else>
     <template v-if="tree && tree.groups.length > 0">
       <div class="costo-total" data-test="costo-total">
         <strong>Costo total de producción:</strong>
@@ -48,7 +53,8 @@ defineProps<{
         </el-table>
       </section>
     </template>
-    <el-empty v-else-if="tree" description="El producto no tiene costos desglosables" />
+    <div v-else-if="tree" class="costo-empty">El producto no tiene costos desglosables</div>
+    </template>
   </div>
 </template>
 
@@ -88,5 +94,17 @@ defineProps<{
 .costo-group-subtotal {
   color: var(--el-text-color-secondary);
   font-size: 0.875rem;
+}
+
+.costo-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.costo-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
 }
 </style>

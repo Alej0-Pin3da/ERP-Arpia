@@ -3,8 +3,8 @@
  * Socios list table (PR8, spec MOD-3).
  *
  * Renders SociosConfiguracionRead rows with es-CO percentages plus the
- * sum-to-100 progress ("current sum vs 100"): an el-progress whose status
- * turns success at exactly 100 (warning below — the backend enforces an
+ * sum-to-100 progress ("current sum vs 100"): a PrimeVue ProgressBar whose
+ * value turns green at exactly 100 (yellow below — the backend enforces an
  * exact-100 sum on create and a never-above-100 rule on update, both 422).
  * Edit/delete actions are hidden for read-only roles (can-edit=false); when
  * shown they emit `edit`/`delete` with the row — the parent owns the PATCH,
@@ -12,13 +12,14 @@
  *
  * Migrated to PrimeVue DataTable (lazy) in slice 1b: column sort re-emits the
  * SAME typed event via the parsePrimeVueSort adapter (no header funnels here).
- * The el-progress stays until a later slice; the Button cells were migrated
- * in slice 2b.
+ * The el-progress became a ProgressBar in slice 3a; the Button cells were
+ * migrated in slice 2b.
  */
 import { computed } from 'vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import ProgressBar from 'primevue/progressbar'
 import { formatQty } from '@/utils/format'
 import { parsePrimeVueSort } from '@/utils/table-filters'
 import { sumaParticipacion } from '@/utils/finanzas'
@@ -54,10 +55,10 @@ function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
       <span class="socios-progress-label">
         Participación total: {{ formatQty(sum) }}% / 100%
       </span>
-      <el-progress
-        :percentage="Math.min(Math.round(sum), 100)"
-        :status="sum === 100 ? 'success' : 'warning'"
-        :stroke-width="10"
+      <ProgressBar
+        :value="Math.min(Math.round(sum), 100)"
+        :showValue="true"
+        :class="sum === 100 ? 'socios-progress-bar-success' : 'socios-progress-bar-warning'"
         class="socios-progress-bar"
       />
     </div>
@@ -101,6 +102,16 @@ function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
 
 .socios-progress-bar {
   width: 100%;
+}
+
+.socios-progress-bar-success {
+  /* EP status=success parity: green bar at exactly 100. */
+  --p-progressbar-value-background: var(--p-green-500);
+}
+
+.socios-progress-bar-warning {
+  /* EP status=warning parity: yellow bar below 100. */
+  --p-progressbar-value-background: var(--p-yellow-500);
 }
 
 .socio-empty {

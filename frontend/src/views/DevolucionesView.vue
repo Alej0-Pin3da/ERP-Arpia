@@ -18,6 +18,7 @@ import { devolucionesApi, productosApi } from '@/api/endpoints'
 import DevolucionesForm from '@/components/devoluciones/DevolucionesForm.vue'
 import DevolucionesTable from '@/components/devoluciones/DevolucionesTable.vue'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
@@ -138,14 +139,9 @@ onMounted(load)
       <Button :loading="loading" data-test="refresh-devoluciones" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="devoluciones-error"
-    />
+    <div v-if="error" class="devoluciones-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
     <div class="filters" data-test="filters">
       <el-input-number

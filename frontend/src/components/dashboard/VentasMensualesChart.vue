@@ -70,7 +70,7 @@ const chartOption = computed(() => ({
   <div v-if="loading" class="chart-skeleton">
     <Skeleton v-for="n in 5" :key="n" />
   </div>
-  <el-empty v-else-if="rows.length === 0" description="Sin ventas en el período" :image-size="80" />
+  <div v-else-if="rows.length === 0" class="chart-empty">Sin ventas en el período</div>
   <v-chart v-else :option="chartOption" autoresize class="ventas-chart" />
 </template>
 
@@ -86,5 +86,14 @@ const chartOption = computed(() => ({
   gap: 0.5rem;
   height: 320px;
   justify-content: center;
+}
+
+.chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 320px;
+  color: var(--el-text-color-secondary);
+  font-size: 0.9rem;
 }
 </style>

@@ -225,6 +225,8 @@ describe('OmisionesView (MIG-3/MIG-4 + T10)', () => {
 
     expect(wrapper.text()).toContain('No se pudieron cargar las omisiones')
     expect(apiMocks.listOmisiones).toHaveBeenCalledTimes(1)
+    // el-alert replaced by PrimeVue Message (slice 3a).
+    expect(wrapper.find('.p-message').exists()).toBe(true)
   })
 
   it('renders the empty state when there are no omisiones (FE-1)', async () => {

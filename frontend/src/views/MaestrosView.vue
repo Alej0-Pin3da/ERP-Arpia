@@ -31,6 +31,7 @@ import {
 import MaestroForm from '@/components/maestros/MaestroForm.vue'
 import MaestrosTable from '@/components/maestros/MaestrosTable.vue'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
@@ -285,14 +286,9 @@ onMounted(load)
       <Button :loading="loading" data-test="refresh-maestros" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="maestros-error"
-    />
+    <div v-if="error" class="maestros-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
     <Tabs v-model:value="activeTab">
       <TabList>

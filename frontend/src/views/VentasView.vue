@@ -14,6 +14,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 
 import { clientesApi, productosApi, ventasApi } from '@/api/endpoints'
@@ -270,14 +271,9 @@ onMounted(load)
       <Button :loading="loading" data-test="refresh-ventas" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="ventas-error"
-    />
+    <div v-if="error" class="ventas-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
     <el-tabs v-model="activeTab">
       <el-tab-pane label="Listado" name="listado">

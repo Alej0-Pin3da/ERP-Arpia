@@ -21,6 +21,7 @@ import ProductosTable from '@/components/productos/ProductosTable.vue'
 import VarianteForm from '@/components/productos/VarianteForm.vue'
 import VariantesTable from '@/components/productos/VariantesTable.vue'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
@@ -86,14 +87,9 @@ onMounted(load)
       <Button :loading="loading" data-test="refresh-productos" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="productos-error"
-    />
+    <div v-if="error" class="productos-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
     <Tabs v-model:value="activeTab">
       <TabList>
