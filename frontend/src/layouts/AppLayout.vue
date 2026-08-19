@@ -14,6 +14,8 @@ import { useRouter } from 'vue-router'
 import SidebarMenu from '@/components/layout/SidebarMenu.vue'
 import { useAuthStore } from '@/stores/auth'
 import { roleLabel } from '@/utils/menu'
+import Button from 'primevue/button'
+import Tag from 'primevue/tag'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -41,11 +43,16 @@ async function onLogout(): Promise<void> {
       <el-header class="app-layout__header">
         <div class="app-layout__user">
           <span class="app-layout__name">{{ auth.userName }}</span>
-          <el-tag size="small" class="app-layout__role">{{ rolLabel }}</el-tag>
+          <Tag class="app-layout__role" severity="secondary">{{ rolLabel }}</Tag>
         </div>
-        <el-button class="app-layout__logout" type="danger" plain size="small" @click="onLogout">
-          Cerrar sesión
-        </el-button>
+        <Button
+          class="app-layout__logout"
+          label="Cerrar sesión"
+          severity="danger"
+          outlined
+          size="small"
+          @click="onLogout"
+        />
       </el-header>
 
       <el-main class="app-layout__main">
