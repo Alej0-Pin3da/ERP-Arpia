@@ -4,7 +4,9 @@
  *
  * Dark scheme only: the app is an always-dark editorial UI (main.css), so the
  * light scheme is left at the Aura base and the theme is forced dark via
- * `darkModeSelector: 'html'` in main.ts.
+ * `darkModeSelector: '.dark-mode'` on <html> in index.html (a class selector
+ * is required — see main.ts for why a bare 'html' type selector loses the
+ * cascade to Aura's ':root,:host' light variables).
  *
  * D1 resolution: `@primeuix/themes/aura` (v2) is the 14px-calibrated preset —
  * its base formField tokens are byte-identical to v3's aura-compat — so
