@@ -79,7 +79,7 @@ function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
 
 <style scoped>
 .producto-empty {
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   padding: 2rem 0;
   text-align: center;
 }

@@ -70,13 +70,13 @@ const chartOption = computed(() => ({
       name: 'Ingresos',
       type: 'bar' as const,
       data: props.rows.map((row) => row.ingresos),
-      itemStyle: { color: 'var(--el-color-success, #67c23a)', borderRadius: [4, 4, 0, 0] },
+      itemStyle: { color: 'var(--arpia-success, #67c23a)', borderRadius: [4, 4, 0, 0] },
     },
     {
       name: 'Gastos',
       type: 'bar' as const,
       data: props.rows.map((row) => row.gastos),
-      itemStyle: { color: 'var(--el-color-danger, #f56c6c)', borderRadius: [4, 4, 0, 0] },
+      itemStyle: { color: 'var(--arpia-danger, #f56c6c)', borderRadius: [4, 4, 0, 0] },
     },
   ],
 }))
@@ -109,7 +109,7 @@ const chartOption = computed(() => ({
   align-items: center;
   justify-content: center;
   height: 320px;
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   font-size: 0.9rem;
 }
 </style>

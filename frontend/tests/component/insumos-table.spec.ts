@@ -10,8 +10,7 @@
  * state. The categoria header funnel is a DataTable filter menu hosting a
  * Select (`filterDisplay="menu"`); it only renders when categorias exist, and
  * the filter/sort payloads are normalized by the parsePrimeVueFilters/
- * parsePrimeVueSort adapters. el-tag/el-button cells still need the
- * el-button cells migrated to PrimeVue in slice 2b.
+ * parsePrimeVueSort adapters. Element Plus was fully dropped in slice 5 (MIG-2).
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
 import DataTable from 'primevue/datatable'

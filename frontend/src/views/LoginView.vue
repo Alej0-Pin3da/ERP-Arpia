@@ -250,7 +250,7 @@ async function onSubmit(): Promise<void> {
 .login-field__error {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--el-color-danger);
+  color: var(--arpia-danger);
 }
 
 .login-submit {

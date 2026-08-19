@@ -13,7 +13,8 @@
  * EP-era 14px density is preserved under the untouched 16px root.
  *
  * BEH-4 single source: every token below references the `--arpia-*` brand
- * vars declared in main.css, which also drive the `--el-*` alias layer. The
+ * vars declared in main.css (the `--el-*` alias layer was removed with
+ * Element Plus in slice 5, MIG-2). The
  * gold editorial accents (eyebrows, rules, gold text) are page typography in
  * main.css, not component tokens — nothing in the component layer consumes
  * them, so they intentionally stay out of this preset.

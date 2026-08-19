@@ -126,7 +126,7 @@ function submit(): void {
 .form-label {
   margin-bottom: 0.25rem;
   font-size: 0.875rem;
-  color: var(--el-text-color-primary);
+  color: var(--arpia-text-primary);
 }
 
 .submit-row {

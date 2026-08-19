@@ -235,7 +235,7 @@ function productSummary(row: VentaRow): string {
 <style scoped>
 .venta-detail-table {
   padding: 0 1rem 0.5rem 3rem;
-  background: var(--el-fill-color-lighter);
+  background: var(--arpia-card);
 }
 
 .venta-estado-cell {
@@ -245,12 +245,12 @@ function productSummary(row: VentaRow): string {
 }
 
 .total-regalo {
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   font-style: italic;
 }
 
 .venta-empty {
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   padding: 2rem 0;
   text-align: center;
 }

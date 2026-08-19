@@ -60,7 +60,7 @@ const chartOption = computed(() => ({
       name: 'Ventas',
       type: 'bar' as const,
       data: props.rows.map((row) => row.total),
-      itemStyle: { color: 'var(--el-color-primary, #8c6ca1)', borderRadius: [4, 4, 0, 0] },
+      itemStyle: { color: 'var(--arpia-primary, #8c6ca1)', borderRadius: [4, 4, 0, 0] },
     },
   ],
 }))
@@ -93,7 +93,7 @@ const chartOption = computed(() => ({
   align-items: center;
   justify-content: center;
   height: 320px;
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   font-size: 0.9rem;
 }
 </style>

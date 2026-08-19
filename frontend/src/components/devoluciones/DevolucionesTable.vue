@@ -74,11 +74,11 @@ const expandedRows = ref<Record<string, boolean>>({})
 <style scoped>
 .devolucion-detail-table {
   padding: 0 1rem 0.5rem 3rem;
-  background: var(--el-fill-color-lighter);
+  background: var(--arpia-card);
 }
 
 .devolucion-empty {
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   padding: 2rem 0;
   text-align: center;
 }

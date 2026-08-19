@@ -1,19 +1,18 @@
 /*
  * Global styles — ARPIA dark editorial theme.
  *
- * This file is imported AFTER element-plus/dist/index.css (see src/main.ts),
- * so every override below takes precedence over the Element Plus defaults.
- * The look mirrors the editorial style of arpia.com.co: dark surfaces,
- * lavender primary paint with a single dominant gradient, gold editorial
- * accents (eyebrows/go-lines) and serif body copy. All variables are plain
- * CSS — no SCSS in this project.
+ * This file holds the global overrides on top of the PrimeVue Aura theme
+ * (registered through arpia-preset.ts). The look mirrors the editorial style
+ * of arpia.com.co: dark surfaces, lavender primary paint with a single
+ * dominant gradient, gold editorial accents (eyebrows/go-lines) and serif
+ * body copy. All variables are plain CSS — no SCSS in this project.
  *
- * S4-T6 (BEH-4): the --arpia-* block below is the SINGLE SOURCE OF TRUTH.
- * The --el-* block is now a pure alias layer (Element Plus stays registered
- * through slice 4, MIG-2, so its variables must keep resolving), and the
- * PrimeVue --p-* tokens are driven by the same --arpia-* vars through
- * arpia-preset.ts. The gold editorial accents (eyebrows, rules, gold text)
- * are page typography, not component tokens — they stay in this file.
+ * S4-T6 (BEH-4) + S5-T1 (MIG-2): the --arpia-* block below is the SINGLE
+ * SOURCE OF TRUTH. The PrimeVue --p-* tokens are driven by the same
+ * --arpia-* vars through arpia-preset.ts; Element Plus was removed in slice
+ * 5, so no --el-* alias layer remains. The gold editorial accents (eyebrows,
+ * rules, gold text) are page typography, not component tokens — they stay
+ * in this file.
  */
 *,
 *::before,
@@ -110,111 +109,6 @@
   --arpia-overlay-editorial: linear-gradient(to top, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.05) 100%);
   --arpia-rule-gradient: linear-gradient(90deg, transparent, #c8a96b, transparent);
   --arpia-gold-text: linear-gradient(90deg, #bf953f, #fcf6ba, #bf953f);
-
-  /* ---------------------------------------------------------------------
-   * Element Plus — brand-aware aliases. EP stays registered through slice 4
-   * (hybrid dual-registration, MIG-2) and views still render el-card,
-   * el-dialog, el-select, el-input*, el-date-picker, el-tabs and el-table
-   * (CostoTree), so every --el-* variable is re-declared as an alias of the
-   * --arpia-* single source above. The light-N tints are translucent
-   * washes so they sit naturally on dark surfaces instead of glowing
-   * near-white. Removed entirely in slice 5.
-   * ------------------------------------------------------------------- */
-  --el-color-primary: var(--arpia-primary);
-  --el-color-primary-rgb: var(--arpia-primary-rgb);
-  --el-color-primary-light-3: color-mix(in srgb, var(--arpia-primary-deep) 35%, transparent);
-  --el-color-primary-light-5: color-mix(in srgb, var(--arpia-primary-deep) 25%, transparent);
-  --el-color-primary-light-7: color-mix(in srgb, var(--arpia-primary-deep) 18%, transparent);
-  --el-color-primary-light-8: color-mix(in srgb, var(--arpia-primary-deep) 15%, transparent);
-  --el-color-primary-light-9: color-mix(in srgb, var(--arpia-primary-deep) 13%, transparent);
-  --el-color-primary-dark-2: var(--arpia-primary);
-
-  --el-color-success: var(--arpia-success);
-  --el-color-success-rgb: var(--arpia-success-rgb);
-  --el-color-success-light-3: color-mix(in srgb, var(--arpia-success) 32%, transparent);
-  --el-color-success-light-5: color-mix(in srgb, var(--arpia-success) 24%, transparent);
-  --el-color-success-light-7: color-mix(in srgb, var(--arpia-success) 16%, transparent);
-  --el-color-success-light-8: color-mix(in srgb, var(--arpia-success) 13%, transparent);
-  --el-color-success-light-9: color-mix(in srgb, var(--arpia-success) 11%, transparent);
-  --el-color-success-dark-2: var(--arpia-success-dark);
-
-  --el-color-warning: var(--arpia-warning);
-  --el-color-warning-rgb: var(--arpia-warning-rgb);
-  --el-color-warning-light-3: color-mix(in srgb, var(--arpia-warning) 32%, transparent);
-  --el-color-warning-light-5: color-mix(in srgb, var(--arpia-warning) 24%, transparent);
-  --el-color-warning-light-7: color-mix(in srgb, var(--arpia-warning) 16%, transparent);
-  --el-color-warning-light-8: color-mix(in srgb, var(--arpia-warning) 13%, transparent);
-  --el-color-warning-light-9: color-mix(in srgb, var(--arpia-warning) 11%, transparent);
-  --el-color-warning-dark-2: var(--arpia-warning-dark);
-
-  --el-color-danger: var(--arpia-danger);
-  --el-color-danger-rgb: var(--arpia-danger-rgb);
-  --el-color-danger-light-3: color-mix(in srgb, var(--arpia-danger) 32%, transparent);
-  --el-color-danger-light-5: color-mix(in srgb, var(--arpia-danger) 24%, transparent);
-  --el-color-danger-light-7: color-mix(in srgb, var(--arpia-danger) 16%, transparent);
-  --el-color-danger-light-8: color-mix(in srgb, var(--arpia-danger) 13%, transparent);
-  --el-color-danger-light-9: color-mix(in srgb, var(--arpia-danger) 11%, transparent);
-  --el-color-danger-dark-2: var(--arpia-danger-dark);
-
-  --el-color-error: var(--arpia-error);
-  --el-color-error-rgb: var(--arpia-error-rgb);
-  --el-color-error-light-3: color-mix(in srgb, var(--arpia-error) 32%, transparent);
-  --el-color-error-light-5: color-mix(in srgb, var(--arpia-error) 24%, transparent);
-  --el-color-error-light-7: color-mix(in srgb, var(--arpia-error) 16%, transparent);
-  --el-color-error-light-8: color-mix(in srgb, var(--arpia-error) 13%, transparent);
-  --el-color-error-light-9: color-mix(in srgb, var(--arpia-error) 11%, transparent);
-  --el-color-error-dark-2: var(--arpia-error-dark);
-
-  --el-color-info: var(--arpia-info);
-  --el-color-info-rgb: var(--arpia-info-rgb);
-  --el-color-info-light-3: color-mix(in srgb, var(--arpia-info) 30%, transparent);
-  --el-color-info-light-5: color-mix(in srgb, var(--arpia-info) 22%, transparent);
-  --el-color-info-light-7: color-mix(in srgb, var(--arpia-info) 14%, transparent);
-  --el-color-info-light-8: color-mix(in srgb, var(--arpia-info) 11%, transparent);
-  --el-color-info-light-9: color-mix(in srgb, var(--arpia-info) 10%, transparent);
-  --el-color-info-dark-2: var(--arpia-info-dark);
-
-  /* Surfacing — coherent dark surfaces for tables/forms/cards. */
-  --el-bg-color: var(--arpia-dark-elevated);
-  --el-bg-color-page: var(--arpia-dark-bg);
-  --el-bg-color-overlay: var(--arpia-card);
-  --el-fill-color-blank: var(--arpia-dark-elevated);
-  --el-fill-color: var(--arpia-card);
-  --el-fill-color-light: var(--arpia-fill-light);
-  --el-fill-color-lighter: var(--arpia-card);
-  --el-fill-color-extra-light: var(--arpia-fill-extra-light);
-  --el-fill-color-dark: var(--arpia-fill-dark);
-  --el-fill-color-darker: var(--arpia-fill-darker);
-
-  /* Text on dark. */
-  --el-text-color-primary: var(--arpia-text-primary);
-  --el-text-color-regular: var(--arpia-text-regular);
-  --el-text-color-secondary: var(--arpia-text-muted);
-  --el-text-color-placeholder: var(--arpia-text-faint);
-  --el-text-color-disabled: var(--arpia-text-disabled);
-
-  /* Borders on dark. */
-  --el-border-color: var(--arpia-border-strong);
-  --el-border-color-light: var(--arpia-border);
-  --el-border-color-lighter: var(--arpia-border-subtle);
-  --el-border-color-extra-light: var(--arpia-border-faint);
-  --el-border-color-dark: var(--arpia-border-dark);
-  --el-border-color-darker: var(--arpia-border-darker);
-  --el-border-color-hover: var(--arpia-border-hover);
-
-  /* Radius + shadows scaled for dark surfaces. */
-  --el-border-radius-base: var(--arpia-radius);
-  --el-box-shadow: var(--arpia-shadow-overlay);
-  --el-box-shadow-light: var(--arpia-shadow-pop);
-  --el-box-shadow-lighter: var(--arpia-shadow-glow);
-  --el-box-shadow-dark: var(--arpia-shadow-deep);
-
-  --el-overlay-color: var(--arpia-overlay);
-  --el-overlay-color-light: var(--arpia-overlay-light);
-  --el-overlay-color-lighter: var(--arpia-overlay-lighter);
-
-  /* Fonts. */
-  --el-font-family: var(--arpia-font-body);
 }
 
 html {
@@ -307,7 +201,7 @@ h6 {
 
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.16);
-  border-radius: var(--el-border-radius-base);
+  border-radius: var(--arpia-radius);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -324,53 +218,10 @@ h6 {
 }
 
 /* ---------------------------------------------------------------------
-   Element Plus component surface tweaks (dark-ready).
-   Kept ONLY for the el-* components still registered through slice 4
-   (el-card / el-table / el-dialog / el-select / el-date-picker); the
-   el-menu, el-button, el-tag and el-empty overrides were dropped because
-   those components are no longer rendered after slices 2-3.
- * ------------------------------------------------------------------- */
-.el-card {
-  --el-card-border-radius: var(--arpia-radius-lg);
-  --el-card-border-color: var(--el-border-color-light);
-  --el-card-bg-color: var(--el-fill-color-blank);
-  border-radius: var(--arpia-radius-lg);
-  box-shadow: var(--arpia-shadow-card);
-}
-
-.el-table {
-  --el-table-header-bg-color: var(--arpia-card);
-  --el-table-header-text-color: var(--arpia-text-muted);
-  --el-table-bg-color: transparent;
-  --el-table-tr-bg-color: transparent;
-  --el-table-row-hover-bg-color: color-mix(in srgb, var(--arpia-primary-deep) 12%, transparent);
-}
-
-.el-table__header th.el-table__cell {
-  font-family: var(--arpia-font-heading);
-  font-weight: 600;
-}
-
-.el-popper.is-light,
-.el-select-dropdown,
-.el-dropdown-menu,
-.el-picker-panel,
-.el-pagination,
-.el-dialog,
-.el-message-box {
-  --el-bg-color-overlay: var(--arpia-card);
-}
-
-.el-picker-panel.el-popper {
-  background: var(--el-bg-color-overlay);
-  border-color: var(--el-border-color-light);
-}
-
-/* ---------------------------------------------------------------------
    PrimeVue — editorial typography compat (S4-T6). The --p-* surfaces and
    colors are driven by arpia-preset.ts; these rules carry the typographic
    signatures (font, weight, tracking, uppercase) that Aura has no tokens
-   for — mirrors of the EP overrides above.
+   for.
  * ------------------------------------------------------------------- */
 .p-button {
   font-family: var(--arpia-font-button);

@@ -3,8 +3,8 @@
  *
  * Authored plain object — PrimeVue ships no es locale, and the key surface
  * (paginator/datepicker/filter/aria) differs from Element Plus's `el.*`
- * shape. Values mirror the Spanish labels users see today with
- * `app.use(ElementPlus, { locale: es })`:
+ * shape. Values mirror the Spanish labels users saw with Element Plus
+ * (`app.use(ElementPlus, { locale: es })`, removed in slice 5 — MIG-2):
  *   - EP pagination `Ir a` / `Total {total}` -> paginator aria + Paginator
  *     `currentPageReportTemplate: 'Total {totalRecords}'` (set per usage)
  *   - EP datepicker months/weeks -> monthNames/dayNames
