@@ -46,9 +46,9 @@ const TREE: CostoTreeType = {
   ],
 }
 
-async function mountTree(tree: CostoTreeType | null = TREE): Promise<VueWrapper> {
+async function mountTree(tree: CostoTreeType | null = TREE, loading = false): Promise<VueWrapper> {
   const wrapper = mount(CostoTree, {
-    props: { tree, loading: false },
+    props: { tree, loading },
     global: { plugins: [ElementPlus] },
   })
   await flushPromises()
@@ -95,5 +95,12 @@ describe('CostoTree (MOD-5)', () => {
   it('renders the empty state when the tree has no groups', async () => {
     const wrapper = await mountTree({ total: '0.00', groups: [] })
     expect(wrapper.text()).toContain('El producto no tiene costos desglosables')
+  })
+
+  it('shows skeleton placeholders while loading instead of the tree', async () => {
+    const wrapper = await mountTree(TREE, true)
+
+    expect(wrapper.find('.p-skeleton').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Costo total de producción')
   })
 })

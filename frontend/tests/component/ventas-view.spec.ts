@@ -290,6 +290,8 @@ describe('VentasView (MOD-1 + T7)', () => {
     const wrapper = await mountView('operador')
 
     expect(wrapper.text()).toContain('No se pudo cargar la lista de ventas')
+    // el-alert replaced by PrimeVue Message (slice 3a).
+    expect(wrapper.find('.p-message').exists()).toBe(true)
   })
 
   it('opens the dialog, posts the form payload, shows the success message, closes and refreshes the list', async () => {

@@ -25,6 +25,7 @@ import ComprasTable from '@/components/inventario/ComprasTable.vue'
 import InsumoForm from '@/components/inventario/InsumoForm.vue'
 import InsumosTable from '@/components/inventario/InsumosTable.vue'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
@@ -300,14 +301,9 @@ onMounted(load)
       <Button :loading="loading" data-test="refresh-inventario" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="inventario-error"
-    />
+    <div v-if="error" class="inventario-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
     <Tabs v-model:value="activeTab">
       <TabList>

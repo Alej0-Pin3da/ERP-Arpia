@@ -12,7 +12,7 @@
  *    self"), and a forced self-demote surfaces the server 400 "Cannot
  *    change your own role away from admin"
  *  - delete other users after a confirm (204)
- * el-dialog/el-alert/el-input/el-select stay until S2/S3.
+ * el-dialog/el-input/el-select stay until S2/S3 (el-alert migrated in 3a).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'

@@ -1,16 +1,16 @@
 /**
  * SociosTable component tests (PR8, spec MOD-3).
  *
- * Mounts the REAL SociosTable with Element Plus + PrimeVue (slice 1b):
+ * Mounts the REAL SociosTable with PrimeVue (slice 1b+):
  * renders partner rows with es-CO percentages, shows the sum-to-100 progress
- * (current sum vs 100, with a success state at exactly 100), hides
+ * (current sum vs 100, with a green ProgressBar at exactly 100), hides
  * edit/delete actions for read-only roles (can-edit=false), emits
  * `edit`/`delete` with the row, and shows the empty state. Column sort is a
- * DataTable lazy `@sort` normalized by parsePrimeVueSort. Buttons migrated to
- * PrimeVue in slice 2b; el-progress stays until a later slice (plugin kept).
+ * DataTable lazy `@sort` normalized by parsePrimeVueSort. The tree is fully
+ * PrimeVue since slice 3a (ProgressBar replaced the last el-progress, so the
+ * ElementPlus plugin was dropped).
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
 import DataTable from 'primevue/datatable'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -38,7 +38,6 @@ async function mountTable(rows: SocioConfiguracionRead[], canEdit = true): Promi
     props: { rows, canEdit },
     global: {
       plugins: [
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
     },
@@ -60,6 +59,9 @@ describe('SociosTable (MOD-3)', () => {
     // Sum-to-100 progress: 100% shown and marked complete.
     expect(text).toContain('100%')
     expect(wrapper.find('[data-test="socios-progress"]').exists()).toBe(true)
+    // Migrated to PrimeVue ProgressBar (slice 3a): bar present with the value.
+    expect(wrapper.find('.p-progressbar').exists()).toBe(true)
+    expect(wrapper.find('[role="progressbar"]').attributes('aria-valuenow')).toBe('100')
   })
 
   it('shows a warning-style progress when the sum is below 100', async () => {
@@ -67,6 +69,8 @@ describe('SociosTable (MOD-3)', () => {
 
     expect(wrapper.text()).toContain('90%')
     expect(wrapper.text()).toContain('100%') // target rendered too
+    expect(wrapper.find('.p-progressbar').exists()).toBe(true)
+    expect(wrapper.find('[role="progressbar"]').attributes('aria-valuenow')).toBe('90')
   })
 
   it('hides the progress section when there are no socios', async () => {
