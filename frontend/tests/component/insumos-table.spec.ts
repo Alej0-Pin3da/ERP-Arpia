@@ -1,18 +1,27 @@
 /**
  * InsumosTable component tests (PR9, spec MOD-4).
  *
- * Mounts the REAL InsumosTable with Element Plus: renders the insumo master
- * rows (nombre, server-joined nombre_categoria with '—' fallback, unidad,
- * es-CO stock and cost), highlights rows below their minimum with a severity
- * tag (Crítico/Bajo — reusing the dashboard stockSeverity), hides the
- * Editar/Eliminar actions for non-admin roles (can-edit=false), emits
- * `edit`/`delete` with the row, and shows the empty state.
+ * Mounts the REAL InsumosTable with Element Plus + PrimeVue (slice 1b):
+ * renders the insumo master rows (nombre, server-joined nombre_categoria with
+ * '—' fallback, unidad, es-CO stock and cost), highlights rows below their
+ * minimum with a severity tag (Crítico/Bajo — reusing the dashboard
+ * stockSeverity), hides the Editar/Eliminar actions for non-admin roles
+ * (can-edit=false), emits `edit`/`delete` with the row, and shows the empty
+ * state. The categoria header funnel is a DataTable filter menu hosting a
+ * Select (`filterDisplay="menu"`); it only renders when categorias exist, and
+ * the filter/sort payloads are normalized by the parsePrimeVueFilters/
+ * parsePrimeVueSort adapters. el-tag/el-button cells still need the
+ * el-button cells migrated to PrimeVue in slice 2b.
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
+import DataTable from 'primevue/datatable'
+import Select from 'primevue/select'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import InsumosTable from '@/components/inventario/InsumosTable.vue'
 import type { components } from '@/types/api.d'
 
@@ -54,10 +63,20 @@ const INSUMOS: InsumoRead[] = [
 async function mountTable(rows: InsumoRead[], canEdit = true): Promise<VueWrapper> {
   const wrapper = mount(InsumosTable, {
     props: { rows, canEdit },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
+}
+
+/** Let the funnel overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await nextTick()
 }
 
 const CATEGORIAS = [
@@ -126,18 +145,30 @@ describe('InsumosTable (MOD-4)', () => {
     expect(wrapper.text()).toContain('Sin insumos registrados')
   })
 
-  it('builds the categoria header funnel from the categorias prop', async () => {
+  it('declares the categoria header funnel from the categorias prop with labeled options', async () => {
     const wrapper = mount(InsumosTable, {
       props: { rows: INSUMOS, categorias: CATEGORIAS },
-      global: { plugins: [ElementPlus] },
+      global: {
+        plugins: [
+          [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+        ],
+      },
     })
     await nextTick()
 
-    const categoriaColumn = wrapper
-      .findAllComponents({ name: 'ElTableColumn' })
-      .find((c) => c.props('columnKey') === 'categoria')
+    // Config-level: one 'equals' constraint per column and the funnel renders.
+    expect(wrapper.findComponent(DataTable).props('filters')).toEqual({
+      categoria: { value: null, matchMode: 'equals' },
+    })
+    expect(wrapper.findAll('.p-datatable-column-filter-button')).toHaveLength(1)
 
-    expect(categoriaColumn!.props('filters')).toEqual([
+    // Behavioral: opening the funnel mounts the Select with the categoria options.
+    await wrapper.find('.p-datatable-column-filter-button').trigger('click')
+    await flushOverlay()
+
+    const categoriaSelect = wrapper.findComponent(Select)
+    expect(categoriaSelect.exists()).toBe(true)
+    expect(categoriaSelect.props('options')).toEqual([
       { text: 'Granos', value: 1 },
       { text: 'Abarrotes', value: 2 },
     ])
@@ -146,38 +177,36 @@ describe('InsumosTable (MOD-4)', () => {
   it('renders no funnel when no categorias are passed (empty filters)', async () => {
     const wrapper = await mountTable(INSUMOS)
 
-    const categoriaColumn = wrapper
-      .findAllComponents({ name: 'ElTableColumn' })
-      .find((c) => c.props('columnKey') === 'categoria')
-
-    expect(categoriaColumn!.props('filters')).toEqual([])
+    expect(wrapper.findAll('.p-datatable-column-filter-button')).toHaveLength(0)
   })
 
-  it('normalizes an el-table filter-change on categoria into a typed emit', async () => {
+  it('normalizes a PrimeVue filter payload on categoria into a typed emit', async () => {
     const wrapper = await mountTable(INSUMOS)
 
-    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { categoria: [2] })
+    wrapper.findComponent(DataTable).vm.$emit('filter', {
+      filters: { categoria: { value: 2, matchMode: 'equals' } },
+    })
     await nextTick()
 
     expect(wrapper.emitted('filter-change')).toBeDefined()
     expect(wrapper.emitted('filter-change')![0][0]).toEqual({ categoria_id: 2 })
   })
 
-  it('emits null when the categoria column filter is cleared', async () => {
+  it('emits null when the categoria column filter is cleared (null constraint)', async () => {
     const wrapper = await mountTable(INSUMOS)
 
-    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { categoria: [] })
+    wrapper.findComponent(DataTable).vm.$emit('filter', {
+      filters: { categoria: { value: null, matchMode: 'equals' } },
+    })
     await nextTick()
 
     expect(wrapper.emitted('filter-change')![0][0]).toEqual({ categoria_id: null })
   })
 
-  it('maps an el-table sort-change into a typed {prop, order} emit', async () => {
+  it('maps a PrimeVue sort payload into a typed {prop, order} emit', async () => {
     const wrapper = await mountTable(INSUMOS)
 
-    wrapper
-      .findComponent({ name: 'ElTable' })
-      .vm.$emit('sort-change', { column: { key: 'stock_actual' }, order: 'descending' })
+    wrapper.findComponent(DataTable).vm.$emit('sort', { sortField: 'stock_actual', sortOrder: -1 })
     await nextTick()
 
     expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'stock_actual', order: 'desc' })

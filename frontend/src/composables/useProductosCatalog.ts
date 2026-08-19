@@ -5,12 +5,13 @@
  * needs. Keeps the view template thin: it only binds, it does not logic.
  */
 import { computed, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { insumosApi, productosApi, tiposProductoApi } from '@/api/endpoints'
 import { serverDetail } from '@/utils/api'
+import { confirmAction } from '@/utils/confirm'
 import { buildListParams } from '@/utils/pagination'
 import { buildProductoRows } from '@/utils/productos'
+import { showToast } from '@/utils/toast'
 import type {
   ProductoPayloadInput,
   ProductoRow,
@@ -128,11 +129,11 @@ export function useProductosCatalog() {
     savingProducto.value = true
     try {
       await productosApi.create(payload)
-      ElMessage.success('Producto creado correctamente')
+      showToast('success', 'Producto creado correctamente')
       productoDialogVisible.value = false
       await load()
     } catch (err) {
-      ElMessage.error(serverDetail(err) ?? 'No se pudo crear el producto.')
+      showToast('error', serverDetail(err) ?? 'No se pudo crear el producto.')
     } finally {
       savingProducto.value = false
     }
@@ -143,32 +144,30 @@ export function useProductosCatalog() {
     savingProducto.value = true
     try {
       await productosApi.update({ producto_id: editingProducto.value.id }, payload)
-      ElMessage.success('Producto actualizado correctamente')
+      showToast('success', 'Producto actualizado correctamente')
       productoDialogVisible.value = false
       await load()
     } catch (err) {
-      ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el producto.')
+      showToast('error', serverDetail(err) ?? 'No se pudo actualizar el producto.')
     } finally {
       savingProducto.value = false
     }
   }
 
   async function onDeleteProducto(row: ProductoRow): Promise<void> {
-    try {
-      await ElMessageBox.confirm(
-        `¿Eliminar el producto "${row.nombre}"?`,
-        'Confirmar eliminación',
-        { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-      )
-    } catch {
-      return
-    }
+    const choice = await confirmAction({
+      message: `¿Eliminar el producto "${row.nombre}"?`,
+      header: 'Confirmar eliminación',
+      acceptLabel: 'Eliminar',
+      rejectLabel: 'Cancelar',
+    })
+    if (choice !== 'accept') return
     try {
       await productosApi.delete({ producto_id: row.id })
-      ElMessage.success('Producto eliminado correctamente')
+      showToast('success', 'Producto eliminado correctamente')
       await load()
     } catch (err) {
-      ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar el producto.')
+      showToast('error', serverDetail(err) ?? 'No se pudo eliminar el producto.')
     }
   }
 
@@ -179,7 +178,7 @@ export function useProductosCatalog() {
     try {
       variantes.value = await productosApi.listVariantes({ producto_id: productoId })
     } catch {
-      ElMessage.error('No se pudieron cargar las variantes del producto.')
+      showToast('error', 'No se pudieron cargar las variantes del producto.')
     } finally {
       variantesLoading.value = false
     }
@@ -214,16 +213,16 @@ export function useProductosCatalog() {
           { producto_id: selectedProducto.value.id, variante_id: editingVariante.value.id },
           payload,
         )
-        ElMessage.success('Variante actualizada correctamente')
+        showToast('success', 'Variante actualizada correctamente')
         editingVariante.value = null
       } else {
         await productosApi.createVariante({ producto_id: selectedProducto.value.id }, payload)
-        ElMessage.success('Variante creada correctamente')
+        showToast('success', 'Variante creada correctamente')
       }
       varianteDialogVisible.value = false
       await loadVariantes(selectedProducto.value.id)
     } catch (err) {
-      ElMessage.error(serverDetail(err) ?? 'No se pudo guardar la variante.')
+      showToast('error', serverDetail(err) ?? 'No se pudo guardar la variante.')
     } finally {
       savingVariante.value = false
     }
@@ -231,24 +230,22 @@ export function useProductosCatalog() {
 
   async function onDeleteVariante(variante: VarianteProductoRead): Promise<void> {
     if (selectedProducto.value === null) return
-    try {
-      await ElMessageBox.confirm(
-        `¿Eliminar la variante "${variante.nombre_variante}"?`,
-        'Confirmar eliminación',
-        { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-      )
-    } catch {
-      return
-    }
+    const choice = await confirmAction({
+      message: `¿Eliminar la variante "${variante.nombre_variante}"?`,
+      header: 'Confirmar eliminación',
+      acceptLabel: 'Eliminar',
+      rejectLabel: 'Cancelar',
+    })
+    if (choice !== 'accept') return
     try {
       await productosApi.deleteVariante({
         producto_id: selectedProducto.value.id,
         variante_id: variante.id,
       })
-      ElMessage.success('Variante eliminada correctamente')
+      showToast('success', 'Variante eliminada correctamente')
       await loadVariantes(selectedProducto.value.id)
     } catch (err) {
-      ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar la variante.')
+      showToast('error', serverDetail(err) ?? 'No se pudo eliminar la variante.')
     }
   }
 

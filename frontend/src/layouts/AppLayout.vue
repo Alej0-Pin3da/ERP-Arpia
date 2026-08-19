@@ -7,6 +7,10 @@
  * logout button, and a main area rendering the active route. Logout goes
  * through the auth store (POST /auth/logout + local session clear) and
  * returns to /login.
+ *
+ * D3 (S3-T4): the el-container/el-header/el-aside/el-main wrapper trio is
+ * replaced by a CSS grid shell — `.app-layout` `grid-template-areas` with a
+ * fixed 220px aside column, an auto header row and a 1fr main row.
  */
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
@@ -30,44 +34,49 @@ async function onLogout(): Promise<void> {
 </script>
 
 <template>
-  <el-container class="app-layout">
-    <el-aside width="220px" class="app-layout__aside">
+  <div class="app-layout">
+    <aside class="app-layout__aside">
       <div class="app-layout__brand">
         <span class="app-layout__brand-strong">ERP</span>
         <span class="app-layout__brand-accent">Arpia</span>
       </div>
       <SidebarMenu />
-    </el-aside>
+    </aside>
 
-    <el-container class="app-layout__body">
-      <el-header class="app-layout__header">
-        <div class="app-layout__user">
-          <span class="app-layout__name">{{ auth.userName }}</span>
-          <Tag class="app-layout__role" severity="secondary">{{ rolLabel }}</Tag>
-        </div>
-        <Button
-          class="app-layout__logout"
-          label="Cerrar sesión"
-          severity="danger"
-          outlined
-          size="small"
-          @click="onLogout"
-        />
-      </el-header>
+    <header class="app-layout__header">
+      <div class="app-layout__user">
+        <span class="app-layout__name">{{ auth.userName }}</span>
+        <Tag class="app-layout__role" severity="secondary">{{ rolLabel }}</Tag>
+      </div>
+      <Button
+        class="app-layout__logout"
+        label="Cerrar sesión"
+        severity="danger"
+        outlined
+        size="small"
+        @click="onLogout"
+      />
+    </header>
 
-      <el-main class="app-layout__main">
-        <router-view />
-      </el-main>
-    </el-container>
-  </el-container>
+    <main class="app-layout__main">
+      <router-view />
+    </main>
+  </div>
 </template>
 
 <style scoped>
 .app-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'aside header'
+    'aside main';
   min-height: 100vh;
 }
 
 .app-layout__aside {
+  grid-area: aside;
   display: flex;
   flex-direction: column;
   background: var(--arpia-dark);
@@ -95,9 +104,11 @@ async function onLogout(): Promise<void> {
 }
 
 .app-layout__header {
+  grid-area: header;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 0 1.25rem;
   background: var(--arpia-dark-bg);
   border-bottom: 1px solid var(--arpia-border);
   backdrop-filter: blur(8px);
@@ -116,6 +127,9 @@ async function onLogout(): Promise<void> {
 }
 
 .app-layout__main {
+  grid-area: main;
+  padding: 1.25rem;
   background: var(--arpia-bg-gradient);
+  overflow: auto;
 }
 </style>

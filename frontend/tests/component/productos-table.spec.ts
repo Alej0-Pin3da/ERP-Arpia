@@ -1,7 +1,7 @@
 /**
  * ProductosTable component tests (PR10, spec MOD-5).
  *
- * Mounts the REAL ProductosTable with Element Plus:
+ * Mounts the REAL ProductosTable with Element Plus + PrimeVue (slice 1c):
  *  - the list renders the client-joined tipo label, nombre,
  *    requiere_fabricacion as a Sí/No tag, and the two money fields es-CO
  *    ($12.345,67 format)
@@ -10,12 +10,18 @@
  *  - a "Variantes" action emits `select-variantes` with the row (the view
  *    then lazy-fetches GET /productos/{id}/variantes)
  *  - the empty state renders
+ * Column sort re-emits the SAME typed event via the parsePrimeVueSort
+ * adapter. el-tag/el-button cells still need the ElementPlus plugin until
+ * slice 2b.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
+import DataTable from 'primevue/datatable'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import ProductosTable from '@/components/productos/ProductosTable.vue'
 
 type ProductoRow = {
@@ -49,7 +55,11 @@ const ROWS: ProductoRow[] = [
 async function mountTable(canEdit = true, rows: ProductoRow[] = ROWS): Promise<VueWrapper> {
   const wrapper = mount(ProductosTable, {
     props: { rows, loading: false, canEdit },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await flushPromises()
   return wrapper
@@ -107,12 +117,10 @@ describe('ProductosTable (MOD-5)', () => {
     expect(wrapper.text()).toContain('Sin productos registrados')
   })
 
-  it('maps an el-table sort-change into a typed {prop, order} emit', async () => {
+  it('maps a PrimeVue sort payload into a typed {prop, order} emit', async () => {
     const wrapper = await mountTable()
 
-    wrapper
-      .findComponent({ name: 'ElTable' })
-      .vm.$emit('sort-change', { column: { key: 'precio_venta_sugerido' }, order: 'descending' })
+    wrapper.findComponent(DataTable).vm.$emit('sort', { sortField: 'precio_venta_sugerido', sortOrder: -1 })
     await nextTick()
 
     expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'precio_venta_sugerido', order: 'desc' })
@@ -121,7 +129,7 @@ describe('ProductosTable (MOD-5)', () => {
   it('maps a cleared sort (null order) for the nombre column', async () => {
     const wrapper = await mountTable()
 
-    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('sort-change', { column: { key: 'nombre' }, order: null })
+    wrapper.findComponent(DataTable).vm.$emit('sort', { sortField: 'nombre', sortOrder: 0 })
     await nextTick()
 
     expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'nombre', order: null })

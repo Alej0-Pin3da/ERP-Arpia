@@ -1,20 +1,27 @@
 /**
  * Ventas register form component tests (task 2.2, spec MOD-1).
  *
- * Mounts the REAL VentasForm with real Element Plus and drives it through
- * real user interaction (el-select dropdowns, el-input-number fields):
+ * Mounts the REAL VentasForm with PrimeVue and drives it through real user
+ * interaction (Select dropdowns, InputNumber fields):
  *  - empty detalles blocks submission with a warning and emits nothing
  *  - selecting a product auto-fills precio_unitario from
  *    precio_venta_sugerido and loads its variantes
  *  - a valid form emits the exact VentaCreate POST body
  *  - the client-side total preview mirrors the server total
  *    (subtotal * (1 - descuento/100))
+ *
+ * Migrated to PrimeVue (slice 2a): dropdown options are `.p-select-option`
+ * (teleported to body), input-number commits on blur, ToggleSwitch toggles
+ * through its inner checkbox. el-button migrated to PrimeVue in slice 2b.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus, { ElMessage } from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
+import esCO from '@/utils/locales/es-CO'
 import VentasForm from '@/components/ventas/VentasForm.vue'
 import type { VentaCreate } from '@/utils/ventas'
 import type { components } from '@/types/api.d'
@@ -119,7 +126,11 @@ const VENTA_EDIT_SIN_VARIANTE: VentaRead = {
 async function mountForm(saving = false): Promise<VueWrapper> {
   const wrapper = mount(VentasForm, {
     props: { productos: PRODUCTOS, clientes: CLIENTES, loadVariantes, saving },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
@@ -135,28 +146,48 @@ async function mountEditForm(initial: VentaRead = VENTA_EDIT): Promise<VueWrappe
       initial,
       saving: false,
     },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   await flushPromises()
   return wrapper
 }
 
-/** Open an el-select by its data-test and click the option with the label. */
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
+/** Open a Select by its data-test and click the option with the label. */
 async function pickOption(select: ReturnType<VueWrapper['find']>, label: string): Promise<void> {
   await select.trigger('click')
-  await nextTick()
-  const item = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
     (el) => el.textContent?.trim() === label,
   )
   if (!item) throw new Error(`dropdown option not found: "${label}"`)
-  item.click()
-  await flushPromises()
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
   await nextTick()
 }
 
+/** PrimeVue InputNumber commits the model on blur — type then blur like a user. */
+async function setNumber(wrapper: VueWrapper, testId: string, value: string): Promise<void> {
+  const input = wrapper.find(`[data-test="${testId}"] input`)
+  await input.setValue(value)
+  await input.trigger('blur')
+  await nextTick()
+}
+
+mountToastHost()
+
 afterEach(() => {
-  ElMessage.closeAll()
+  clearToastHost()
 })
 
 describe('VentasForm (MOD-1 register)', () => {
@@ -222,8 +253,8 @@ describe('VentasForm (MOD-1 register)', () => {
     await pickOption(wrapper.find('[data-test="canal-select"]'), 'WhatsApp')
     await pickOption(wrapper.find('[data-test="producto-select"]'), 'Arepa de huevo')
     await pickOption(wrapper.find('[data-test="variante-select"]'), 'Grande')
-    await wrapper.find('[data-test="cantidad-input"] input').setValue('2')
-    await wrapper.find('[data-test="descuento-input"] input').setValue('5')
+    await setNumber(wrapper, 'cantidad-input', '2')
+    await setNumber(wrapper, 'descuento-input', '5')
 
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -243,8 +274,8 @@ describe('VentasForm (MOD-1 register)', () => {
     const wrapper = await mountForm()
 
     await pickOption(wrapper.find('[data-test="producto-select"]'), 'Arepa de huevo') // 5000
-    await wrapper.find('[data-test="cantidad-input"] input').setValue('2') // subtotal 10000
-    await wrapper.find('[data-test="descuento-input"] input').setValue('10') // -10% -> 9000
+    await setNumber(wrapper, 'cantidad-input', '2') // subtotal 10000
+    await setNumber(wrapper, 'descuento-input', '10') // -10% -> 9000
 
     expect(wrapper.find('[data-test="total-preview"]').text()).toContain('$9.000,00')
   })
@@ -254,7 +285,7 @@ describe('VentasForm (MOD-1 register)', () => {
 
     await pickOption(wrapper.find('[data-test="producto-select"]'), 'Arepa de huevo') // 5000
     await pickOption(wrapper.find('[data-test="variante-select"]'), 'Grande') // VV-1: sized product
-    await wrapper.find('[data-test="es-regalo-toggle"]').trigger('click')
+    await wrapper.find('[data-test="es-regalo-toggle"] input').trigger('change')
     await nextTick()
 
     expect(wrapper.find('[data-test="total-preview"]').text()).toContain('$0,00') // gift -> $0
@@ -306,7 +337,7 @@ describe('VentasForm (MOD-1 register)', () => {
   it('prefills es_regalo=true and zeroes the preview in edit mode', async () => {
     const wrapper = await mountEditForm({ ...VENTA_EDIT, es_regalo: true, total_venta: '0.00' })
 
-    expect(wrapper.find('[data-test="es-regalo-toggle"]').classes()).toContain('is-checked')
+    expect(wrapper.find('[data-test="es-regalo-toggle"]').classes()).toContain('p-toggleswitch-checked')
     expect(wrapper.find('[data-test="total-preview"]').text()).toContain('$0,00')
 
     await wrapper.find('form').trigger('submit')
@@ -366,7 +397,7 @@ describe('VentasForm (MOD-1 register)', () => {
   it('VV-2: the variant select is disabled on an empty line', async () => {
     const wrapper = await mountForm()
 
-    expect(wrapper.find('[data-test="variante-select"] input').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-test="variante-select"]').classes()).toContain('p-disabled')
   })
 
   it('VV-4: the select stays disabled when the loaded variant list is empty', async () => {
@@ -374,7 +405,7 @@ describe('VentasForm (MOD-1 register)', () => {
 
     await pickOption(wrapper.find('[data-test="producto-select"]'), 'Jugo de naranja')
     expect(loadVariantes).toHaveBeenCalledWith(2)
-    expect(wrapper.find('[data-test="variante-select"] input').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-test="variante-select"]').classes()).toContain('p-disabled')
   })
 
   it('VV-4: a sized product enables the select once its variants load', async () => {
@@ -382,7 +413,7 @@ describe('VentasForm (MOD-1 register)', () => {
 
     await pickOption(wrapper.find('[data-test="producto-select"]'), 'Arepa de huevo')
     expect(loadVariantes).toHaveBeenCalledWith(1)
-    expect(wrapper.find('[data-test="variante-select"] input').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[data-test="variante-select"]').classes()).not.toContain('p-disabled')
   })
 
   it('VV-3: a combo sale submits one detail without a variante', async () => {

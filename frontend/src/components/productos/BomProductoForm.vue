@@ -2,18 +2,21 @@
 /**
  * Combo-content (BomProducto) form (PR10, spec MOD-5).
  *
- * Dual-mode ElForm (create -> BomProductoCreate / edit -> BomProductoUpdate):
- * producto_incluido select (productos prop) + cantidad (> 0). Client gates
- * es-CO. Edit prefills from the row (name -> id lookup over the productos
- * prop, same pattern as BomInsumoForm).
+ * Dual-mode PrimeVue form (create -> BomProductoCreate / edit ->
+ * BomProductoUpdate): producto_incluido select (productos prop) + cantidad
+ * (> 0). Client gates es-CO. Edit prefills from the row (name -> id lookup
+ * over the productos prop, same pattern as BomInsumoForm).
  *
  * Emits the API-ready payload via buildBomProductoPayload/Update.
  */
 import { computed, reactive, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
+import InputNumber from 'primevue/inputnumber'
+import Select from 'primevue/select'
 
 import type { components } from '@/types/api.d'
 import { parseDecimal } from '@/utils/format'
+import { showToast } from '@/utils/toast'
 import {
   buildBomProductoPayload,
   buildBomProductoUpdatePayload,
@@ -56,11 +59,11 @@ const submitLabel = computed(() => (props.mode === 'create' ? 'Agregar producto'
 
 function onSubmit(): void {
   if (form.producto_incluido_id === null) {
-    ElMessage.warning('Selecciona el producto incluido')
+    showToast('warn', 'Selecciona el producto incluido')
     return
   }
   if (form.cantidad === null || form.cantidad <= 0) {
-    ElMessage.warning('Indica la cantidad')
+    showToast('warn', 'Indica la cantidad')
     return
   }
   emit('submit', props.mode === 'edit' ? buildBomProductoUpdatePayload(form) : buildBomProductoPayload(form))
@@ -68,28 +71,84 @@ function onSubmit(): void {
 </script>
 
 <template>
-  <el-form label-position="top" @submit.prevent="onSubmit">
-    <el-form-item label="Producto incluido">
-      <el-select
-        v-model="form.producto_incluido_id"
-        data-test="bom-producto-select"
-        placeholder="Selecciona el producto"
-        style="width: 100%"
-      >
-        <el-option v-for="p in productos" :key="p.id" :label="p.nombre" :value="p.id" />
-      </el-select>
-    </el-form-item>
-    <el-form-item label="Cantidad">
-      <el-input-number
-        v-model="form.cantidad"
-        data-test="cantidad-bom-producto-input"
-        :min="0.01"
-        :precision="2"
-        style="width: 100%"
-      />
-    </el-form-item>
-    <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-bom-producto">
-      {{ submitLabel }}
-    </el-button>
-  </el-form>
+  <form class="bom-producto-form" @submit.prevent="onSubmit">
+    <div class="form-grid">
+      <div class="form-col" style="--md: 12">
+        <div class="form-item">
+          <label class="form-label">Producto incluido</label>
+          <Select
+            v-model="form.producto_incluido_id"
+            :options="productos"
+            option-label="nombre"
+            option-value="id"
+            data-test="bom-producto-select"
+            placeholder="Selecciona el producto"
+            class="bom-producto-field"
+          />
+        </div>
+      </div>
+      <div class="form-col" style="--md: 6">
+        <div class="form-item">
+          <label class="form-label">Cantidad</label>
+          <InputNumber
+            v-model="form.cantidad"
+            data-test="cantidad-bom-producto-input"
+            :min="0.01"
+            :min-fraction-digits="2"
+            :max-fraction-digits="2"
+            :use-grouping="false"
+            class="bom-producto-field"
+          />
+        </div>
+      </div>
+      <div class="form-col submit-col" style="--md: 24">
+        <Button type="submit" :loading="saving" data-test="submit-bom-producto">
+          {{ submitLabel }}
+        </Button>
+      </div>
+    </div>
+  </form>
 </template>
+
+<style scoped>
+.bom-producto-form {
+  max-width: 56rem;
+}
+
+.bom-producto-field {
+  width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.form-col {
+  grid-column: span 24;
+}
+
+@media (min-width: 768px) {
+  .form-col {
+    grid-column: span var(--md, 24);
+  }
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--el-text-color-primary);
+}
+
+.submit-col {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 0.15rem;
+}
+</style>

@@ -2,7 +2,7 @@
 /**
  * Devoluciones create form (task 2.3, spec MOD-2).
  *
- * Element Plus form that maps to POST /devoluciones (DevolucionCreate):
+ * PrimeVue form that maps to POST /devoluciones (DevolucionCreate):
  * required venta_id, tipo select (total|parcial), optional motivo, and —
  * ONLY for tipo 'parcial' — dynamic line items (producto, optional variante,
  * cantidad > 0, precio_unitario). CRITICAL rules from MOD-2:
@@ -16,7 +16,10 @@
  * The view owns the actual POST, the success message and the list refresh.
  */
 import { computed, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
+import InputNumber from 'primevue/inputnumber'
+import InputText from 'primevue/inputtext'
+import Select from 'primevue/select'
 
 import {
   TIPO_DEVOLUCION,
@@ -29,6 +32,7 @@ import {
   type DevolucionTipo,
 } from '@/utils/devoluciones'
 import { parseDecimal } from '@/utils/format'
+import { showToast } from '@/utils/toast'
 import type { ProductoRead, VarianteProductoRead } from '@/types/api.d'
 
 const props = defineProps<{
@@ -50,6 +54,8 @@ const variantesPorProducto = ref<Record<number, VarianteProductoRead[]>>({})
 
 /** MOD-2: items are only relevant (and only rendered) for a parcial return. */
 const isParcial = computed(() => tipo.value === 'parcial')
+
+const tipoOptions = computed(() => TIPO_DEVOLUCION.map((t) => ({ label: tipoLabel(t), value: t })))
 
 /** Variantes available for a row's currently selected product. */
 function variantesDe(row: DevolucionFormItem): VarianteProductoRead[] {
@@ -87,11 +93,11 @@ function removeItem(index: number): void {
 /** MOD-2: client-side gates — venta_id required; parcial requires items. */
 function submit(): void {
   if (ventaId.value === null) {
-    ElMessage.warning('Indica el número de la venta a devolver.')
+    showToast('warn', 'Indica el número de la venta a devolver.')
     return
   }
   if (isParcial.value && !hasValidDevolucionItems(items.value)) {
-    ElMessage.warning('Una devolución parcial requiere al menos un item con producto y cantidad mayor a cero.')
+    showToast('warn', 'Una devolución parcial requiere al menos un item con producto y cantidad mayor a cero.')
     return
   }
   emit('submit', buildDevolucionPayload({
@@ -104,89 +110,97 @@ function submit(): void {
 </script>
 
 <template>
-  <el-form label-position="top" class="devolucion-form" @submit.prevent="submit">
-    <el-row :gutter="16">
-      <el-col :xs="24" :md="8">
-        <el-form-item label="Número de venta">
-          <el-input-number
+  <form class="devolucion-form" @submit.prevent="submit">
+    <div class="form-grid">
+      <div class="form-col" style="--md: 8">
+        <div class="form-item">
+          <label class="form-label">Número de venta</label>
+          <InputNumber
             v-model="ventaId"
             :min="1"
             :step="1"
-            :controls="false"
+            :use-grouping="false"
+            :show-buttons="false"
             class="devolucion-field"
             data-test="venta-id-input"
           />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="8">
-        <el-form-item label="Tipo de devolución">
-          <el-select v-model="tipo" class="devolucion-field" data-test="tipo-select">
-            <el-option
-              v-for="t in TIPO_DEVOLUCION"
-              :key="t"
-              :label="tipoLabel(t)"
-              :value="t"
-            />
-          </el-select>
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="8">
-        <el-form-item label="Motivo">
-          <el-input v-model="motivo" placeholder="Opcional" data-test="motivo-input" />
-        </el-form-item>
-      </el-col>
-    </el-row>
+        </div>
+      </div>
+      <div class="form-col" style="--md: 8">
+        <div class="form-item">
+          <label class="form-label">Tipo de devolución</label>
+          <Select
+            v-model="tipo"
+            :options="tipoOptions"
+            option-label="label"
+            option-value="value"
+            class="devolucion-field"
+            data-test="tipo-select"
+          />
+        </div>
+      </div>
+      <div class="form-col" style="--md: 8">
+        <div class="form-item">
+          <label class="form-label">Motivo</label>
+          <InputText v-model="motivo" placeholder="Opcional" data-test="motivo-input" />
+        </div>
+      </div>
+    </div>
 
     <div v-if="isParcial" class="items-section">
       <div class="items-header">
         <span>Items a devolver</span>
-        <el-button size="small" type="primary" plain data-test="add-item" @click="addItem">
+        <Button size="small" text data-test="add-item" @click="addItem">
           Agregar item
-        </el-button>
+        </Button>
       </div>
 
       <div v-for="(row, index) in items" :key="index" class="item-row" data-test="devolucion-item">
-        <el-select
+        <Select
           v-model="row.producto_id"
-          filterable
+          :options="productos"
+          option-label="nombre"
+          option-value="id"
+          filter
           placeholder="Producto"
           class="devolucion-field"
           data-test="producto-select"
           @change="onProductoChange(row)"
-        >
-          <el-option v-for="p in productos" :key="p.id" :label="p.nombre" :value="p.id" />
-        </el-select>
+        />
 
-        <el-select
+        <Select
           v-model="row.variante_id"
-          clearable
+          :options="variantesDe(row)"
+          option-label="nombre_variante"
+          option-value="id"
+          show-clear
           placeholder="Variante (opcional)"
           :disabled="row.producto_id === null"
           class="devolucion-field"
           data-test="variante-select"
-        >
-          <el-option v-for="v in variantesDe(row)" :key="v.id" :label="v.nombre_variante" :value="v.id" />
-        </el-select>
+        />
 
-        <el-input-number
+        <InputNumber
           v-model="row.cantidad"
           :min="1"
           :step="1"
+          :use-grouping="false"
           class="devolucion-field"
           data-test="cantidad-input"
         />
 
-        <el-input-number
+        <InputNumber
           v-model="row.precio_unitario"
           :min="0"
           :step="100"
+          :use-grouping="false"
           class="devolucion-field"
           data-test="precio-input"
         />
 
-        <el-button size="small" type="danger" plain data-test="remove-item" @click="removeItem(index)">
+        <Button size="small" text severity="danger" data-test="remove-item" @click="removeItem(index)">
           Quitar
-        </el-button>
+        </Button>
       </div>
 
       <p class="price-note">
@@ -196,11 +210,11 @@ function submit(): void {
 
     <div class="form-footer">
       <span class="form-hint">La devolución total anula la venta completa.</span>
-      <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-devolucion">
+      <Button type="submit" :loading="saving" data-test="submit-devolucion">
         Registrar devolución
-      </el-button>
+      </Button>
     </div>
-  </el-form>
+  </form>
 </template>
 
 <style scoped>
@@ -210,6 +224,33 @@ function submit(): void {
 
 .devolucion-field {
   width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.form-col {
+  grid-column: span 24;
+}
+
+@media (min-width: 768px) {
+  .form-col {
+    grid-column: span var(--md, 24);
+  }
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--el-text-color-primary);
 }
 
 .items-header {

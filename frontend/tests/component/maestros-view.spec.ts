@@ -13,12 +13,17 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import ElementPlus from 'element-plus'
+import Paginator from 'primevue/paginator'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import MaestrosView from '@/views/MaestrosView.vue'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 
 const { apiMocks } = vi.hoisted(() => ({
   apiMocks: {
@@ -56,6 +61,11 @@ vi.mock('@/api/endpoints', () => ({
     delete: apiMocks.deleteCategoria,
   },
 }))
+const confirmMocks = vi.hoisted(() => ({ confirmAction: vi.fn() }))
+vi.mock('@/utils/confirm', () => ({ confirmAction: confirmMocks.confirmAction }))
+
+// Fake PrimeVue Toast host: renders showToast() messages into <body>.
+mountToastHost()
 
 const CLIENTES = [
   { id: 1, nombre: 'Ana Torres', documento_identidad: 'CC 123', email: 'ana@arpia.com.co', telefono: '3001234567', created_at: '2026-01-01T10:00:00Z' },
@@ -74,7 +84,14 @@ async function mountView(rol: string): Promise<VueWrapper> {
     user: { id: 2, nombre: 'Pepe', email: 'pepe@arpia.com.co', rol },
   })
   const wrapper = mount(MaestrosView, {
-    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+    global: {
+      plugins: [
+        pinia,
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+      stubs: { transition: false },
+    },
   })
   await nextTick()
   await flushPromises()
@@ -82,9 +99,9 @@ async function mountView(rol: string): Promise<VueWrapper> {
   return wrapper
 }
 
-/** Click the el-tabs item with the given label (panes stay mounted). */
+/** Click the PrimeVue Tab with the given label (panels stay mounted). */
 async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
-  const item = wrapper.findAll('.el-tabs__item').find((i) => i.text().trim() === label)
+  const item = wrapper.findAll('.p-tab').find((i) => i.text().trim() === label)
   if (!item) throw new Error(`tab not found: "${label}"`)
   await item.trigger('click')
   await nextTick()
@@ -100,6 +117,7 @@ async function flushDialogTransition(): Promise<void> {
 describe('MaestrosView (MOD-5 + T6)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    confirmMocks.confirmAction.mockReset()
     // Every list uses the {items,total} contract now.
     apiMocks.listClientes.mockResolvedValue({ items: CLIENTES, total: 2 })
     apiMocks.listTipos.mockResolvedValue({ items: TIPOS, total: 1 })
@@ -116,7 +134,7 @@ describe('MaestrosView (MOD-5 + T6)', () => {
   })
 
   afterEach(() => {
-    ElMessage.closeAll()
+    clearToastHost()
     vi.restoreAllMocks()
   })
 
@@ -151,7 +169,7 @@ describe('MaestrosView (MOD-5 + T6)', () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listClientes).toHaveBeenCalledWith({ limit: 20, offset: 0 })
 
-    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    wrapper.findComponent(Paginator).vm.$emit('page', { first: 20, rows: 20 })
     await flushPromises()
     expect(apiMocks.listClientes).toHaveBeenCalledWith({ limit: 20, offset: 20 })
   })
@@ -231,7 +249,7 @@ describe('MaestrosView (MOD-5 + T6)', () => {
   })
 
   it('deletes a tipo de producto after the confirm dialog (204) and refreshes', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     const wrapper = await mountView('admin')
     await activateTab(wrapper, 'Tipos de producto')
     expect(apiMocks.listTipos).toHaveBeenCalledTimes(1)
@@ -246,7 +264,7 @@ describe('MaestrosView (MOD-5 + T6)', () => {
   })
 
   it('surfaces the 409 when deleting a tipo that is in use', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     apiMocks.deleteTipo.mockRejectedValueOnce({
       response: { data: { detail: 'TipoProducto is in use and cannot be deleted' } },
     })

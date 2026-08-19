@@ -8,6 +8,7 @@
  * missing months render as zero bars. Tooltips are es-CO money.
  */
 import { computed } from 'vue'
+import Skeleton from 'primevue/skeleton'
 
 import { BarChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
@@ -82,8 +83,10 @@ const chartOption = computed(() => ({
 </script>
 
 <template>
-  <el-skeleton v-if="loading" :rows="5" animated />
-  <el-empty v-else-if="rows.length === 0" description="Sin datos en el período" :image-size="80" />
+  <div v-if="loading" class="chart-skeleton">
+    <Skeleton v-for="n in 5" :key="n" />
+  </div>
+  <div v-else-if="rows.length === 0" class="chart-empty">Sin datos en el período</div>
   <v-chart v-else :option="chartOption" autoresize class="finanzas-chart" />
 </template>
 
@@ -91,5 +94,22 @@ const chartOption = computed(() => ({
 .finanzas-chart {
   height: 320px;
   width: 100%;
+}
+
+.chart-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: 320px;
+  justify-content: center;
+}
+
+.chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 320px;
+  color: var(--el-text-color-secondary);
+  font-size: 0.9rem;
 }
 </style>

@@ -9,7 +9,13 @@
  * admin-only via `canEdit`.
  *
  * Presentational: emits `edit` / `delete` with the clicked row.
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. Button cells were
+ * migrated in slice 2b.
  */
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import type { components } from '@/types/api.d'
 import { formatMoney } from '@/utils/format'
 
@@ -28,23 +34,32 @@ defineEmits<{
 </script>
 
 <template>
-  <el-table :data="variantes" v-loading="loading">
-    <el-table-column prop="nombre_variante" label="Variante" min-width="160" />
-    <el-table-column label="Precio de venta" min-width="140" align="right">
-      <template #default="{ row }">
-        {{ row.precio_venta == null || row.precio_venta === '' ? '—' : formatMoney(row.precio_venta) }}
+  <DataTable :value="variantes" lazy :loading="loading">
+    <Column field="nombre_variante" header="Variante" style="min-width: 160px" />
+    <Column field="precio_venta" header="Precio de venta" style="min-width: 140px" align="right">
+      <template #body="{ data }">
+        {{ data.precio_venta == null || data.precio_venta === '' ? '—' : formatMoney(data.precio_venta) }}
       </template>
-    </el-table-column>
-    <el-table-column v-if="canEdit" label="Acciones" width="180" fixed="right">
-      <template #default="{ row }">
-        <el-button size="small" data-test="edit-variante" @click="$emit('edit', row)">Editar</el-button>
-        <el-button size="small" type="danger" data-test="delete-variante" @click="$emit('delete', row)">
+    </Column>
+    <Column v-if="canEdit" header="Acciones" style="width: 180px">
+      <template #body="{ data: row }">
+        <Button size="small" severity="secondary" data-test="edit-variante" @click="$emit('edit', row)">Editar</Button>
+        <Button size="small" severity="danger" data-test="delete-variante" @click="$emit('delete', row)">
           Eliminar
-        </el-button>
+        </Button>
       </template>
-    </el-table-column>
+    </Column>
+
     <template #empty>
-      <el-empty description="Sin variantes registradas" />
+      <div class="variante-empty">Sin variantes registradas</div>
     </template>
-  </el-table>
+  </DataTable>
 </template>
+
+<style scoped>
+.variante-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
+}
+</style>

@@ -1,8 +1,8 @@
 /**
  * MovimientosForm component tests (PR8, spec MOD-3).
  *
- * Mounts the REAL MovimientosForm with Element Plus and drives it through
- * real interaction (el-select dropdowns, el-input-number fields):
+ * Mounts the REAL MovimientosForm with PrimeVue and drives it through
+ * real interaction (Select dropdowns, InputNumber fields):
  *  - client gates: missing tipo / empty descripcion / monto <= 0 each block
  *    submission with a warning and emit nothing
  *  - the socio select is OPTIONAL for every tipo (the backend does not
@@ -11,10 +11,13 @@
  *    socio_id when unset and including it when a socio is picked
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus, { ElMessage } from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
+import esCO from '@/utils/locales/es-CO'
 import MovimientosForm from '@/components/finanzas/MovimientosForm.vue'
 import type { components } from '@/types/api.d'
 
@@ -28,27 +31,47 @@ const SOCIOS: SocioConfiguracionRead[] = [
 async function mountForm(saving = false): Promise<VueWrapper> {
   const wrapper = mount(MovimientosForm, {
     props: { socios: SOCIOS, saving },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
 }
 
-/** Open an el-select by its data-test and click the option with the label. */
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
+/** Open a PrimeVue Select by its data-test and click the option with the label. */
 async function pickOption(select: ReturnType<VueWrapper['find']>, label: string): Promise<void> {
   await select.trigger('click')
-  await nextTick()
-  const item = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
     (el) => el.textContent?.trim() === label,
   )
   if (!item) throw new Error(`dropdown option not found: "${label}"`)
-  item.click()
-  await flushPromises()
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
   await nextTick()
 }
 
+/** PrimeVue InputNumber commits the model on blur — type then blur like a user. */
+async function setNumber(wrapper: VueWrapper, testId: string, value: string): Promise<void> {
+  const input = wrapper.find(`[data-test="${testId}"] input`)
+  await input.setValue(value)
+  await input.trigger('blur')
+  await nextTick()
+}
+
+mountToastHost()
+
 afterEach(() => {
-  ElMessage.closeAll()
+  clearToastHost()
 })
 
 describe('MovimientosForm (MOD-3 create)', () => {
@@ -69,7 +92,7 @@ describe('MovimientosForm (MOD-3 create)', () => {
     const wrapper = await mountForm()
 
     await wrapper.find('[data-test="descripcion-input"]').setValue('Compra de arepas')
-    await wrapper.find('[data-test="monto-input"] input').setValue('50000')
+    await setNumber(wrapper, 'monto-input', '50000')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -81,7 +104,7 @@ describe('MovimientosForm (MOD-3 create)', () => {
     const wrapper = await mountForm()
 
     await pickOption(wrapper.find('[data-test="tipo-movimiento-select"]'), 'Gasto')
-    await wrapper.find('[data-test="monto-input"] input').setValue('50000')
+    await setNumber(wrapper, 'monto-input', '50000')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -89,7 +112,7 @@ describe('MovimientosForm (MOD-3 create)', () => {
     expect(wrapper.emitted('submit')).toBeUndefined()
   })
 
-  it('blocks submission when monto is empty (el-input-number min 0.01 already clamps zero)', async () => {
+  it('blocks submission when monto is empty (InputNumber min 0.01 already clamps zero)', async () => {
     const wrapper = await mountForm()
 
     await pickOption(wrapper.find('[data-test="tipo-movimiento-select"]'), 'Gasto')
@@ -106,7 +129,7 @@ describe('MovimientosForm (MOD-3 create)', () => {
 
     await pickOption(wrapper.find('[data-test="tipo-movimiento-select"]'), 'Retiro')
     await wrapper.find('[data-test="descripcion-input"]').setValue('Retiro manual')
-    await wrapper.find('[data-test="monto-input"] input').setValue('150000')
+    await setNumber(wrapper, 'monto-input', '150000')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -123,7 +146,7 @@ describe('MovimientosForm (MOD-3 create)', () => {
     await pickOption(wrapper.find('[data-test="tipo-movimiento-select"]'), 'Gasto')
     await pickOption(wrapper.find('[data-test="socio-select"]'), 'Ana María')
     await wrapper.find('[data-test="descripcion-input"]').setValue('Gasto a socio')
-    await wrapper.find('[data-test="monto-input"] input').setValue('80000')
+    await setNumber(wrapper, 'monto-input', '80000')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -162,7 +185,11 @@ describe('MovimientosForm (T9 edit mode)', () => {
   async function mountEdit(initial: components['schemas']['MovimientoRead']): Promise<VueWrapper> {
     const wrapper = mount(MovimientosForm, {
       props: { mode: 'edit', initial, socios: SOCIOS, saving: false },
-      global: { plugins: [ElementPlus] },
+      global: {
+        plugins: [
+          [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+        ],
+      },
     })
     await nextTick()
     return wrapper
@@ -172,12 +199,14 @@ describe('MovimientosForm (T9 edit mode)', () => {
     const wrapper = await mountEdit(INITIAL)
 
     expect((wrapper.find('[data-test="descripcion-input"]').element as HTMLInputElement).value).toBe('Compra de arepas')
-    // el-input-number renders the prefilled amount with the configured precision (2).
+    // InputNumber renders the prefilled amount with the configured precision (2).
     expect((wrapper.find('[data-test="monto-input"] input').element as HTMLInputElement).value).toBe('50000.00')
     expect(wrapper.find('[data-test="socio-select"]').text()).toContain('Ana María')
     expect(wrapper.find('[data-test="tipo-movimiento-select"]').text()).toContain('Gasto')
     // The Fecha field is prefilled with the row's date (normalized, no 'Z').
-    expect(wrapper.findComponent({ name: 'ElDatePicker' }).props('modelValue')).toBe('2026-08-01T10:00:00')
+    // The PrimeVue DatePicker model is a Date built from the "YYYY-MM-DDTHH:mm:ss" string.
+    const fechaModel = wrapper.findComponent({ name: 'DatePicker' }).props('modelValue') as Date
+    expect(fechaModel.toISOString()).toBe('2026-08-01T10:00:00.000Z')
   })
 
   it('emits the MovimientoUpdate payload on submit in edit mode', async () => {
@@ -199,7 +228,10 @@ describe('MovimientosForm (T9 edit mode)', () => {
     const wrapper = await mountEdit(LIQUIDACION)
 
     expect(wrapper.find('[data-test="monto-input"] input').attributes('disabled')).toBeDefined()
-    expect(wrapper.find('[data-test="socio-select"] input').attributes('disabled')).toBeDefined()
+    // PrimeVue Select renders a non-editable span when disabled (no inner input);
+    // the root carries the p-disabled class and the combobox the aria-disabled attr.
+    expect(wrapper.find('[data-test="socio-select"]').classes()).toContain('p-disabled')
+    expect(wrapper.find('[data-test="socio-select"] [role="combobox"]').attributes('aria-disabled')).toBeDefined()
   })
 
   it('omits monto/socio_id from the edit payload for liquidacion rows (FIN-2)', async () => {

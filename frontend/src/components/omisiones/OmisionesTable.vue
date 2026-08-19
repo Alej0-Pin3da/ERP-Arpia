@@ -6,7 +6,14 @@
  * rows. The "Marcar resuelta"/"Reabrir" action emits the row and is shown
  * ONLY when the view grants it (admin-only, D9 — the PATCH endpoint is
  * require_admin server-side; the UI is the read-side mirror).
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. Tag/Button cells were
+ * migrated in slice 2b.
  */
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import Tag from 'primevue/tag'
 import type { OmisionRead } from '@/types/api.d'
 
 defineProps<{
@@ -20,38 +27,46 @@ const emit = defineEmits<{ toggle: [row: OmisionRead] }>()
 </script>
 
 <template>
-  <el-table :data="rows" v-loading="loading">
-    <el-table-column prop="id" label="#" width="70" align="center" />
-    <el-table-column prop="corrida_id" label="Corrida" min-width="200" show-overflow-tooltip />
-    <el-table-column prop="fase" label="Fase" width="80" align="center" />
-    <el-table-column prop="hoja" label="Hoja" min-width="140" show-overflow-tooltip />
-    <el-table-column prop="fila" label="Fila" width="70" align="center" />
-    <el-table-column prop="celda" label="Celda" width="90" align="center" />
-    <el-table-column label="Nivel" width="100" align="center">
-      <template #default="{ row }">
-        <el-tag :type="row.nivel === 'ERROR' ? 'danger' : 'warning'" size="small">
-          {{ row.nivel }}
-        </el-tag>
+  <DataTable :value="rows" lazy :loading="loading">
+    <Column field="id" header="#" style="width: 70px" align="center" />
+    <Column field="corrida_id" header="Corrida" style="min-width: 200px" />
+    <Column field="fase" header="Fase" style="width: 80px" align="center" />
+    <Column field="hoja" header="Hoja" style="min-width: 140px" />
+    <Column field="fila" header="Fila" style="width: 70px" align="center" />
+    <Column field="celda" header="Celda" style="width: 90px" align="center" />
+    <Column header="Nivel" style="width: 100px" align="center">
+      <template #body="{ data }">
+        <Tag :severity="data.nivel === 'ERROR' ? 'danger' : 'warn'">
+          {{ data.nivel }}
+        </Tag>
       </template>
-    </el-table-column>
-    <el-table-column prop="mensaje" label="Mensaje" min-width="260" show-overflow-tooltip />
-    <el-table-column label="Resuelta" width="110" align="center">
-      <template #default="{ row }">
-        <el-tag :type="row.resuelta ? 'success' : 'info'" size="small">
-          {{ row.resuelta ? 'Sí' : 'No' }}
-        </el-tag>
+    </Column>
+    <Column field="mensaje" header="Mensaje" style="min-width: 260px" />
+    <Column header="Resuelta" style="width: 110px" align="center">
+      <template #body="{ data }">
+        <Tag :severity="data.resuelta ? 'success' : 'info'">
+          {{ data.resuelta ? 'Sí' : 'No' }}
+        </Tag>
       </template>
-    </el-table-column>
-    <el-table-column v-if="canResolve" label="Acciones" width="150" align="center">
-      <template #default="{ row }">
-        <el-button link type="primary" size="small" data-test="toggle-omision" @click="emit('toggle', row)">
+    </Column>
+    <Column v-if="canResolve" header="Acciones" style="width: 150px" align="center">
+      <template #body="{ data: row }">
+        <Button link size="small" data-test="toggle-omision" @click="emit('toggle', row)">
           {{ row.resuelta ? 'Reabrir' : 'Marcar resuelta' }}
-        </el-button>
+        </Button>
       </template>
-    </el-table-column>
+    </Column>
 
     <template #empty>
-      <el-empty description="Sin omisiones registradas" :image-size="80" />
+      <div class="omision-empty">Sin omisiones registradas</div>
     </template>
-  </el-table>
+  </DataTable>
 </template>
+
+<style scoped>
+.omision-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
+}
+</style>

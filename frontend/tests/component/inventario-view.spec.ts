@@ -12,13 +12,18 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import ElementPlus from 'element-plus'
+import Paginator from 'primevue/paginator'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import InventarioView from '@/views/InventarioView.vue'
 import type { components } from '@/types/api.d'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 
 type InsumoRead = components['schemas']['InsumoRead']
 type CompraInsumoRead = components['schemas']['CompraInsumoRead']
@@ -50,6 +55,11 @@ vi.mock('@/api/endpoints', () => ({
     list: apiMocks.listCategorias,
   },
 }))
+const confirmMocks = vi.hoisted(() => ({ confirmAction: vi.fn() }))
+vi.mock('@/utils/confirm', () => ({ confirmAction: confirmMocks.confirmAction }))
+
+// Fake PrimeVue Toast host: renders showToast() messages into <body>.
+mountToastHost()
 
 const INSUMOS: InsumoRead[] = [
   {
@@ -112,7 +122,14 @@ async function mountView(rol: string): Promise<VueWrapper> {
     user: { id: 2, nombre: 'Pepe', email: 'pepe@arpia.com.co', rol },
   })
   const wrapper = mount(InventarioView, {
-    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+    global: {
+      plugins: [
+        pinia,
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+      stubs: { transition: false },
+    },
   })
   await nextTick()
   await flushPromises()
@@ -120,9 +137,9 @@ async function mountView(rol: string): Promise<VueWrapper> {
   return wrapper
 }
 
-/** Click the el-tabs item with the given label (pane content mounts on visit). */
+/** Click the PrimeVue Tab with the given label (panels stay mounted via v-show). */
 async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
-  const item = wrapper.findAll('.el-tabs__item').find((i) => i.text().trim() === label)
+  const item = wrapper.findAll('.p-tab').find((i) => i.text().trim() === label)
   if (!item) throw new Error(`tab not found: "${label}"`)
   await item.trigger('click')
   await nextTick()
@@ -138,6 +155,7 @@ async function flushDialogTransition(): Promise<void> {
 describe('InventarioView (MOD-4 + T6)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    confirmMocks.confirmAction.mockReset()
     // Table fetches use the page contract; lookups keep limit:1000 with `.items`.
     apiMocks.listInsumos.mockResolvedValue({ items: INSUMOS, total: 3 })
     apiMocks.listCompras.mockResolvedValue({ items: COMPRAS, total: 1 })
@@ -149,7 +167,7 @@ describe('InventarioView (MOD-4 + T6)', () => {
   })
 
   afterEach(() => {
-    ElMessage.closeAll()
+    clearToastHost()
     vi.restoreAllMocks()
   })
 
@@ -172,11 +190,14 @@ describe('InventarioView (MOD-4 + T6)', () => {
     expect(apiMocks.listCompras).toHaveBeenCalledWith(PAGE1)
   })
 
-  it('renders el-pagination with the server total on the insumos tab', async () => {
+  it('renders Paginator with the server total on both tabs', async () => {
     const wrapper = await mountView('operador')
-    // Element Plus pagination renders a page-size selector and page buttons;
-    // the total comes from the API (3), not a local guess.
-    expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(true)
+    // Both lists page via PrimeVue Paginator; the totals come from the API
+    // (3 insumos, 1 compra), not a local guess.
+    const paginators = wrapper.findAllComponents(Paginator)
+    expect(paginators).toHaveLength(2)
+    expect(paginators[0].props('totalRecords')).toBe(3)
+    expect(paginators[1].props('totalRecords')).toBe(1)
     expect(apiMocks.listInsumos).toHaveBeenCalledWith(PAGE1)
   })
 
@@ -330,8 +351,8 @@ describe('InventarioView (MOD-4 + T6)', () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listInsumos).toHaveBeenCalledWith(PAGE1)
 
-    // Emit the page-change event from el-pagination -> page 2 -> offset 20.
-    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    // Emit the page event from the PrimeVue Paginator -> page 2 -> offset 20.
+    wrapper.findComponent(Paginator).vm.$emit('page', { first: 20, rows: 20 })
     await flushPromises()
 
     expect(apiMocks.listInsumos).toHaveBeenCalledWith({ limit: 20, offset: 20 })
@@ -458,7 +479,7 @@ describe('InventarioView (MOD-4 + T6)', () => {
   })
 
   it('deletes an insumo after the confirm dialog and refreshes', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     const wrapper = await mountView('admin')
     expect(apiMocks.listInsumos).toHaveBeenCalledTimes(2)
 

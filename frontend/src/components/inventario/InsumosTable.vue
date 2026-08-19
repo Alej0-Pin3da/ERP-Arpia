@@ -11,10 +11,26 @@
  * (can-edit=false for operador/consulta — the backend enforces require_admin);
  * when shown they emit `edit`/`delete` with the row — the parent owns the
  * create/edit forms, the confirm dialog and the API calls.
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1b: the categoria header
+ * funnel and column sort re-emit the SAME typed events the view consumes, via
+ * the parsePrimeVueFilters/parsePrimeVueSort adapters. The funnel only renders
+ * when categorias exist (mirroring the old el-table `:filters=[]` behavior).
+ * Tag/Button cells were migrated in slice 2b.
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import Select from 'primevue/select'
+import Tag from 'primevue/tag'
 import { formatMoney, formatQty } from '@/utils/format'
-import { parseColumnFilter } from '@/utils/table-filters'
+import {
+  parseColumnFilter,
+  parsePrimeVueFilters,
+  parsePrimeVueSort,
+  type PrimeVueFilterConstraint,
+} from '@/utils/table-filters'
 import { stockSeverity, type StockSeverity } from '@/utils/dashboard'
 import type { InsumoRead } from '@/types/api.d'
 
@@ -39,25 +55,25 @@ const categoriaFilters = computed(() =>
   (props.categorias ?? []).map((c) => ({ text: c.nombre, value: c.id })),
 )
 
-/** Normalize el-table's filter-change into a typed single-value emit. */
-function onColumnFilterChange(elFilters: Record<string, unknown[]>): void {
-  const categoria_id = parseColumnFilter(elFilters.categoria)
+/** DataTable lazy filter state (server-side filtering, single constraint per column). */
+const filters = ref<Record<string, PrimeVueFilterConstraint>>({
+  categoria: { value: null, matchMode: 'equals' },
+})
+
+/** Normalize DataTable's @filter payload into the typed single-value emit. */
+function onDataTableFilter(e: {
+  filters: Record<string, PrimeVueFilterConstraint | PrimeVueFilterConstraint[]>
+}): void {
+  const normalized = parsePrimeVueFilters(e.filters)
+  const categoria_id = parseColumnFilter(normalized.categoria)
   emit('filter-change', {
     categoria_id: typeof categoria_id === 'number' ? categoria_id : null,
   })
 }
 
-/** Normalize el-table's sort-change into a typed {prop, order} emit. */
-function onSortChange(s: {
-  column: { key?: string; property?: string }
-  prop: string
-  order: 'ascending' | 'descending' | null
-}): void {
-  const prop = s.column.key ?? s.column.property ?? s.prop
-  emit('sort-change', {
-    prop,
-    order: s.order === 'ascending' ? 'asc' : s.order === 'descending' ? 'desc' : null,
-  })
+/** Normalize DataTable's @sort payload into the typed {prop, order} emit. */
+function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
+  emit('sort-change', parsePrimeVueSort(s))
 }
 
 type BelowMin = Exclude<StockSeverity, 'ok'>
@@ -67,57 +83,95 @@ const SEVERITY_LABEL: Record<BelowMin, string> = {
   warning: 'Bajo',
 }
 
-const SEVERITY_TAG: Record<BelowMin, 'danger' | 'warning'> = {
+const SEVERITY_TAG: Record<BelowMin, 'danger' | 'warn'> = {
   danger: 'danger',
-  warning: 'warning',
+  warning: 'warn',
 }
 
 function severityOf(row: InsumoRead): StockSeverity {
   return stockSeverity(row.stock_actual, row.stock_minimo)
 }
 
-/** el-table row class hook — below-min rows get a severity background tint. */
-function rowClass({ row }: { row: InsumoRead }): string {
+/** DataTable row class hook — below-min rows get a severity background tint. */
+function rowClass(row: InsumoRead): string {
   return stockSeverity(row.stock_actual, row.stock_minimo)
 }
 </script>
 
 <template>
-  <el-table :data="rows" :row-class-name="rowClass" v-loading="loading" @filter-change="onColumnFilterChange" @sort-change="onSortChange">
-    <el-table-column prop="nombre" label="Insumo" column-key="nombre" sortable min-width="180" />
-    <el-table-column label="Categoría" column-key="categoria" :filters="categoriaFilters" sortable min-width="140" sort-orders="['ascending', 'descending']">
-      <template #default="{ row }">{{ row.nombre_categoria ?? '—' }}</template>
-    </el-table-column>
-    <el-table-column prop="unidad_medida" label="Unidad" column-key="unidad_medida" sortable width="100" />
-    <el-table-column label="Stock actual" column-key="stock_actual" sortable width="130" align="right">
-      <template #default="{ row }">{{ formatQty(row.stock_actual) }}</template>
-    </el-table-column>
-    <el-table-column label="Stock mínimo" column-key="stock_minimo" sortable width="130" align="right">
-      <template #default="{ row }">{{ formatQty(row.stock_minimo) }}</template>
-    </el-table-column>
-    <el-table-column label="Costo promedio" column-key="costo_promedio_actual" sortable width="160" align="right">
-      <template #default="{ row }">{{ formatMoney(row.costo_promedio_actual) }}</template>
-    </el-table-column>
-    <el-table-column label="Estado" width="100" align="center">
-      <template #default="{ row }">
-        <el-tag v-if="severityOf(row) !== 'ok'" :type="SEVERITY_TAG[severityOf(row) as BelowMin]" size="small">
-          {{ SEVERITY_LABEL[severityOf(row) as BelowMin] }}
-        </el-tag>
+  <DataTable
+    :value="rows"
+    lazy
+    filterDisplay="menu"
+    :loading="loading"
+    :filters="filters"
+    :row-class="rowClass"
+    @filter="onDataTableFilter"
+    @sort="onDataTableSort"
+  >
+    <Column field="nombre" header="Insumo" sortable style="min-width: 180px" />
+    <Column
+      field="categoria"
+      header="Categoría"
+      sortable
+      :show-filter-operator="false"
+      :show-filter-match-modes="false"
+      :show-filter-add-button="false"
+      :show-filter-apply-button="false"
+      :show-clear-button="false"
+      style="min-width: 140px"
+    >
+      <template #body="{ data }">{{ data.nombre_categoria ?? '—' }}</template>
+      <template v-if="categoriaFilters.length > 0" #filter="{ filterModel, filterCallback }">
+        <Select
+          v-model="filterModel.value"
+          :options="categoriaFilters"
+          optionLabel="text"
+          optionValue="value"
+          placeholder="Categoría"
+          :show-clear="true"
+          @change="filterCallback()"
+        />
       </template>
-    </el-table-column>
-    <el-table-column v-if="canEdit" label="Acciones" width="150" align="center">
-      <template #default="{ row }">
-        <el-button link type="primary" size="small" data-test="edit-insumo" @click="emit('edit', row)">
+    </Column>
+    <Column field="unidad_medida" header="Unidad" sortable style="width: 100px" />
+    <Column field="stock_actual" header="Stock actual" sortable style="width: 130px" align="right">
+      <template #body="{ data }">{{ formatQty(data.stock_actual) }}</template>
+    </Column>
+    <Column field="stock_minimo" header="Stock mínimo" sortable style="width: 130px" align="right">
+      <template #body="{ data }">{{ formatQty(data.stock_minimo) }}</template>
+    </Column>
+    <Column field="costo_promedio_actual" header="Costo promedio" sortable style="width: 160px" align="right">
+      <template #body="{ data }">{{ formatMoney(data.costo_promedio_actual) }}</template>
+    </Column>
+    <Column header="Estado" style="width: 100px" align="center">
+      <template #body="{ data }">
+        <Tag v-if="severityOf(data) !== 'ok'" :severity="SEVERITY_TAG[severityOf(data) as BelowMin]">
+          {{ SEVERITY_LABEL[severityOf(data) as BelowMin] }}
+        </Tag>
+      </template>
+    </Column>
+    <Column v-if="canEdit" header="Acciones" style="width: 150px" align="center">
+      <template #body="{ data: row }">
+        <Button link size="small" data-test="edit-insumo" @click="emit('edit', row)">
           Editar
-        </el-button>
-        <el-button link type="danger" size="small" data-test="delete-insumo" @click="emit('delete', row)">
+        </Button>
+        <Button text severity="danger" size="small" data-test="delete-insumo" @click="emit('delete', row)">
           Eliminar
-        </el-button>
+        </Button>
       </template>
-    </el-table-column>
+    </Column>
 
     <template #empty>
-      <el-empty description="Sin insumos registrados" :image-size="80" />
+      <div class="insumo-empty">Sin insumos registrados</div>
     </template>
-  </el-table>
+  </DataTable>
 </template>
+
+<style scoped>
+.insumo-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
+}
+</style>

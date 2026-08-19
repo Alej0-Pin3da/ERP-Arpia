@@ -3,21 +3,27 @@
  *
  * Mounts the REAL DevolucionesView + DevolucionesTable + DevolucionesForm
  * against a mocked API module: the /devoluciones list is server-side paginated
- * ({items,total} + el-pagination), joined client-side
+ * ({items,total} + PrimeVue Paginator), joined client-side
  * (/productos?limit=1000 against `.items`), the filters drive the GET query,
  * the create section is role-gated (consulta = list only), and a submit routes
  * the payload through devolucionesApi.create, surfaces the success message
- * and refreshes the list.
+ * and refreshes the list. Row expansion uses the DataTable
+ * `.p-datatable-row-toggle-button` (slice 1b).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage } from 'element-plus'
+import ElementPlus from 'element-plus'
+import Paginator from 'primevue/paginator'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import DevolucionesView from '@/views/DevolucionesView.vue'
 import type { components } from '@/types/api.d'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 
 type DevolucionRead = components['schemas']['DevolucionRead']
 
@@ -32,6 +38,9 @@ vi.mock('@/api/endpoints', () => ({
   devolucionesApi: { list: apiMocks.listDevoluciones, create: apiMocks.createDevolucion },
   productosApi: { list: apiMocks.listProductos },
 }))
+
+// Fake PrimeVue Toast host: renders showToast() messages into <body>.
+mountToastHost()
 
 const DEVOLUCIONES: DevolucionRead[] = [
   {
@@ -79,7 +88,14 @@ async function mountView(rol: string): Promise<VueWrapper> {
     user: { id: 2, nombre: 'Pepe Operador', email: 'pepe@arpia.com.co', rol },
   })
   const wrapper = mount(DevolucionesView, {
-    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+    global: {
+      plugins: [
+        pinia,
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+      stubs: { transition: false },
+    },
   })
   await nextTick()
   await flushPromises()
@@ -96,7 +112,7 @@ describe('DevolucionesView (MOD-2 + T7)', () => {
   })
 
   afterEach(() => {
-    ElMessage.closeAll()
+    clearToastHost()
   })
 
   it('renders the joined list and the register button for an operador', async () => {
@@ -112,18 +128,18 @@ describe('DevolucionesView (MOD-2 + T7)', () => {
     expect(apiMocks.listProductos).toHaveBeenCalledWith({ limit: 1000 })
     expect(apiMocks.listDevoluciones).toHaveBeenCalledWith(PAGE1)
 
-    // Expand the row -> the joined product name renders.
-    await wrapper.find('.el-table__expand-icon').trigger('click')
+    // Expand the row -> the joined product name renders (DataTable toggler).
+    await wrapper.find('.p-datatable-row-toggle-button').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('Arepa de huevo')
   })
 
-  it('renders el-pagination and pages the list with a new offset', async () => {
+  it('renders Paginator and pages the list with a new offset', async () => {
     const wrapper = await mountView('operador')
-    expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(true)
+    expect(wrapper.findComponent(Paginator).exists()).toBe(true)
     expect(apiMocks.listDevoluciones).toHaveBeenCalledWith(PAGE1)
 
-    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    wrapper.findComponent(Paginator).vm.$emit('page', { first: 20, rows: 20 })
     await flushPromises()
     expect(apiMocks.listDevoluciones).toHaveBeenCalledWith({ limit: 20, offset: 20 })
   })
@@ -150,6 +166,8 @@ describe('DevolucionesView (MOD-2 + T7)', () => {
     const wrapper = await mountView('operador')
 
     expect(wrapper.text()).toContain('No se pudo cargar la lista de devoluciones')
+    // el-alert replaced by PrimeVue Message (slice 3a).
+    expect(wrapper.find('.p-message').exists()).toBe(true)
   })
 
   it('opens the dialog, posts the form payload, shows the success message, closes and refreshes the list', async () => {

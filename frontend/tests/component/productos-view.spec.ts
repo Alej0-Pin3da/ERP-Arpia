@@ -4,21 +4,26 @@
  * Mounts the REAL ProductosView + all productos components against mocked
  * productosApi/tiposProductoApi/insumosApi: the three tabs (Productos / BOM /
  * Costo), the client-joined productos list with server-side pagination
- * ({items,total} + el-pagination + q/tipo filters), role visibility (ALL
+ * ({items,total} + PrimeVue Paginator + q/tipo filters), role visibility (ALL
  * product, variante and BOM writes are require_admin server-side), the nested
  * variantes lazy flow, the productos create/edit/delete flows, the BOM tab and
  * the Costo tab. Lookup joins (BOM/Costo selects, tipo/insumo labels) keep
- * limit:1000 against `.items` (design D3).
+ * limit:1000 against `.items` (design D3). el-tabs/el-dialog stay until S2.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import ElementPlus from 'element-plus'
+import Paginator from 'primevue/paginator'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import ProductosView from '@/views/ProductosView.vue'
 import type { components } from '@/types/api.d'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 
 type ProductoRead = components['schemas']['ProductoRead']
 type TipoProductoRead = components['schemas']['TipoProductoRead']
@@ -74,6 +79,11 @@ vi.mock('@/api/endpoints', () => ({
   tiposProductoApi: { list: apiMocks.listTipos },
   insumosApi: { list: apiMocks.listInsumos },
 }))
+const confirmMocks = vi.hoisted(() => ({ confirmAction: vi.fn() }))
+vi.mock('@/utils/confirm', () => ({ confirmAction: confirmMocks.confirmAction }))
+
+// Fake PrimeVue Toast host: renders showToast() messages into <body>.
+mountToastHost()
 
 const TIPOS: TipoProductoRead[] = [{ id: 1, nombre: 'Alimentos' }]
 
@@ -151,7 +161,14 @@ async function mountView(rol: string): Promise<VueWrapper> {
     user: { id: 2, nombre: 'Pepe', email: 'pepe@arpia.com.co', rol },
   })
   const wrapper = mount(ProductosView, {
-    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+    global: {
+      plugins: [
+        pinia,
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+      stubs: { transition: false },
+    },
   })
   await nextTick()
   await flushPromises()
@@ -159,9 +176,9 @@ async function mountView(rol: string): Promise<VueWrapper> {
   return wrapper
 }
 
-/** Click the el-tabs item with the given label (pane content mounts on visit). */
+/** Click the PrimeVue Tab with the given label (panels stay mounted via v-show). */
 async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
-  const item = wrapper.findAll('.el-tabs__item').find((i) => i.text().trim() === label)
+  const item = wrapper.findAll('.p-tab').find((i) => i.text().trim() === label)
   if (!item) throw new Error(`tab not found: "${label}"`)
   await item.trigger('click')
   await nextTick()
@@ -193,6 +210,7 @@ async function flushDialogTransition(): Promise<void> {
 describe('ProductosView (MOD-5 + T6)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    confirmMocks.confirmAction.mockReset()
     // Table page uses the {items,total} contract; lookups keep limit:1000.
     apiMocks.listProductos.mockResolvedValue({ items: PRODUCTOS, total: 2 })
     apiMocks.listTipos.mockResolvedValue({ items: TIPOS, total: 1 })
@@ -216,7 +234,7 @@ describe('ProductosView (MOD-5 + T6)', () => {
   })
 
   afterEach(() => {
-    ElMessage.closeAll()
+    clearToastHost()
     vi.restoreAllMocks()
   })
 
@@ -239,12 +257,12 @@ describe('ProductosView (MOD-5 + T6)', () => {
     expect(apiMocks.listTipos).toHaveBeenCalledTimes(1)
   })
 
-  it('renders el-pagination on the productos tab and pages with offset', async () => {
+  it('renders Paginator on the productos tab and pages with offset', async () => {
     const wrapper = await mountView('operador')
-    expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(true)
+    expect(wrapper.findComponent(Paginator).exists()).toBe(true)
     expect(apiMocks.listProductos).toHaveBeenCalledWith(PAGE1)
 
-    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    wrapper.findComponent(Paginator).vm.$emit('page', { first: 20, rows: 20 })
     await flushPromises()
     expect(apiMocks.listProductos).toHaveBeenCalledWith({ limit: 20, offset: 20 })
   })
@@ -411,7 +429,7 @@ describe('ProductosView (MOD-5 + T6)', () => {
   })
 
   it('deletes a product after the confirm dialog (204) and refreshes', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     const wrapper = await mountView('admin')
     expect(apiMocks.listProductos).toHaveBeenCalledTimes(2)
 
@@ -425,7 +443,7 @@ describe('ProductosView (MOD-5 + T6)', () => {
   })
 
   it('surfaces the 409 when deleting a product that is in use', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     apiMocks.deleteProducto.mockRejectedValue({
       response: { data: { detail: 'Producto is in use and cannot be deleted' } },
     })

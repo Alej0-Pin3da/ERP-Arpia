@@ -2,21 +2,25 @@
 /**
  * Usuario form (PR11, spec MOD-5 usuarios) — admin only.
  *
- * Dual-mode Element Plus form over /usuarios:
+ * Dual-mode PrimeVue form over /usuarios:
  *  - create: POST UsuarioCreate {nombre, email, rol, password} — every field
  *    required; password must be at least 6 chars (backend schema
  *    min_length=6). The password is a secret: never trimmed, shown with the
- *    show-password toggle.
+ *    show-password toggle (Password toggleMask).
  *  - edit: ROL-ONLY — the module's edit action changes just the rol
  *    (prefilled from the row). A self-demote (own rol away from admin) is
  *    rejected server-side with 400 "Cannot change your own role away from
  *    admin" and surfaced by the view.
  *  The view owns the POST/PATCH, the admin-only gate and the refresh.
  */
-import { ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, ref, watch } from 'vue'
+import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
+import Password from 'primevue/password'
+import Select from 'primevue/select'
 
 import { roleLabel } from '@/utils/menu'
+import { showToast } from '@/utils/toast'
 import {
   buildUsuarioPayload,
   buildUsuarioUpdatePayload,
@@ -39,6 +43,8 @@ const email = ref('')
 const rol = ref<string | null>(null)
 const password = ref('')
 
+const rolOptions = computed(() => USUARIO_ROLES.map((r) => ({ label: roleLabel(r), value: r })))
+
 /** Edit mode prefills the rol (the only editable field). */
 watch(
   () => props.initial,
@@ -55,7 +61,7 @@ watch(
 function submit(): void {
   if (props.mode === 'edit') {
     if (rol.value === null) {
-      ElMessage.warning('Selecciona el rol.')
+      showToast('warn', 'Selecciona el rol.')
       return
     }
     emit('submit', buildUsuarioUpdatePayload(rol.value))
@@ -63,23 +69,23 @@ function submit(): void {
   }
 
   if (nombre.value.trim() === '') {
-    ElMessage.warning('Escribe el nombre del usuario.')
+    showToast('warn', 'Escribe el nombre del usuario.')
     return
   }
   if (email.value.trim() === '') {
-    ElMessage.warning('Escribe el correo del usuario.')
+    showToast('warn', 'Escribe el correo del usuario.')
     return
   }
   if (rol.value === null) {
-    ElMessage.warning('Selecciona el rol.')
+    showToast('warn', 'Selecciona el rol.')
     return
   }
   if (password.value === '') {
-    ElMessage.warning('Escribe la contraseña.')
+    showToast('warn', 'Escribe la contraseña.')
     return
   }
   if (password.value.length < 6) {
-    ElMessage.warning('La contraseña debe tener al menos 6 caracteres.')
+    showToast('warn', 'La contraseña debe tener al menos 6 caracteres.')
     return
   }
   emit(
@@ -95,52 +101,60 @@ function submit(): void {
 </script>
 
 <template>
-  <el-form label-position="top" class="usuario-form" @submit.prevent="submit">
-    <el-row :gutter="16">
-      <el-col v-if="mode === 'create'" :xs="24" :md="12">
-        <el-form-item label="Nombre">
-          <el-input v-model="nombre" placeholder="Ej: María Pérez" data-test="usuario-nombre-input" />
-        </el-form-item>
-      </el-col>
-      <el-col v-if="mode === 'create'" :xs="24" :md="12">
-        <el-form-item label="Email">
-          <el-input
+  <form class="usuario-form" @submit.prevent="submit">
+    <div class="form-grid">
+      <div v-if="mode === 'create'" class="form-col" style="--md: 12">
+        <div class="form-item">
+          <label class="form-label">Nombre</label>
+          <InputText v-model="nombre" placeholder="Ej: María Pérez" data-test="usuario-nombre-input" />
+        </div>
+      </div>
+      <div v-if="mode === 'create'" class="form-col" style="--md: 12">
+        <div class="form-item">
+          <label class="form-label">Email</label>
+          <InputText
             v-model="email"
             type="email"
             placeholder="Ej: maria@arpia.com.co"
             data-test="usuario-email-input"
           />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="12">
-        <el-form-item label="Rol">
-          <el-select
+        </div>
+      </div>
+      <div class="form-col" style="--md: 12">
+        <div class="form-item">
+          <label class="form-label">Rol</label>
+          <Select
             v-model="rol"
+            :options="rolOptions"
+            option-label="label"
+            option-value="value"
             placeholder="Selecciona el rol"
             class="usuario-field"
-            popper-class="usuario-rol-popper"
+            panel-class="usuario-rol-popper"
             data-test="usuario-rol-select"
-          >
-            <el-option v-for="r in USUARIO_ROLES" :key="r" :label="roleLabel(r)" :value="r" />
-          </el-select>
-        </el-form-item>
-      </el-col>
-      <el-col v-if="mode === 'create'" :xs="24" :md="12">
-        <el-form-item label="Contraseña">
-          <el-input
+          />
+        </div>
+      </div>
+      <div v-if="mode === 'create'" class="form-col" style="--md: 12">
+        <div class="form-item">
+          <label class="form-label">Contraseña</label>
+          <Password
             v-model="password"
-            type="password"
-            show-password
+            :toggle-mask="true"
+            :feedback="false"
             placeholder="Mínimo 6 caracteres"
+            class="usuario-field"
             data-test="usuario-password-input"
           />
-        </el-form-item>
-      </el-col>
-    </el-row>
-    <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-usuario">
-      {{ mode === 'edit' ? 'Guardar cambios' : 'Crear usuario' }}
-    </el-button>
-  </el-form>
+        </div>
+      </div>
+    </div>
+    <div class="submit-row">
+      <Button type="submit" :loading="saving" data-test="submit-usuario">
+        {{ mode === 'edit' ? 'Guardar cambios' : 'Crear usuario' }}
+      </Button>
+    </div>
+  </form>
 </template>
 
 <style scoped>
@@ -150,5 +164,36 @@ function submit(): void {
 
 .usuario-field {
   width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.form-col {
+  grid-column: span 24;
+}
+
+@media (min-width: 768px) {
+  .form-col {
+    grid-column: span var(--md, 24);
+  }
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--el-text-color-primary);
+}
+
+.submit-row {
+  margin-top: 0.5rem;
 }
 </style>

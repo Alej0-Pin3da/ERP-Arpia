@@ -1,7 +1,7 @@
 /**
  * VarianteForm component tests (PR10, spec MOD-5).
  *
- * Mounts the REAL VarianteForm with Element Plus in both modes — the nested
+ * Mounts the REAL VarianteForm with PrimeVue in both modes — the nested
  * variante create/edit form for ONE product:
  *  - create: nombre_variante + optional precio_venta; empty nombre blocks
  *    submission with a warning
@@ -11,10 +11,13 @@
  * The view owns the POST/PUT, the admin-only gate and the refresh.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus, { ElMessage } from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
+import esCO from '@/utils/locales/es-CO'
 import VarianteForm from '@/components/productos/VarianteForm.vue'
 import type { components } from '@/types/api.d'
 
@@ -33,15 +36,28 @@ async function mountForm(
 ): Promise<VueWrapper> {
   const wrapper = mount(VarianteForm, {
     props: { mode, initial },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
 }
 
+/** PrimeVue InputNumber commits the model on blur — type then blur like a user. */
+async function setNumber(wrapper: VueWrapper, testId: string, value: string): Promise<void> {
+  const input = wrapper.find(`[data-test="${testId}"] input`)
+  await input.setValue(value)
+  await input.trigger('blur')
+  await nextTick()
+}
+
+mountToastHost()
+
 afterEach(() => {
-  ElMessage.closeAll()
-  document.body.innerHTML = ''
+  clearToastHost()
 })
 
 describe('VarianteForm (MOD-5)', () => {
@@ -75,7 +91,7 @@ describe('VarianteForm (MOD-5)', () => {
     const wrapper = await mountForm('create')
 
     await wrapper.find('[data-test="nombre-variante-input"]').setValue('Individual')
-    await wrapper.find('[data-test="precio-variante-input"] input').setValue('13000')
+    await setNumber(wrapper, 'precio-variante-input', '13000')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

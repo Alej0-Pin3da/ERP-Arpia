@@ -5,7 +5,11 @@
  * Renders the client-side joined margen rows (buildMargenRows output):
  * product name, variant label (or '(base)'), total and average margin —
  * all Decimal-formatted es-CO. Missing products degrade to "Producto #{id}".
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c.
  */
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import { formatMoney } from '@/utils/format'
 import type { MargenRow } from '@/utils/dashboard'
 
@@ -16,17 +20,26 @@ defineProps<{
 </script>
 
 <template>
-  <el-table :data="rows" v-loading="loading">
-    <el-table-column prop="nombre" label="Producto" min-width="180" />
-    <el-table-column prop="variante" label="Variante" min-width="120" />
-    <el-table-column label="Margen total" width="140" align="right">
-      <template #default="{ row }">{{ formatMoney(row.margen_total) }}</template>
-    </el-table-column>
-    <el-table-column label="Margen promedio" width="150" align="right">
-      <template #default="{ row }">{{ formatMoney(row.margen_promedio) }}</template>
-    </el-table-column>
+  <DataTable :value="rows" lazy :loading="loading">
+    <Column field="nombre" header="Producto" style="min-width: 180px" />
+    <Column field="variante" header="Variante" style="min-width: 120px" />
+    <Column field="margen_total" header="Margen total" style="width: 140px" align="right">
+      <template #body="{ data }">{{ formatMoney(data.margen_total) }}</template>
+    </Column>
+    <Column field="margen_promedio" header="Margen promedio" style="width: 150px" align="right">
+      <template #body="{ data }">{{ formatMoney(data.margen_promedio) }}</template>
+    </Column>
+
     <template #empty>
-      <el-empty description="Sin márgenes calculados" :image-size="80" />
+      <div class="margen-empty">Sin márgenes calculados</div>
     </template>
-  </el-table>
+  </DataTable>
 </template>
+
+<style scoped>
+.margen-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
+}
+</style>

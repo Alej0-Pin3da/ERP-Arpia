@@ -4,12 +4,24 @@
  * Mounts the REAL VentasTable with pre-joined rows (buildVentaRows output):
  * es-CO formatted money/date, canal/estado labels, joined product names in
  * the summary column, and expandable detail lines with product/variant names.
+ *
+ * Migrated to PrimeVue DataTable (slice 1a): rows are `tbody tr` (DataTable
+ * paints `p-row-even`/`p-row-odd` body rows — there is no `.p-datatable-row`
+ * class), expansion uses `.p-datatable-row-toggle-button`, and the header
+ * funnels are DataTable filter menus (`filterDisplay="menu"`) hosting a
+ * Select per column. el-tag/el-button cells still need the ElementPlus plugin;
+ * the v-tooltip gift action needs the PrimeVue Tooltip directive.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
+import DataTable from 'primevue/datatable'
+import Select from 'primevue/select'
+import PrimeVue from 'primevue/config'
+import Tooltip from 'primevue/tooltip'
 import { nextTick } from 'vue'
 import { describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import VentasTable from '@/components/ventas/VentasTable.vue'
 import type { VentaRow } from '@/utils/ventas'
 
@@ -83,11 +95,22 @@ const ROW_REGALO: VentaRow = {
 async function mountTable(rows: VentaRow[], loading = false, canMarkRegalo = false): Promise<VueWrapper> {
   const wrapper = mount(VentasTable, {
     props: { rows, loading, canMarkRegalo },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+      directives: { tooltip: Tooltip },
+    },
   })
-  // el-table paints its body one tick after mount (ResizeObserver layout).
+  // DataTable paints its body one tick after mount.
   await nextTick()
   return wrapper
+}
+
+/** Let the funnel overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
 }
 
 describe('VentasTable (MOD-1 list)', () => {
@@ -95,7 +118,7 @@ describe('VentasTable (MOD-1 list)', () => {
     const wrapper = await mountTable([ROW])
 
     const text = wrapper.text()
-    expect(wrapper.findAll('.el-table__row')[0].text()).toContain('10') // id cell
+    expect(wrapper.findAll('tbody tr')[0].text()).toContain('10') // id cell
     expect(text).toContain('01/08/2026')
     expect(text).toContain('WhatsApp')
     expect(text).toContain('Completada')
@@ -116,9 +139,8 @@ describe('VentasTable (MOD-1 list)', () => {
 
   it('expands a row into detail lines with product/variant names and money', async () => {
     const wrapper = await mountTable([ROW])
-    // Expand the first row: el-table's expand icon toggles the detail area.
-    const expandIcon = wrapper.find('.el-table__expand-icon')
-    await expandIcon.trigger('click')
+    // Expand the first row: DataTable's expander toggler opens the detail row.
+    await wrapper.find('.p-datatable-row-toggle-button').trigger('click')
     await flushPromises()
 
     const text = wrapper.text()
@@ -138,31 +160,36 @@ describe('VentasTable (MOD-1 list)', () => {
   it('declares header funnel filters on the canal/estado columns with labeled options', async () => {
     const wrapper = await mountTable([ROW])
 
-    const canalColumn = wrapper
-      .findAllComponents({ name: 'ElTableColumn' })
-      .find((c) => c.props('columnKey') === 'canal_venta')
-    const estadoColumn = wrapper
-      .findAllComponents({ name: 'ElTableColumn' })
-      .find((c) => c.props('columnKey') === 'estado')
+    // Config-level: the lazy filter state declares one 'equals' constraint per
+    // column and both funnels render (filterDisplay="menu").
+    expect(wrapper.findComponent(DataTable).props('filters')).toEqual({
+      canal_venta: { value: null, matchMode: 'equals' },
+      estado: { value: null, matchMode: 'equals' },
+    })
+    expect(wrapper.findAll('.p-datatable-column-filter-button')).toHaveLength(2)
 
-    expect(canalColumn!.props('filters')).toEqual([
+    // Behavioral: opening the canal funnel mounts the Select with labeled options.
+    await wrapper.findAll('.p-datatable-column-filter-button')[0].trigger('click')
+    await flushOverlay()
+
+    const canalSelect = wrapper.findComponent(Select)
+    expect(canalSelect.exists()).toBe(true)
+    expect(canalSelect.props('options')).toEqual([
       { text: 'Web', value: 'web' },
       { text: 'WhatsApp', value: 'whatsapp' },
       { text: 'Instagram', value: 'instagram' },
       { text: 'Feria', value: 'feria' },
     ])
-    expect(estadoColumn!.props('filters')).toEqual([
-      { text: 'Completada', value: 'completada' },
-      { text: 'Anulada', value: 'anulada' },
-    ])
   })
 
-  it('normalizes an el-table filter-change into a typed single-value emit', async () => {
+  it('normalizes a PrimeVue filter payload into a typed single-value emit', async () => {
     const wrapper = await mountTable([ROW])
 
-    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', {
-      canal_venta: ['feria'],
-      estado: ['anulada'],
+    wrapper.findComponent(DataTable).vm.$emit('filter', {
+      filters: {
+        canal_venta: { value: 'feria', matchMode: 'equals' },
+        estado: { value: 'anulada', matchMode: 'equals' },
+      },
     })
     await nextTick()
 
@@ -170,35 +197,33 @@ describe('VentasTable (MOD-1 list)', () => {
     expect(wrapper.emitted('filter-change')![0][0]).toEqual({ canal_venta: 'feria', estado: 'anulada' })
   })
 
-  it('emits nulls when a column filter is cleared (empty selection)', async () => {
+  it('emits nulls when a column filter is cleared (null constraint)', async () => {
     const wrapper = await mountTable([ROW])
 
-    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', {
-      canal_venta: [],
-      estado: [],
+    wrapper.findComponent(DataTable).vm.$emit('filter', {
+      filters: {
+        canal_venta: { value: null, matchMode: 'equals' },
+        estado: { value: null, matchMode: 'equals' },
+      },
     })
     await nextTick()
 
     expect(wrapper.emitted('filter-change')![0][0]).toEqual({ canal_venta: null, estado: null })
   })
 
-  it('maps an el-table sort-change into a typed {prop, order} emit', async () => {
+  it('maps a PrimeVue sort payload into a typed {prop, order} emit', async () => {
     const wrapper = await mountTable([ROW])
 
-    wrapper
-      .findComponent({ name: 'ElTable' })
-      .vm.$emit('sort-change', { column: { key: 'total_venta' }, order: 'ascending' })
+    wrapper.findComponent(DataTable).vm.$emit('sort', { sortField: 'total_venta', sortOrder: 1 })
     await nextTick()
 
     expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'total_venta', order: 'asc' })
   })
 
-  it('maps a cleared sort (null order) for the same column', async () => {
+  it('maps a cleared sort (order 0) for the same column', async () => {
     const wrapper = await mountTable([ROW])
 
-    wrapper
-      .findComponent({ name: 'ElTable' })
-      .vm.$emit('sort-change', { column: { key: 'cliente' }, order: null })
+    wrapper.findComponent(DataTable).vm.$emit('sort', { sortField: 'cliente', sortOrder: 0 })
     await nextTick()
 
     expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'cliente', order: null })

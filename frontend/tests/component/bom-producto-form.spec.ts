@@ -1,7 +1,7 @@
 /**
  * BomProductoForm component tests (PR10, spec MOD-5).
  *
- * Mounts the REAL BomProductoForm with Element Plus in both modes — the
+ * Mounts the REAL BomProductoForm with PrimeVue in both modes — the
  * combo-content (BomProducto) create/edit form for the selected product:
  *  - create: producto_incluido select (productos prop) + cantidad; empty
  *    selection / empty cantidad each block submission with a warning
@@ -10,10 +10,13 @@
  * The view owns the POST/PUT, the admin-only gate and the refresh.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus, { ElMessage } from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
+import esCO from '@/utils/locales/es-CO'
 import BomProductoForm from '@/components/productos/BomProductoForm.vue'
 import type { components } from '@/types/api.d'
 import type { BomProductoRow } from '@/utils/productos'
@@ -47,28 +50,47 @@ async function mountForm(
 ): Promise<VueWrapper> {
   const wrapper = mount(BomProductoForm, {
     props: { mode, initial, productos: PRODUCTOS },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
 }
 
-async function pickProducto(wrapper: VueWrapper, label: string): Promise<void> {
-  const select = wrapper.find('[data-test="bom-producto-select"]')
-  await select.trigger('click')
-  await nextTick()
-  const item = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
-    (el) => el.textContent?.trim() === label,
-  )
-  if (!item) throw new Error(`producto option not found: "${label}"`)
-  item.click()
-  await nextTick()
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
 }
 
+async function pickProducto(wrapper: VueWrapper, label: string): Promise<void> {
+  const select = wrapper.find('[data-test="bom-producto-select"]')
+  await select.trigger('click')
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
+    (el) => el.textContent?.trim() === label,
+  )
+  if (!item) throw new Error(`producto option not found: "${label}"`)
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
+  await nextTick()
+}
+
+/** PrimeVue InputNumber commits the model on blur — type then blur like a user. */
+async function setNumber(wrapper: VueWrapper, testId: string, value: string): Promise<void> {
+  const input = wrapper.find(`[data-test="${testId}"] input`)
+  await input.setValue(value)
+  await input.trigger('blur')
+  await nextTick()
+}
+
+mountToastHost()
+
 afterEach(() => {
-  ElMessage.closeAll()
-  document.body.innerHTML = ''
+  clearToastHost()
 })
 
 describe('BomProductoForm (MOD-5)', () => {
@@ -79,8 +101,8 @@ describe('BomProductoForm (MOD-5)', () => {
     expect(wrapper.text()).toContain('Cantidad')
 
     await wrapper.find('[data-test="bom-producto-select"]').trigger('click')
-    await nextTick()
-    const options = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')]
+    await flushOverlay()
+    const options = [...document.querySelectorAll<HTMLElement>('.p-select-option')]
     expect(options.map((o) => o.textContent?.trim())).toEqual(['Arepa de choclo', 'Queso campesino'])
   })
 
@@ -109,7 +131,7 @@ describe('BomProductoForm (MOD-5)', () => {
     const wrapper = await mountForm('create')
 
     await pickProducto(wrapper, 'Queso campesino')
-    await wrapper.find('[data-test="cantidad-bom-producto-input"] input').setValue('2')
+    await setNumber(wrapper, 'cantidad-bom-producto-input', '2')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -121,7 +143,7 @@ describe('BomProductoForm (MOD-5)', () => {
 
     expect(wrapper.text()).toContain('Queso campesino') // select prefilled
 
-    await wrapper.find('[data-test="cantidad-bom-producto-input"] input').setValue('3')
+    await setNumber(wrapper, 'cantidad-bom-producto-input', '3')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

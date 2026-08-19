@@ -1,17 +1,23 @@
 /**
  * SociosTable component tests (PR8, spec MOD-3).
  *
- * Mounts the REAL SociosTable with Element Plus: renders partner rows with
- * es-CO percentages, shows the sum-to-100 progress (current sum vs 100, with
- * a success state at exactly 100), hides edit/delete actions for read-only
- * roles (can-edit=false), emits `edit`/`delete` with the row, and shows the
- * empty state.
+ * Mounts the REAL SociosTable with PrimeVue (slice 1b+):
+ * renders partner rows with es-CO percentages, shows the sum-to-100 progress
+ * (current sum vs 100, with a green ProgressBar at exactly 100), hides
+ * edit/delete actions for read-only roles (can-edit=false), emits
+ * `edit`/`delete` with the row, and shows the empty state. Column sort is a
+ * DataTable lazy `@sort` normalized by parsePrimeVueSort. The tree is fully
+ * PrimeVue since slice 3a (ProgressBar replaced the last el-progress, so the
+ * ElementPlus plugin was dropped).
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
+import DataTable from 'primevue/datatable'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import SociosTable from '@/components/finanzas/SociosTable.vue'
 import type { components } from '@/types/api.d'
 
@@ -30,7 +36,11 @@ const PARTIAL: SocioConfiguracionRead[] = [
 async function mountTable(rows: SocioConfiguracionRead[], canEdit = true): Promise<VueWrapper> {
   const wrapper = mount(SociosTable, {
     props: { rows, canEdit },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
@@ -49,6 +59,9 @@ describe('SociosTable (MOD-3)', () => {
     // Sum-to-100 progress: 100% shown and marked complete.
     expect(text).toContain('100%')
     expect(wrapper.find('[data-test="socios-progress"]').exists()).toBe(true)
+    // Migrated to PrimeVue ProgressBar (slice 3a): bar present with the value.
+    expect(wrapper.find('.p-progressbar').exists()).toBe(true)
+    expect(wrapper.find('[role="progressbar"]').attributes('aria-valuenow')).toBe('100')
   })
 
   it('shows a warning-style progress when the sum is below 100', async () => {
@@ -56,6 +69,8 @@ describe('SociosTable (MOD-3)', () => {
 
     expect(wrapper.text()).toContain('90%')
     expect(wrapper.text()).toContain('100%') // target rendered too
+    expect(wrapper.find('.p-progressbar').exists()).toBe(true)
+    expect(wrapper.find('[role="progressbar"]').attributes('aria-valuenow')).toBe('90')
   })
 
   it('hides the progress section when there are no socios', async () => {
@@ -82,12 +97,12 @@ describe('SociosTable (MOD-3)', () => {
     expect(wrapper.findAll('[data-test="delete-socio"]')).toHaveLength(0)
   })
 
-  it('maps an el-table sort-change into a typed {prop, order} emit', async () => {
+  it('maps a PrimeVue sort payload into a typed {prop, order} emit', async () => {
     const wrapper = await mountTable(SOCIOS)
 
     wrapper
-      .findComponent({ name: 'ElTable' })
-      .vm.$emit('sort-change', { column: { key: 'porcentaje_participacion' }, order: 'ascending' })
+      .findComponent(DataTable)
+      .vm.$emit('sort', { sortField: 'porcentaje_participacion', sortOrder: 1 })
     await nextTick()
 
     expect(wrapper.emitted('sort-change')![0][0]).toEqual({
@@ -96,10 +111,10 @@ describe('SociosTable (MOD-3)', () => {
     })
   })
 
-  it('maps a cleared sort (null order) for the nombre column', async () => {
+  it('maps a cleared sort (order 0) for the nombre column', async () => {
     const wrapper = await mountTable(SOCIOS)
 
-    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('sort-change', { column: { key: 'nombre' }, order: null })
+    wrapper.findComponent(DataTable).vm.$emit('sort', { sortField: 'nombre', sortOrder: 0 })
     await nextTick()
 
     expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'nombre', order: null })

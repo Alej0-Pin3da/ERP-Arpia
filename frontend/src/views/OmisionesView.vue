@@ -3,7 +3,8 @@
  * Omisiones view (PR3, spec MIG-3/MIG-4 + FE-1/FE-2/FE-3).
  *
  * Read surface for the migration omission log (populated by the CLI hook in
- * commit mode): server-side el-pagination against {items, total}, toolbar
+ * commit mode): server-side pagination against {items, total} via the
+ * PrimeVue Paginator, toolbar
  * filters (q, fase, nivel, hoja, resuelta) that reset to page 1 (FE-2),
  * and an admin-only "Marcar resuelta"/"Reabrir" action (D9 — the PATCH
  * endpoint is require_admin server-side).
@@ -12,12 +13,15 @@
  * calls the API, and passes rows down to OmisionesTable.
  */
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 
 import { omisionesApi } from '@/api/endpoints'
 import OmisionesTable from '@/components/omisiones/OmisionesTable.vue'
+import Button from 'primevue/button'
+import Message from 'primevue/message'
+import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
+import { showToast } from '@/utils/toast'
 import type { OmisionRead } from '@/types/api.d'
 
 const auth = useAuthStore()
@@ -82,10 +86,10 @@ async function onToggleResuelta(row: OmisionRead): Promise<void> {
       { omision_id: row.id },
       { resuelta: !row.resuelta },
     )
-    ElMessage.success(updated.resuelta ? 'Omisión marcada como resuelta' : 'Omisión reabierta')
+    showToast('success', updated.resuelta ? 'Omisión marcada como resuelta' : 'Omisión reabierta')
     await load()
   } catch {
-    ElMessage.error('No se pudo actualizar la omisión.')
+    showToast('error', 'No se pudo actualizar la omisión.')
   }
 }
 
@@ -96,17 +100,12 @@ onMounted(load)
   <section class="omisiones">
     <header class="omisiones-header">
       <h2>Omisiones de migración</h2>
-      <el-button :loading="loading" data-test="refresh-omisiones" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-omisiones" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="omisiones-error"
-    />
+    <div v-if="error" class="omisiones-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
     <div class="omisiones-toolbar">
       <el-input
@@ -161,14 +160,13 @@ onMounted(load)
     </div>
 
     <OmisionesTable :rows="omisiones" :loading="loading" :can-resolve="canResolve" @toggle="onToggleResuelta" />
-    <el-pagination
+    <Paginator
       class="tabla-paginacion"
-      background
-      layout="total, prev, pager, next"
-      :total="total"
-      :page-size="pageSize"
-      :current-page="page"
-      @current-change="(p: number) => { page = p; load() }"
+      :total-records="total"
+      :rows="pageSize"
+      :first="(page - 1) * pageSize"
+      template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+      @page="(e: { first: number; rows: number }) => { page = Math.floor(e.first / e.rows) + 1; load() }"
     />
   </section>
 </template>

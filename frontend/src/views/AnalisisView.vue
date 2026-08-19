@@ -15,6 +15,10 @@ import { computed, onMounted, ref } from 'vue'
 
 import { analiticosApi, productosApi } from '@/api/endpoints'
 import FinanzasMensualesChart from '@/components/dashboard/FinanzasMensualesChart.vue'
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import Message from 'primevue/message'
 import { fillFinanzasMonths, type FinanzasMonthRow } from '@/utils/dashboard'
 import { formatMoney, parseDecimal } from '@/utils/format'
 import type {
@@ -73,49 +77,44 @@ onMounted(load)
   <section class="analisis">
     <header class="analisis-header">
       <h2>Análisis</h2>
-      <el-button :loading="loading" data-test="refresh-analisis" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-analisis" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="analisis-error"
-    />
+    <div v-if="error" class="analisis-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
     <el-row :gutter="16">
       <el-col :xs="24" :md="12">
         <el-card shadow="never" class="panel-card">
           <template #header>Productos más vendidos</template>
-          <el-table :data="topProductoRows" v-loading="loading" max-height="400">
-            <el-table-column prop="nombre" label="Producto" min-width="180" />
-            <el-table-column label="Unidades" width="110" align="right">
-              <template #default="{ row }">{{ parseDecimal(row.unidades) }}</template>
-            </el-table-column>
-            <el-table-column label="Ingresos" width="150" align="right">
-              <template #default="{ row }">{{ formatMoney(row.ingresos) }}</template>
-            </el-table-column>
+          <DataTable :value="topProductoRows" :loading="loading" scrollable scroll-height="400px">
+            <Column field="nombre" header="Producto" style="min-width: 180px" />
+            <Column header="Unidades" style="width: 110px" align="right">
+              <template #body="{ data }">{{ parseDecimal(data.unidades) }}</template>
+            </Column>
+            <Column header="Ingresos" style="width: 150px" align="right">
+              <template #body="{ data }">{{ formatMoney(data.ingresos) }}</template>
+            </Column>
             <template #empty>
-              <el-empty description="Sin ventas registradas" :image-size="80" />
+              <div class="analisis-empty">Sin ventas registradas</div>
             </template>
-          </el-table>
+          </DataTable>
         </el-card>
       </el-col>
       <el-col :xs="24" :md="12">
         <el-card shadow="never" class="panel-card">
           <template #header>Insumos más usados</template>
-          <el-table :data="topInsumos" v-loading="loading" max-height="400">
-            <el-table-column prop="nombre" label="Insumo" min-width="180" />
-            <el-table-column prop="unidad_medida" label="Unidad" width="100" />
-            <el-table-column label="Cantidad usada" width="140" align="right">
-              <template #default="{ row }">{{ parseDecimal(row.cantidad) }}</template>
-            </el-table-column>
+          <DataTable :value="topInsumos" :loading="loading" scrollable scroll-height="400px">
+            <Column field="nombre" header="Insumo" style="min-width: 180px" />
+            <Column field="unidad_medida" header="Unidad" style="width: 100px" />
+            <Column header="Cantidad usada" style="width: 140px" align="right">
+              <template #body="{ data }">{{ parseDecimal(data.cantidad) }}</template>
+            </Column>
             <template #empty>
-              <el-empty description="Sin compras de insumos" :image-size="80" />
+              <div class="analisis-empty">Sin compras de insumos</div>
             </template>
-          </el-table>
+          </DataTable>
         </el-card>
       </el-col>
     </el-row>
@@ -145,5 +144,11 @@ onMounted(load)
 
 .panel-card {
   margin-bottom: 1rem;
+}
+
+.analisis-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
 }
 </style>

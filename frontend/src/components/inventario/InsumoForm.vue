@@ -2,7 +2,7 @@
 /**
  * Insumo master form (PR9, spec MOD-4) — admin only.
  *
- * Dual-mode Element Plus form over /insumos:
+ * Dual-mode PrimeVue form over /insumos:
  *  - create: POST InsumoCreate {categoria_id, nombre, unidad_medida,
  *    stock_actual, stock_minimo, costo_promedio_actual}
  *  - edit: PUT InsumoUpdate with the same full field set — the backend update
@@ -12,7 +12,10 @@
  *  the success message and the refresh.
  */
 import { ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
+import InputNumber from 'primevue/inputnumber'
+import InputText from 'primevue/inputtext'
+import Select from 'primevue/select'
 
 import {
   buildInsumoPayload,
@@ -21,6 +24,7 @@ import {
   type InsumoUpdate,
 } from '@/utils/inventario'
 import { parseDecimal } from '@/utils/format'
+import { showToast } from '@/utils/toast'
 import type { CategoriaInsumoRead, InsumoRead } from '@/types/api.d'
 
 const props = defineProps<{
@@ -61,27 +65,27 @@ watch(
 /** MOD-4: client-side gates — every master field is required. */
 function submit(): void {
   if (nombre.value.trim() === '') {
-    ElMessage.warning('Escribe el nombre del insumo.')
+    showToast('warn', 'Escribe el nombre del insumo.')
     return
   }
   if (categoriaId.value === null) {
-    ElMessage.warning('Selecciona la categoría.')
+    showToast('warn', 'Selecciona la categoría.')
     return
   }
   if (unidadMedida.value.trim() === '') {
-    ElMessage.warning('Escribe la unidad de medida.')
+    showToast('warn', 'Escribe la unidad de medida.')
     return
   }
   if (stockActual.value === null || stockActual.value < 0) {
-    ElMessage.warning('Indica el stock actual.')
+    showToast('warn', 'Indica el stock actual.')
     return
   }
   if (stockMinimo.value === null || stockMinimo.value < 0) {
-    ElMessage.warning('Indica el stock mínimo.')
+    showToast('warn', 'Indica el stock mínimo.')
     return
   }
   if (costoPromedio.value === null || costoPromedio.value < 0) {
-    ElMessage.warning('Indica el costo promedio.')
+    showToast('warn', 'Indica el costo promedio.')
     return
   }
 
@@ -98,77 +102,87 @@ function submit(): void {
 </script>
 
 <template>
-  <el-form label-position="top" class="insumo-form" @submit.prevent="submit">
-    <el-row :gutter="16">
-      <el-col :xs="24" :md="10">
-        <el-form-item label="Nombre del insumo">
-          <el-input v-model="nombre" placeholder="Ej: Harina de maíz" data-test="nombre-insumo-input" />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="6">
-        <el-form-item label="Categoría">
-          <el-select
+  <form class="insumo-form" @submit.prevent="submit">
+    <div class="form-grid">
+      <div class="form-col" style="--md: 10">
+        <div class="form-item">
+          <label class="form-label">Nombre del insumo</label>
+          <InputText v-model="nombre" placeholder="Ej: Harina de maíz" data-test="nombre-insumo-input" />
+        </div>
+      </div>
+      <div class="form-col" style="--md: 6">
+        <div class="form-item">
+          <label class="form-label">Categoría</label>
+          <Select
             v-model="categoriaId"
-            filterable
+            :options="categorias"
+            option-label="nombre"
+            option-value="id"
+            filter
             placeholder="Selecciona la categoría"
             class="insumo-field"
             data-test="categoria-insumo-select"
-          >
-            <el-option v-for="c in categorias" :key="c.id" :label="c.nombre" :value="c.id" />
-          </el-select>
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="8">
-        <el-form-item label="Unidad de medida">
-          <el-input v-model="unidadMedida" placeholder="Ej: kg, L, unidad" data-test="unidad-insumo-input" />
-        </el-form-item>
-      </el-col>
-    </el-row>
+          />
+        </div>
+      </div>
+      <div class="form-col" style="--md: 8">
+        <div class="form-item">
+          <label class="form-label">Unidad de medida</label>
+          <InputText v-model="unidadMedida" placeholder="Ej: kg, L, unidad" data-test="unidad-insumo-input" />
+        </div>
+      </div>
+    </div>
 
-    <el-row :gutter="16">
-      <el-col :xs="24" :md="6">
-        <el-form-item label="Stock actual">
-          <el-input-number
+    <div class="form-grid">
+      <div class="form-col" style="--md: 6">
+        <div class="form-item">
+          <label class="form-label">Stock actual</label>
+          <InputNumber
             v-model="stockActual"
             :min="0"
-            :precision="2"
-            :controls="false"
+            :min-fraction-digits="2"
+            :max-fraction-digits="2"
+            :use-grouping="false"
             class="insumo-field"
             data-test="stock-actual-input"
           />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="6">
-        <el-form-item label="Stock mínimo">
-          <el-input-number
+        </div>
+      </div>
+      <div class="form-col" style="--md: 6">
+        <div class="form-item">
+          <label class="form-label">Stock mínimo</label>
+          <InputNumber
             v-model="stockMinimo"
             :min="0"
-            :precision="2"
-            :controls="false"
+            :min-fraction-digits="2"
+            :max-fraction-digits="2"
+            :use-grouping="false"
             class="insumo-field"
             data-test="stock-minimo-input"
           />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="6">
-        <el-form-item label="Costo promedio">
-          <el-input-number
+        </div>
+      </div>
+      <div class="form-col" style="--md: 6">
+        <div class="form-item">
+          <label class="form-label">Costo promedio</label>
+          <InputNumber
             v-model="costoPromedio"
             :min="0"
-            :precision="2"
-            :controls="false"
+            :min-fraction-digits="2"
+            :max-fraction-digits="2"
+            :use-grouping="false"
             class="insumo-field"
             data-test="costo-promedio-input"
           />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="6" class="submit-col">
-        <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-insumo">
+        </div>
+      </div>
+      <div class="form-col submit-col" style="--md: 6">
+        <Button type="submit" :loading="saving" data-test="submit-insumo">
           {{ mode === 'edit' ? 'Guardar cambios' : 'Crear insumo' }}
-        </el-button>
-      </el-col>
-    </el-row>
-  </el-form>
+        </Button>
+      </div>
+    </div>
+  </form>
 </template>
 
 <style scoped>
@@ -178,6 +192,33 @@ function submit(): void {
 
 .insumo-field {
   width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.form-col {
+  grid-column: span 24;
+}
+
+@media (min-width: 768px) {
+  .form-col {
+    grid-column: span var(--md, 24);
+  }
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--el-text-color-primary);
 }
 
 .submit-col {

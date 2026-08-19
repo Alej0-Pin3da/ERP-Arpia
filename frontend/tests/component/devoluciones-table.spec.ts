@@ -4,12 +4,20 @@
  * Mounts the REAL DevolucionesTable with pre-joined rows (buildDevolucionRows
  * output): es-CO formatted fecha/monto, tipo labels + tags, motivo fallback
  * '—', items count, and expandable detail lines with joined product names.
+ *
+ * Migrated to PrimeVue DataTable (slice 1b): rows are `tbody tr` (DataTable
+ * paints `p-row-even`/`p-row-odd` body rows), expansion uses the expander
+ * column's `.p-datatable-row-toggle-button` opening the `#expansion` nested
+ * DataTable (BEH-6). el-tag cells still need the ElementPlus plugin until
+ * slice 2b.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import DevolucionesTable from '@/components/devoluciones/DevolucionesTable.vue'
 import type { DevolucionRow } from '@/utils/devoluciones'
 
@@ -40,9 +48,13 @@ const ROW_TOTAL: DevolucionRow = {
 async function mountTable(rows: DevolucionRow[], loading = false): Promise<VueWrapper> {
   const wrapper = mount(DevolucionesTable, {
     props: { rows, loading },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
-  // el-table paints its body one tick after mount (ResizeObserver layout).
+  // DataTable paints its body one tick after mount.
   await nextTick()
   return wrapper
 }
@@ -51,7 +63,7 @@ describe('DevolucionesTable (MOD-2 list)', () => {
   it('renders rows with es-CO formatting, tipo tag and motivo', async () => {
     const wrapper = await mountTable([ROW])
 
-    const rowText = wrapper.findAll('.el-table__row')[0].text()
+    const rowText = wrapper.findAll('tbody tr')[0].text()
     expect(rowText).toContain('3') // id cell
     expect(rowText).toContain('02/08/2026')
     expect(rowText).toContain('10') // venta_id cell
@@ -70,16 +82,14 @@ describe('DevolucionesTable (MOD-2 list)', () => {
 
     // The joined product label (fallback for a missing product) renders in
     // the expandable item area.
-    const expandIcon = wrapper.find('.el-table__expand-icon')
-    await expandIcon.trigger('click')
+    await wrapper.find('.p-datatable-row-toggle-button').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('Producto #99')
   })
 
   it('expands a row into item lines with product name, qty and subtotal', async () => {
     const wrapper = await mountTable([ROW])
-    const expandIcon = wrapper.find('.el-table__expand-icon')
-    await expandIcon.trigger('click')
+    await wrapper.find('.p-datatable-row-toggle-button').trigger('click')
     await flushPromises()
 
     const text = wrapper.text()

@@ -9,9 +9,18 @@
  * Presentational: the view owns the API calls, the admin gate and the
  * refresh; this component only emits `edit` / `delete` / `select-variantes`
  * with the clicked row.
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c: column sort re-emits the
+ * SAME typed event via the parsePrimeVueSort adapter (no header funnels here).
+ * Tag/Button cells were migrated in slice 2b.
  */
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import Tag from 'primevue/tag'
 import type { ProductoRow } from '@/utils/productos'
 import { formatMoney } from '@/utils/format'
+import { parsePrimeVueSort } from '@/utils/table-filters'
 
 defineProps<{
   rows: ProductoRow[]
@@ -26,51 +35,52 @@ const emit = defineEmits<{
   'sort-change': [sort: { prop: string; order: 'asc' | 'desc' | null }]
 }>()
 
-/** Normalize el-table's sort-change into a typed {prop, order} emit. */
-function onSortChange(s: {
-  column: { key?: string; property?: string }
-  prop: string
-  order: 'ascending' | 'descending' | null
-}): void {
-  const prop = s.column.key ?? s.column.property ?? s.prop
-  emit('sort-change', {
-    prop,
-    order: s.order === 'ascending' ? 'asc' : s.order === 'descending' ? 'desc' : null,
-  })
+/** Normalize DataTable's @sort payload into the typed {prop, order} emit. */
+function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
+  emit('sort-change', parsePrimeVueSort(s))
 }
 </script>
 
 <template>
-  <el-table :data="rows" v-loading="loading" @sort-change="onSortChange">
-    <el-table-column prop="id" label="#" column-key="id" sortable width="60" />
-    <el-table-column prop="tipo" label="Tipo" min-width="120" />
-    <el-table-column prop="nombre" label="Nombre" column-key="nombre" sortable min-width="180" />
-    <el-table-column label="Requiere fabricación" column-key="requiere_fabricacion" sortable width="160">
-      <template #default="{ row }">
-        <el-tag :type="row.requiere_fabricacion ? 'primary' : 'info'">
-          {{ row.requiere_fabricacion ? 'Sí' : 'No' }}
-        </el-tag>
+  <DataTable :value="rows" lazy :loading="loading" @sort="onDataTableSort">
+    <Column field="id" header="#" sortable style="width: 60px" />
+    <Column field="tipo" header="Tipo" style="min-width: 120px" />
+    <Column field="nombre" header="Nombre" sortable style="min-width: 180px" />
+    <Column field="requiere_fabricacion" header="Requiere fabricación" sortable style="width: 160px">
+      <template #body="{ data }">
+        <Tag :severity="data.requiere_fabricacion ? 'primary' : 'info'">
+          {{ data.requiere_fabricacion ? 'Sí' : 'No' }}
+        </Tag>
       </template>
-    </el-table-column>
-    <el-table-column label="Precio venta sugerido" column-key="precio_venta_sugerido" sortable width="170" align="right">
-      <template #default="{ row }">{{ formatMoney(row.precio_venta_sugerido) }}</template>
-    </el-table-column>
-    <el-table-column label="Costos operativos fijos" column-key="costos_operativos_fijos" sortable width="180" align="right">
-      <template #default="{ row }">{{ formatMoney(row.costos_operativos_fijos) }}</template>
-    </el-table-column>
-    <el-table-column v-if="canEdit" label="Acciones" width="240" fixed="right">
-      <template #default="{ row }">
-        <el-button size="small" data-test="producto-variantes" @click="$emit('select-variantes', row)">
+    </Column>
+    <Column field="precio_venta_sugerido" header="Precio venta sugerido" sortable style="width: 170px" align="right">
+      <template #body="{ data }">{{ formatMoney(data.precio_venta_sugerido) }}</template>
+    </Column>
+    <Column field="costos_operativos_fijos" header="Costos operativos fijos" sortable style="width: 180px" align="right">
+      <template #body="{ data }">{{ formatMoney(data.costos_operativos_fijos) }}</template>
+    </Column>
+    <Column v-if="canEdit" header="Acciones" style="width: 240px">
+      <template #body="{ data: row }">
+        <Button size="small" severity="secondary" data-test="producto-variantes" @click="$emit('select-variantes', row)">
           Variantes
-        </el-button>
-        <el-button size="small" data-test="edit-producto" @click="$emit('edit', row)">Editar</el-button>
-        <el-button size="small" type="danger" data-test="delete-producto" @click="$emit('delete', row)">
+        </Button>
+        <Button size="small" severity="secondary" data-test="edit-producto" @click="$emit('edit', row)">Editar</Button>
+        <Button size="small" severity="danger" data-test="delete-producto" @click="$emit('delete', row)">
           Eliminar
-        </el-button>
+        </Button>
       </template>
-    </el-table-column>
+    </Column>
+
     <template #empty>
-      <el-empty description="Sin productos registrados" />
+      <div class="producto-empty">Sin productos registrados</div>
     </template>
-  </el-table>
+  </DataTable>
 </template>
+
+<style scoped>
+.producto-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
+}
+</style>

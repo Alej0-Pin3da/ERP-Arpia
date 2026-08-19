@@ -19,7 +19,6 @@
  * no Liquidaciones tab.
  */
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { finanzasApi } from '@/api/endpoints'
 import LiquidacionesForm from '@/components/finanzas/LiquidacionesForm.vue'
@@ -27,9 +26,21 @@ import MovimientosForm from '@/components/finanzas/MovimientosForm.vue'
 import MovimientosTable from '@/components/finanzas/MovimientosTable.vue'
 import SociosForm from '@/components/finanzas/SociosForm.vue'
 import SociosTable from '@/components/finanzas/SociosTable.vue'
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import Message from 'primevue/message'
+import Paginator from 'primevue/paginator'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
 import { useAuthStore } from '@/stores/auth'
+import { confirmAction } from '@/utils/confirm'
 import { formatMoney } from '@/utils/format'
 import { buildListParams } from '@/utils/pagination'
+import { showToast } from '@/utils/toast'
 import {
   buildLiquidacionRows,
   buildMovimientoRows,
@@ -178,11 +189,11 @@ async function onCreateMovimiento(payload: MovimientoCreate): Promise<void> {
   savingMovimiento.value = true
   try {
     await finanzasApi.createMovimiento(payload)
-    ElMessage.success('Movimiento registrado correctamente')
+    showToast('success', 'Movimiento registrado correctamente')
     movimientoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo registrar el movimiento. Verifica los datos e inténtalo de nuevo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo registrar el movimiento. Verifica los datos e inténtalo de nuevo.')
   } finally {
     savingMovimiento.value = false
   }
@@ -190,21 +201,19 @@ async function onCreateMovimiento(payload: MovimientoCreate): Promise<void> {
 
 /** MOD-3: soft-delete after a confirm dialog; DELETE answers 200, not 204. */
 async function onDeleteMovimiento(row: MovimientoRow): Promise<void> {
-  try {
-    await ElMessageBox.confirm(
-      `¿Eliminar el movimiento "${row.descripcion}"?`,
-      'Confirmar eliminación',
-      { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-    )
-  } catch {
-    return // cancelled
-  }
+  const choice = await confirmAction({
+    message: `¿Eliminar el movimiento "${row.descripcion}"?`,
+    header: 'Confirmar eliminación',
+    acceptLabel: 'Eliminar',
+    rejectLabel: 'Cancelar',
+  })
+  if (choice !== 'accept') return // cancelled
   try {
     await finanzasApi.deleteMovimiento({ movimiento_id: row.id })
-    ElMessage.success('Movimiento eliminado correctamente')
+    showToast('success', 'Movimiento eliminado correctamente')
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar el movimiento.')
+    showToast('error', serverDetail(err) ?? 'No se pudo eliminar el movimiento.')
   }
 }
 
@@ -214,11 +223,11 @@ async function onCreateLiquidacion(payload: LiquidacionCreate): Promise<void> {
   try {
     const result = await finanzasApi.createLiquidacion(payload)
     liquidacionRows.value = buildLiquidacionRows(result, socios.value)
-    ElMessage.success('Liquidación procesada correctamente')
+    showToast('success', 'Liquidación procesada correctamente')
     await load() // the settlement created Retiro rows
   } catch (err) {
     // 409 replay ("...ya fue procesada") surfaces as-is.
-    ElMessage.error(serverDetail(err) ?? 'No se pudo procesar la liquidación.')
+    showToast('error', serverDetail(err) ?? 'No se pudo procesar la liquidación.')
   } finally {
     savingLiquidacion.value = false
   }
@@ -259,11 +268,11 @@ async function onUpdateMovimiento(payload: MovimientoUpdate): Promise<void> {
   savingMovimiento.value = true
   try {
     await finanzasApi.updateMovimiento({ movimiento_id: editingMovimiento.value.id }, payload)
-    ElMessage.success('Movimiento actualizado correctamente')
+    showToast('success', 'Movimiento actualizado correctamente')
     movimientoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el movimiento. Verifica los datos e inténtalo de nuevo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo actualizar el movimiento. Verifica los datos e inténtalo de nuevo.')
   } finally {
     savingMovimiento.value = false
   }
@@ -273,11 +282,11 @@ async function onCreateSocio(payload: SocioConfiguracionCreate): Promise<void> {
   savingSocio.value = true
   try {
     await finanzasApi.createSocio(payload)
-    ElMessage.success('Socio creado correctamente')
+    showToast('success', 'Socio creado correctamente')
     socioDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo crear el socio.')
+    showToast('error', serverDetail(err) ?? 'No se pudo crear el socio.')
   } finally {
     savingSocio.value = false
   }
@@ -314,11 +323,11 @@ async function onUpdateSocio(payload: SocioConfiguracionUpdate): Promise<void> {
   savingSocio.value = true
   try {
     await finanzasApi.updateSocio({ socio_id: editingSocio.value.id }, payload)
-    ElMessage.success('Socio actualizado correctamente')
+    showToast('success', 'Socio actualizado correctamente')
     socioDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el socio.')
+    showToast('error', serverDetail(err) ?? 'No se pudo actualizar el socio.')
   } finally {
     savingSocio.value = false
   }
@@ -326,21 +335,19 @@ async function onUpdateSocio(payload: SocioConfiguracionUpdate): Promise<void> {
 
 /** MOD-3: delete a socio after a confirm dialog; 409 (payouts) surfaced. */
 async function onDeleteSocio(row: SocioConfiguracionRead): Promise<void> {
-  try {
-    await ElMessageBox.confirm(
-      `¿Eliminar el socio "${row.nombre}"?`,
-      'Confirmar eliminación',
-      { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-    )
-  } catch {
-    return // cancelled
-  }
+  const choice = await confirmAction({
+    message: `¿Eliminar el socio "${row.nombre}"?`,
+    header: 'Confirmar eliminación',
+    acceptLabel: 'Eliminar',
+    rejectLabel: 'Cancelar',
+  })
+  if (choice !== 'accept') return // cancelled
   try {
     await finanzasApi.deleteSocio({ socio_id: row.id })
-    ElMessage.success('Socio eliminado correctamente')
+    showToast('success', 'Socio eliminado correctamente')
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar el socio.')
+    showToast('error', serverDetail(err) ?? 'No se pudo eliminar el socio.')
   }
 }
 
@@ -351,20 +358,21 @@ onMounted(load)
   <section class="finanzas">
     <header class="finanzas-header">
       <h2>Finanzas</h2>
-      <el-button :loading="loading" data-test="refresh-finanzas" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-finanzas" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="finanzas-error"
-    />
+    <div v-if="error" class="finanzas-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
-    <el-tabs v-model="activeTab">
-      <el-tab-pane label="Movimientos" name="movimientos">
+    <Tabs v-model:value="activeTab">
+      <TabList>
+        <Tab value="movimientos">Movimientos</Tab>
+        <Tab v-if="canRegister" value="liquidaciones">Liquidaciones</Tab>
+        <Tab value="socios">Socios</Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="movimientos">
         <div class="finanzas-toolbar">
           <el-select
             v-model="filterTipo"
@@ -377,9 +385,9 @@ onMounted(load)
             <el-option label="Inversión" value="Inversion" />
             <el-option label="Retiro" value="Retiro" />
           </el-select>
-          <el-button v-if="canRegister" type="primary" data-test="nuevo-movimiento" @click="openCreateMovimiento">
+          <Button v-if="canRegister" data-test="nuevo-movimiento" @click="openCreateMovimiento">
             Nuevo movimiento
-          </el-button>
+          </Button>
         </div>
         <MovimientosTable
           :rows="movimientoRows"
@@ -391,14 +399,13 @@ onMounted(load)
           @filter-change="onMovimientoTableFilterChange"
           @sort-change="onMovimientoTableSortChange"
         />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="movimientosTotal"
-          :page-size="movimientosPageSize"
-          :current-page="movimientosPage"
-          @current-change="(p: number) => { movimientosPage = p; load() }"
+          :total-records="movimientosTotal"
+          :rows="movimientosPageSize"
+          :first="(movimientosPage - 1) * movimientosPageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="(e: { first: number; rows: number }) => { movimientosPage = Math.floor(e.first / e.rows) + 1; load() }"
         />
 
         <el-dialog
@@ -419,27 +426,27 @@ onMounted(load)
             @submit="submitMovimiento"
           />
         </el-dialog>
-      </el-tab-pane>
+      </TabPanel>
 
-      <el-tab-pane v-if="canRegister" label="Liquidaciones" name="liquidaciones">
+      <TabPanel v-if="canRegister" value="liquidaciones">
         <LiquidacionesForm :saving="savingLiquidacion" @submit="onCreateLiquidacion" />
 
         <div v-if="liquidacionRows.length > 0" class="liquidacion-result" data-test="liquidacion-result">
           <h3>Resultado de la liquidación</h3>
-          <el-table :data="liquidacionRows">
-            <el-table-column prop="socio" label="Socio" min-width="220" />
-            <el-table-column label="Monto" width="180" align="right">
-              <template #default="{ row }">{{ formatMoney(row.monto) }}</template>
-            </el-table-column>
-          </el-table>
+          <DataTable :value="liquidacionRows">
+            <Column field="socio" header="Socio" style="min-width: 220px" />
+            <Column header="Monto" style="width: 180px" align="right">
+              <template #body="{ data }">{{ formatMoney(data.monto) }}</template>
+            </Column>
+          </DataTable>
         </div>
-      </el-tab-pane>
+      </TabPanel>
 
-      <el-tab-pane label="Socios" name="socios">
+      <TabPanel value="socios">
         <div class="socios-toolbar">
-          <el-button v-if="canRegister" type="primary" data-test="nuevo-socio" @click="openCreateSocio">
+          <Button v-if="canRegister" data-test="nuevo-socio" @click="openCreateSocio">
             Nuevo socio
-          </el-button>
+          </Button>
         </div>
         <SociosTable
           :rows="socios"
@@ -449,14 +456,13 @@ onMounted(load)
           @delete="onDeleteSocio"
           @sort-change="onSociosTableSortChange"
         />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="sociosTotal"
-          :page-size="sociosPageSize"
-          :current-page="sociosPage"
-          @current-change="(p: number) => { sociosPage = p; load() }"
+          :total-records="sociosTotal"
+          :rows="sociosPageSize"
+          :first="(sociosPage - 1) * sociosPageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="(e: { first: number; rows: number }) => { sociosPage = Math.floor(e.first / e.rows) + 1; load() }"
         />
 
         <el-dialog
@@ -476,8 +482,9 @@ onMounted(load)
             @submit="submitSocio"
           />
         </el-dialog>
-      </el-tab-pane>
-    </el-tabs>
+      </TabPanel>
+      </TabPanels>
+    </Tabs>
   </section>
 </template>
 

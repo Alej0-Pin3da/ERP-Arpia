@@ -11,7 +11,9 @@
  * The view owns the POST/PATCH, the 422 surfacing and the refresh.
  */
 import { ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
+import InputNumber from 'primevue/inputnumber'
+import InputText from 'primevue/inputtext'
 
 import {
   buildSocioPayload,
@@ -19,6 +21,7 @@ import {
   type SocioConfiguracionCreate,
   type SocioConfiguracionUpdate,
 } from '@/utils/finanzas'
+import { showToast } from '@/utils/toast'
 import type { SocioConfiguracionRead } from '@/types/api.d'
 
 const props = withDefaults(
@@ -53,11 +56,11 @@ watch(
 /** MOD-3: client gates — create requires nombre; every mode requires a share. */
 function submit(): void {
   if (props.mode === 'create' && nombre.value.trim() === '') {
-    ElMessage.warning('Escribe el nombre del socio.')
+    showToast('warn', 'Escribe el nombre del socio.')
     return
   }
   if (porcentaje.value === null || porcentaje.value <= 0) {
-    ElMessage.warning('El porcentaje debe ser mayor a cero.')
+    showToast('warn', 'El porcentaje debe ser mayor a cero.')
     return
   }
   if (props.mode === 'edit') {
@@ -69,42 +72,47 @@ function submit(): void {
 </script>
 
 <template>
-  <el-form label-position="top" class="socio-form" @submit.prevent="submit">
-    <el-row :gutter="16">
-      <el-col :xs="24" :md="12">
+  <form class="socio-form" @submit.prevent="submit">
+    <div class="form-grid">
+      <div class="form-col" style="--md: 12">
         <template v-if="mode === 'create'">
-          <el-form-item label="Nombre del socio">
-            <el-input v-model="nombre" placeholder="Ej: Ana María" data-test="nombre-socio-input" />
-          </el-form-item>
+          <div class="form-item">
+            <label class="form-label">Nombre del socio</label>
+            <InputText v-model="nombre" placeholder="Ej: Ana María" data-test="nombre-socio-input" />
+          </div>
         </template>
-        <el-form-item v-else label="Socio">
+        <div v-else class="form-item">
+          <label class="form-label">Socio</label>
           <span class="socio-name-static" data-test="socio-name-static">{{ initial?.nombre }}</span>
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="12">
-        <el-form-item label="Porcentaje de participación">
-          <el-input-number
+        </div>
+      </div>
+      <div class="form-col" style="--md: 12">
+        <div class="form-item">
+          <label class="form-label">Porcentaje de participación</label>
+          <InputNumber
             v-model="porcentaje"
             :min="0.01"
             :max="100"
-            :precision="2"
+            :min-fraction-digits="2"
+            :max-fraction-digits="2"
             :step="5"
+            :use-grouping="false"
             class="socio-field"
             data-test="porcentaje-socio-input"
           />
-        </el-form-item>
-      </el-col>
-    </el-row>
+        </div>
+      </div>
+    </div>
 
     <div class="form-footer">
       <span class="form-hint">
         {{ mode === 'edit' ? 'Solo se puede ajustar el porcentaje.' : 'La suma de participaciones debe ser exactamente 100%.' }}
       </span>
-      <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-socio">
+      <Button type="submit" :loading="saving" data-test="submit-socio">
         {{ mode === 'edit' ? 'Guardar cambios' : 'Crear socio' }}
-      </el-button>
+      </Button>
     </div>
-  </el-form>
+  </form>
 </template>
 
 <style scoped>
@@ -118,6 +126,33 @@ function submit(): void {
 
 .socio-name-static {
   line-height: 2rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.form-col {
+  grid-column: span 24;
+}
+
+@media (min-width: 768px) {
+  .form-col {
+    grid-column: span var(--md, 24);
+  }
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--el-text-color-primary);
 }
 
 .form-footer {

@@ -17,15 +17,24 @@
  * views use real pagination, join fetches keep the lookup hack.
  */
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { categoriasInsumosApi, comprasApi, insumosApi } from '@/api/endpoints'
 import ComprasForm from '@/components/inventario/ComprasForm.vue'
 import ComprasTable from '@/components/inventario/ComprasTable.vue'
 import InsumoForm from '@/components/inventario/InsumoForm.vue'
 import InsumosTable from '@/components/inventario/InsumosTable.vue'
+import Button from 'primevue/button'
+import Message from 'primevue/message'
+import Paginator from 'primevue/paginator'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
 import { useAuthStore } from '@/stores/auth'
+import { confirmAction } from '@/utils/confirm'
 import { buildListParams } from '@/utils/pagination'
+import { showToast } from '@/utils/toast'
 import {
   buildCompraRows,
   type CompraInsumoCreate,
@@ -192,11 +201,11 @@ async function onCreateCompra(payload: CompraInsumoCreate): Promise<void> {
   savingCompra.value = true
   try {
     await comprasApi.create(payload)
-    ElMessage.success('Compra registrada correctamente')
+    showToast('success', 'Compra registrada correctamente')
     comprasDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo registrar la compra. Verifica los datos e inténtalo de nuevo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo registrar la compra. Verifica los datos e inténtalo de nuevo.')
   } finally {
     savingCompra.value = false
   }
@@ -207,11 +216,11 @@ async function onCreateInsumo(payload: InsumoCreate): Promise<void> {
   savingInsumo.value = true
   try {
     await insumosApi.create(payload)
-    ElMessage.success('Insumo creado correctamente')
+    showToast('success', 'Insumo creado correctamente')
     insumoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo crear el insumo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo crear el insumo.')
   } finally {
     savingInsumo.value = false
   }
@@ -253,11 +262,11 @@ async function onUpdateInsumo(payload: InsumoUpdate): Promise<void> {
   savingInsumo.value = true
   try {
     await insumosApi.update({ insumo_id: editingInsumo.value.id }, payload)
-    ElMessage.success('Insumo actualizado correctamente')
+    showToast('success', 'Insumo actualizado correctamente')
     insumoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el insumo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo actualizar el insumo.')
   } finally {
     savingInsumo.value = false
   }
@@ -265,21 +274,19 @@ async function onUpdateInsumo(payload: InsumoUpdate): Promise<void> {
 
 /** MOD-4: admin — delete after a confirm dialog; DELETE answers 204. */
 async function onDeleteInsumo(row: InsumoRead): Promise<void> {
-  try {
-    await ElMessageBox.confirm(
-      `¿Eliminar el insumo "${row.nombre}"?`,
-      'Confirmar eliminación',
-      { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-    )
-  } catch {
-    return // cancelled
-  }
+  const choice = await confirmAction({
+    message: `¿Eliminar el insumo "${row.nombre}"?`,
+    header: 'Confirmar eliminación',
+    acceptLabel: 'Eliminar',
+    rejectLabel: 'Cancelar',
+  })
+  if (choice !== 'accept') return // cancelled
   try {
     await insumosApi.delete({ insumo_id: row.id })
-    ElMessage.success('Insumo eliminado correctamente')
+    showToast('success', 'Insumo eliminado correctamente')
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar el insumo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo eliminar el insumo.')
   }
 }
 
@@ -290,20 +297,20 @@ onMounted(load)
   <section class="inventario">
     <header class="inventario-header">
       <h2>Inventario</h2>
-      <el-button :loading="loading" data-test="refresh-inventario" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-inventario" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="inventario-error"
-    />
+    <div v-if="error" class="inventario-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
-    <el-tabs v-model="activeTab">
-      <el-tab-pane label="Insumos" name="insumos">
+    <Tabs v-model:value="activeTab">
+      <TabList>
+        <Tab value="insumos">Insumos</Tab>
+        <Tab value="compras">Compras</Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="insumos">
         <div class="insumo-toolbar">
           <el-input
             v-model="insumoQ"
@@ -324,9 +331,9 @@ onMounted(load)
           >
             <el-option v-for="c in categorias" :key="c.id" :label="c.nombre" :value="c.id" />
           </el-select>
-          <el-button v-if="canManage" type="primary" data-test="nuevo-insumo" @click="openCreateInsumo">
+          <Button v-if="canManage" data-test="nuevo-insumo" @click="openCreateInsumo">
             Nuevo insumo
-          </el-button>
+          </Button>
         </div>
 
         <InsumosTable
@@ -339,14 +346,13 @@ onMounted(load)
           @filter-change="onInsumosTableFilterChange"
           @sort-change="onInsumosTableSortChange"
         />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="insumosTotal"
-          :page-size="insumosPageSize"
-          :current-page="insumosPage"
-          @current-change="(p: number) => { insumosPage = p; load() }"
+          :total-records="insumosTotal"
+          :rows="insumosPageSize"
+          :first="(insumosPage - 1) * insumosPageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="(e: { first: number; rows: number }) => { insumosPage = Math.floor(e.first / e.rows) + 1; load() }"
         />
 
         <el-dialog
@@ -367,9 +373,9 @@ onMounted(load)
             @submit="submitInsumo"
           />
         </el-dialog>
-      </el-tab-pane>
+      </TabPanel>
 
-      <el-tab-pane label="Compras" name="compras">
+      <TabPanel value="compras">
         <div class="compras-filtro">
           <el-input
             v-model="compraQ"
@@ -390,9 +396,9 @@ onMounted(load)
           >
             <el-option v-for="i in insumosLookup" :key="i.id" :label="i.nombre" :value="i.id" />
           </el-select>
-          <el-button v-if="canRegister" type="primary" data-test="nueva-compra" @click="openCreateCompra">
+          <Button v-if="canRegister" data-test="nueva-compra" @click="openCreateCompra">
             Nueva compra
-          </el-button>
+          </Button>
         </div>
 
         <ComprasTable
@@ -402,14 +408,13 @@ onMounted(load)
           @filter-change="onComprasTableFilterChange"
           @sort-change="onComprasTableSortChange"
         />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="comprasTotal"
-          :page-size="comprasPageSize"
-          :current-page="comprasPage"
-          @current-change="(p: number) => { comprasPage = p; load() }"
+          :total-records="comprasTotal"
+          :rows="comprasPageSize"
+          :first="(comprasPage - 1) * comprasPageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="(e: { first: number; rows: number }) => { comprasPage = Math.floor(e.first / e.rows) + 1; load() }"
         />
 
         <el-dialog
@@ -427,8 +432,9 @@ onMounted(load)
             @submit="onCreateCompra"
           />
         </el-dialog>
-      </el-tab-pane>
-    </el-tabs>
+      </TabPanel>
+      </TabPanels>
+    </Tabs>
   </section>
 </template>
 

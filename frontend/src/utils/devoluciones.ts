@@ -62,10 +62,10 @@ export function tipoLabel(tipo: string): string {
   return TIPO_LABELS[tipo] ?? tipo
 }
 
-/** el-tag type per tipo: total danger (cancels the sale), parcial warning. */
-export function tipoTagType(tipo: string): 'success' | 'warning' | 'danger' | 'info' {
+/** PrimeVue Tag severity per tipo: total danger (cancels the sale), parcial warn. */
+export function tipoTagType(tipo: string): 'success' | 'warn' | 'danger' | 'info' {
   if (tipo === 'total') return 'danger'
-  if (tipo === 'parcial') return 'warning'
+  if (tipo === 'parcial') return 'warn'
   return 'info'
 }
 

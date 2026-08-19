@@ -5,9 +5,11 @@
  * Renders the menu items the current role may access (Usuarios is
  * admin-only) using the pure `RoleMenuFilter` from utils/menu — the same
  * roles the router guard enforces, so the visible menu can never offer a
- * route the role is blocked from. ElMenu runs in router mode: each item's
- * `index` is its route path (click navigates) and `default-active` follows
- * the current route for highlighting.
+ * route the role is blocked from.
+ *
+ * D3 (S3-T4): el-menu/el-menu-item are replaced by a flat `<nav>` +
+ * `<router-link>` list; the active item is derived from `route.path` (exact
+ * match against each item's top-level path).
  */
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
@@ -20,42 +22,57 @@ const auth = useAuthStore()
 
 /** Menu items visible to the current role (empty for an unsigned session). */
 const items = computed(() => RoleMenuFilter(auth.role))
+
+/** Exact-path match against the current route for active highlighting. */
+function isActive(path: string): boolean {
+  return route.path === path
+}
 </script>
 
 <template>
-  <el-menu class="sidebar-menu" :default-active="route.path" router>
-    <el-menu-item v-for="item in items" :key="item.path" :index="item.path">
+  <nav class="sidebar-menu" aria-label="Navegación principal">
+    <router-link
+      v-for="item in items"
+      :key="item.path"
+      :to="item.path"
+      class="sidebar-menu__item"
+      :class="{ 'sidebar-menu__item--active': isActive(item.path) }"
+    >
       {{ item.label }}
-    </el-menu-item>
-  </el-menu>
+    </router-link>
+  </nav>
 </template>
 
 <style scoped>
 .sidebar-menu {
+  display: flex;
+  flex-direction: column;
   border-right: none;
 }
 
-.sidebar-menu :deep(.el-menu-item) {
+.sidebar-menu__item {
   position: relative;
+  padding: 0.75rem 1.25rem;
   font-family: var(--arpia-font-button);
   font-weight: 600;
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
 }
 
-.sidebar-menu :deep(.el-menu-item:hover) {
+.sidebar-menu__item:hover {
   color: #ffffff;
   background: rgba(140, 108, 161, 0.25);
 }
 
-.sidebar-menu :deep(.el-menu-item.is-active) {
+.sidebar-menu__item--active {
   color: var(--arpia-primary-soft);
   background: rgba(140, 108, 161, 0.25);
 }
 
-.sidebar-menu :deep(.el-menu-item.is-active::before) {
+.sidebar-menu__item--active::before {
   content: '';
   position: absolute;
   left: 0;

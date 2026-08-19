@@ -3,8 +3,8 @@
  * Devoluciones view (task 2.3, spec MOD-2 + ui-mantenimiento PR1 T7).
  *
  * Two sections: the returns list and the create form.
- *  - List: server-side paginated GET /devoluciones ({items,total} +
- *    el-pagination) with optional filters (venta_id, fecha range) — items are
+ *  - List: server-side paginated GET /devoluciones ({items,total} + PrimeVue
+ *    Paginator) with optional filters (venta_id, fecha range) — items are
  *    joined client-side with /productos?limit=1000 (`Producto #{id}` fallback,
  *    `.items` per D3).
  *  - Create: DevolucionesForm emits the DevolucionCreate payload; the view
@@ -12,13 +12,16 @@
  *    consulta (read-only role).
  */
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 
 import { devolucionesApi, productosApi } from '@/api/endpoints'
 import DevolucionesForm from '@/components/devoluciones/DevolucionesForm.vue'
 import DevolucionesTable from '@/components/devoluciones/DevolucionesTable.vue'
+import Button from 'primevue/button'
+import Message from 'primevue/message'
+import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
+import { showToast } from '@/utils/toast'
 import { buildDevolucionRows, type DevolucionCreate, type DevolucionRow } from '@/utils/devoluciones'
 import type { ProductoRead, VarianteProductoRead } from '@/types/api.d'
 
@@ -116,11 +119,11 @@ async function onSubmit(payload: DevolucionCreate): Promise<void> {
   saving.value = true
   try {
     await devolucionesApi.create(payload)
-    ElMessage.success('Devolución registrada correctamente')
+    showToast('success', 'Devolución registrada correctamente')
     devolucionDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo registrar la devolución. Verifica los datos e inténtalo de nuevo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo registrar la devolución. Verifica los datos e inténtalo de nuevo.')
   } finally {
     saving.value = false
   }
@@ -133,17 +136,12 @@ onMounted(load)
   <section class="devoluciones">
     <header class="devoluciones-header">
       <h2>Devoluciones</h2>
-      <el-button :loading="loading" data-test="refresh-devoluciones" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-devoluciones" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="devoluciones-error"
-    />
+    <div v-if="error" class="devoluciones-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
     <div class="filters" data-test="filters">
       <el-input-number
@@ -171,24 +169,23 @@ onMounted(load)
         class="filter-field"
         data-test="filtro-hasta"
       />
-      <el-button type="primary" plain data-test="apply-filters" @click="applyFilters">Filtrar</el-button>
-      <el-button data-test="clear-filters" @click="clearFilters">Limpiar</el-button>
-      <el-button v-if="canRegister" type="primary" data-test="nueva-devolucion" @click="openCreateDevolucion">
+      <Button text data-test="apply-filters" @click="applyFilters">Filtrar</Button>
+      <Button severity="secondary" data-test="clear-filters" @click="clearFilters">Limpiar</Button>
+      <Button v-if="canRegister" data-test="nueva-devolucion" @click="openCreateDevolucion">
         Nueva devolución
-      </el-button>
+      </Button>
     </div>
 
     <el-tabs v-model="activeTab">
       <el-tab-pane label="Listado" name="listado">
         <DevolucionesTable :rows="rows" :loading="loading" />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="total"
-          :page-size="pageSize"
-          :current-page="page"
-          @current-change="(p: number) => { page = p; load() }"
+          :total-records="total"
+          :rows="pageSize"
+          :first="(page - 1) * pageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="(e: { first: number; rows: number }) => { page = Math.floor(e.first / e.rows) + 1; load() }"
         />
       </el-tab-pane>
     </el-tabs>

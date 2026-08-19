@@ -11,13 +11,18 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import ElementPlus from 'element-plus'
+import Paginator from 'primevue/paginator'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import FinanzasView from '@/views/FinanzasView.vue'
 import type { components } from '@/types/api.d'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 
 type MovimientoRead = components['schemas']['MovimientoRead']
 type SocioConfiguracionRead = components['schemas']['SocioConfiguracionRead']
@@ -48,6 +53,11 @@ vi.mock('@/api/endpoints', () => ({
     createLiquidacion: apiMocks.createLiquidacion,
   },
 }))
+const confirmMocks = vi.hoisted(() => ({ confirmAction: vi.fn() }))
+vi.mock('@/utils/confirm', () => ({ confirmAction: confirmMocks.confirmAction }))
+
+// Fake PrimeVue Toast host: renders showToast() messages into <body>.
+mountToastHost()
 
 const MOVIMIENTOS: MovimientoRead[] = [
   {
@@ -92,7 +102,14 @@ async function mountView(rol: string): Promise<VueWrapper> {
     user: { id: 2, nombre: 'Pepe Operador', email: 'pepe@arpia.com.co', rol },
   })
   const wrapper = mount(FinanzasView, {
-    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+    global: {
+      plugins: [
+        pinia,
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+      stubs: { transition: false },
+    },
   })
   await nextTick()
   await flushPromises()
@@ -100,9 +117,9 @@ async function mountView(rol: string): Promise<VueWrapper> {
   return wrapper
 }
 
-/** Click the el-tabs item with the given label (pane content mounts on visit). */
+/** Click the PrimeVue Tab with the given label (panels stay mounted via v-show). */
 async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
-  const item = wrapper.findAll('.el-tabs__item').find((i) => i.text().trim() === label)
+  const item = wrapper.findAll('.p-tab').find((i) => i.text().trim() === label)
   if (!item) throw new Error(`tab not found: "${label}"`)
   await item.trigger('click')
   await nextTick()
@@ -118,6 +135,7 @@ async function flushDialogTransition(): Promise<void> {
 describe('FinanzasView (MOD-3 + T7)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    confirmMocks.confirmAction.mockReset()
     // Lists page server-side; the socios lookup keeps limit:1000 (D3).
     apiMocks.listMovimientos.mockResolvedValue({ items: MOVIMIENTOS, total: 2 })
     apiMocks.listSocios.mockResolvedValue({ items: SOCIOS, total: 2 })
@@ -131,7 +149,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
   })
 
   afterEach(() => {
-    ElMessage.closeAll()
+    clearToastHost()
     vi.restoreAllMocks()
   })
 
@@ -164,17 +182,17 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     expect(wrapper.find('[data-test="nuevo-socio"]').exists()).toBe(true)
   })
 
-  it('renders el-pagination on both lists and pages with new offsets', async () => {
+  it('renders Paginator on both lists and pages with new offsets', async () => {
     const wrapper = await mountView('operador')
-    // Movimientos table paginator (first ElPagination in the pane).
-    const paginators = wrapper.findAllComponents({ name: 'ElPagination' })
+    // Movimientos table paginator (first Paginator in the pane).
+    const paginators = wrapper.findAllComponents(Paginator)
     expect(paginators.length).toBeGreaterThanOrEqual(1)
     expect(apiMocks.listMovimientos).toHaveBeenCalledWith({ limit: 20, offset: 0 })
 
     // Two paginators exist (movimientos + socios); drive the movimientos one.
-    const movPaginador = paginators.find((p) => p.props('total') === 2)
+    const movPaginador = paginators.find((p) => p.props('totalRecords') === 2)
     expect(movPaginador).toBeDefined()
-    movPaginador!.vm.$emit('current-change', 2)
+    movPaginador!.vm.$emit('page', { first: 20, rows: 20 })
     await flushPromises()
     expect(apiMocks.listMovimientos).toHaveBeenCalledWith({ limit: 20, offset: 20 })
   })
@@ -304,7 +322,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
   })
 
   it('soft-deletes a movimiento after the confirm dialog (DELETE expects 200)', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     const wrapper = await mountView('operador')
     expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(1)
 
@@ -320,7 +338,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
   })
 
   it('does not call the API when the delete confirm dialog is cancelled', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel' as never)
+    confirmMocks.confirmAction.mockResolvedValue('reject')
     const wrapper = await mountView('operador')
 
     await wrapper.findAll('[data-test="delete-movimiento"]')[0].trigger('click')
@@ -415,7 +433,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
   })
 
   it('deletes a socio after the confirm dialog and refreshes', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     const wrapper = await mountView('operador')
     await activateTab(wrapper, 'Socios')
     expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // table page + lookup
@@ -430,7 +448,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
   })
 
   it('surfaces the 409 when deleting a socio with payouts', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     apiMocks.deleteSocio.mockRejectedValue({
       response: { data: { detail: 'El socio tiene movimientos asociados; no se puede eliminar' } },
     })

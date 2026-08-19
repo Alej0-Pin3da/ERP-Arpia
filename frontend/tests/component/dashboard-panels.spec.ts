@@ -5,17 +5,25 @@
  * SEES: KPI values formatted es-CO, low-stock severity tags (Crítico/Bajo),
  * margen rows with joined names + fallbacks, and the ECharts option the
  * sales chart receives (vue-echarts mocked — jsdom has no canvas).
+ *
+ * BajoStockTable/MargenTable migrated to PrimeVue DataTable in slice 1c;
+ * KpiCards/VentasMensualesChart migrated to PrimeVue in slice 2a.
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
+import DataTable from 'primevue/datatable'
+import PrimeVue from 'primevue/config'
 import { nextTick, type Component } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import BajoStockTable from '@/components/dashboard/BajoStockTable.vue'
+import FinanzasMensualesChart from '@/components/dashboard/FinanzasMensualesChart.vue'
 import KpiCards from '@/components/dashboard/KpiCards.vue'
 import MargenTable from '@/components/dashboard/MargenTable.vue'
 import VentasMensualesChart from '@/components/dashboard/VentasMensualesChart.vue'
-import type { FilledMonthRow, MargenRow } from '@/utils/dashboard'
+import type { FilledMonthRow, FinanzasMonthRow, MargenRow } from '@/utils/dashboard'
 import type { components } from '@/types/api.d'
 
 type InsumoBajoStockRead = components['schemas']['InsumoBajoStockRead']
@@ -32,8 +40,16 @@ const { VChartStub } = vi.hoisted(() => ({
 vi.mock('vue-echarts', () => ({ default: VChartStub }))
 
 async function mountPanel(component: Component, props: Record<string, unknown>): Promise<VueWrapper> {
-  const wrapper = mount(component, { props, global: { plugins: [ElementPlus] } })
-  // el-table paints its body one tick after mount (ResizeObserver layout).
+  const wrapper = mount(component, {
+    props,
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
+  })
+  // DataTable paints its body one tick after mount (ResizeObserver layout).
   await nextTick()
   return wrapper
 }
@@ -79,7 +95,7 @@ describe('KpiCards (DASH-1)', () => {
       loading: true,
     })
 
-    expect(wrapper.find('.el-skeleton').exists()).toBe(true)
+    expect(wrapper.find('.p-skeleton').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('$5.000,00')
   })
 })
@@ -114,6 +130,31 @@ describe('VentasMensualesChart (DASH-1)', () => {
 
     expect(wrapper.findComponent(VChartStub).exists()).toBe(false)
     expect(wrapper.text()).toContain('Sin ventas en el período')
+    // el-empty replaced by custom markup (slice 3a, BEH-6).
+    expect(wrapper.find('.chart-empty').exists()).toBe(true)
+  })
+})
+
+describe('FinanzasMensualesChart (ANA-6)', () => {
+  const rows: FinanzasMonthRow[] = [
+    { mes: '2026-01', label: 'ene 2026', ingresos: 1000, gastos: 400 },
+  ]
+
+  it('passes the gap-filled months to ECharts as grouped bars', async () => {
+    const wrapper = await mountPanel(FinanzasMensualesChart, { rows })
+
+    const option = wrapper.findComponent(VChartStub).props('option')
+    expect(option.series[0].data).toEqual([1000])
+    expect(option.series[1].data).toEqual([400])
+    expect(option.legend.data).toEqual(['Ingresos', 'Gastos'])
+  })
+
+  it('shows an empty state instead of the chart when there are no months', async () => {
+    const wrapper = await mountPanel(FinanzasMensualesChart, { rows: [] })
+
+    expect(wrapper.findComponent(VChartStub).exists()).toBe(false)
+    expect(wrapper.text()).toContain('Sin datos en el período')
+    expect(wrapper.find('.chart-empty').exists()).toBe(true)
   })
 })
 
@@ -133,6 +174,13 @@ describe('BajoStockTable (DASH-2)', () => {
     // stock_actual 2 < 50% of 10 -> danger "Crítico"; 6 in [5,10) -> warning "Bajo".
     expect(text).toContain('Crítico')
     expect(text).toContain('Bajo')
+  })
+
+  it('renders one DataTable row per low-stock insumo', async () => {
+    const wrapper = await mountPanel(BajoStockTable, { rows })
+
+    expect(wrapper.findComponent(DataTable).exists()).toBe(true)
+    expect(wrapper.findAll('tbody tr')).toHaveLength(2)
   })
 
   it('shows an empty state when no insumos are below stock', async () => {
@@ -172,6 +220,13 @@ describe('MargenTable (DASH-3)', () => {
     expect(text).toContain('Producto #99')
     expect(text).toContain('De carne')
     expect(text).toContain('$20.000,50')
+  })
+
+  it('renders one DataTable row per margen product', async () => {
+    const wrapper = await mountPanel(MargenTable, { rows })
+
+    expect(wrapper.findComponent(DataTable).exists()).toBe(true)
+    expect(wrapper.findAll('tbody tr')).toHaveLength(2)
   })
 
   it('shows an empty state when no margins were computed', async () => {

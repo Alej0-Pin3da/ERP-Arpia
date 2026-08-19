@@ -5,11 +5,17 @@
  * module: KPIs computed from the last ventas-mensuales row, the chart
  * receiving gap-filled months, both tables populated with joined/severity
  * data, and the loading/error/refresh lifecycle.
+ *
+ * BajoStockTable/MargenTable are PrimeVue DataTables since slice 1c; the
+ * el-card/el-row shell stays (el-alert/el-button migrated in slices 2b/3a).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import DashboardView from '@/views/DashboardView.vue'
 
 // jsdom has no canvas — stub vue-echarts (the view renders the real chart).
@@ -67,7 +73,14 @@ const PRODUCTOS = [
 ]
 
 async function mountDashboard(): Promise<VueWrapper> {
-  const wrapper = mount(DashboardView, { global: { plugins: [ElementPlus] } })
+  const wrapper = mount(DashboardView, {
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
+  })
   await flushPromises()
   await flushPromises()
   return wrapper
@@ -138,6 +151,8 @@ describe('DashboardView (DASH-1..3)', () => {
     const wrapper = await mountDashboard()
 
     expect(wrapper.text()).toContain('No se pudo cargar el tablero')
+    // el-alert replaced by PrimeVue Message (slice 3a).
+    expect(wrapper.find('.p-message').exists()).toBe(true)
   })
 
   it('reloads all panels when the refresh button is clicked', async () => {

@@ -8,7 +8,14 @@
  * user's own row ("can't delete self" — the backend additionally rejects
  * DELETE /usuarios/{self} with 400 "Cannot delete your own user"). The view
  * owns the edit form and the API calls.
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. Tag/Button cells were
+ * migrated in slice 2b.
  */
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import Tag from 'primevue/tag'
 import { roleLabel } from '@/utils/menu'
 import { rolTagType } from '@/utils/usuarios'
 import type { UsuarioRead } from '@/types/api.d'
@@ -28,35 +35,43 @@ function isSelf(row: UsuarioRead): boolean {
 </script>
 
 <template>
-  <el-table :data="rows" v-loading="loading">
-    <el-table-column prop="id" label="#" width="70" align="center" />
-    <el-table-column prop="nombre" label="Nombre" min-width="200" />
-    <el-table-column prop="email" label="Email" min-width="220" />
-    <el-table-column label="Rol" width="150" align="center">
-      <template #default="{ row }">
-        <el-tag :type="rolTagType(row.rol)" size="small">{{ roleLabel(row.rol) }}</el-tag>
+  <DataTable :value="rows" lazy :loading="loading">
+    <Column field="id" header="#" style="width: 70px" align="center" />
+    <Column field="nombre" header="Nombre" style="min-width: 200px" />
+    <Column field="email" header="Email" style="min-width: 220px" />
+    <Column field="rol" header="Rol" style="width: 150px" align="center">
+      <template #body="{ data }">
+        <Tag :severity="rolTagType(data.rol)">{{ roleLabel(data.rol) }}</Tag>
       </template>
-    </el-table-column>
-    <el-table-column label="Acciones" width="150" align="center">
-      <template #default="{ row }">
-        <el-button link type="primary" size="small" data-test="edit-usuario" @click="emit('edit', row)">
+    </Column>
+    <Column header="Acciones" style="width: 150px" align="center">
+      <template #body="{ data: row }">
+        <Button link size="small" data-test="edit-usuario" @click="emit('edit', row)">
           Editar
-        </el-button>
-        <el-button
+        </Button>
+        <Button
           v-if="!isSelf(row)"
-          link
-          type="danger"
+          text
+          severity="danger"
           size="small"
           data-test="delete-usuario"
           @click="emit('delete', row)"
         >
           Eliminar
-        </el-button>
+        </Button>
       </template>
-    </el-table-column>
+    </Column>
 
     <template #empty>
-      <el-empty description="Sin usuarios registrados" :image-size="80" />
+      <div class="usuario-empty">Sin usuarios registrados</div>
     </template>
-  </el-table>
+  </DataTable>
 </template>
+
+<style scoped>
+.usuario-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
+}
+</style>

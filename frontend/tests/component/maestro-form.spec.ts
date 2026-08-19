@@ -10,10 +10,13 @@
  *    single field
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus, { ElMessage } from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
+import esCO from '@/utils/locales/es-CO'
 import MaestroForm from '@/components/maestros/MaestroForm.vue'
 import {
   MAESTRO_ENTITIES,
@@ -39,16 +42,21 @@ async function mountForm(
 ): Promise<VueWrapper> {
   const wrapper = mount(MaestroForm, {
     props: { mode, fields: config.fields, singular: config.singular, initial },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   await flushPromises()
   return wrapper
 }
 
+mountToastHost()
+
 afterEach(() => {
-  ElMessage.closeAll()
-  document.body.innerHTML = ''
+  clearToastHost()
 })
 
 describe('MaestroForm (MOD-5)', () => {
