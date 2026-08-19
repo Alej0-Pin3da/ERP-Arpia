@@ -13,5 +13,21 @@ if (!('ResizeObserver' in globalThis)) {
   ;(globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub
 }
 
+// PrimeVue Select binds an orientation media query listener on mount; jsdom
+// does not implement matchMedia. No-op polyfill keeps Select (used inside
+// DataTable column filter funnels) from crashing in tests.
+if (typeof globalThis.matchMedia !== 'function') {
+  ;(globalThis as unknown as { matchMedia: unknown }).matchMedia = (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    dispatchEvent: () => false,
+  })
+}
+
 // Unmount every mounted component after each test to avoid leaks between specs.
 enableAutoUnmount(afterEach)

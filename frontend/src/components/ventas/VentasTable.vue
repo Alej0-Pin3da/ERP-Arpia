@@ -6,9 +6,23 @@
  * fecha/total, canal + estado labels (estado gets a colored tag), a condensed
  * product summary per row, and expandable detail lines with the full
  * product/variant snapshot. Missing products degrade to "Producto #{id}".
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1a: header funnels and sort
+ * re-emit the SAME typed events the view already consumes, via the
+ * parsePrimeVueFilters/parsePrimeVueSort adapters. el-tag/el-button cells stay
+ * until slice 2b; only the gift tooltip uses the PrimeVue v-tooltip directive.
  */
+import { ref } from 'vue'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import Select from 'primevue/select'
 import { formatDateTime, formatMoney, formatQty } from '@/utils/format'
-import { parseColumnFilter } from '@/utils/table-filters'
+import {
+  parseColumnFilter,
+  parsePrimeVueFilters,
+  parsePrimeVueSort,
+  type PrimeVueFilterConstraint,
+} from '@/utils/table-filters'
 import {
   CANAL_VENTAS,
   canalLabel,
@@ -38,27 +52,31 @@ const estadoFilters = (['completada', 'anulada'] as const).map((e) => ({
   value: e,
 }))
 
-/** Normalize el-table's filter-change into a typed single-value emit. */
-function onColumnFilterChange(elFilters: Record<string, unknown[]>): void {
-  const canal_venta = parseColumnFilter(elFilters.canal_venta)
-  const estado = parseColumnFilter(elFilters.estado)
+/** DataTable lazy filter state (server-side filtering, single constraint per column). */
+const filters = ref<Record<string, PrimeVueFilterConstraint>>({
+  canal_venta: { value: null, matchMode: 'equals' },
+  estado: { value: null, matchMode: 'equals' },
+})
+
+/** Expanded rows keyed by row id (nested detail table). */
+const expandedRows = ref<Record<string, boolean>>({})
+
+/** Normalize DataTable's @filter payload into the typed single-value emit. */
+function onDataTableFilter(e: {
+  filters: Record<string, PrimeVueFilterConstraint | PrimeVueFilterConstraint[]>
+}): void {
+  const normalized = parsePrimeVueFilters(e.filters)
+  const canal_venta = parseColumnFilter(normalized.canal_venta)
+  const estado = parseColumnFilter(normalized.estado)
   emit('filter-change', {
     canal_venta: canal_venta === null ? null : String(canal_venta),
     estado: estado === null ? null : String(estado),
   })
 }
 
-/** Normalize el-table's sort-change into a typed {prop, order} emit. */
-function onSortChange(s: {
-  column: { key?: string; property?: string }
-  prop: string
-  order: 'ascending' | 'descending' | null
-}): void {
-  const prop = s.column.key ?? s.column.property ?? s.prop
-  emit('sort-change', {
-    prop,
-    order: s.order === 'ascending' ? 'asc' : s.order === 'descending' ? 'desc' : null,
-  })
+/** Normalize DataTable's @sort payload into the typed {prop, order} emit. */
+function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
+  emit('sort-change', parsePrimeVueSort(s))
 }
 
 /** el-tag type per estado: completada success, anulada danger, rest info. */
@@ -75,68 +93,115 @@ function productSummary(row: VentaRow): string {
 </script>
 
 <template>
-  <el-table :data="rows" v-loading="loading" @filter-change="onColumnFilterChange" @sort-change="onSortChange">
-    <el-table-column type="expand">
-      <template #default="{ row }">
-        <el-table :data="row.detalles" size="small" class="venta-detail-table">
-          <el-table-column prop="nombre" label="Producto" min-width="180" />
-          <el-table-column prop="variante" label="Variante" min-width="120" />
-          <el-table-column label="Cantidad" width="110" align="right">
-            <template #default="{ row: d }">{{ formatQty(d.cantidad) }}</template>
-          </el-table-column>
-          <el-table-column label="P. unitario" width="130" align="right">
-            <template #default="{ row: d }">{{ formatMoney(d.precio_unitario_aplicado) }}</template>
-          </el-table-column>
-        </el-table>
-      </template>
-    </el-table-column>
+  <DataTable
+    :value="rows"
+    v-model:expandedRows="expandedRows"
+    dataKey="id"
+    lazy
+    filterDisplay="menu"
+    :loading="loading"
+    :filters="filters"
+    @filter="onDataTableFilter"
+    @sort="onDataTableSort"
+  >
+    <Column expander style="width: 3rem" />
+    <template #expansion="{ data }">
+      <DataTable :value="data.detalles" size="small" class="venta-detail-table">
+        <Column field="nombre" header="Producto" style="min-width: 180px" />
+        <Column field="variante" header="Variante" style="min-width: 120px" />
+        <Column header="Cantidad" style="width: 110px" align="right">
+          <template #body="{ data: d }">{{ formatQty(d.cantidad) }}</template>
+        </Column>
+        <Column header="P. unitario" style="width: 130px" align="right">
+          <template #body="{ data: d }">{{ formatMoney(d.precio_unitario_aplicado) }}</template>
+        </Column>
+      </DataTable>
+    </template>
 
-    <el-table-column prop="id" label="#" column-key="id" sortable width="70" />
-    <el-table-column label="Fecha" column-key="fecha" sortable width="110">
-      <template #default="{ row }">{{ formatDateTime(row.fecha) }}</template>
-    </el-table-column>
-    <el-table-column label="Canal" column-key="canal_venta" :filters="canalFilters" sortable width="110">
-      <template #default="{ row }">{{ canalLabel(row.canal_venta) }}</template>
-    </el-table-column>
-    <el-table-column label="Estado" column-key="estado" :filters="estadoFilters" sortable width="150">
-      <template #default="{ row }">
+    <Column field="id" header="#" sortable style="width: 70px" />
+    <Column field="fecha" header="Fecha" sortable style="width: 110px">
+      <template #body="{ data }">{{ formatDateTime(data.fecha) }}</template>
+    </Column>
+    <Column
+      field="canal_venta"
+      header="Canal"
+      sortable
+      :show-filter-operator="false"
+      :show-filter-match-modes="false"
+      :show-filter-add-button="false"
+      :show-filter-apply-button="false"
+      :show-clear-button="false"
+      style="width: 110px"
+    >
+      <template #body="{ data }">{{ canalLabel(data.canal_venta) }}</template>
+      <template #filter="{ filterModel, filterCallback }">
+        <Select
+          v-model="filterModel.value"
+          :options="canalFilters"
+          optionLabel="text"
+          optionValue="value"
+          placeholder="Canal"
+          :show-clear="true"
+          @change="filterCallback()"
+        />
+      </template>
+    </Column>
+    <Column
+      field="estado"
+      header="Estado"
+      sortable
+      :show-filter-operator="false"
+      :show-filter-match-modes="false"
+      :show-filter-add-button="false"
+      :show-filter-apply-button="false"
+      :show-clear-button="false"
+      style="width: 150px"
+    >
+      <template #body="{ data }">
         <div class="venta-estado-cell">
-          <el-tag :type="estadoTagType(row.estado)" size="small">{{ estadoLabel(row.estado) }}</el-tag>
-          <el-tag v-if="row.es_regalo" type="warning" size="small" data-test="tag-regalo">Regalo</el-tag>
+          <el-tag :type="estadoTagType(data.estado)" size="small">{{ estadoLabel(data.estado) }}</el-tag>
+          <el-tag v-if="data.es_regalo" type="warning" size="small" data-test="tag-regalo">Regalo</el-tag>
         </div>
       </template>
-    </el-table-column>
-    <el-table-column label="Productos" min-width="220">
-      <template #default="{ row }">{{ productSummary(row) }}</template>
-    </el-table-column>
-    <el-table-column prop="cliente" label="Cliente" column-key="cliente" sortable min-width="150" />
-    <el-table-column prop="detalle_count" label="Detalles" width="90" align="right" />
-    <el-table-column label="Total" column-key="total_venta" sortable width="130" align="right">
-      <template #default="{ row }">
-        <span :class="{ 'total-regalo': row.es_regalo }">
-          {{ formatMoney(row.es_regalo ? 0 : row.total_venta) }}
+      <template #filter="{ filterModel, filterCallback }">
+        <Select
+          v-model="filterModel.value"
+          :options="estadoFilters"
+          optionLabel="text"
+          optionValue="value"
+          placeholder="Estado"
+          :show-clear="true"
+          @change="filterCallback()"
+        />
+      </template>
+    </Column>
+    <Column field="nombre" header="Productos" style="min-width: 220px">
+      <template #body="{ data }">{{ productSummary(data) }}</template>
+    </Column>
+    <Column field="cliente" header="Cliente" sortable style="min-width: 150px" />
+    <Column field="detalle_count" header="Detalles" style="width: 90px" align="right" />
+    <Column field="total_venta" header="Total" sortable style="width: 130px" align="right">
+      <template #body="{ data }">
+        <span :class="{ 'total-regalo': data.es_regalo }">
+          {{ formatMoney(data.es_regalo ? 0 : data.total_venta) }}
         </span>
       </template>
-    </el-table-column>
-    <el-table-column v-if="canMarkRegalo" label="Acciones" width="210" align="center">
-      <template #default="{ row }">
-        <el-tooltip
+    </Column>
+    <Column v-if="canMarkRegalo" header="Acciones" style="width: 210px" align="center">
+      <template #body="{ data: row }">
+        <el-button
           v-if="!row.es_regalo"
-          content="Marcar como regalo"
-          placement="top"
+          v-tooltip="{ value: 'Marcar como regalo', position: 'top' }"
+          size="small"
+          circle
+          plain
+          type="warning"
+          aria-label="Marcar como regalo"
+          data-test="marcar-regalo"
+          @click="emit('marcar-regalo', row.id)"
         >
-          <el-button
-            size="small"
-            circle
-            plain
-            type="warning"
-            aria-label="Marcar como regalo"
-            data-test="marcar-regalo"
-            @click="emit('marcar-regalo', row.id)"
-          >
-            🎁
-          </el-button>
-        </el-tooltip>
+          🎁
+        </el-button>
         <el-button
           v-if="row.estado !== 'anulada'"
           link
@@ -158,12 +223,12 @@ function productSummary(row: VentaRow): string {
           Anular
         </el-button>
       </template>
-    </el-table-column>
+    </Column>
 
     <template #empty>
-      <el-empty description="Sin ventas registradas" :image-size="80" />
+      <div class="venta-empty">Sin ventas registradas</div>
     </template>
-  </el-table>
+  </DataTable>
 </template>
 
 <style scoped>
@@ -181,5 +246,11 @@ function productSummary(row: VentaRow): string {
 .total-regalo {
   color: var(--el-text-color-secondary);
   font-style: italic;
+}
+
+.venta-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
 }
 </style>

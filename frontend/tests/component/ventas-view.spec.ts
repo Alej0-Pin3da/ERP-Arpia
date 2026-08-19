@@ -11,9 +11,14 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import Paginator from 'primevue/paginator'
+import PrimeVue from 'primevue/config'
+import Tooltip from 'primevue/tooltip'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import VentasView from '@/views/VentasView.vue'
 import type { components } from '@/types/api.d'
@@ -131,7 +136,15 @@ async function mountView(rol: string): Promise<VueWrapper> {
     user: { id: 2, nombre: 'Pepe Operador', email: 'pepe@arpia.com.co', rol },
   })
   const wrapper = mount(VentasView, {
-    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+    global: {
+      plugins: [
+        pinia,
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+      directives: { tooltip: Tooltip },
+      stubs: { transition: false },
+    },
   })
   await nextTick()
   await flushPromises()
@@ -176,12 +189,12 @@ describe('VentasView (MOD-1 + T7)', () => {
     expect(apiMocks.listVariantes).toHaveBeenCalledWith({ producto_id: 2 })
   })
 
-  it('renders el-pagination and pages the list with a new offset', async () => {
+  it('renders Paginator and pages the list with a new offset', async () => {
     const wrapper = await mountView('operador')
-    expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(true)
+    expect(wrapper.findComponent(Paginator).exists()).toBe(true)
     expect(apiMocks.listVentas).toHaveBeenCalledWith(PAGE1)
 
-    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    wrapper.findComponent(Paginator).vm.$emit('page', { first: 20, rows: 20 })
     await flushPromises()
     expect(apiMocks.listVentas).toHaveBeenCalledWith({ limit: 20, offset: 20 })
   })
