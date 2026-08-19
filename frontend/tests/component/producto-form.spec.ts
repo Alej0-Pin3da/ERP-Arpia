@@ -1,7 +1,7 @@
 /**
  * ProductoForm component tests (PR10, spec MOD-5).
  *
- * Mounts the REAL ProductoForm with Element Plus in both modes:
+ * Mounts the REAL ProductoForm with PrimeVue in both modes:
  *  - create: tipo select (GET /tipos-producto), nombre, requiere_fabricacion
  *    switch (default on), costos_operativos_fijos + precio_venta_sugerido
  *    number fields; empty nombre / no tipo each block submission with a
@@ -13,9 +13,12 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus, { ElMessage } from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import ProductoForm from '@/components/productos/ProductoForm.vue'
 import type { components } from '@/types/api.d'
 
@@ -42,28 +45,46 @@ async function mountForm(
 ): Promise<VueWrapper> {
   const wrapper = mount(ProductoForm, {
     props: { mode, initial, tipos: TIPOS },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
 }
 
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
 async function pickTipo(wrapper: VueWrapper, label: string): Promise<void> {
   const select = wrapper.find('[data-test="tipo-producto-select"]')
   await select.trigger('click')
-  await nextTick()
-  const item = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
     (el) => el.textContent?.trim() === label,
   )
   if (!item) throw new Error(`tipo option not found: "${label}"`)
-  item.click()
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
   await nextTick()
-  await flushPromises()
+}
+
+/** PrimeVue InputNumber commits the model on blur — type then blur like a user. */
+async function setNumber(wrapper: VueWrapper, testId: string, value: string): Promise<void> {
+  const input = wrapper.find(`[data-test="${testId}"] input`)
+  await input.setValue(value)
+  await input.trigger('blur')
+  await nextTick()
 }
 
 afterEach(() => {
   ElMessage.closeAll()
-  document.body.innerHTML = ''
 })
 
 describe('ProductoForm (MOD-5)', () => {
@@ -78,8 +99,8 @@ describe('ProductoForm (MOD-5)', () => {
     expect(text).toContain('Precio de venta sugerido')
 
     await wrapper.find('[data-test="tipo-producto-select"]').trigger('click')
-    await nextTick()
-    const options = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')]
+    await flushOverlay()
+    const options = [...document.querySelectorAll<HTMLElement>('.p-select-option')]
     expect(options.map((o) => o.textContent?.trim())).toEqual(['Alimentos', 'Aseo'])
   })
 
@@ -110,8 +131,8 @@ describe('ProductoForm (MOD-5)', () => {
 
     await wrapper.find('[data-test="nombre-producto-input"]').setValue('Arepa de choclo')
     await pickTipo(wrapper, 'Alimentos')
-    await wrapper.find('[data-test="costos-fijos-input"] input').setValue('5000')
-    await wrapper.find('[data-test="precio-venta-input"] input').setValue('12000')
+    await setNumber(wrapper, 'costos-fijos-input', '5000')
+    await setNumber(wrapper, 'precio-venta-input', '12000')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

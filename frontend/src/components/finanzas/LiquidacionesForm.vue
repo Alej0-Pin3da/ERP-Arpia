@@ -2,7 +2,7 @@
 /**
  * Liquidaciones form (PR8, spec MOD-3).
  *
- * Element Plus form that maps to POST /finanzas/liquidaciones
+ * PrimeVue form that maps to POST /finanzas/liquidaciones
  * (LiquidacionCreate): monto > 0 and optional notas. The settlement is
  * ONE-TIME — the backend rejects a replay of the same liquidacion_id with
  * 409 — so the form carries an explicit warning. The view owns the POST, the
@@ -10,6 +10,8 @@
  */
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import InputNumber from 'primevue/inputnumber'
+import Textarea from 'primevue/textarea'
 
 import { buildLiquidacionPayload, type LiquidacionCreate } from '@/utils/finanzas'
 
@@ -37,33 +39,36 @@ function submit(): void {
 </script>
 
 <template>
-  <el-form label-position="top" class="liquidacion-form" @submit.prevent="submit">
-    <el-row :gutter="16">
-      <el-col :xs="24" :md="8">
-        <el-form-item label="Monto a liquidar">
-          <el-input-number
+  <form class="liquidacion-form" @submit.prevent="submit">
+    <div class="form-grid">
+      <div class="form-col" style="--md: 8">
+        <div class="form-item">
+          <label class="form-label">Monto a liquidar</label>
+          <InputNumber
             v-model="monto"
             :min="0.01"
-            :precision="2"
+            :min-fraction-digits="2"
+            :max-fraction-digits="2"
             :step="100000"
-            :controls="false"
+            :use-grouping="false"
+            :show-buttons="false"
             class="liquidacion-field"
             data-test="monto-liquidacion-input"
           />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="16">
-        <el-form-item label="Notas">
-          <el-input
+        </div>
+      </div>
+      <div class="form-col" style="--md: 16">
+        <div class="form-item">
+          <label class="form-label">Notas</label>
+          <Textarea
             v-model="notas"
-            type="textarea"
             :rows="2"
             placeholder="Opcional"
             data-test="notas-input"
           />
-        </el-form-item>
-      </el-col>
-    </el-row>
+        </div>
+      </div>
+    </div>
 
     <div class="form-footer">
       <span class="form-hint">
@@ -73,7 +78,7 @@ function submit(): void {
         Procesar liquidación
       </el-button>
     </div>
-  </el-form>
+  </form>
 </template>
 
 <style scoped>
@@ -83,6 +88,33 @@ function submit(): void {
 
 .liquidacion-field {
   width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.form-col {
+  grid-column: span 24;
+}
+
+@media (min-width: 768px) {
+  .form-col {
+    grid-column: span var(--md, 24);
+  }
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--el-text-color-primary);
 }
 
 .form-footer {

@@ -2,7 +2,7 @@
 /**
  * Compras register form (PR9, spec MOD-4) — operador+.
  *
- * Element Plus form that maps to POST /compras-insumos (CompraInsumoCreate):
+ * PrimeVue form that maps to POST /compras-insumos (CompraInsumoCreate):
  * required insumo (select over the insumos catalog), cantidad > 0 and
  * precio_unitario >= 0. The schema field names are `cantidad_comprada` /
  * `precio_unitario_compra`. The backend runs the WAC service on POST
@@ -13,6 +13,8 @@
  */
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import InputNumber from 'primevue/inputnumber'
+import Select from 'primevue/select'
 
 import { buildCompraPayload, type CompraInsumoCreate } from '@/utils/inventario'
 import type { InsumoRead } from '@/types/api.d'
@@ -56,56 +58,64 @@ function submit(): void {
 </script>
 
 <template>
-  <el-form label-position="top" class="compra-form" @submit.prevent="submit">
-    <el-row :gutter="16">
-      <el-col :xs="24" :md="8">
-        <el-form-item label="Insumo">
-          <el-select
+  <form class="compra-form" @submit.prevent="submit">
+    <div class="form-grid">
+      <div class="form-col" style="--md: 8">
+        <div class="form-item">
+          <label class="form-label">Insumo</label>
+          <Select
             v-model="insumoId"
-            filterable
+            :options="insumos"
+            option-label="nombre"
+            option-value="id"
+            filter
             placeholder="Selecciona el insumo"
             class="compra-field"
             data-test="compra-insumo-select"
-          >
-            <el-option v-for="i in insumos" :key="i.id" :label="i.nombre" :value="i.id" />
-          </el-select>
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="4">
-        <el-form-item label="Cantidad">
-          <el-input-number
+          />
+        </div>
+      </div>
+      <div class="form-col" style="--md: 4">
+        <div class="form-item">
+          <label class="form-label">Cantidad</label>
+          <InputNumber
             v-model="cantidad"
             :min="0.01"
-            :precision="2"
-            :controls="false"
+            :min-fraction-digits="2"
+            :max-fraction-digits="2"
+            :use-grouping="false"
+            :show-buttons="false"
             class="compra-field"
             data-test="compra-cantidad-input"
           />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="6">
-        <el-form-item label="Precio unitario">
-          <el-input-number
+        </div>
+      </div>
+      <div class="form-col" style="--md: 6">
+        <div class="form-item">
+          <label class="form-label">Precio unitario</label>
+          <InputNumber
             v-model="precioUnitario"
             :min="0"
-            :precision="2"
-            :controls="false"
+            :min-fraction-digits="2"
+            :max-fraction-digits="2"
+            :use-grouping="false"
+            :show-buttons="false"
             class="compra-field"
             data-test="compra-precio-input"
           />
-        </el-form-item>
-      </el-col>
-      <el-col :xs="24" :md="6" class="submit-col">
+        </div>
+      </div>
+      <div class="form-col submit-col" style="--md: 6">
         <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-compra">
           Registrar compra
         </el-button>
-      </el-col>
-    </el-row>
+      </div>
+    </div>
 
     <p class="form-hint">
       El registro actualiza el stock y el costo promedio (WAC) automáticamente.
     </p>
-  </el-form>
+  </form>
 </template>
 
 <style scoped>
@@ -115,6 +125,33 @@ function submit(): void {
 
 .compra-field {
   width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.form-col {
+  grid-column: span 24;
+}
+
+@media (min-width: 768px) {
+  .form-col {
+    grid-column: span var(--md, 24);
+  }
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--el-text-color-primary);
 }
 
 .submit-col {

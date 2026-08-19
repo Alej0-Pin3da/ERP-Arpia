@@ -1,7 +1,7 @@
 /**
  * Devoluciones create form component tests (task 2.3, spec MOD-2).
  *
- * Mounts the REAL DevolucionesForm with real Element Plus and drives it
+ * Mounts the REAL DevolucionesForm with PrimeVue and drives it
  * through real interaction. The CRITICAL behavior (spec MOD-2):
  *  - tipo 'total'  -> items section HIDDEN; a submit without items is valid
  *    (POST returns 201) and the payload has NO items key
@@ -13,9 +13,12 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus, { ElMessage } from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import DevolucionesForm from '@/components/devoluciones/DevolucionesForm.vue'
 import type { components } from '@/types/api.d'
 
@@ -50,22 +53,41 @@ const loadVariantes = vi.fn().mockResolvedValue(VARIANTES)
 async function mountForm(saving = false): Promise<VueWrapper> {
   const wrapper = mount(DevolucionesForm, {
     props: { productos: PRODUCTOS, loadVariantes, saving },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await nextTick()
   return wrapper
 }
 
-/** Open an el-select by its data-test and click the option with the label. */
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
+/** Open a PrimeVue Select by its data-test and click the option with the label. */
 async function pickOption(select: ReturnType<VueWrapper['find']>, label: string): Promise<void> {
   await select.trigger('click')
-  await nextTick()
-  const item = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
     (el) => el.textContent?.trim() === label,
   )
   if (!item) throw new Error(`dropdown option not found: "${label}"`)
-  item.click()
-  await flushPromises()
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
+  await nextTick()
+}
+
+/** PrimeVue InputNumber commits the model on blur — type then blur like a user. */
+async function setNumber(wrapper: VueWrapper, testId: string, value: string): Promise<void> {
+  const input = wrapper.find(`[data-test="${testId}"] input`)
+  await input.setValue(value)
+  await input.trigger('blur')
   await nextTick()
 }
 
@@ -118,7 +140,7 @@ describe('DevolucionesForm (MOD-2 create)', () => {
 
   it('total tipo: submit WITHOUT items emits a payload with no items key', async () => {
     const wrapper = await mountForm()
-    await wrapper.find('[data-test="venta-id-input"] input').setValue('9')
+    await setNumber(wrapper, 'venta-id-input', '9')
 
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -130,7 +152,7 @@ describe('DevolucionesForm (MOD-2 create)', () => {
 
   it('total tipo: a non-empty motivo is included in the payload', async () => {
     const wrapper = await mountForm()
-    await wrapper.find('[data-test="venta-id-input"] input').setValue('9')
+    await setNumber(wrapper, 'venta-id-input', '9')
     await wrapper.find('[data-test="motivo-input"]').setValue('Cliente pidió cancelación')
 
     await wrapper.find('form').trigger('submit')
@@ -148,7 +170,7 @@ describe('DevolucionesForm (MOD-2 create)', () => {
   it('parcial tipo: blocks a submit with no complete item (server would 422)', async () => {
     const wrapper = await mountForm()
     await setTipo(wrapper, 'Parcial')
-    await wrapper.find('[data-test="venta-id-input"] input').setValue('10')
+    await setNumber(wrapper, 'venta-id-input', '10')
 
     // Leave the default empty row untouched -> no valid item.
     await wrapper.find('form').trigger('submit')
@@ -161,7 +183,7 @@ describe('DevolucionesForm (MOD-2 create)', () => {
   it('parcial tipo: emits the exact payload for a complete item', async () => {
     const wrapper = await mountForm()
     await setTipo(wrapper, 'Parcial')
-    await wrapper.find('[data-test="venta-id-input"] input').setValue('10')
+    await setNumber(wrapper, 'venta-id-input', '10')
 
     await pickOption(wrapper.find('[data-test="producto-select"]'), 'Arepa de huevo')
     // precio_unitario auto-defaults from precio_venta_sugerido (schema-required;
@@ -169,7 +191,7 @@ describe('DevolucionesForm (MOD-2 create)', () => {
     const precioInput = wrapper.find('[data-test="precio-input"] input')
     expect((precioInput.element as HTMLInputElement).value).toBe('5000')
     await pickOption(wrapper.find('[data-test="variante-select"]'), 'Grande')
-    await wrapper.find('[data-test="cantidad-input"] input').setValue('2')
+    await setNumber(wrapper, 'cantidad-input', '2')
 
     await wrapper.find('form').trigger('submit')
     await flushPromises()

@@ -7,6 +7,8 @@
  * margen product count. All values go through the central es-CO formatters.
  */
 import { computed } from 'vue'
+import Card from 'primevue/card'
+import Skeleton from 'primevue/skeleton'
 
 import { formatMoney, formatQty } from '@/utils/format'
 
@@ -32,24 +34,48 @@ const cards = computed(() => [
 </script>
 
 <template>
-  <el-row :gutter="16" class="kpi-cards">
-    <el-col v-for="card in cards" :key="card.label" :xs="24" :sm="12" :md="6">
-      <el-card shadow="never" class="kpi-card">
-        <p class="kpi-label">{{ card.label }}</p>
-        <el-skeleton v-if="loading" :rows="1" animated />
-        <p v-else class="kpi-value" data-test="kpi-value">{{ card.value }}</p>
-      </el-card>
-    </el-col>
-  </el-row>
+  <div class="kpi-cards">
+    <div v-for="card in cards" :key="card.label" class="kpi-col">
+      <Card :pt="{ root: { class: 'kpi-card' } }">
+        <template #content>
+          <p class="kpi-label">{{ card.label }}</p>
+          <Skeleton v-if="loading" class="kpi-skeleton" />
+          <p v-else class="kpi-value" data-test="kpi-value">{{ card.value }}</p>
+        </template>
+      </Card>
+    </div>
+  </div>
 </template>
 
 <style scoped>
+.kpi-cards {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .kpi-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .kpi-cards {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 .kpi-card {
-  margin-bottom: 1rem;
   border: 1px solid var(--arpia-border);
   border-radius: 0;
   background: var(--arpia-card);
   box-shadow: none;
+}
+
+.kpi-skeleton {
+  width: 100%;
+  height: 1.5rem;
 }
 
 .kpi-label {
