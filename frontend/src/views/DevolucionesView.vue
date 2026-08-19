@@ -17,8 +17,16 @@ import { devolucionesApi, productosApi } from '@/api/endpoints'
 import DevolucionesForm from '@/components/devoluciones/DevolucionesForm.vue'
 import DevolucionesTable from '@/components/devoluciones/DevolucionesTable.vue'
 import Button from 'primevue/button'
+import DatePicker from 'primevue/datepicker'
+import Dialog from 'primevue/dialog'
+import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
 import { showToast } from '@/utils/toast'
@@ -40,11 +48,44 @@ const page = ref(1)
 const pageSize = 20
 const productos = ref<ProductoRead[]>([])
 
-/** T8/FE-DLG-1: the register form lives in an el-dialog opened from the toolbar. */
+/** T8/FE-DLG-1: the register form lives in a PrimeVue Dialog opened from the toolbar. */
 const devolucionDialogVisible = ref(false)
 
 /** List filters (MOD-2: venta_id, fecha_desde, fecha_hasta). */
 const filtros = reactive({ venta_id: null as number | null, fecha_desde: '', fecha_hasta: '' })
+
+/**
+ * DatePicker works with Date objects (MIG-2); the API contract wants
+ * 'YYYY-MM-DD' strings — the computed proxies convert at the boundary and
+ * keep `filtros` unchanged for buildListParams and clearFilters.
+ */
+function fechaToDate(s: string): Date | null {
+  if (s === '') return null
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function fechaToString(d: Date | null): string {
+  if (d === null) return ''
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const fechaDesdeModel = computed({
+  get: () => fechaToDate(filtros.fecha_desde),
+  set: (v: Date | null) => {
+    filtros.fecha_desde = fechaToString(v)
+  },
+})
+
+const fechaHastaModel = computed({
+  get: () => fechaToDate(filtros.fecha_hasta),
+  set: (v: Date | null) => {
+    filtros.fecha_hasta = fechaToString(v)
+  },
+})
 
 /** Variante fetcher handed to the form (productosApi.listVariantes). */
 async function loadVariantes(productoId: number): Promise<VarianteProductoRead[]> {
@@ -144,28 +185,26 @@ onMounted(load)
     </div>
 
     <div class="filters" data-test="filters">
-      <el-input-number
+      <InputNumber
         v-model="filtros.venta_id"
         :min="1"
         :step="1"
-        :controls="false"
+        :show-buttons="false"
         placeholder="Venta"
         class="filter-field"
         data-test="filtro-venta"
       />
-      <el-date-picker
-        v-model="filtros.fecha_desde"
-        type="date"
+      <DatePicker
+        v-model="fechaDesdeModel"
+        dateFormat="yy-mm-dd"
         placeholder="Desde"
-        value-format="YYYY-MM-DD"
         class="filter-field"
         data-test="filtro-desde"
       />
-      <el-date-picker
-        v-model="filtros.fecha_hasta"
-        type="date"
+      <DatePicker
+        v-model="fechaHastaModel"
+        dateFormat="yy-mm-dd"
         placeholder="Hasta"
-        value-format="YYYY-MM-DD"
         class="filter-field"
         data-test="filtro-hasta"
       />
@@ -176,8 +215,12 @@ onMounted(load)
       </Button>
     </div>
 
-    <el-tabs v-model="activeTab">
-      <el-tab-pane label="Listado" name="listado">
+    <Tabs v-model:value="activeTab">
+      <TabList>
+        <Tab value="listado">Listado</Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="listado">
         <DevolucionesTable :rows="rows" :loading="loading" />
         <Paginator
           class="tabla-paginacion"
@@ -187,16 +230,19 @@ onMounted(load)
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
           @page="(e: { first: number; rows: number }) => { page = Math.floor(e.first / e.rows) + 1; load() }"
         />
-      </el-tab-pane>
-    </el-tabs>
+      </TabPanel>
+      </TabPanels>
+    </Tabs>
 
-    <el-dialog
-      v-model="devolucionDialogVisible"
-      title="Nueva devolución"
-      :close-on-click-modal="false"
-      :close-on-press-escape="!saving"
-      :show-close="!saving"
-      width="640px"
+    <Dialog
+      v-model:visible="devolucionDialogVisible"
+      header="Nueva devolución"
+      modal
+      position="top"
+      style="width: 640px"
+      :dismissable-mask="false"
+      :close-on-escape="!saving"
+      :closable="!saving"
     >
       <DevolucionesForm
         v-if="devolucionDialogVisible"
@@ -205,7 +251,7 @@ onMounted(load)
         :saving="saving"
         @submit="onSubmit"
       />
-    </el-dialog>
+    </Dialog>
   </section>
 </template>
 

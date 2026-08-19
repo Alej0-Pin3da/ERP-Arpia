@@ -12,7 +12,6 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -72,7 +71,7 @@ const PAYLOAD = { venta_id: 10, tipo: 'parcial' as const, items: [{ producto_id:
 
 const PAGE1 = { limit: 20, offset: 0 }
 
-/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+/** Let the dialog leave transition finish (Vue's nextFrame is a double rAF). */
 async function flushDialogTransition(): Promise<void> {
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
@@ -91,7 +90,6 @@ async function mountView(rol: string): Promise<VueWrapper> {
     global: {
       plugins: [
         pinia,
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
       stubs: { transition: false },
@@ -174,7 +172,7 @@ describe('DevolucionesView (MOD-2 + T7)', () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listDevoluciones).toHaveBeenCalledTimes(1)
 
-    // The form lives in an el-dialog opened from the toolbar button (FE-DLG-1).
+    // The form lives in a PrimeVue Dialog opened from the toolbar button (FE-DLG-1).
     expect(wrapper.findComponent({ name: 'DevolucionesForm' }).exists()).toBe(false)
     await wrapper.find('[data-test="nueva-devolucion"]').trigger('click')
     await nextTick()
@@ -198,7 +196,7 @@ describe('DevolucionesView (MOD-2 + T7)', () => {
     await nextTick()
     expect(wrapper.findComponent({ name: 'DevolucionesForm' }).exists()).toBe(true)
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape' }))
     await flushDialogTransition()
 
     expect(apiMocks.createDevolucion).not.toHaveBeenCalled()
@@ -209,19 +207,21 @@ describe('DevolucionesView (MOD-2 + T7)', () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listDevoluciones).toHaveBeenCalledTimes(1)
 
-    await wrapper.find('[data-test="filtro-venta"] input').setValue('7')
+    // PrimeVue InputNumber commits the typed value on Enter (MIG-2).
+    const ventaInput = wrapper.find('[data-test="filtro-venta"] input')
+    await ventaInput.setValue('7')
+    await ventaInput.trigger('keydown', { key: 'Enter', code: 'Enter' })
     await wrapper.find('[data-test="apply-filters"]').trigger('click')
     await flushPromises()
 
     expect(apiMocks.listDevoluciones).toHaveBeenLastCalledWith({ ...PAGE1, venta_id: 7 })
 
-    // Fecha range bound by the view's date pickers (value-format YYYY-MM-DD).
-    const desde = wrapper.find('input[placeholder="Desde"]')
-    await desde.setValue('2026-01-01')
-    await desde.trigger('change')
-    const hasta = wrapper.find('input[placeholder="Hasta"]')
-    await hasta.setValue('2026-01-31')
-    await hasta.trigger('change')
+    // Fecha range bound by the view's DatePicker proxies (Date <-> YYYY-MM-DD).
+    const pickers = wrapper.findAllComponents({ name: 'DatePicker' })
+    expect(pickers).toHaveLength(2)
+    pickers[0].vm.$emit('update:modelValue', new Date(2026, 0, 1))
+    pickers[1].vm.$emit('update:modelValue', new Date(2026, 0, 31))
+    await nextTick()
     await wrapper.find('[data-test="apply-filters"]').trigger('click')
     await flushPromises()
 
