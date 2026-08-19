@@ -2,14 +2,20 @@
 /**
  * Login view (task 1.8, spec SHELL-3).
  *
- * Element Plus form (email + password) -> authStore.login -> redirect to the
- * intended route (`?redirect=`, set by the guard) or /dashboard. A 401
- * surfaces inline as incorrect credentials; other failures as a connection
- * message (design refresh-algorithm step 5 wording).
+ * Manual validation (D7/BEH-3): blur-triggered checks for email
+ * required/type and password required, with the exact current messages
+ * ("Ingrese su correo electrónico", "El correo no es válido", "Ingrese su
+ * contraseña"); submission is blocked while the form is invalid. A 401
+ * surfaces inline as incorrect credentials via a PrimeVue Message
+ * (el-alert -> Message); other failures as a connection message.
  */
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { FormInstance, FormRules } from 'element-plus'
+
+import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
+import Message from 'primevue/message'
+import Password from 'primevue/password'
 
 import { isUnauthorized } from '@/api/errors'
 import { useAuthStore } from '@/stores/auth'
@@ -18,28 +24,51 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
-const formRef = ref<FormInstance>()
 const loading = ref(false)
 const errorMessage = ref('')
+const emailTouched = ref(false)
+const passwordTouched = ref(false)
 
 const form = reactive({
   email: '',
   password: '',
 })
 
-const rules: FormRules = {
-  email: [
-    { required: true, message: 'Ingrese su correo electrónico', trigger: 'blur' },
-    { type: 'email', message: 'El correo no es válido', trigger: 'blur' },
-  ],
-  password: [{ required: true, message: 'Ingrese su contraseña', trigger: 'blur' }],
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** Blur-triggered email error: required first, then format (BEH-3). */
+const emailError = computed(() => {
+  if (!emailTouched.value) return ''
+  if (form.email.trim() === '') return 'Ingrese su correo electrónico'
+  if (!EMAIL_RE.test(form.email)) return 'El correo no es válido'
+  return ''
+})
+
+/** Blur-triggered password error: required only (BEH-3). */
+const passwordError = computed(() => {
+  if (!passwordTouched.value) return ''
+  if (form.password === '') return 'Ingrese su contraseña'
+  return ''
+})
+
+const invalid = computed(() => emailError.value !== '' || passwordError.value !== '')
+
+function onEmailBlur(): void {
+  emailTouched.value = true
+}
+
+function onPasswordBlur(): void {
+  passwordTouched.value = true
 }
 
 async function onSubmit(): Promise<void> {
-  errorMessage.value = ''
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  // Touching both fields on submit surfaces every error at once; the request
+  // is blocked while any field is invalid (BEH-3).
+  emailTouched.value = true
+  passwordTouched.value = true
+  if (invalid.value) return
 
+  errorMessage.value = ''
   loading.value = true
   try {
     await authStore.login(form.email, form.password)
@@ -64,54 +93,62 @@ async function onSubmit(): Promise<void> {
       <p class="login-eyebrow arpia-eyebrow">Sistema de gestión</p>
       <p class="login-subtitle">Inicie sesión para continuar</p>
 
-      <el-alert
+      <Message
         v-if="errorMessage"
-        :title="errorMessage"
-        type="error"
-        show-icon
+        severity="error"
         :closable="false"
+        icon="pi pi-times-circle"
         class="login-error"
-      />
-
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-position="top"
-        size="large"
-        @submit.prevent="onSubmit"
       >
-        <el-form-item label="Correo electrónico" prop="email">
-          <el-input
+        {{ errorMessage }}
+      </Message>
+
+      <form class="login-form" novalidate @submit.prevent="onSubmit">
+        <div class="login-field">
+          <label class="login-label" for="login-email">Correo electrónico</label>
+          <InputText
+            id="login-email"
             v-model="form.email"
             type="email"
             name="email"
             autocomplete="username"
             placeholder="usuario@arpia.com.co"
+            :invalid="emailError !== ''"
+            aria-describedby="login-email-error"
+            @blur="onEmailBlur"
           />
-        </el-form-item>
+          <p v-if="emailError" id="login-email-error" class="login-field__error">
+            {{ emailError }}
+          </p>
+        </div>
 
-        <el-form-item label="Contraseña" prop="password">
-          <el-input
+        <div class="login-field">
+          <label class="login-label" for="login-password">Contraseña</label>
+          <Password
+            id="login-password"
             v-model="form.password"
-            type="password"
             name="password"
             autocomplete="current-password"
             placeholder="••••••••"
-            show-password
+            :toggle-mask="true"
+            :feedback="false"
+            :invalid="passwordError !== ''"
+            aria-describedby="login-password-error"
+            @blur="onPasswordBlur"
           />
-        </el-form-item>
+          <p v-if="passwordError" id="login-password-error" class="login-field__error">
+            {{ passwordError }}
+          </p>
+        </div>
 
-        <el-button
+        <Button
           class="login-submit"
-          type="primary"
-          native-type="submit"
+          type="submit"
           :loading="loading"
           :disabled="loading"
-        >
-          Iniciar sesión
-        </el-button>
-      </el-form>
+          label="Iniciar sesión"
+        />
+      </form>
     </div>
   </div>
 </template>
@@ -196,6 +233,24 @@ async function onSubmit(): Promise<void> {
 
 .login-error {
   margin-bottom: 1rem;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.login-field__error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--el-color-danger);
 }
 
 .login-submit {

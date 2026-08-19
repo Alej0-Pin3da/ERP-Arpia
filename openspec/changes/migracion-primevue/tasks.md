@@ -84,10 +84,10 @@ Decision resolved during design: **PrimeVue 4.5.5 MIT** (pinned); chain strategy
 - [x] **S3-T1** PR3a empty/alert/loading sweep — el-empty→DataTable `#empty`/custom markup (description kept, BEH-6); el-alert→Message (`type`→`severity`) view error alerts; v-loading→`:loading`/Skeleton/overlay (CostoTree, AnalisisView, views). Deps: S1/S2. Verify: view specs.
 - [x] **S3-T2** PR3a audit + update specs asserting el-empty/el-alert/v-loading behavior. Deps: S3-T1.
 - [x] **S3-T3** PR3a gate: `npm test` green.
-- [ ] **S3-T4** PR3b `AppLayout.vue`: CSS grid shell (D3) — el-container/el-header/el-aside/el-main → `.app-layout` `grid-template-areas` (aside 220px/header/main); `SidebarMenu.vue`: el-menu/el-menu-item → flat `<nav>`+`<router-link>` list, active class from `route.path`. Deps: S0-T7. Verify: layout.spec.
-- [ ] **S3-T5** PR3b `LoginView.vue` manual validation (D7/BEH-3): InputText/Password/Button, blur-triggered email required+type / password required with exact messages ("Ingrese su correo electrónico", "El correo no es válido", "Ingrese su contraseña"), submit blocked while invalid, inline Message error for 401/connection, loading state. Deps: S3-T4. Verify: login.spec.
-- [ ] **S3-T6** PR3b migrate `layout.spec.ts` (`.el-menu-item`→nav-link active assertions — final plugins drop) + `login.spec.ts` (validation messages, no request on invalid, alert→Message). Deps: S3-T4/T5.
-- [ ] **S3-T7** PR3b gate: `npm test` green.
+- [x] **S3-T4** PR3b `AppLayout.vue`: CSS grid shell (D3) — el-container/el-header/el-aside/el-main → `.app-layout` `grid-template-areas` (aside 220px/header/main); `SidebarMenu.vue`: el-menu/el-menu-item → flat `<nav>`+`<router-link>` list, active class from `route.path`. Deps: S0-T7. Verify: layout.spec.
+- [x] **S3-T5** PR3b `LoginView.vue` manual validation (D7/BEH-3): InputText/Password/Button, blur-triggered email required+type / password required with exact messages ("Ingrese su correo electrónico", "El correo no es válido", "Ingrese su contraseña"), submit blocked while invalid, inline Message error for 401/connection, loading state. Deps: S3-T4. Verify: login.spec.
+- [x] **S3-T6** PR3b migrate `layout.spec.ts` (`.el-menu-item`→nav-link active assertions — final plugins drop) + `login.spec.ts` (validation messages, no request on invalid, alert→Message). Deps: S3-T4/T5.
+- [x] **S3-T7** PR3b gate: `npm test` green.
 
 ## Phase 5 — Slice 4: Messages + Theme (PRs 4a / 4b)
 

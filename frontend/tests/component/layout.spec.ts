@@ -7,15 +7,14 @@
  * sidebar (Usuarios hidden for operador/consulta), active-route
  * highlighting, and logout that clears the session and returns to /login.
  *
- * Slice-0 pilot (S0-T7): proves per-component PrimeVue imports (Tag/Button in
- * AppLayout), Teleported Toast/ConfirmDialog hosts (attachTo: document.body),
- * and hybrid dual-registration — ElementPlus plugin stays registered ONLY for
- * the el-menu assertions until S3-T4 replaces SidebarMenu.
+ * S3-T4/S3-T6: AppLayout is a CSS grid shell (D3) and SidebarMenu is a flat
+ * <nav> + <router-link> list (active class from route.path). ElementPlus is
+ * dropped from plugins — the FINAL plugins drop for this spec, since neither
+ * AppLayout nor SidebarMenu uses Element Plus components anymore (MIG-4).
  */
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory } from 'vue-router'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import PrimeVue from 'primevue/config'
 import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
@@ -52,8 +51,8 @@ const OPERADOR = { id: 2, nombre: 'Pepe Operador', email: 'pepe@arpia.com.co', r
  *
  * attachTo: document.body — App.vue mounts Toast/ConfirmDialog hosts which
  * Teleport to <body>; without an attached root the teleported hosts are
- * dropped. ElementPlus stays registered for el-menu until S3 (MIG-4 pilot);
- * PrimeVue + services mirror main.ts dual registration.
+ * dropped. PrimeVue + services mirror main.ts dual registration; ElementPlus
+ * is no longer needed (SidebarMenu is a plain nav list since S3-T4).
  */
 async function mountLayout(rol: string) {
   const pinia = createPinia()
@@ -71,7 +70,6 @@ async function mountLayout(rol: string) {
       plugins: [
         pinia,
         router,
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
         ToastService,
         ConfirmationService,
@@ -84,7 +82,7 @@ async function mountLayout(rol: string) {
 }
 
 function sidebarLabels(wrapper: ReturnType<typeof mount>): string[] {
-  return wrapper.findAll('.el-menu-item').map((item) => item.text())
+  return wrapper.findAll('.sidebar-menu__item').map((item) => item.text())
 }
 
 describe('AppLayout (spec SHELL-5)', () => {
@@ -169,14 +167,14 @@ describe('AppLayout (spec SHELL-5)', () => {
     const { wrapper, router } = await mountLayout('operador')
 
     // Mounted at /dashboard (root redirect) — the Dashboard item is active.
-    expect(wrapper.find('.el-menu-item.is-active').text()).toBe('Dashboard')
+    expect(wrapper.find('.sidebar-menu__item--active').text()).toBe('Dashboard')
 
-    const ventasItem = wrapper.findAll('.el-menu-item').find((item) => item.text() === 'Ventas')
+    const ventasItem = wrapper.findAll('.sidebar-menu__item').find((item) => item.text() === 'Ventas')
     await ventasItem!.trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.path).toBe('/ventas')
-    expect(wrapper.find('.el-menu-item.is-active').text()).toBe('Ventas')
+    expect(wrapper.find('.sidebar-menu__item--active').text()).toBe('Ventas')
   })
 
   it('logs out: invalidates the refresh token, clears the session and returns to /login', async () => {
