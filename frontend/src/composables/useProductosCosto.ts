@@ -5,10 +5,10 @@
  * for the Costo tab. Read-only: no mutations — only fetches the cost breakdown.
  */
 import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
 
 import { productosApi } from '@/api/endpoints'
 import { buildCostoTree } from '@/utils/productos'
+import { showToast } from '@/utils/toast'
 import type { CostoTree } from '@/utils/productos'
 import type { CostoProduccionRead, VarianteProductoRead } from '@/types/api.d'
 
@@ -38,7 +38,7 @@ export function useProductosCosto() {
       costoTree.value = buildCostoTree(costo)
     } catch {
       costoTree.value = null
-      ElMessage.error('No se pudo calcular el costo de producción.')
+      showToast('error', 'No se pudo calcular el costo de producción.')
     } finally {
       costoLoading.value = false
     }

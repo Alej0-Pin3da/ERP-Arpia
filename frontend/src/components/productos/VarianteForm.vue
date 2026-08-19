@@ -12,13 +12,13 @@
  * Emits the payload; the view owns the POST/PUT, the admin gate and refresh.
  */
 import { computed, reactive, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 
 import type { components } from '@/types/api.d'
 import { parseDecimal } from '@/utils/format'
+import { showToast } from '@/utils/toast'
 import { buildVariantePayload, buildVarianteUpdatePayload, type VariantePayloadInput } from '@/utils/productos'
 
 type VarianteProductoRead = components['schemas']['VarianteProductoRead']
@@ -51,7 +51,7 @@ const submitLabel = computed(() => (props.mode === 'create' ? 'Agregar variante'
 
 function onSubmit(): void {
   if (form.nombre_variante.trim() === '') {
-    ElMessage.warning('Escribe el nombre de la variante')
+    showToast('warn', 'Escribe el nombre de la variante')
     return
   }
   emit('submit', props.mode === 'edit' ? buildVarianteUpdatePayload(form) : buildVariantePayload(form))

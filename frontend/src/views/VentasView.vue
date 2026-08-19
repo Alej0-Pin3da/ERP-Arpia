@@ -12,10 +12,12 @@
  *    consulta (read-only role — MOD-1 "consulta sees a read-only list").
  */
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
+
+import { confirmAction } from '@/utils/confirm'
+import { showToast } from '@/utils/toast'
 
 import { clientesApi, productosApi, ventasApi } from '@/api/endpoints'
 import VentasForm from '@/components/ventas/VentasForm.vue'
@@ -176,11 +178,11 @@ async function onSubmit(payload: VentaCreate): Promise<void> {
   saving.value = true
   try {
     await ventasApi.create(payload)
-    ElMessage.success('Venta registrada correctamente')
+    showToast('success', 'Venta registrada correctamente')
     ventaDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo registrar la venta. Verifica los datos e inténtalo de nuevo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo registrar la venta. Verifica los datos e inténtalo de nuevo.')
   } finally {
     saving.value = false
   }
@@ -202,11 +204,11 @@ async function onSubmitEdit(payload: VentaCreate): Promise<void> {
   saving.value = true
   try {
     await ventasApi.update({ venta_id: editingVenta.value.id }, payload)
-    ElMessage.success('Venta actualizada correctamente')
+    showToast('success', 'Venta actualizada correctamente')
     ventaDialogVisible.value = false
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar la venta. Verifica los datos e inténtalo de nuevo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo actualizar la venta. Verifica los datos e inténtalo de nuevo.')
   } finally {
     saving.value = false
   }
@@ -215,49 +217,37 @@ async function onSubmitEdit(payload: VentaCreate): Promise<void> {
 /** Anular (soft-cancel): confirm first, then DELETE; success restores stock
  *  server-side and refreshes the list. */
 async function onAnular(ventaId: number): Promise<void> {
-  try {
-    await ElMessageBox.confirm(
-      `¿Anular la venta #${ventaId}? Se restaurará el stock de los insumos.`,
-      'Anular venta',
-      {
-        type: 'warning',
-        confirmButtonText: 'Sí, anular',
-        cancelButtonText: 'Cancelar',
-      },
-    )
-  } catch {
-    return // user cancelled
-  }
+  const choice = await confirmAction({
+    message: `¿Anular la venta #${ventaId}? Se restaurará el stock de los insumos.`,
+    header: 'Anular venta',
+    acceptLabel: 'Sí, anular',
+    rejectLabel: 'Cancelar',
+  })
+  if (choice !== 'accept') return // user cancelled
   try {
     await ventasApi.anular({ venta_id: ventaId })
-    ElMessage.success('Venta anulada correctamente')
+    showToast('success', 'Venta anulada correctamente')
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo anular la venta.')
+    showToast('error', serverDetail(err) ?? 'No se pudo anular la venta.')
   }
 }
 
 /** Marcar una venta como regalo tras confirmar; recarga la lista al éxito. */
 async function onMarcarRegalo(ventaId: number): Promise<void> {
-  try {
-    await ElMessageBox.confirm(
-      `¿Marcar la venta #${ventaId} como regalo? Se conservará el precio como referencia pero no contará como ingreso.`,
-      'Marcar como regalo',
-      {
-        type: 'warning',
-        confirmButtonText: 'Sí, marcar',
-        cancelButtonText: 'Cancelar',
-      },
-    )
-  } catch {
-    return // user cancelled
-  }
+  const choice = await confirmAction({
+    message: `¿Marcar la venta #${ventaId} como regalo? Se conservará el precio como referencia pero no contará como ingreso.`,
+    header: 'Marcar como regalo',
+    acceptLabel: 'Sí, marcar',
+    rejectLabel: 'Cancelar',
+  })
+  if (choice !== 'accept') return // user cancelled
   try {
     await ventasApi.updateEsRegalo({ venta_id: ventaId }, { es_regalo: true })
-    ElMessage.success('Venta marcada como regalo')
+    showToast('success', 'Venta marcada como regalo')
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo marcar la venta como regalo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo marcar la venta como regalo.')
   }
 }
 

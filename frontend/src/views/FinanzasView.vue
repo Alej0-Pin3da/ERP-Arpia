@@ -19,7 +19,6 @@
  * no Liquidaciones tab.
  */
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { finanzasApi } from '@/api/endpoints'
 import LiquidacionesForm from '@/components/finanzas/LiquidacionesForm.vue'
@@ -38,8 +37,10 @@ import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import { useAuthStore } from '@/stores/auth'
+import { confirmAction } from '@/utils/confirm'
 import { formatMoney } from '@/utils/format'
 import { buildListParams } from '@/utils/pagination'
+import { showToast } from '@/utils/toast'
 import {
   buildLiquidacionRows,
   buildMovimientoRows,
@@ -188,11 +189,11 @@ async function onCreateMovimiento(payload: MovimientoCreate): Promise<void> {
   savingMovimiento.value = true
   try {
     await finanzasApi.createMovimiento(payload)
-    ElMessage.success('Movimiento registrado correctamente')
+    showToast('success', 'Movimiento registrado correctamente')
     movimientoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo registrar el movimiento. Verifica los datos e inténtalo de nuevo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo registrar el movimiento. Verifica los datos e inténtalo de nuevo.')
   } finally {
     savingMovimiento.value = false
   }
@@ -200,21 +201,19 @@ async function onCreateMovimiento(payload: MovimientoCreate): Promise<void> {
 
 /** MOD-3: soft-delete after a confirm dialog; DELETE answers 200, not 204. */
 async function onDeleteMovimiento(row: MovimientoRow): Promise<void> {
-  try {
-    await ElMessageBox.confirm(
-      `¿Eliminar el movimiento "${row.descripcion}"?`,
-      'Confirmar eliminación',
-      { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-    )
-  } catch {
-    return // cancelled
-  }
+  const choice = await confirmAction({
+    message: `¿Eliminar el movimiento "${row.descripcion}"?`,
+    header: 'Confirmar eliminación',
+    acceptLabel: 'Eliminar',
+    rejectLabel: 'Cancelar',
+  })
+  if (choice !== 'accept') return // cancelled
   try {
     await finanzasApi.deleteMovimiento({ movimiento_id: row.id })
-    ElMessage.success('Movimiento eliminado correctamente')
+    showToast('success', 'Movimiento eliminado correctamente')
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar el movimiento.')
+    showToast('error', serverDetail(err) ?? 'No se pudo eliminar el movimiento.')
   }
 }
 
@@ -224,11 +223,11 @@ async function onCreateLiquidacion(payload: LiquidacionCreate): Promise<void> {
   try {
     const result = await finanzasApi.createLiquidacion(payload)
     liquidacionRows.value = buildLiquidacionRows(result, socios.value)
-    ElMessage.success('Liquidación procesada correctamente')
+    showToast('success', 'Liquidación procesada correctamente')
     await load() // the settlement created Retiro rows
   } catch (err) {
     // 409 replay ("...ya fue procesada") surfaces as-is.
-    ElMessage.error(serverDetail(err) ?? 'No se pudo procesar la liquidación.')
+    showToast('error', serverDetail(err) ?? 'No se pudo procesar la liquidación.')
   } finally {
     savingLiquidacion.value = false
   }
@@ -269,11 +268,11 @@ async function onUpdateMovimiento(payload: MovimientoUpdate): Promise<void> {
   savingMovimiento.value = true
   try {
     await finanzasApi.updateMovimiento({ movimiento_id: editingMovimiento.value.id }, payload)
-    ElMessage.success('Movimiento actualizado correctamente')
+    showToast('success', 'Movimiento actualizado correctamente')
     movimientoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el movimiento. Verifica los datos e inténtalo de nuevo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo actualizar el movimiento. Verifica los datos e inténtalo de nuevo.')
   } finally {
     savingMovimiento.value = false
   }
@@ -283,11 +282,11 @@ async function onCreateSocio(payload: SocioConfiguracionCreate): Promise<void> {
   savingSocio.value = true
   try {
     await finanzasApi.createSocio(payload)
-    ElMessage.success('Socio creado correctamente')
+    showToast('success', 'Socio creado correctamente')
     socioDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo crear el socio.')
+    showToast('error', serverDetail(err) ?? 'No se pudo crear el socio.')
   } finally {
     savingSocio.value = false
   }
@@ -324,11 +323,11 @@ async function onUpdateSocio(payload: SocioConfiguracionUpdate): Promise<void> {
   savingSocio.value = true
   try {
     await finanzasApi.updateSocio({ socio_id: editingSocio.value.id }, payload)
-    ElMessage.success('Socio actualizado correctamente')
+    showToast('success', 'Socio actualizado correctamente')
     socioDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el socio.')
+    showToast('error', serverDetail(err) ?? 'No se pudo actualizar el socio.')
   } finally {
     savingSocio.value = false
   }
@@ -336,21 +335,19 @@ async function onUpdateSocio(payload: SocioConfiguracionUpdate): Promise<void> {
 
 /** MOD-3: delete a socio after a confirm dialog; 409 (payouts) surfaced. */
 async function onDeleteSocio(row: SocioConfiguracionRead): Promise<void> {
-  try {
-    await ElMessageBox.confirm(
-      `¿Eliminar el socio "${row.nombre}"?`,
-      'Confirmar eliminación',
-      { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-    )
-  } catch {
-    return // cancelled
-  }
+  const choice = await confirmAction({
+    message: `¿Eliminar el socio "${row.nombre}"?`,
+    header: 'Confirmar eliminación',
+    acceptLabel: 'Eliminar',
+    rejectLabel: 'Cancelar',
+  })
+  if (choice !== 'accept') return // cancelled
   try {
     await finanzasApi.deleteSocio({ socio_id: row.id })
-    ElMessage.success('Socio eliminado correctamente')
+    showToast('success', 'Socio eliminado correctamente')
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar el socio.')
+    showToast('error', serverDetail(err) ?? 'No se pudo eliminar el socio.')
   }
 }
 

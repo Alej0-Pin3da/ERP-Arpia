@@ -17,7 +17,6 @@
  * views use real pagination, join fetches keep the lookup hack.
  */
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { categoriasInsumosApi, comprasApi, insumosApi } from '@/api/endpoints'
 import ComprasForm from '@/components/inventario/ComprasForm.vue'
@@ -33,7 +32,9 @@ import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import { useAuthStore } from '@/stores/auth'
+import { confirmAction } from '@/utils/confirm'
 import { buildListParams } from '@/utils/pagination'
+import { showToast } from '@/utils/toast'
 import {
   buildCompraRows,
   type CompraInsumoCreate,
@@ -200,11 +201,11 @@ async function onCreateCompra(payload: CompraInsumoCreate): Promise<void> {
   savingCompra.value = true
   try {
     await comprasApi.create(payload)
-    ElMessage.success('Compra registrada correctamente')
+    showToast('success', 'Compra registrada correctamente')
     comprasDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo registrar la compra. Verifica los datos e inténtalo de nuevo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo registrar la compra. Verifica los datos e inténtalo de nuevo.')
   } finally {
     savingCompra.value = false
   }
@@ -215,11 +216,11 @@ async function onCreateInsumo(payload: InsumoCreate): Promise<void> {
   savingInsumo.value = true
   try {
     await insumosApi.create(payload)
-    ElMessage.success('Insumo creado correctamente')
+    showToast('success', 'Insumo creado correctamente')
     insumoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo crear el insumo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo crear el insumo.')
   } finally {
     savingInsumo.value = false
   }
@@ -261,11 +262,11 @@ async function onUpdateInsumo(payload: InsumoUpdate): Promise<void> {
   savingInsumo.value = true
   try {
     await insumosApi.update({ insumo_id: editingInsumo.value.id }, payload)
-    ElMessage.success('Insumo actualizado correctamente')
+    showToast('success', 'Insumo actualizado correctamente')
     insumoDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el insumo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo actualizar el insumo.')
   } finally {
     savingInsumo.value = false
   }
@@ -273,21 +274,19 @@ async function onUpdateInsumo(payload: InsumoUpdate): Promise<void> {
 
 /** MOD-4: admin — delete after a confirm dialog; DELETE answers 204. */
 async function onDeleteInsumo(row: InsumoRead): Promise<void> {
-  try {
-    await ElMessageBox.confirm(
-      `¿Eliminar el insumo "${row.nombre}"?`,
-      'Confirmar eliminación',
-      { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-    )
-  } catch {
-    return // cancelled
-  }
+  const choice = await confirmAction({
+    message: `¿Eliminar el insumo "${row.nombre}"?`,
+    header: 'Confirmar eliminación',
+    acceptLabel: 'Eliminar',
+    rejectLabel: 'Cancelar',
+  })
+  if (choice !== 'accept') return // cancelled
   try {
     await insumosApi.delete({ insumo_id: row.id })
-    ElMessage.success('Insumo eliminado correctamente')
+    showToast('success', 'Insumo eliminado correctamente')
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar el insumo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo eliminar el insumo.')
   }
 }
 

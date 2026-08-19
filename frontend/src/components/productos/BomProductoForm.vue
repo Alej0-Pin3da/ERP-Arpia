@@ -10,13 +10,13 @@
  * Emits the API-ready payload via buildBomProductoPayload/Update.
  */
 import { computed, reactive, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 
 import type { components } from '@/types/api.d'
 import { parseDecimal } from '@/utils/format'
+import { showToast } from '@/utils/toast'
 import {
   buildBomProductoPayload,
   buildBomProductoUpdatePayload,
@@ -59,11 +59,11 @@ const submitLabel = computed(() => (props.mode === 'create' ? 'Agregar producto'
 
 function onSubmit(): void {
   if (form.producto_incluido_id === null) {
-    ElMessage.warning('Selecciona el producto incluido')
+    showToast('warn', 'Selecciona el producto incluido')
     return
   }
   if (form.cantidad === null || form.cantidad <= 0) {
-    ElMessage.warning('Indica la cantidad')
+    showToast('warn', 'Indica la cantidad')
     return
   }
   emit('submit', props.mode === 'edit' ? buildBomProductoUpdatePayload(form) : buildBomProductoPayload(form))

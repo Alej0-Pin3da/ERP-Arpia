@@ -10,7 +10,7 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import Tooltip from 'primevue/tooltip'
@@ -22,6 +22,7 @@ import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import VentasView from '@/views/VentasView.vue'
 import type { components } from '@/types/api.d'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 
 type VentaRead = components['schemas']['VentaRead']
 
@@ -37,6 +38,8 @@ const { apiMocks } = vi.hoisted(() => ({
     listClientes: vi.fn(),
   },
 }))
+const confirmMocks = vi.hoisted(() => ({ confirmAction: vi.fn() }))
+vi.mock('@/utils/confirm', () => ({ confirmAction: confirmMocks.confirmAction }))
 vi.mock('@/api/endpoints', () => ({
   ventasApi: {
     list: apiMocks.listVentas,
@@ -48,6 +51,10 @@ vi.mock('@/api/endpoints', () => ({
   productosApi: { list: apiMocks.listProductos, listVariantes: apiMocks.listVariantes },
   clientesApi: { list: apiMocks.listClientes },
 }))
+
+// Fake PrimeVue Toast host: renders showToast() messages into <body> so the
+// existing `document.body.textContent` assertions keep working.
+mountToastHost()
 
 const VENTAS: VentaRead[] = [
   {
@@ -155,6 +162,7 @@ async function mountView(rol: string): Promise<VueWrapper> {
 describe('VentasView (MOD-1 + T7)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    confirmMocks.confirmAction.mockReset()
     // The list now pages server-side; lookups keep limit:1000 with `.items`.
     apiMocks.listVentas.mockResolvedValue({ items: VENTAS, total: 1 })
     apiMocks.listProductos.mockResolvedValue({ items: PRODUCTOS, total: 2 })
@@ -167,7 +175,7 @@ describe('VentasView (MOD-1 + T7)', () => {
   })
 
   afterEach(() => {
-    ElMessage.closeAll()
+    clearToastHost()
   })
 
   it('renders the joined list and the register button for an operador', async () => {
@@ -346,21 +354,21 @@ describe('VentasView (MOD-1 + T7)', () => {
   })
 
   it('marks a venta as regalo after confirming (PATCH + refresh)', async () => {
-    const confirmSpy = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     const wrapper = await mountView('operador')
     expect(apiMocks.listVentas).toHaveBeenCalledTimes(1)
 
     await wrapper.find('[data-test="marcar-regalo"]').trigger('click')
     await flushPromises()
 
-    expect(confirmSpy).toHaveBeenCalled()
+    expect(confirmMocks.confirmAction).toHaveBeenCalled()
     expect(apiMocks.updateEsRegalo).toHaveBeenCalledWith({ venta_id: 10 }, { es_regalo: true })
     expect(document.body.textContent).toContain('Venta marcada como regalo')
     expect(apiMocks.listVentas).toHaveBeenCalledTimes(2) // refreshed after PATCH
   })
 
   it('does not PATCH when the user cancels the confirmation', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel')
+    confirmMocks.confirmAction.mockResolvedValue('reject')
     const wrapper = await mountView('operador')
 
     await wrapper.find('[data-test="marcar-regalo"]').trigger('click')
@@ -416,7 +424,7 @@ describe('VentasView (MOD-1 + T7)', () => {
   })
 
   it('anula a venta after confirming (DELETE + refresh)', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     const wrapper = await mountView('operador')
     expect(apiMocks.listVentas).toHaveBeenCalledTimes(1)
 
@@ -429,7 +437,7 @@ describe('VentasView (MOD-1 + T7)', () => {
   })
 
   it('does not DELETE when the anular confirmation is cancelled', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel')
+    confirmMocks.confirmAction.mockResolvedValue('reject')
     const wrapper = await mountView('operador')
 
     await wrapper.find('[data-test="anular-venta"]').trigger('click')

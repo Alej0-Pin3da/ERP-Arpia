@@ -16,7 +16,7 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -26,6 +26,7 @@ import { ArpiaPreset } from '@/styles/arpia-preset'
 import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import UsuariosView from '@/views/UsuariosView.vue'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 
 const { apiMocks } = vi.hoisted(() => ({
   apiMocks: {
@@ -43,6 +44,11 @@ vi.mock('@/api/endpoints', () => ({
     delete: apiMocks.delete,
   },
 }))
+const confirmMocks = vi.hoisted(() => ({ confirmAction: vi.fn() }))
+vi.mock('@/utils/confirm', () => ({ confirmAction: confirmMocks.confirmAction }))
+
+// Fake PrimeVue Toast host: renders showToast() messages into <body>.
+mountToastHost()
 
 const USUARIOS = [
   { id: 1, nombre: 'Ana Admin', email: 'ana@arpia.com.co', rol: 'admin' },
@@ -85,6 +91,7 @@ async function flushDialogTransition(): Promise<void> {
 describe('UsuariosView (MOD-5 usuarios + T6)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    confirmMocks.confirmAction.mockReset()
     apiMocks.list.mockResolvedValue({ items: USUARIOS, total: 3 })
     apiMocks.create.mockResolvedValue(USUARIOS[0])
     apiMocks.update.mockResolvedValue({ ...USUARIOS[2], rol: 'consulta' })
@@ -92,7 +99,7 @@ describe('UsuariosView (MOD-5 usuarios + T6)', () => {
   })
 
   afterEach(() => {
-    ElMessage.closeAll()
+    clearToastHost()
     vi.restoreAllMocks()
   })
 
@@ -255,7 +262,7 @@ describe('UsuariosView (MOD-5 usuarios + T6)', () => {
   })
 
   it('deletes another user after the confirm dialog (204) and refreshes', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     const wrapper = await mountView()
 
     await wrapper.findAll('[data-test="delete-usuario"]')[0].trigger('click') // Pepe (id 2)

@@ -12,7 +12,7 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage } from 'element-plus'
+import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -23,6 +23,7 @@ import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import DevolucionesView from '@/views/DevolucionesView.vue'
 import type { components } from '@/types/api.d'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 
 type DevolucionRead = components['schemas']['DevolucionRead']
 
@@ -37,6 +38,9 @@ vi.mock('@/api/endpoints', () => ({
   devolucionesApi: { list: apiMocks.listDevoluciones, create: apiMocks.createDevolucion },
   productosApi: { list: apiMocks.listProductos },
 }))
+
+// Fake PrimeVue Toast host: renders showToast() messages into <body>.
+mountToastHost()
 
 const DEVOLUCIONES: DevolucionRead[] = [
   {
@@ -108,7 +112,7 @@ describe('DevolucionesView (MOD-2 + T7)', () => {
   })
 
   afterEach(() => {
-    ElMessage.closeAll()
+    clearToastHost()
   })
 
   it('renders the joined list and the register button for an operador', async () => {

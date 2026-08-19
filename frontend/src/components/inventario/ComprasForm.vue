@@ -12,12 +12,12 @@
  * The view owns the POST, the success message and the two-tab refresh.
  */
 import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 
 import { buildCompraPayload, type CompraInsumoCreate } from '@/utils/inventario'
+import { showToast } from '@/utils/toast'
 import type { InsumoRead } from '@/types/api.d'
 
 defineProps<{
@@ -36,15 +36,15 @@ const precioUnitario = ref<number | null>(null)
 /** MOD-4: client-side gates — insumo, cantidad > 0 and precio >= 0 required. */
 function submit(): void {
   if (insumoId.value === null) {
-    ElMessage.warning('Selecciona el insumo.')
+    showToast('warn', 'Selecciona el insumo.')
     return
   }
   if (cantidad.value === null || cantidad.value <= 0) {
-    ElMessage.warning('La cantidad debe ser mayor a cero.')
+    showToast('warn', 'La cantidad debe ser mayor a cero.')
     return
   }
   if (precioUnitario.value === null || precioUnitario.value < 0) {
-    ElMessage.warning('Indica el precio unitario.')
+    showToast('warn', 'Indica el precio unitario.')
     return
   }
   emit(

@@ -9,16 +9,20 @@
  * the 403 interceptor in client.ts can fire before the shell mounts (e.g. on
  * /login), so the hosts must exist for the whole app lifetime. The captured
  * ToastService instance is handed to the toast.ts module singleton so
- * non-component code can call showToast() (BEH-2); ConfirmDialog needs no
- * module capture — client code uses useConfirm() where a choice is required.
+ * non-component code can call showToast() (BEH-2); the ConfirmationService
+ * instance is handed to confirm.ts so component code can await
+ * confirmAction() (BEH-5).
  */
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 
 import { setToastInstance } from '@/utils/toast'
+import { setConfirmInstance } from '@/utils/confirm'
 
 setToastInstance(useToast())
+setConfirmInstance(useConfirm())
 </script>
 
 <template>

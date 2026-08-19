@@ -16,7 +16,6 @@
  * The view owns the actual POST, the success message and the list refresh.
  */
 import { computed, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -33,6 +32,7 @@ import {
   type DevolucionTipo,
 } from '@/utils/devoluciones'
 import { parseDecimal } from '@/utils/format'
+import { showToast } from '@/utils/toast'
 import type { ProductoRead, VarianteProductoRead } from '@/types/api.d'
 
 const props = defineProps<{
@@ -93,11 +93,11 @@ function removeItem(index: number): void {
 /** MOD-2: client-side gates — venta_id required; parcial requires items. */
 function submit(): void {
   if (ventaId.value === null) {
-    ElMessage.warning('Indica el número de la venta a devolver.')
+    showToast('warn', 'Indica el número de la venta a devolver.')
     return
   }
   if (isParcial.value && !hasValidDevolucionItems(items.value)) {
-    ElMessage.warning('Una devolución parcial requiere al menos un item con producto y cantidad mayor a cero.')
+    showToast('warn', 'Una devolución parcial requiere al menos un item con producto y cantidad mayor a cero.')
     return
   }
   emit('submit', buildDevolucionPayload({

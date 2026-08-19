@@ -11,7 +11,7 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -22,6 +22,7 @@ import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import FinanzasView from '@/views/FinanzasView.vue'
 import type { components } from '@/types/api.d'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 
 type MovimientoRead = components['schemas']['MovimientoRead']
 type SocioConfiguracionRead = components['schemas']['SocioConfiguracionRead']
@@ -52,6 +53,11 @@ vi.mock('@/api/endpoints', () => ({
     createLiquidacion: apiMocks.createLiquidacion,
   },
 }))
+const confirmMocks = vi.hoisted(() => ({ confirmAction: vi.fn() }))
+vi.mock('@/utils/confirm', () => ({ confirmAction: confirmMocks.confirmAction }))
+
+// Fake PrimeVue Toast host: renders showToast() messages into <body>.
+mountToastHost()
 
 const MOVIMIENTOS: MovimientoRead[] = [
   {
@@ -129,6 +135,7 @@ async function flushDialogTransition(): Promise<void> {
 describe('FinanzasView (MOD-3 + T7)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    confirmMocks.confirmAction.mockReset()
     // Lists page server-side; the socios lookup keeps limit:1000 (D3).
     apiMocks.listMovimientos.mockResolvedValue({ items: MOVIMIENTOS, total: 2 })
     apiMocks.listSocios.mockResolvedValue({ items: SOCIOS, total: 2 })
@@ -142,7 +149,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
   })
 
   afterEach(() => {
-    ElMessage.closeAll()
+    clearToastHost()
     vi.restoreAllMocks()
   })
 
@@ -315,7 +322,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
   })
 
   it('soft-deletes a movimiento after the confirm dialog (DELETE expects 200)', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     const wrapper = await mountView('operador')
     expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(1)
 
@@ -331,7 +338,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
   })
 
   it('does not call the API when the delete confirm dialog is cancelled', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockRejectedValue('cancel' as never)
+    confirmMocks.confirmAction.mockResolvedValue('reject')
     const wrapper = await mountView('operador')
 
     await wrapper.findAll('[data-test="delete-movimiento"]')[0].trigger('click')
@@ -426,7 +433,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
   })
 
   it('deletes a socio after the confirm dialog and refreshes', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     const wrapper = await mountView('operador')
     await activateTab(wrapper, 'Socios')
     expect(apiMocks.listSocios).toHaveBeenCalledTimes(2) // table page + lookup
@@ -441,7 +448,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
   })
 
   it('surfaces the 409 when deleting a socio with payouts', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     apiMocks.deleteSocio.mockRejectedValue({
       response: { data: { detail: 'El socio tiene movimientos asociados; no se puede eliminar' } },
     })

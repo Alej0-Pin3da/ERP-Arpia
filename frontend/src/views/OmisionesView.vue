@@ -13,7 +13,6 @@
  * calls the API, and passes rows down to OmisionesTable.
  */
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 
 import { omisionesApi } from '@/api/endpoints'
 import OmisionesTable from '@/components/omisiones/OmisionesTable.vue'
@@ -22,6 +21,7 @@ import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
+import { showToast } from '@/utils/toast'
 import type { OmisionRead } from '@/types/api.d'
 
 const auth = useAuthStore()
@@ -86,10 +86,10 @@ async function onToggleResuelta(row: OmisionRead): Promise<void> {
       { omision_id: row.id },
       { resuelta: !row.resuelta },
     )
-    ElMessage.success(updated.resuelta ? 'Omisión marcada como resuelta' : 'Omisión reabierta')
+    showToast('success', updated.resuelta ? 'Omisión marcada como resuelta' : 'Omisión reabierta')
     await load()
   } catch {
-    ElMessage.error('No se pudo actualizar la omisión.')
+    showToast('error', 'No se pudo actualizar la omisión.')
   }
 }
 

@@ -21,7 +21,6 @@
  * consulta see read-only lists (SHELL-4).
  */
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 import {
   categoriasInsumosApi,
@@ -39,6 +38,7 @@ import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import { useAuthStore } from '@/stores/auth'
+import { confirmAction } from '@/utils/confirm'
 import { buildListParams } from '@/utils/pagination'
 import {
   buildCategoriaInsumoPayload,
@@ -51,6 +51,7 @@ import {
   maestroEntityConfig,
   type MaestroRow,
 } from '@/utils/maestros'
+import { showToast } from '@/utils/toast'
 const auth = useAuthStore()
 
 /** MOD-5: every maestros write is admin-only server-side. */
@@ -199,11 +200,11 @@ async function onCreate(entityKey: EntityKey, values: Record<string, string>): P
   saving.value[entityKey] = true
   try {
     await crudApis[entityKey].create(BUILDERS[entityKey].create(values))
-    ElMessage.success(`Se creó ${singularOf(entityKey)} correctamente`)
+    showToast('success', `Se creó ${singularOf(entityKey)} correctamente`)
     dialogVisible.value[entityKey] = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? `No se pudo crear ${singularOf(entityKey).toLowerCase()}.`)
+    showToast('error', serverDetail(err) ?? `No se pudo crear ${singularOf(entityKey).toLowerCase()}.`)
   } finally {
     saving.value[entityKey] = false
   }
@@ -241,11 +242,11 @@ async function onUpdate(entityKey: EntityKey, values: Record<string, string>): P
   saving.value[entityKey] = true
   try {
     await crudApis[entityKey].update({ [ID_KEYS[entityKey]]: row.id }, BUILDERS[entityKey].update(values))
-    ElMessage.success(`Se actualizó ${singularOf(entityKey)} correctamente`)
+    showToast('success', `Se actualizó ${singularOf(entityKey)} correctamente`)
     dialogVisible.value[entityKey] = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? `No se pudo actualizar ${singularOf(entityKey).toLowerCase()}.`)
+    showToast('error', serverDetail(err) ?? `No se pudo actualizar ${singularOf(entityKey).toLowerCase()}.`)
   } finally {
     saving.value[entityKey] = false
   }
@@ -254,21 +255,19 @@ async function onUpdate(entityKey: EntityKey, values: Record<string, string>): P
 /** MOD-5: admin — delete after a confirm dialog; DELETE answers 204. */
 async function onDelete(entityKey: EntityKey, row: MaestroRow): Promise<void> {
   const singular = singularOf(entityKey)
-  try {
-    await ElMessageBox.confirm(`¿Eliminar ${singular.toLowerCase()} "${row.nombre}"?`, 'Confirmar eliminación', {
-      type: 'warning',
-      confirmButtonText: 'Eliminar',
-      cancelButtonText: 'Cancelar',
-    })
-  } catch {
-    return // cancelled
-  }
+  const choice = await confirmAction({
+    message: `¿Eliminar ${singular.toLowerCase()} "${row.nombre}"?`,
+    header: 'Confirmar eliminación',
+    acceptLabel: 'Eliminar',
+    rejectLabel: 'Cancelar',
+  })
+  if (choice !== 'accept') return // cancelled
   try {
     await crudApis[entityKey].delete({ [ID_KEYS[entityKey]]: row.id })
-    ElMessage.success(`Se eliminó ${singular} correctamente`)
+    showToast('success', `Se eliminó ${singular} correctamente`)
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? `No se pudo eliminar ${singular.toLowerCase()}.`)
+    showToast('error', serverDetail(err) ?? `No se pudo eliminar ${singular.toLowerCase()}.`)
   }
 }
 

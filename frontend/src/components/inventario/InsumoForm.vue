@@ -12,7 +12,6 @@
  *  the success message and the refresh.
  */
 import { ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -25,6 +24,7 @@ import {
   type InsumoUpdate,
 } from '@/utils/inventario'
 import { parseDecimal } from '@/utils/format'
+import { showToast } from '@/utils/toast'
 import type { CategoriaInsumoRead, InsumoRead } from '@/types/api.d'
 
 const props = defineProps<{
@@ -65,27 +65,27 @@ watch(
 /** MOD-4: client-side gates — every master field is required. */
 function submit(): void {
   if (nombre.value.trim() === '') {
-    ElMessage.warning('Escribe el nombre del insumo.')
+    showToast('warn', 'Escribe el nombre del insumo.')
     return
   }
   if (categoriaId.value === null) {
-    ElMessage.warning('Selecciona la categoría.')
+    showToast('warn', 'Selecciona la categoría.')
     return
   }
   if (unidadMedida.value.trim() === '') {
-    ElMessage.warning('Escribe la unidad de medida.')
+    showToast('warn', 'Escribe la unidad de medida.')
     return
   }
   if (stockActual.value === null || stockActual.value < 0) {
-    ElMessage.warning('Indica el stock actual.')
+    showToast('warn', 'Indica el stock actual.')
     return
   }
   if (stockMinimo.value === null || stockMinimo.value < 0) {
-    ElMessage.warning('Indica el stock mínimo.')
+    showToast('warn', 'Indica el stock mínimo.')
     return
   }
   if (costoPromedio.value === null || costoPromedio.value < 0) {
-    ElMessage.warning('Indica el costo promedio.')
+    showToast('warn', 'Indica el costo promedio.')
     return
   }
 

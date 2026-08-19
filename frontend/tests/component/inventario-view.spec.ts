@@ -12,7 +12,7 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -23,6 +23,7 @@ import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import InventarioView from '@/views/InventarioView.vue'
 import type { components } from '@/types/api.d'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 
 type InsumoRead = components['schemas']['InsumoRead']
 type CompraInsumoRead = components['schemas']['CompraInsumoRead']
@@ -54,6 +55,11 @@ vi.mock('@/api/endpoints', () => ({
     list: apiMocks.listCategorias,
   },
 }))
+const confirmMocks = vi.hoisted(() => ({ confirmAction: vi.fn() }))
+vi.mock('@/utils/confirm', () => ({ confirmAction: confirmMocks.confirmAction }))
+
+// Fake PrimeVue Toast host: renders showToast() messages into <body>.
+mountToastHost()
 
 const INSUMOS: InsumoRead[] = [
   {
@@ -149,6 +155,7 @@ async function flushDialogTransition(): Promise<void> {
 describe('InventarioView (MOD-4 + T6)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    confirmMocks.confirmAction.mockReset()
     // Table fetches use the page contract; lookups keep limit:1000 with `.items`.
     apiMocks.listInsumos.mockResolvedValue({ items: INSUMOS, total: 3 })
     apiMocks.listCompras.mockResolvedValue({ items: COMPRAS, total: 1 })
@@ -160,7 +167,7 @@ describe('InventarioView (MOD-4 + T6)', () => {
   })
 
   afterEach(() => {
-    ElMessage.closeAll()
+    clearToastHost()
     vi.restoreAllMocks()
   })
 
@@ -472,7 +479,7 @@ describe('InventarioView (MOD-4 + T6)', () => {
   })
 
   it('deletes an insumo after the confirm dialog and refreshes', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     const wrapper = await mountView('admin')
     expect(apiMocks.listInsumos).toHaveBeenCalledTimes(2)
 

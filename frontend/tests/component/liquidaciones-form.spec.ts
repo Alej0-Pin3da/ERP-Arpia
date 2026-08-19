@@ -8,12 +8,12 @@
  * surfacing.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { ElMessage } from 'element-plus'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { ArpiaPreset } from '@/styles/arpia-preset'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 import esCO from '@/utils/locales/es-CO'
 import LiquidacionesForm from '@/components/finanzas/LiquidacionesForm.vue'
 
@@ -38,8 +38,10 @@ async function setNumber(wrapper: VueWrapper, testId: string, value: string): Pr
   await nextTick()
 }
 
+mountToastHost()
+
 afterEach(() => {
-  ElMessage.closeAll()
+  clearToastHost()
 })
 
 describe('LiquidacionesForm (MOD-3)', () => {

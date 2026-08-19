@@ -7,11 +7,12 @@
  * for display joins; they are passed in at call time, not re-fetched here.
  */
 import { computed, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { productosApi } from '@/api/endpoints'
 import { serverDetail } from '@/utils/api'
+import { confirmAction } from '@/utils/confirm'
 import { buildBomInsumoRows, buildBomProductoRows } from '@/utils/productos'
+import { showToast } from '@/utils/toast'
 import type { BomInsumoPayloadInput, BomInsumoRow, BomProductoPayloadInput, BomProductoRow } from '@/utils/productos'
 import type { BomInsumoRead, BomProductoRead, InsumoRead, ProductoRead } from '@/types/api.d'
 
@@ -43,7 +44,7 @@ export function useProductosBom(
       bomInsumos.value = insumosList
       bomProductos.value = productosList
     } catch {
-      ElMessage.error('No se pudo cargar la receta del producto.')
+      showToast('error', 'No se pudo cargar la receta del producto.')
     } finally {
       bomLoading.value = false
     }
@@ -81,16 +82,16 @@ export function useProductosBom(
           { producto_id: bomProductoId.value, linea_id: editingBomInsumo.value.id },
           payload,
         )
-        ElMessage.success('Línea de BOM actualizada correctamente')
+        showToast('success', 'Línea de BOM actualizada correctamente')
         editingBomInsumo.value = null
       } else {
         await productosApi.createBomInsumo({ producto_id: bomProductoId.value }, payload)
-        ElMessage.success('Línea de BOM agregada correctamente')
+        showToast('success', 'Línea de BOM agregada correctamente')
       }
       bomInsumoDialogVisible.value = false
       await loadBom(bomProductoId.value)
     } catch (err) {
-      ElMessage.error(serverDetail(err) ?? 'No se pudo guardar la línea de BOM.')
+      showToast('error', serverDetail(err) ?? 'No se pudo guardar la línea de BOM.')
     } finally {
       savingBomInsumo.value = false
     }
@@ -98,21 +99,19 @@ export function useProductosBom(
 
   async function onDeleteBomInsumo(row: BomInsumoRow): Promise<void> {
     if (bomProductoId.value === null) return
-    try {
-      await ElMessageBox.confirm(
-        `¿Eliminar la línea de insumo "${row.insumo}"?`,
-        'Confirmar eliminación',
-        { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-      )
-    } catch {
-      return
-    }
+    const choice = await confirmAction({
+      message: `¿Eliminar la línea de insumo "${row.insumo}"?`,
+      header: 'Confirmar eliminación',
+      acceptLabel: 'Eliminar',
+      rejectLabel: 'Cancelar',
+    })
+    if (choice !== 'accept') return
     try {
       await productosApi.deleteBomInsumo({ producto_id: bomProductoId.value, linea_id: row.id })
-      ElMessage.success('Línea de BOM eliminada correctamente')
+      showToast('success', 'Línea de BOM eliminada correctamente')
       await loadBom(bomProductoId.value)
     } catch (err) {
-      ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar la línea de BOM.')
+      showToast('error', serverDetail(err) ?? 'No se pudo eliminar la línea de BOM.')
     }
   }
 
@@ -141,16 +140,16 @@ export function useProductosBom(
           { producto_id: bomProductoId.value, linea_id: editingBomProducto.value.id },
           payload,
         )
-        ElMessage.success('Línea de combo actualizada correctamente')
+        showToast('success', 'Línea de combo actualizada correctamente')
         editingBomProducto.value = null
       } else {
         await productosApi.createBomProducto({ producto_id: bomProductoId.value }, payload)
-        ElMessage.success('Línea de combo agregada correctamente')
+        showToast('success', 'Línea de combo agregada correctamente')
       }
       bomProductoDialogVisible.value = false
       await loadBom(bomProductoId.value)
     } catch (err) {
-      ElMessage.error(serverDetail(err) ?? 'No se pudo guardar la línea de combo.')
+      showToast('error', serverDetail(err) ?? 'No se pudo guardar la línea de combo.')
     } finally {
       savingBomProducto.value = false
     }
@@ -158,21 +157,19 @@ export function useProductosBom(
 
   async function onDeleteBomProducto(row: BomProductoRow): Promise<void> {
     if (bomProductoId.value === null) return
-    try {
-      await ElMessageBox.confirm(
-        `¿Eliminar la línea de combo "${row.producto}"?`,
-        'Confirmar eliminación',
-        { type: 'warning', confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar' },
-      )
-    } catch {
-      return
-    }
+    const choice = await confirmAction({
+      message: `¿Eliminar la línea de combo "${row.producto}"?`,
+      header: 'Confirmar eliminación',
+      acceptLabel: 'Eliminar',
+      rejectLabel: 'Cancelar',
+    })
+    if (choice !== 'accept') return
     try {
       await productosApi.deleteBomProducto({ producto_id: bomProductoId.value, linea_id: row.id })
-      ElMessage.success('Línea de combo eliminada correctamente')
+      showToast('success', 'Línea de combo eliminada correctamente')
       await loadBom(bomProductoId.value)
     } catch (err) {
-      ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar la línea de combo.')
+      showToast('error', serverDetail(err) ?? 'No se pudo eliminar la línea de combo.')
     }
   }
 

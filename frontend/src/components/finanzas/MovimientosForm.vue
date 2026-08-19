@@ -24,7 +24,6 @@
  * The view owns the POST/PATCH, the success message and the list refresh.
  */
 import { computed, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
 import InputNumber from 'primevue/inputnumber'
@@ -40,6 +39,7 @@ import {
   type MovimientoTipo,
   type MovimientoUpdate,
 } from '@/utils/finanzas'
+import { showToast } from '@/utils/toast'
 import type { MovimientoRead, SocioConfiguracionRead } from '@/types/api.d'
 
 const props = withDefaults(
@@ -118,15 +118,15 @@ const fechaModel = computed<Date | null>({
  *  whenever it is part of the payload (create + edit of non-liquidacion rows). */
 function submit(): void {
   if (tipo.value === null) {
-    ElMessage.warning('Selecciona el tipo de movimiento.')
+    showToast('warn', 'Selecciona el tipo de movimiento.')
     return
   }
   if (descripcion.value.trim() === '') {
-    ElMessage.warning('Escribe una descripción del movimiento.')
+    showToast('warn', 'Escribe una descripción del movimiento.')
     return
   }
   if (!frozenMontoSocio.value && (monto.value === null || monto.value <= 0)) {
-    ElMessage.warning('El monto debe ser mayor a cero.')
+    showToast('warn', 'El monto debe ser mayor a cero.')
     return
   }
   if (props.mode === 'edit') {
