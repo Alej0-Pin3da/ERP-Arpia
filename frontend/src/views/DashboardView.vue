@@ -10,6 +10,9 @@
  *    (variantes fetched ONLY for the products that appear in margen rows —
  *    the payload is ID-only, so a full product scan is not needed).
  * One refresh button reloads everything; failures surface as an alert.
+ *
+ * Slice 5 (MIG-2): el-row/el-col/el-card replaced by a scoped CSS grid and
+ * PrimeVue Card panels (same responsive behavior, no EP dependency).
  */
 import { computed, onMounted, ref } from 'vue'
 
@@ -19,6 +22,7 @@ import KpiCards from '@/components/dashboard/KpiCards.vue'
 import MargenTable from '@/components/dashboard/MargenTable.vue'
 import VentasMensualesChart from '@/components/dashboard/VentasMensualesChart.vue'
 import Button from 'primevue/button'
+import Card from 'primevue/card'
 import Message from 'primevue/message'
 import {
   buildMargenRows,
@@ -95,25 +99,31 @@ onMounted(load)
       :loading="loading"
     />
 
-    <el-row :gutter="16">
-      <el-col :xs="24" :lg="12">
-        <el-card shadow="never" class="panel-card">
-          <template #header>Ventas por mes</template>
+    <div class="dashboard-grid">
+      <div>
+        <Card class="panel-card">
+          <template #title>Ventas por mes</template>
+          <template #content>
           <VentasMensualesChart :rows="chartRows" :loading="loading" />
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :lg="12">
-        <el-card shadow="never" class="panel-card">
-          <template #header>Insumos bajo stock</template>
+          </template>
+        </Card>
+      </div>
+      <div>
+        <Card class="panel-card">
+          <template #title>Insumos bajo stock</template>
+          <template #content>
           <BajoStockTable :rows="bajoStock" :loading="loading" />
-        </el-card>
-      </el-col>
-    </el-row>
+          </template>
+        </Card>
+      </div>
+    </div>
 
-    <el-card shadow="never" class="panel-card">
-      <template #header>Márgenes por producto</template>
+    <Card class="panel-card">
+      <template #title>Márgenes por producto</template>
+      <template #content>
       <MargenTable :rows="margenRows" :loading="loading" />
-    </el-card>
+      </template>
+    </Card>
   </section>
 </template>
 
@@ -131,6 +141,19 @@ onMounted(load)
 
 .dashboard-error {
   margin-bottom: 1rem;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 1200px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .panel-card {

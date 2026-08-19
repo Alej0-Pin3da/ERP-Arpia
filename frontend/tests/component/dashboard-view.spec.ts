@@ -7,10 +7,10 @@
  * data, and the loading/error/refresh lifecycle.
  *
  * BajoStockTable/MargenTable are PrimeVue DataTables since slice 1c; the
- * el-card/el-row shell stays (el-alert/el-button migrated in slices 2b/3a).
+ * el-card/el-row shell was replaced by PrimeVue Card + a scoped CSS grid in
+ * slice 5 (MIG-2).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
 import PrimeVue from 'primevue/config'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -76,7 +76,6 @@ async function mountDashboard(): Promise<VueWrapper> {
   const wrapper = mount(DashboardView, {
     global: {
       plugins: [
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
     },
