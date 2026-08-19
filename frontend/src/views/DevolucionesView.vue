@@ -3,8 +3,8 @@
  * Devoluciones view (task 2.3, spec MOD-2 + ui-mantenimiento PR1 T7).
  *
  * Two sections: the returns list and the create form.
- *  - List: server-side paginated GET /devoluciones ({items,total} +
- *    el-pagination) with optional filters (venta_id, fecha range) — items are
+ *  - List: server-side paginated GET /devoluciones ({items,total} + PrimeVue
+ *    Paginator) with optional filters (venta_id, fecha range) — items are
  *    joined client-side with /productos?limit=1000 (`Producto #{id}` fallback,
  *    `.items` per D3).
  *  - Create: DevolucionesForm emits the DevolucionCreate payload; the view
@@ -17,6 +17,7 @@ import { ElMessage } from 'element-plus'
 import { devolucionesApi, productosApi } from '@/api/endpoints'
 import DevolucionesForm from '@/components/devoluciones/DevolucionesForm.vue'
 import DevolucionesTable from '@/components/devoluciones/DevolucionesTable.vue'
+import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
 import { buildDevolucionRows, type DevolucionCreate, type DevolucionRow } from '@/utils/devoluciones'
@@ -181,14 +182,13 @@ onMounted(load)
     <el-tabs v-model="activeTab">
       <el-tab-pane label="Listado" name="listado">
         <DevolucionesTable :rows="rows" :loading="loading" />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="total"
-          :page-size="pageSize"
-          :current-page="page"
-          @current-change="(p: number) => { page = p; load() }"
+          :total-records="total"
+          :rows="pageSize"
+          :first="(page - 1) * pageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="(e: { first: number; rows: number }) => { page = Math.floor(e.first / e.rows) + 1; load() }"
         />
       </el-tab-pane>
     </el-tabs>

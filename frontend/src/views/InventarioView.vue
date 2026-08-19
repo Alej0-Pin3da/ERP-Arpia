@@ -24,6 +24,7 @@ import ComprasForm from '@/components/inventario/ComprasForm.vue'
 import ComprasTable from '@/components/inventario/ComprasTable.vue'
 import InsumoForm from '@/components/inventario/InsumoForm.vue'
 import InsumosTable from '@/components/inventario/InsumosTable.vue'
+import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
 import {
@@ -339,14 +340,13 @@ onMounted(load)
           @filter-change="onInsumosTableFilterChange"
           @sort-change="onInsumosTableSortChange"
         />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="insumosTotal"
-          :page-size="insumosPageSize"
-          :current-page="insumosPage"
-          @current-change="(p: number) => { insumosPage = p; load() }"
+          :total-records="insumosTotal"
+          :rows="insumosPageSize"
+          :first="(insumosPage - 1) * insumosPageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="(e: { first: number; rows: number }) => { insumosPage = Math.floor(e.first / e.rows) + 1; load() }"
         />
 
         <el-dialog

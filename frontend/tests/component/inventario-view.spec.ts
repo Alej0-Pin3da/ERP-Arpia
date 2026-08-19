@@ -13,9 +13,13 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import Paginator from 'primevue/paginator'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import InventarioView from '@/views/InventarioView.vue'
 import type { components } from '@/types/api.d'
@@ -112,7 +116,14 @@ async function mountView(rol: string): Promise<VueWrapper> {
     user: { id: 2, nombre: 'Pepe', email: 'pepe@arpia.com.co', rol },
   })
   const wrapper = mount(InventarioView, {
-    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+    global: {
+      plugins: [
+        pinia,
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+      stubs: { transition: false },
+    },
   })
   await nextTick()
   await flushPromises()
@@ -172,11 +183,13 @@ describe('InventarioView (MOD-4 + T6)', () => {
     expect(apiMocks.listCompras).toHaveBeenCalledWith(PAGE1)
   })
 
-  it('renders el-pagination with the server total on the insumos tab', async () => {
+  it('renders Paginator with the server total on the insumos tab', async () => {
     const wrapper = await mountView('operador')
-    // Element Plus pagination renders a page-size selector and page buttons;
-    // the total comes from the API (3), not a local guess.
-    expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(true)
+    // The insumos list pages via PrimeVue Paginator; the total comes from the
+    // API (3), not a local guess. (The compras paginator stays el-pagination
+    // until slice 1c.)
+    expect(wrapper.findComponent(Paginator).exists()).toBe(true)
+    expect(wrapper.findComponent(Paginator).props('totalRecords')).toBe(3)
     expect(apiMocks.listInsumos).toHaveBeenCalledWith(PAGE1)
   })
 
@@ -330,8 +343,8 @@ describe('InventarioView (MOD-4 + T6)', () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listInsumos).toHaveBeenCalledWith(PAGE1)
 
-    // Emit the page-change event from el-pagination -> page 2 -> offset 20.
-    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    // Emit the page event from the PrimeVue Paginator -> page 2 -> offset 20.
+    wrapper.findComponent(Paginator).vm.$emit('page', { first: 20, rows: 20 })
     await flushPromises()
 
     expect(apiMocks.listInsumos).toHaveBeenCalledWith({ limit: 20, offset: 20 })

@@ -11,9 +11,23 @@
  * soft-delete call (expects 200, not 204) and the refresh. The edit action
  * (T9) is shown with can-edit=true and emits `edit` with the row; the parent
  * resolves the full MovimientoRead and opens the prefilled edit form.
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1b: the tipo header funnel
+ * and column sort re-emit the SAME typed events the view consumes, via the
+ * parsePrimeVueFilters/parsePrimeVueSort adapters. el-tag/el-button cells
+ * stay until slice 2b.
  */
+import { ref } from 'vue'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import Select from 'primevue/select'
 import { formatDateTime, formatMoney } from '@/utils/format'
-import { parseColumnFilter } from '@/utils/table-filters'
+import {
+  parseColumnFilter,
+  parsePrimeVueFilters,
+  parsePrimeVueSort,
+  type PrimeVueFilterConstraint,
+} from '@/utils/table-filters'
 import {
   TIPO_MOVIMIENTO,
   tipoMovimientoLabel,
@@ -42,49 +56,78 @@ const emit = defineEmits<{
 /** Header funnel options for the Tipo column (labels via tipoMovimientoLabel). */
 const tipoFilters = TIPO_MOVIMIENTO.map((t) => ({ text: tipoMovimientoLabel(t), value: t }))
 
-/** Normalize el-table's filter-change into a typed single-value emit. */
-function onColumnFilterChange(elFilters: Record<string, unknown[]>): void {
-  const tipo = parseColumnFilter(elFilters.tipo)
+/** DataTable lazy filter state (server-side filtering, single constraint per column). */
+const filters = ref<Record<string, PrimeVueFilterConstraint>>({
+  tipo: { value: null, matchMode: 'equals' },
+})
+
+/** Normalize DataTable's @filter payload into the typed single-value emit. */
+function onDataTableFilter(e: {
+  filters: Record<string, PrimeVueFilterConstraint | PrimeVueFilterConstraint[]>
+}): void {
+  const normalized = parsePrimeVueFilters(e.filters)
+  const tipo = parseColumnFilter(normalized.tipo)
   emit('filter-change', {
     tipo: (tipo === null ? null : String(tipo)) as MovimientoTipoFilter | null,
   })
 }
 
-/** Normalize el-table's sort-change into a typed {prop, order} emit. */
-function onSortChange(s: {
-  column: { key?: string; property?: string }
-  prop: string
-  order: 'ascending' | 'descending' | null
-}): void {
-  const prop = s.column.key ?? s.column.property ?? s.prop
-  emit('sort-change', {
-    prop,
-    order: s.order === 'ascending' ? 'asc' : s.order === 'descending' ? 'desc' : null,
-  })
+/** Normalize DataTable's @sort payload into the typed {prop, order} emit. */
+function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
+  emit('sort-change', parsePrimeVueSort(s))
 }
 </script>
 
 <template>
-  <el-table :data="rows" v-loading="loading" @filter-change="onColumnFilterChange" @sort-change="onSortChange">
-    <el-table-column prop="id" label="#" column-key="id" sortable width="70" />
-    <el-table-column label="Fecha" column-key="fecha" sortable width="110">
-      <template #default="{ row }">{{ formatDateTime(row.fecha) }}</template>
-    </el-table-column>
-    <el-table-column label="Tipo" column-key="tipo" :filters="tipoFilters" sortable width="120">
-      <template #default="{ row }">
-        <el-tag :type="tipoMovimientoTagType(row.tipo)" size="small">{{ tipoMovimientoLabel(row.tipo) }}</el-tag>
+  <DataTable
+    :value="rows"
+    lazy
+    filterDisplay="menu"
+    :loading="loading"
+    :filters="filters"
+    @filter="onDataTableFilter"
+    @sort="onDataTableSort"
+  >
+    <Column field="id" header="#" sortable style="width: 70px" />
+    <Column field="fecha" header="Fecha" sortable style="width: 110px">
+      <template #body="{ data }">{{ formatDateTime(data.fecha) }}</template>
+    </Column>
+    <Column
+      field="tipo"
+      header="Tipo"
+      sortable
+      :show-filter-operator="false"
+      :show-filter-match-modes="false"
+      :show-filter-add-button="false"
+      :show-filter-apply-button="false"
+      :show-clear-button="false"
+      style="width: 120px"
+    >
+      <template #body="{ data }">
+        <el-tag :type="tipoMovimientoTagType(data.tipo)" size="small">{{ tipoMovimientoLabel(data.tipo) }}</el-tag>
       </template>
-    </el-table-column>
-    <el-table-column prop="descripcion" label="Descripción" column-key="descripcion" sortable min-width="220" />
-    <el-table-column prop="socio" label="Socio" column-key="socio" sortable min-width="140" />
-    <el-table-column label="Monto" column-key="monto" sortable width="160" align="right">
-      <template #default="{ row }">{{ formatMoney(row.monto) }}</template>
-    </el-table-column>
-    <el-table-column label="Liquidación" width="110">
-      <template #default="{ row }">{{ row.liquidacion_id ?? '—' }}</template>
-    </el-table-column>
-    <el-table-column v-if="canEdit || canDelete" label="Acciones" width="150" align="center">
-      <template #default="{ row }">
+      <template #filter="{ filterModel, filterCallback }">
+        <Select
+          v-model="filterModel.value"
+          :options="tipoFilters"
+          optionLabel="text"
+          optionValue="value"
+          placeholder="Tipo"
+          :show-clear="true"
+          @change="filterCallback()"
+        />
+      </template>
+    </Column>
+    <Column field="descripcion" header="Descripción" sortable style="min-width: 220px" />
+    <Column field="socio" header="Socio" sortable style="min-width: 140px" />
+    <Column field="monto" header="Monto" sortable style="width: 160px" align="right">
+      <template #body="{ data }">{{ formatMoney(data.monto) }}</template>
+    </Column>
+    <Column header="Liquidación" style="width: 110px">
+      <template #body="{ data }">{{ data.liquidacion_id ?? '—' }}</template>
+    </Column>
+    <Column v-if="canEdit || canDelete" header="Acciones" style="width: 150px" align="center">
+      <template #body="{ data: row }">
         <el-button
           v-if="canEdit"
           link
@@ -106,10 +149,18 @@ function onSortChange(s: {
           Eliminar
         </el-button>
       </template>
-    </el-table-column>
+    </Column>
 
     <template #empty>
-      <el-empty description="Sin movimientos registrados" :image-size="80" />
+      <div class="movimiento-empty">Sin movimientos registrados</div>
     </template>
-  </el-table>
+  </DataTable>
 </template>
+
+<style scoped>
+.movimiento-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
+}
+</style>
