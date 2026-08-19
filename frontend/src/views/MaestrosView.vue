@@ -30,6 +30,8 @@ import {
 import MaestroForm from '@/components/maestros/MaestroForm.vue'
 import MaestrosTable from '@/components/maestros/MaestrosTable.vue'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import Tab from 'primevue/tab'
@@ -95,7 +97,7 @@ const saving = ref<Record<EntityKey, boolean>>({
   'tipos-producto': false,
   'categorias-insumos': false,
 })
-/** T8/FE-DLG-1: one el-dialog per entity, opened from the toolbar button. */
+/** T8/FE-DLG-1: one PrimeVue Dialog per entity, opened from the toolbar. */
 const dialogVisible = ref<Record<EntityKey, boolean>>({
   clientes: false,
   'tipos-producto': false,
@@ -298,14 +300,12 @@ onMounted(load)
       <TabPanels>
         <TabPanel v-for="entity in MAESTRO_ENTITIES" :key="entity.key" :value="entity.key">
         <div class="maestro-toolbar">
-          <el-input
+          <InputText
             v-model="searchQ[entity.key]"
-            clearable
             :placeholder="`Buscar ${entity.singular.toLowerCase()}…`"
             :data-test="`maestro-search-${entity.key}`"
             class="maestro-search"
             @keyup.enter="onSearch(entity.key)"
-            @clear="onSearch(entity.key)"
           />
           <Button
             v-if="canManage"
@@ -334,14 +334,16 @@ onMounted(load)
           @page="(e: { first: number; rows: number }) => { pages[entity.key] = Math.floor(e.first / e.rows) + 1; load() }"
         />
 
-        <el-dialog
-          v-model="dialogVisible[entity.key]"
-          :title="editing[entity.key] === null ? `Crear ${entity.singular}` : `Editar ${entity.singular}`"
-          :close-on-click-modal="false"
-          :close-on-press-escape="!saving[entity.key]"
-          :show-close="!saving[entity.key]"
-          width="560px"
-          @closed="resetDialog(entity.key)"
+        <Dialog
+          v-model:visible="dialogVisible[entity.key]"
+          :header="editing[entity.key] === null ? `Crear ${entity.singular}` : `Editar ${entity.singular}`"
+          modal
+          position="top"
+          style="width: 560px"
+          :dismissable-mask="false"
+          :close-on-escape="!saving[entity.key]"
+          :closable="!saving[entity.key]"
+          @after-hide="resetDialog(entity.key)"
         >
           <MaestroForm
             v-if="dialogVisible[entity.key]"
@@ -352,7 +354,7 @@ onMounted(load)
             :saving="saving[entity.key]"
             @submit="(values) => submitEntity(entity.key, values)"
           />
-        </el-dialog>
+        </Dialog>
       </TabPanel>
       </TabPanels>
     </Tabs>

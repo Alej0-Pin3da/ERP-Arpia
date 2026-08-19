@@ -10,10 +10,11 @@
  * posts the exact schema payload, edit PUTs the update payload via the
  * inline edit form, delete expects 204 and surfaces the tipos-producto 409
  * "in use".
+ *
+ * Toolbar inputs + dialogs migrated to PrimeVue in slice 5 (MIG-2).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -87,7 +88,6 @@ async function mountView(rol: string): Promise<VueWrapper> {
     global: {
       plugins: [
         pinia,
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
       stubs: { transition: false },
@@ -108,7 +108,7 @@ async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
   await flushPromises()
 }
 
-/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+/** Let the dialog leave transition finish (Vue's nextFrame is a double rAF). */
 async function flushDialogTransition(): Promise<void> {
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
@@ -241,7 +241,7 @@ describe('MaestrosView (MOD-5 + T6)', () => {
     await nextTick()
     expect(wrapper.findComponent({ name: 'MaestroForm' }).exists()).toBe(true)
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape' }))
     await flushDialogTransition()
 
     expect(apiMocks.createTipo).not.toHaveBeenCalled()
