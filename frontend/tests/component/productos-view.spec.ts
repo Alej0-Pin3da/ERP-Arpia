@@ -8,11 +8,11 @@
  * product, variante and BOM writes are require_admin server-side), the nested
  * variantes lazy flow, the productos create/edit/delete flows, the BOM tab and
  * the Costo tab. Lookup joins (BOM/Costo selects, tipo/insumo labels) keep
- * limit:1000 against `.items` (design D3). el-tabs/el-dialog stay until S2.
+ * limit:1000 against `.items` (design D3). Tabs/dialogs/selects migrated to
+ * PrimeVue in slice 5 (MIG-2); dropdowns are scoped via `panelClass`.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -164,7 +164,6 @@ async function mountView(rol: string): Promise<VueWrapper> {
     global: {
       plugins: [
         pinia,
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
       stubs: { transition: false },
@@ -187,21 +186,28 @@ async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
 
 /**
  * Pick an option in the dropdown of a specific select. The view keeps every
- * el-tab-pane mounted, so several selects share the DOM — scope the lookup to
- * the select's `popper-class` (`.{popperClass} .el-select-dropdown__item`)
+ * PrimeVue TabPanel mounted, so several selects share the DOM — scope the
+ * lookup to the select's `panelClass` (`.{panelClass} .p-select-option`)
  * instead of a document-wide query.
  */
-async function pickOption(popperClass: string, label: string): Promise<void> {
-  const option = [...document.querySelectorAll<HTMLElement>(`.${popperClass} .el-select-dropdown__item`)].find(
+async function pickOption(panelClass: string, label: string): Promise<void> {
+  await flushOverlay()
+  const option = [...document.querySelectorAll<HTMLElement>(`.${panelClass} .p-select-option`)].find(
     (el) => el.textContent?.trim() === label,
   )
-  if (!option) throw new Error(`option not found in ${popperClass}: "${label}"`)
-  option.click()
+  if (!option) throw new Error(`option not found in ${panelClass}: "${label}"`)
+  option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
   await nextTick()
+}
+
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
 }
 
-/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+/** Let the dialog leave transition finish (Vue's nextFrame is a double rAF). */
 async function flushDialogTransition(): Promise<void> {
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
@@ -319,7 +325,7 @@ describe('ProductosView (MOD-5 + T6)', () => {
   it('admin owns the dialog buttons, the edit/delete actions and the variantes button', async () => {
     const wrapper = await mountView('admin')
 
-    // The create form lives in an el-dialog — closed until the button opens it (FE-DLG-1).
+    // The create form lives in a PrimeVue Dialog — closed until the button opens it (FE-DLG-1).
     expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(false)
     expect(wrapper.find('[data-test="nuevo-producto"]').exists()).toBe(true)
     expect(wrapper.findAll('[data-test="edit-producto"]')).toHaveLength(2)
@@ -364,7 +370,8 @@ describe('ProductosView (MOD-5 + T6)', () => {
     await wrapper.findAll('[data-test="edit-producto"]')[0].trigger('click')
     await nextTick()
 
-    expect(wrapper.text()).toContain('Editar producto')
+    // The Dialog teleports to body (MIG-2), so the title lives in document.body.
+    expect(document.body.textContent).toContain('Editar producto')
     expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(true)
     wrapper.findComponent({ name: 'ProductoForm' }).vm.$emit('submit', {
       tipo_producto_id: 1,
@@ -399,7 +406,7 @@ describe('ProductosView (MOD-5 + T6)', () => {
     await nextTick()
     expect(wrapper.findComponent({ name: 'ProductoForm' }).exists()).toBe(true)
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape' }))
     await flushDialogTransition()
 
     expect(apiMocks.createProducto).not.toHaveBeenCalled()
@@ -468,7 +475,7 @@ describe('ProductosView (MOD-5 + T6)', () => {
     expect(wrapper.text()).toContain('$13.000,00')
     expect(wrapper.text()).toContain('—') // null precio_venta
 
-    // The variante form lives in an el-dialog opened from the section button (FE-DLG-1).
+    // The variante form lives in a PrimeVue Dialog opened from the section button (FE-DLG-1).
     expect(wrapper.findComponent({ name: 'VarianteForm' }).exists()).toBe(false)
     await wrapper.find('[data-test="nueva-variante"]').trigger('click')
     await nextTick()
@@ -508,7 +515,7 @@ describe('ProductosView (MOD-5 + T6)', () => {
     await nextTick()
     await pickOption('bom-product-popper', 'Arepa de choclo')
 
-    // The BOM line forms live in el-dialogs opened from the section buttons (FE-DLG-1).
+    // The BOM line forms live in PrimeVue Dialogs opened from the section buttons (FE-DLG-1).
     expect(wrapper.findComponent({ name: 'BomInsumoForm' }).exists()).toBe(false)
     expect(wrapper.findAll('[data-test="edit-bom-insumo"]')).toHaveLength(1)
     await wrapper.find('[data-test="nueva-linea-insumo"]').trigger('click')

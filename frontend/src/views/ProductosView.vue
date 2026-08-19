@@ -21,8 +21,11 @@ import ProductosTable from '@/components/productos/ProductosTable.vue'
 import VarianteForm from '@/components/productos/VarianteForm.vue'
 import VariantesTable from '@/components/productos/VariantesTable.vue'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
+import Select from 'primevue/select'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
@@ -100,25 +103,25 @@ onMounted(load)
       <TabPanels>
         <TabPanel value="productos">
         <div class="producto-toolbar">
-          <el-input
+          <InputText
             v-model="productoQ"
-            clearable
             placeholder="Buscar producto…"
             data-test="producto-search"
             class="producto-search"
             @keyup.enter="onProductosSearch"
-            @clear="onProductosSearch"
           />
-          <el-select
+          <Select
             v-model="filterTipoProductoId"
-            clearable
-            filterable
+            :options="tipos"
+            optionLabel="nombre"
+            optionValue="id"
             placeholder="Filtrar por tipo"
+            filter
+            :show-clear="true"
             data-test="producto-tipo-filter"
+            class="producto-tipo-filter"
             @change="onProductosFilterChange"
-          >
-            <el-option v-for="t in tipos" :key="t.id" :label="t.nombre" :value="t.id" />
-          </el-select>
+          />
           <Button v-if="canManage" data-test="nuevo-producto" @click="openCreateProducto">
             Nuevo producto
           </Button>
@@ -142,14 +145,16 @@ onMounted(load)
           @page="(e: { first: number; rows: number }) => { productosPage = Math.floor(e.first / e.rows) + 1; load() }"
         />
 
-        <el-dialog
-          v-model="productoDialogVisible"
-          :title="editingProducto === null ? 'Crear producto' : 'Editar producto'"
-          :close-on-click-modal="false"
-          :close-on-press-escape="!savingProducto"
-          :show-close="!savingProducto"
-          width="560px"
-          @closed="resetProductoDialog"
+        <Dialog
+          v-model:visible="productoDialogVisible"
+          :header="editingProducto === null ? 'Crear producto' : 'Editar producto'"
+          modal
+          position="top"
+          style="width: 560px"
+          :dismissable-mask="false"
+          :close-on-escape="!savingProducto"
+          :closable="!savingProducto"
+          @after-hide="resetProductoDialog"
         >
           <ProductoForm
             v-if="productoDialogVisible"
@@ -159,7 +164,7 @@ onMounted(load)
             :saving="savingProducto"
             @submit="submitProducto"
           />
-        </el-dialog>
+        </Dialog>
 
         <div v-if="selectedProducto !== null" class="variantes-section" data-test="variantes-section">
           <header class="variantes-header">
@@ -182,14 +187,16 @@ onMounted(load)
             @delete="onDeleteVariante"
           />
 
-          <el-dialog
-            v-model="varianteDialogVisible"
-            :title="editingVariante === null ? 'Nueva variante' : 'Editar variante'"
-            :close-on-click-modal="false"
-            :close-on-press-escape="!savingVariante"
-            :show-close="!savingVariante"
-            width="480px"
-            @closed="resetVarianteDialog"
+          <Dialog
+            v-model:visible="varianteDialogVisible"
+            :header="editingVariante === null ? 'Nueva variante' : 'Editar variante'"
+            modal
+            position="top"
+            style="width: 480px"
+            :dismissable-mask="false"
+            :close-on-escape="!savingVariante"
+            :closable="!savingVariante"
+            @after-hide="resetVarianteDialog"
           >
             <VarianteForm
               v-if="varianteDialogVisible"
@@ -198,23 +205,24 @@ onMounted(load)
               :saving="savingVariante"
               @submit="onSubmitVariante"
             />
-          </el-dialog>
+          </Dialog>
         </div>
       </TabPanel>
 
       <TabPanel value="bom">
         <div class="bom-select">
-          <el-select
+          <Select
             v-model="bomProductoId"
-            filterable
+            :options="productosLookup"
+            optionLabel="nombre"
+            optionValue="id"
             placeholder="Selecciona un producto para ver su receta"
+            filter
             data-test="bom-product-select"
-            popper-class="bom-product-popper"
+            panelClass="bom-product-popper"
             style="width: 100%"
-            @change="onSelectBomProducto"
-          >
-            <el-option v-for="p in productosLookup" :key="p.id" :label="p.nombre" :value="p.id" />
-          </el-select>
+            @change="(e: { value: number }) => onSelectBomProducto(e.value)"
+          />
         </div>
 
         <template v-if="bomProductoId !== null">
@@ -238,14 +246,16 @@ onMounted(load)
               @delete="onDeleteBomInsumo"
             />
 
-            <el-dialog
-              v-model="bomInsumoDialogVisible"
-              :title="editingBomInsumo === null ? 'Nueva línea de insumo' : 'Editar línea de insumo'"
-              :close-on-click-modal="false"
-              :close-on-press-escape="!savingBomInsumo"
-              :show-close="!savingBomInsumo"
-              width="480px"
-              @closed="resetBomInsumoDialog"
+            <Dialog
+              v-model:visible="bomInsumoDialogVisible"
+              :header="editingBomInsumo === null ? 'Nueva línea de insumo' : 'Editar línea de insumo'"
+              modal
+              position="top"
+              style="width: 480px"
+              :dismissable-mask="false"
+              :close-on-escape="!savingBomInsumo"
+              :closable="!savingBomInsumo"
+              @after-hide="resetBomInsumoDialog"
             >
               <BomInsumoForm
                 v-if="bomInsumoDialogVisible"
@@ -255,7 +265,7 @@ onMounted(load)
                 :saving="savingBomInsumo"
                 @submit="onSubmitBomInsumo"
               />
-            </el-dialog>
+            </Dialog>
           </section>
 
           <section class="bom-subsection">
@@ -278,14 +288,16 @@ onMounted(load)
               @delete="onDeleteBomProducto"
             />
 
-            <el-dialog
-              v-model="bomProductoDialogVisible"
-              :title="editingBomProducto === null ? 'Nueva línea de combo' : 'Editar línea de combo'"
-              :close-on-click-modal="false"
-              :close-on-press-escape="!savingBomProducto"
-              :show-close="!savingBomProducto"
-              width="480px"
-              @closed="resetBomProductoDialog"
+            <Dialog
+              v-model:visible="bomProductoDialogVisible"
+              :header="editingBomProducto === null ? 'Nueva línea de combo' : 'Editar línea de combo'"
+              modal
+              position="top"
+              style="width: 480px"
+              :dismissable-mask="false"
+              :close-on-escape="!savingBomProducto"
+              :closable="!savingBomProducto"
+              @after-hide="resetBomProductoDialog"
             >
               <BomProductoForm
                 v-if="bomProductoDialogVisible"
@@ -295,35 +307,37 @@ onMounted(load)
                 :saving="savingBomProducto"
                 @submit="onSubmitBomProducto"
               />
-            </el-dialog>
+            </Dialog>
           </section>
         </template>
       </TabPanel>
 
       <TabPanel value="costo">
         <div class="costo-selects">
-          <el-select
+          <Select
             v-model="costoProductoId"
-            filterable
+            :options="productosLookup"
+            optionLabel="nombre"
+            optionValue="id"
             placeholder="Selecciona un producto"
+            filter
             data-test="costo-product-select"
-            popper-class="costo-product-popper"
+            panelClass="costo-product-popper"
             style="width: 100%"
-            @change="onSelectCostoProducto"
-          >
-            <el-option v-for="p in productosLookup" :key="p.id" :label="p.nombre" :value="p.id" />
-          </el-select>
-          <el-select
+            @change="(e: { value: number }) => onSelectCostoProducto(e.value)"
+          />
+          <Select
             v-model="costoVarianteId"
-            clearable
+            :options="costoProductoVariantes"
+            optionLabel="nombre_variante"
+            optionValue="id"
             placeholder="Variante (opcional)"
+            :show-clear="true"
             data-test="costo-variante-select"
-            popper-class="costo-variante-popper"
+            panelClass="costo-variante-popper"
             style="width: 100%"
             @change="onCostoVarianteChange"
-          >
-            <el-option v-for="v in costoProductoVariantes" :key="v.id" :label="v.nombre_variante" :value="v.id" />
-          </el-select>
+          />
         </div>
 
         <CostoTree :tree="costoTree" :loading="costoLoading" />
@@ -360,7 +374,7 @@ onMounted(load)
   width: 14rem;
 }
 
-.producto-toolbar .el-select {
+.producto-tipo-filter {
   width: 12rem;
 }
 
@@ -372,7 +386,7 @@ onMounted(load)
 .variantes-section {
   margin-top: 1rem;
   padding: 1rem;
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--arpia-border-subtle);
   border-radius: 0.375rem;
 }
 
