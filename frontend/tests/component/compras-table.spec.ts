@@ -1,15 +1,24 @@
 /**
  * ComprasTable component tests (PR9, spec MOD-4).
  *
- * Mounts the REAL ComprasTable with Element Plus: renders the joined compra
- * rows (es-CO fecha, insumo name join, cantidad, precio_unitario and the
- * client-computed costo_total) and the empty state.
+ * Mounts the REAL ComprasTable with PrimeVue only (slice 1c — the component is
+ * fully migrated, no el-* cells left, so ElementPlus is dropped here):
+ * renders the joined compra rows (es-CO fecha, insumo name join, cantidad,
+ * precio_unitario and the client-computed costo_total) and the empty state.
+ * The insumo header funnel is a DataTable filter menu hosting a Select
+ * (`filterDisplay="menu"`); it only renders when lookups are passed, and the
+ * filter/sort payloads are normalized by the parsePrimeVueFilters/
+ * parsePrimeVueSort adapters.
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
+import DataTable from 'primevue/datatable'
+import Select from 'primevue/select'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import ComprasTable from '@/components/inventario/ComprasTable.vue'
 import type { CompraRow } from '@/utils/inventario'
 
@@ -35,11 +44,24 @@ const ROWS: CompraRow[] = [
 async function mountTable(rows: CompraRow[]): Promise<VueWrapper> {
   const wrapper = mount(ComprasTable, {
     props: { rows },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [[PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }]],
+    },
   })
   await nextTick()
   return wrapper
 }
+
+/** Let the funnel overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await nextTick()
+}
+
+const INSUMOS = [
+  { id: 1, nombre: 'Harina de maíz' },
+  { id: 2, nombre: 'Aceite' },
+]
 
 describe('ComprasTable (MOD-4)', () => {
   it('renders the compra rows es-CO with joined insumo names and computed totals', async () => {
@@ -61,23 +83,28 @@ describe('ComprasTable (MOD-4)', () => {
     expect(wrapper.text()).toContain('Sin compras registradas')
   })
 
-  it('builds the insumo header funnel from the props', async () => {
+  it('declares the insumo header funnel from the props with labeled options', async () => {
     const wrapper = mount(ComprasTable, {
-      props: {
-        rows: ROWS,
-        insumos: [
-          { id: 1, nombre: 'Harina de maíz' },
-          { id: 2, nombre: 'Aceite' },
-        ],
+      props: { rows: ROWS, insumos: INSUMOS },
+      global: {
+        plugins: [[PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }]],
       },
-      global: { plugins: [ElementPlus] },
     })
     await nextTick()
 
-    const columns = wrapper.findAllComponents({ name: 'ElTableColumn' })
+    // Config-level: one 'equals' constraint per column and the funnel renders.
+    expect(wrapper.findComponent(DataTable).props('filters')).toEqual({
+      insumo: { value: null, matchMode: 'equals' },
+    })
+    expect(wrapper.findAll('.p-datatable-column-filter-button')).toHaveLength(1)
 
-    const insumoColumn = columns.find((c) => c.props('columnKey') === 'insumo')
-    expect(insumoColumn!.props('filters')).toEqual([
+    // Behavioral: opening the funnel mounts the Select with the insumo options.
+    await wrapper.find('.p-datatable-column-filter-button').trigger('click')
+    await flushOverlay()
+
+    const insumoSelect = wrapper.findComponent(Select)
+    expect(insumoSelect.exists()).toBe(true)
+    expect(insumoSelect.props('options')).toEqual([
       { text: 'Harina de maíz', value: 1 },
       { text: 'Aceite', value: 2 },
     ])
@@ -86,37 +113,38 @@ describe('ComprasTable (MOD-4)', () => {
   it('renders no funnel when no lookups are passed (empty filters)', async () => {
     const wrapper = await mountTable(ROWS)
 
-    const columns = wrapper.findAllComponents({ name: 'ElTableColumn' })
-    const insumoColumn = columns.find((c) => c.props('columnKey') === 'insumo')
-
-    expect(insumoColumn!.props('filters')).toEqual([])
+    expect(wrapper.findAll('.p-datatable-column-filter-button')).toHaveLength(0)
   })
 
-  it('normalizes an el-table filter-change on insumo into a typed emit', async () => {
+  it('normalizes a PrimeVue filter payload on insumo into a typed emit', async () => {
     const wrapper = await mountTable(ROWS)
 
-    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { insumo: [1] })
+    wrapper.findComponent(DataTable).vm.$emit('filter', {
+      filters: { insumo: { value: 1, matchMode: 'equals' } },
+    })
     await nextTick()
 
     expect(wrapper.emitted('filter-change')).toBeDefined()
     expect(wrapper.emitted('filter-change')![0][0]).toEqual({ insumo_id: 1 })
   })
 
-  it('emits null when the column filter is cleared', async () => {
+  it('emits null when the insumo column filter is cleared (null constraint)', async () => {
     const wrapper = await mountTable(ROWS)
 
-    wrapper.findComponent({ name: 'ElTable' }).vm.$emit('filter-change', { insumo: [] })
+    wrapper.findComponent(DataTable).vm.$emit('filter', {
+      filters: { insumo: { value: null, matchMode: 'equals' } },
+    })
     await nextTick()
 
     expect(wrapper.emitted('filter-change')![0][0]).toEqual({ insumo_id: null })
   })
 
-  it('maps an el-table sort-change into a typed {prop, order} emit', async () => {
+  it('maps a PrimeVue sort payload into a typed {prop, order} emit', async () => {
     const wrapper = await mountTable(ROWS)
 
     wrapper
-      .findComponent({ name: 'ElTable' })
-      .vm.$emit('sort-change', { column: { key: 'precio_unitario_compra' }, order: 'descending' })
+      .findComponent(DataTable)
+      .vm.$emit('sort', { sortField: 'precio_unitario_compra', sortOrder: -1 })
     await nextTick()
 
     expect(wrapper.emitted('sort-change')![0][0]).toEqual({ prop: 'precio_unitario_compra', order: 'desc' })

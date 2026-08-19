@@ -1,19 +1,24 @@
 /**
  * VariantesTable component tests (PR10, spec MOD-5).
  *
- * Mounts the REAL VariantesTable with Element Plus — the nested variantes list
- * for ONE selected product:
+ * Mounts the REAL VariantesTable with Element Plus + PrimeVue (slice 1c) —
+ * the nested variantes list for ONE selected product:
  *  - renders nombre_variante and precio_venta es-CO, with '—' for a null
  *    precio (the backend VarianteProductoRead has NO costo_adicional — only
  *    nombre_variante + precio_venta)
  *  - Editar / Eliminar emit `edit` / `delete` with the row; hidden when
  *    canEdit=false
  *  - the empty state renders
+ * el-button cells still need the ElementPlus plugin until slice 2b.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
+import DataTable from 'primevue/datatable'
+import PrimeVue from 'primevue/config'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import VariantesTable from '@/components/productos/VariantesTable.vue'
 import type { components } from '@/types/api.d'
 
@@ -27,7 +32,12 @@ const VARIANTES: VarianteProductoRead[] = [
 async function mountTable(canEdit = true, variantes = VARIANTES): Promise<VueWrapper> {
   const wrapper = mount(VariantesTable, {
     props: { variantes, loading: false, canEdit },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await flushPromises()
   return wrapper
@@ -46,6 +56,14 @@ describe('VariantesTable (MOD-5)', () => {
     expect(text).toContain('$13.000,00')
     expect(text).toContain('Docena')
     expect(text).toContain('—') // null precio_venta
+  })
+
+  it('renders one DataTable row per variante', async () => {
+    const wrapper = await mountTable()
+
+    expect(wrapper.findComponent(DataTable).exists()).toBe(true)
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows).toHaveLength(2)
   })
 
   it('emits edit and delete with the row when the actions are visible', async () => {

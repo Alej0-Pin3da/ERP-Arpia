@@ -14,9 +14,13 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import Paginator from 'primevue/paginator'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import MaestrosView from '@/views/MaestrosView.vue'
 
@@ -74,7 +78,14 @@ async function mountView(rol: string): Promise<VueWrapper> {
     user: { id: 2, nombre: 'Pepe', email: 'pepe@arpia.com.co', rol },
   })
   const wrapper = mount(MaestrosView, {
-    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+    global: {
+      plugins: [
+        pinia,
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+      stubs: { transition: false },
+    },
   })
   await nextTick()
   await flushPromises()
@@ -151,7 +162,7 @@ describe('MaestrosView (MOD-5 + T6)', () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listClientes).toHaveBeenCalledWith({ limit: 20, offset: 0 })
 
-    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    wrapper.findComponent(Paginator).vm.$emit('page', { first: 20, rows: 20 })
     await flushPromises()
     expect(apiMocks.listClientes).toHaveBeenCalledWith({ limit: 20, offset: 20 })
   })

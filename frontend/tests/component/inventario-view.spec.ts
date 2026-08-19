@@ -183,13 +183,14 @@ describe('InventarioView (MOD-4 + T6)', () => {
     expect(apiMocks.listCompras).toHaveBeenCalledWith(PAGE1)
   })
 
-  it('renders Paginator with the server total on the insumos tab', async () => {
+  it('renders Paginator with the server total on both tabs', async () => {
     const wrapper = await mountView('operador')
-    // The insumos list pages via PrimeVue Paginator; the total comes from the
-    // API (3), not a local guess. (The compras paginator stays el-pagination
-    // until slice 1c.)
-    expect(wrapper.findComponent(Paginator).exists()).toBe(true)
-    expect(wrapper.findComponent(Paginator).props('totalRecords')).toBe(3)
+    // Both lists page via PrimeVue Paginator; the totals come from the API
+    // (3 insumos, 1 compra), not a local guess.
+    const paginators = wrapper.findAllComponents(Paginator)
+    expect(paginators).toHaveLength(2)
+    expect(paginators[0].props('totalRecords')).toBe(3)
+    expect(paginators[1].props('totalRecords')).toBe(1)
     expect(apiMocks.listInsumos).toHaveBeenCalledWith(PAGE1)
   })
 

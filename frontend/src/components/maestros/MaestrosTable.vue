@@ -2,7 +2,7 @@
 /**
  * Generic maestros table (PR11, spec MOD-5).
  *
- * One el-table renders every master-data entity from its column config
+ * One DataTable renders every master-data entity from its column config
  * (`columns` from `MAESTRO_ENTITIES`): each configured column shows the row
  * value, and empty/null optionals render an em dash ('—'). The Editar /
  * Eliminar actions are ADMIN ONLY (can-edit=false hides them for
@@ -10,7 +10,12 @@
  * when shown they emit `edit`/`delete` with the row — the view owns the
  * forms, the confirm dialog and the API calls. The entity's `emptyText`
  * drives the empty state.
+ *
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. el-button cells stay
+ * until slice 2b.
  */
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import type { MaestroColumn, MaestroRow } from '@/utils/maestros'
 
 defineProps<{
@@ -31,24 +36,31 @@ function cell(row: MaestroRow, column: MaestroColumn): string {
   if (value === null || value === undefined || value === '') return '—'
   return String(value)
 }
+
+/** Map the config width/minWidth numbers onto a Column style object. */
+function columnStyle(column: MaestroColumn): Record<string, string> {
+  const style: Record<string, string> = {}
+  if (column.width !== undefined) style.width = `${column.width}px`
+  if (column.minWidth !== undefined) style.minWidth = `${column.minWidth}px`
+  return style
+}
 </script>
 
 <template>
-  <el-table :data="rows" v-loading="loading">
-    <el-table-column
+  <DataTable :value="rows" lazy :loading="loading">
+    <Column
       v-for="column in columns"
       :key="column.key"
-      :prop="column.key"
-      :label="column.label"
-      :width="column.width"
-      :min-width="column.minWidth"
+      :field="column.key"
+      :header="column.label"
+      :style="columnStyle(column)"
       :align="column.align"
     >
-      <template #default="{ row }">{{ cell(row, column) }}</template>
-    </el-table-column>
+      <template #body="{ data }">{{ cell(data, column) }}</template>
+    </Column>
 
-    <el-table-column v-if="canEdit" label="Acciones" width="150" align="center">
-      <template #default="{ row }">
+    <Column v-if="canEdit" header="Acciones" style="width: 150px" align="center">
+      <template #body="{ data: row }">
         <el-button link type="primary" size="small" data-test="edit-maestro" @click="emit('edit', row)">
           Editar
         </el-button>
@@ -56,10 +68,18 @@ function cell(row: MaestroRow, column: MaestroColumn): string {
           Eliminar
         </el-button>
       </template>
-    </el-table-column>
+    </Column>
 
     <template #empty>
-      <el-empty :description="emptyText" :image-size="80" />
+      <div class="maestro-empty">{{ emptyText }}</div>
     </template>
-  </el-table>
+  </DataTable>
 </template>
+
+<style scoped>
+.maestro-empty {
+  color: var(--el-text-color-secondary);
+  padding: 2rem 0;
+  text-align: center;
+}
+</style>

@@ -30,6 +30,7 @@ import {
 } from '@/api/endpoints'
 import MaestroForm from '@/components/maestros/MaestroForm.vue'
 import MaestrosTable from '@/components/maestros/MaestrosTable.vue'
+import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
 import {
@@ -318,14 +319,13 @@ onMounted(load)
           @edit="(row) => onEdit(entity.key, row)"
           @delete="(row) => onDelete(entity.key, row)"
         />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="totals[entity.key]"
-          :page-size="pageSize"
-          :current-page="pages[entity.key]"
-          @current-change="(p: number) => { pages[entity.key] = p; load() }"
+          :total-records="totals[entity.key]"
+          :rows="pageSize"
+          :first="(pages[entity.key] - 1) * pageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="(e: { first: number; rows: number }) => { pages[entity.key] = Math.floor(e.first / e.rows) + 1; load() }"
         />
 
         <el-dialog

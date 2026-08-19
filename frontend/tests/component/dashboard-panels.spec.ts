@@ -5,12 +5,19 @@
  * SEES: KPI values formatted es-CO, low-stock severity tags (Crítico/Bajo),
  * margen rows with joined names + fallbacks, and the ECharts option the
  * sales chart receives (vue-echarts mocked — jsdom has no canvas).
+ *
+ * BajoStockTable/MargenTable migrated to PrimeVue DataTable in slice 1c;
+ * KpiCards/VentasMensualesChart keep their el-* panels until slice 2a.
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
+import DataTable from 'primevue/datatable'
+import PrimeVue from 'primevue/config'
 import { nextTick, type Component } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import BajoStockTable from '@/components/dashboard/BajoStockTable.vue'
 import KpiCards from '@/components/dashboard/KpiCards.vue'
 import MargenTable from '@/components/dashboard/MargenTable.vue'
@@ -32,8 +39,16 @@ const { VChartStub } = vi.hoisted(() => ({
 vi.mock('vue-echarts', () => ({ default: VChartStub }))
 
 async function mountPanel(component: Component, props: Record<string, unknown>): Promise<VueWrapper> {
-  const wrapper = mount(component, { props, global: { plugins: [ElementPlus] } })
-  // el-table paints its body one tick after mount (ResizeObserver layout).
+  const wrapper = mount(component, {
+    props,
+    global: {
+      plugins: [
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
+  })
+  // DataTable paints its body one tick after mount (ResizeObserver layout).
   await nextTick()
   return wrapper
 }
@@ -135,6 +150,13 @@ describe('BajoStockTable (DASH-2)', () => {
     expect(text).toContain('Bajo')
   })
 
+  it('renders one DataTable row per low-stock insumo', async () => {
+    const wrapper = await mountPanel(BajoStockTable, { rows })
+
+    expect(wrapper.findComponent(DataTable).exists()).toBe(true)
+    expect(wrapper.findAll('tbody tr')).toHaveLength(2)
+  })
+
   it('shows an empty state when no insumos are below stock', async () => {
     const wrapper = await mountPanel(BajoStockTable, { rows: [] })
 
@@ -172,6 +194,13 @@ describe('MargenTable (DASH-3)', () => {
     expect(text).toContain('Producto #99')
     expect(text).toContain('De carne')
     expect(text).toContain('$20.000,50')
+  })
+
+  it('renders one DataTable row per margen product', async () => {
+    const wrapper = await mountPanel(MargenTable, { rows })
+
+    expect(wrapper.findComponent(DataTable).exists()).toBe(true)
+    expect(wrapper.findAll('tbody tr')).toHaveLength(2)
   })
 
   it('shows an empty state when no margins were computed', async () => {

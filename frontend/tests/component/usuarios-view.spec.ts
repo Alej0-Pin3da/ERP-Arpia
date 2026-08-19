@@ -12,13 +12,18 @@
  *    self"), and a forced self-demote surfaces the server 400 "Cannot
  *    change your own role away from admin"
  *  - delete other users after a confirm (204)
+ * el-dialog/el-alert/el-input/el-select stay until S2/S3.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import Paginator from 'primevue/paginator'
+import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import UsuariosView from '@/views/UsuariosView.vue'
 
@@ -56,7 +61,14 @@ async function mountView(): Promise<VueWrapper> {
     user: { id: 1, nombre: 'Ana Admin', email: 'ana@arpia.com.co', rol: 'admin' },
   })
   const wrapper = mount(UsuariosView, {
-    global: { plugins: [pinia, ElementPlus], stubs: { transition: false } },
+    global: {
+      plugins: [
+        pinia,
+        ElementPlus,
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+      stubs: { transition: false },
+    },
   })
   await nextTick()
   await flushPromises()
@@ -98,12 +110,12 @@ describe('UsuariosView (MOD-5 usuarios + T6)', () => {
     expect(apiMocks.list).toHaveBeenCalledWith({ limit: 20, offset: 0 })
   })
 
-  it('renders el-pagination and pages with the new offset', async () => {
+  it('renders Paginator and pages with the new offset', async () => {
     const wrapper = await mountView()
-    expect(wrapper.findComponent({ name: 'ElPagination' }).exists()).toBe(true)
+    expect(wrapper.findComponent(Paginator).exists()).toBe(true)
     expect(apiMocks.list).toHaveBeenCalledWith({ limit: 20, offset: 0 })
 
-    wrapper.findComponent({ name: 'ElPagination' }).vm.$emit('current-change', 2)
+    wrapper.findComponent(Paginator).vm.$emit('page', { first: 20, rows: 20 })
     await flushPromises()
     expect(apiMocks.list).toHaveBeenCalledWith({ limit: 20, offset: 20 })
   })

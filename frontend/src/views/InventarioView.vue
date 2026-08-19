@@ -402,14 +402,13 @@ onMounted(load)
           @filter-change="onComprasTableFilterChange"
           @sort-change="onComprasTableSortChange"
         />
-        <el-pagination
+        <Paginator
           class="tabla-paginacion"
-          background
-          layout="total, prev, pager, next"
-          :total="comprasTotal"
-          :page-size="comprasPageSize"
-          :current-page="comprasPage"
-          @current-change="(p: number) => { comprasPage = p; load() }"
+          :total-records="comprasTotal"
+          :rows="comprasPageSize"
+          :first="(comprasPage - 1) * comprasPageSize"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+          @page="(e: { first: number; rows: number }) => { comprasPage = Math.floor(e.first / e.rows) + 1; load() }"
         />
 
         <el-dialog
