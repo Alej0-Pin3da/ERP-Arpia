@@ -126,6 +126,12 @@ function applyFilters(): void {
   void load()
 }
 
+/** Paginator @page: recompute the 1-based page from the 0-based first index. */
+function onPage(e: { first: number; rows: number }): void {
+  page.value = Math.floor(e.first / e.rows) + 1
+  void load()
+}
+
 function clearFilters(): void {
   filtros.venta_id = null
   filtros.fecha_desde = ''
@@ -228,7 +234,7 @@ onMounted(load)
           :rows="pageSize"
           :first="(page - 1) * pageSize"
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="(e: { first: number; rows: number }) => { page = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onPage"
         />
       </TabPanel>
       </TabPanels>

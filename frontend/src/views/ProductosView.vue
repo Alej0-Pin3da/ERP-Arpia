@@ -79,6 +79,22 @@ const {
   onSelectCostoProducto, onCostoVarianteChange,
 } = costo
 
+/** Paginator @page: recompute the 1-based page from the 0-based first index. */
+function onProductosPage(e: { first: number; rows: number }): void {
+  productosPage.value = Math.floor(e.first / e.rows) + 1
+  load()
+}
+
+/** PrimeVue Select emits change as { originalEvent, value } (MIG-2). */
+function onBomProductoChange(e: { value: number }): void {
+  onSelectBomProducto(e.value)
+}
+
+/** PrimeVue Select emits change as { originalEvent, value } (MIG-2). */
+function onCostoProductoChange(e: { value: number }): void {
+  onSelectCostoProducto(e.value)
+}
+
 onMounted(load)
 </script>
 
@@ -142,7 +158,7 @@ onMounted(load)
           :rows="productosPageSize"
           :first="(productosPage - 1) * productosPageSize"
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="(e: { first: number; rows: number }) => { productosPage = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onProductosPage"
         />
 
         <Dialog
@@ -221,7 +237,7 @@ onMounted(load)
             data-test="bom-product-select"
             panelClass="bom-product-popper"
             style="width: 100%"
-            @change="(e: { value: number }) => onSelectBomProducto(e.value)"
+            @change="onBomProductoChange"
           />
         </div>
 
@@ -324,7 +340,7 @@ onMounted(load)
             data-test="costo-product-select"
             panelClass="costo-product-popper"
             style="width: 100%"
-            @change="(e: { value: number }) => onSelectCostoProducto(e.value)"
+            @change="onCostoProductoChange"
           />
           <Select
             v-model="costoVarianteId"

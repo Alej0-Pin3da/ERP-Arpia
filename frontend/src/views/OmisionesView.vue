@@ -94,6 +94,12 @@ function onFilterChange(): void {
   load()
 }
 
+/** Paginator @page: recompute the 1-based page from the 0-based first index. */
+function onPage(e: { first: number; rows: number }): void {
+  page.value = Math.floor(e.first / e.rows) + 1
+  load()
+}
+
 /** MIG-4: marca/desmarca resuelta (admin-only, D9). */
 async function onToggleResuelta(row: OmisionRead): Promise<void> {
   try {
@@ -175,7 +181,7 @@ onMounted(load)
       :rows="pageSize"
       :first="(page - 1) * pageSize"
       template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-      @page="(e: { first: number; rows: number }) => { page = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onPage"
     />
   </section>
 </template>

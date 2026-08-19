@@ -172,6 +172,18 @@ function onComprasFilterChange(): void {
   load()
 }
 
+/** Paginator @page (insumos): recompute the 1-based page from first index. */
+function onInsumosPage(e: { first: number; rows: number }): void {
+  insumosPage.value = Math.floor(e.first / e.rows) + 1
+  load()
+}
+
+/** Paginator @page (compras): recompute the 1-based page from first index. */
+function onComprasPage(e: { first: number; rows: number }): void {
+  comprasPage.value = Math.floor(e.first / e.rows) + 1
+  load()
+}
+
 /** Header column filter (InsumosTable) maps into the categoria_id ref. */
 function onInsumosTableFilterChange(filters: { categoria_id?: number | null }): void {
   filterCategoriaId.value = filters.categoria_id ?? null
@@ -355,7 +367,7 @@ onMounted(load)
           :rows="insumosPageSize"
           :first="(insumosPage - 1) * insumosPageSize"
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="(e: { first: number; rows: number }) => { insumosPage = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onInsumosPage"
         />
 
         <Dialog
@@ -419,7 +431,7 @@ onMounted(load)
           :rows="comprasPageSize"
           :first="(comprasPage - 1) * comprasPageSize"
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="(e: { first: number; rows: number }) => { comprasPage = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onComprasPage"
         />
 
         <Dialog

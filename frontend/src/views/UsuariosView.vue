@@ -90,6 +90,12 @@ function onFilterChange(): void {
   load()
 }
 
+/** Paginator @page: recompute the 1-based page from the 0-based first index. */
+function onPage(e: { first: number; rows: number }): void {
+  page.value = Math.floor(e.first / e.rows) + 1
+  load()
+}
+
 /** Surface the server validation detail (400/404) when present. */
 function serverDetail(err: unknown): string | null {
   if (typeof err === 'object' && err !== null && 'response' in err) {
@@ -231,7 +237,7 @@ onMounted(load)
       :rows="pageSize"
       :first="(page - 1) * pageSize"
       template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-      @page="(e: { first: number; rows: number }) => { page = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onPage"
     />
 
     <Dialog

@@ -181,6 +181,13 @@ function onSearch(entityKey: EntityKey): void {
   load()
 }
 
+/** Paginator @page: recompute the entity's 1-based page from the 0-based
+ *  first index (typed handler; the template passes $event + the key). */
+function onEntityPage(e: { first: number; rows: number }, entityKey: EntityKey): void {
+  pages.value[entityKey] = Math.floor(e.first / e.rows) + 1
+  load()
+}
+
 /** Surface the server validation detail (400/404/409) when present. */
 function serverDetail(err: unknown): string | null {
   if (typeof err === 'object' && err !== null && 'response' in err) {
@@ -331,7 +338,7 @@ onMounted(load)
           :rows="pageSize"
           :first="(pages[entity.key] - 1) * pageSize"
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="(e: { first: number; rows: number }) => { pages[entity.key] = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onEntityPage($event, entity.key)"
         />
 
         <Dialog

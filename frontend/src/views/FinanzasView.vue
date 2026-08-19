@@ -247,9 +247,20 @@ function onEditMovimiento(row: MovimientoRow): void {
   movimientoDialogVisible.value = true
 }
 
+/** Paginator @page (movimientos): recompute the 1-based page from first index. */
+function onMovimientosPage(e: { first: number; rows: number }): void {
+  movimientosPage.value = Math.floor(e.first / e.rows) + 1
+  load()
+}
+
+/** Paginator @page (socios): recompute the 1-based page from first index. */
+function onSociosPage(e: { first: number; rows: number }): void {
+  sociosPage.value = Math.floor(e.first / e.rows) + 1
+  load()
+}
+
 /** FE-DLG-1: the toolbar button opens the dialog in create mode. */
 function openCreateMovimiento(): void {
-  editingMovimiento.value = null
   movimientoDialogVisible.value = true
 }
 
@@ -412,7 +423,7 @@ onMounted(load)
           :rows="movimientosPageSize"
           :first="(movimientosPage - 1) * movimientosPageSize"
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="(e: { first: number; rows: number }) => { movimientosPage = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onMovimientosPage"
         />
 
         <Dialog
@@ -471,7 +482,7 @@ onMounted(load)
           :rows="sociosPageSize"
           :first="(sociosPage - 1) * sociosPageSize"
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="(e: { first: number; rows: number }) => { sociosPage = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onSociosPage"
         />
 
         <Dialog
