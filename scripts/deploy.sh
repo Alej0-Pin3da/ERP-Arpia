@@ -10,9 +10,10 @@
 #   1) Clone the repo if the clone dir does not exist (bootstrap)
 #   2) Pull latest code in the clone
 #   3) Sync backend to the app dir
-#   4) Run alembic migrations
+#   4) Validate production configuration and run alembic migrations
 #   5) Restart the Passenger app
-#   6) (Optional) Deploy the frontend — enabled with DEPLOY_FRONTEND=1
+#   6) Verify readiness
+#   7) (Optional) Deploy the frontend — enabled with DEPLOY_FRONTEND=1
 #
 # Adjust CLONE / APP / VENV / REPO_URL if the server layout changes.
 # Frontend docroot / URL live in scripts/deploy-frontend.sh.
@@ -56,6 +57,10 @@ rsync -av --delete \
 echo "==> [4/6] Running migrations"
 cd "$APP"
 source "$VENV/activate"
+
+echo "    Validating production configuration"
+python -c "from app.core.config import settings; raise SystemExit(0 if settings.ENVIRONMENT in ('production', 'staging') else 'ENVIRONMENT must be production or staging');"
+echo "    production configuration accepted"
 alembic upgrade head
 
 echo "==> [5/6] Migration state"
@@ -64,18 +69,25 @@ alembic current
 echo "==> [6/6] Restarting Passenger app"
 touch "$APP/passenger_wsgi.py"
 
+HEALTHCHECK_URL="${HEALTHCHECK_URL:-https://api.arpia.com.co/health/ready}"
+echo "==> Readiness check: $HEALTHCHECK_URL"
+if ! curl --fail --silent --show-error "$HEALTHCHECK_URL" >/dev/null; then
+  echo "ERROR: Passenger restarted but readiness check failed." >&2
+  exit 1
+fi
+
 # =============================================================================
-# Optional step 7: frontend deploy (static SPA -> app.arpia.com.co docroot).
+# Optional step 8: frontend deploy (static SPA -> app.arpia.com.co docroot).
 # Disabled by default so backend deploys behave exactly as before.
 # Enable with:  DEPLOY_FRONTEND=1 bash scripts/deploy.sh [branch]
 # The frontend is a static bundle (no Passenger restart needed); this just
 # builds frontend/ and syncs dist/ to FRONTEND_DOCROOT in deploy-frontend.sh.
 # =============================================================================
 if [ "${DEPLOY_FRONTEND:-0}" = "1" ]; then
-  echo "==> [7/7] Deploying frontend"
+  echo "==> [8/8] Deploying frontend"
   bash "$CLONE/scripts/deploy-frontend.sh" "$BRANCH"
 else
-  echo "==> [7/7] Skipping frontend deploy (set DEPLOY_FRONTEND=1 to enable)"
+  echo "==> [8/8] Skipping frontend deploy (set DEPLOY_FRONTEND=1 to enable)"
 fi
 
 echo ""

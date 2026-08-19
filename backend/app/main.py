@@ -70,12 +70,33 @@ def unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespons
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 
-@app.get("/health", tags=["health"])
-def health() -> dict:
-    db_status = "ok"
+def _database_is_ready() -> bool:
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
+        return True
     except Exception:  # noqa: BLE001
-        db_status = "error"
-    return {"status": "ok", "database": db_status}
+        return False
+
+
+@app.get("/health/live", tags=["health"])
+def health_live() -> dict:
+    return {"status": "ok"}
+
+
+@app.get("/health/ready", tags=["health"])
+def health_ready() -> dict:
+    if not _database_is_ready():
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "error", "database": "error"},
+        )
+    return {"status": "ok", "database": "ok"}
+
+
+@app.get("/health", tags=["health"])
+def health() -> dict:
+    """Backward-compatible alias for the readiness check."""
+    if not _database_is_ready():
+        return {"status": "ok", "database": "error"}
+    return {"status": "ok", "database": "ok"}

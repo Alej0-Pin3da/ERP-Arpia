@@ -24,3 +24,9 @@ ARPIA.xlsx
 backend/migrate/reports/
 # CodeGraph local index (machine-local, regenerable)
 .codegraph/
+.idea/.gitignore
+.idea/ERP-Arpia.iml
+.idea/modules.xml
+.idea/prettier.xml
+.idea/vcs.xml
+.idea/inspectionProfiles/profiles_settings.xml

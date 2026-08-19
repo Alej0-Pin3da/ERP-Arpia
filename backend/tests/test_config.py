@@ -17,9 +17,21 @@ def test_settings_production_rejects_default_secret():
 
 def test_settings_production_accepts_secure_secret():
     s = Settings(
-        ENVIRONMENT="production", JWT_SECRET_KEY="super_secure_production_secret_key_12345"
+        ENVIRONMENT="production",
+        JWT_SECRET_KEY="super_secure_production_secret_key_12345",
+        DATABASE_URL="postgresql+psycopg://arpia:secret@db.example.com:5432/arpia",
     )
     assert s.JWT_SECRET_KEY == "super_secure_production_secret_key_12345"
+
+
+def test_settings_production_rejects_default_database_url():
+    with pytest.raises(ValidationError) as excinfo:
+        Settings(
+            ENVIRONMENT="production",
+            JWT_SECRET_KEY="super_secure_production_secret_key_12345",
+            DATABASE_URL="postgresql+psycopg://arpia:arpia_secret@localhost:5432/arpia",
+        )
+    assert "DATABASE_URL must be configured" in str(excinfo.value)
 
 
 def test_cors_origins_list():

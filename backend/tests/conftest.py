@@ -70,7 +70,7 @@ def _bd_test_lista():
         alembic_command.upgrade(cfg, "head")
 
         with SessionLocal() as db:
-            seed_usuarios(db)
+            seed_usuarios(db, ADMIN_EMAIL, ADMIN_PASSWORD)
             seed_categorias(db)
     except Exception:
         # If test postgres server is offline, yield so pure non-DB unit tests can still run
