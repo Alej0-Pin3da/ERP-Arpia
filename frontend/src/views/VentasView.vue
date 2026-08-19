@@ -276,7 +276,14 @@ onMounted(load)
   <section class="ventas">
     <header class="ventas-header">
       <h2>Ventas</h2>
-      <Button :loading="loading" data-test="refresh-ventas" @click="load">Actualizar</Button>
+      <Button
+        icon="pi pi-refresh"
+        :loading="loading"
+        data-test="refresh-ventas"
+        @click="load"
+      >
+        Actualizar
+      </Button>
     </header>
 
     <div v-if="error" class="ventas-error">
@@ -324,20 +331,27 @@ onMounted(load)
             class="venta-filter"
             @change="onFilterChange"
           />
-          <Button v-if="canRegister" data-test="nueva-venta" @click="openCreateVenta">
+          <Button
+            v-if="canRegister"
+            icon="pi pi-plus"
+            data-test="nueva-venta"
+            @click="openCreateVenta"
+          >
             Nueva venta
           </Button>
         </div>
-        <VentasTable
-          :rows="rows"
-          :loading="loading"
-          :can-mark-regalo="canRegister"
-          @filter-change="onTableFilterChange"
-          @sort-change="onTableSortChange"
-          @marcar-regalo="onMarcarRegalo"
-          @editar="openEditVenta"
-          @anular="onAnular"
-        />
+        <div class="ventas-table-wrap">
+          <VentasTable
+            :rows="rows"
+            :loading="loading"
+            :can-mark-regalo="canRegister"
+            @filter-change="onTableFilterChange"
+            @sort-change="onTableSortChange"
+            @marcar-regalo="onMarcarRegalo"
+            @editar="openEditVenta"
+            @anular="onAnular"
+          />
+        </div>
         <Paginator
           class="tabla-paginacion"
           :total-records="total"
@@ -399,6 +413,12 @@ onMounted(load)
   margin-bottom: 1rem;
 }
 
+.ventas-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
 .venta-filter {
   width: 12rem;
 }
@@ -406,5 +426,30 @@ onMounted(load)
 .tabla-paginacion {
   margin-top: 1rem;
   justify-content: flex-end;
+}
+
+@media (max-width: 767px) {
+  .ventas-header {
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .ventas-header h2 {
+    font-size: 1.35rem;
+  }
+
+  .venta-toolbar {
+    max-width: none;
+  }
+
+  .venta-filter,
+  .venta-toolbar :deep(.p-button) {
+    width: 100%;
+  }
+
+  .tabla-paginacion {
+    justify-content: center;
+    overflow-x: auto;
+  }
 }
 </style>

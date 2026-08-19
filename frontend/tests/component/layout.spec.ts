@@ -115,9 +115,25 @@ describe('AppLayout (spec SHELL-5)', () => {
   it('renders the logout control as a per-component PrimeVue Button (S0-T7 pilot)', async () => {
     const { wrapper } = await mountLayout('operador')
 
-    const logout = wrapper.find('.p-button')
+    const logout = wrapper.find('.app-layout__logout')
     expect(logout.exists()).toBe(true)
     expect(logout.text()).toContain('Cerrar sesión')
+  })
+
+  it('opens and closes the mobile navigation drawer', async () => {
+    const { wrapper } = await mountLayout('operador')
+
+    const toggle = wrapper.find('.app-layout__menu-toggle')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+
+    await toggle.trigger('click')
+    expect(wrapper.find('.app-layout__aside--open').exists()).toBe(true)
+    expect(wrapper.find('.app-layout__scrim').exists()).toBe(true)
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+
+    await wrapper.find('.app-layout__scrim').trigger('click')
+    expect(wrapper.find('.app-layout__aside--open').exists()).toBe(false)
+    expect(toggle.attributes('aria-expanded')).toBe('false')
   })
 
   it('renders every section including Usuarios for an admin', async () => {

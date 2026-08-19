@@ -469,6 +469,25 @@ El tema utiliza gradientes y un glow radial en el login. Conviene reservar estos
 - las tablas conservan las columnas y acciones esenciales en pantallas pequeñas;
 - el shell mantiene navegación usable desde 320px de ancho.
 
+### 9.9 Evolución de la sección Análisis
+
+La vista actual de [AnalisisView.vue](frontend/src/views/AnalisisView.vue) muestra productos vendidos, compras de insumos y tendencia financiera, pero todavía mezcla acumulados sin periodo seleccionado. Además, el endpoint `top-insumos` representa compras, no consumo real, porque aún no existe un ledger de producción/consumo.
+
+**Implementado en la primera iteración:**
+
+- mostrar el margen por producto usando el snapshot de costo histórico;
+- renombrar “Insumos más usados” a “Insumos más comprados” para no inducir a error.
+
+**Pendiente como siguiente fase analítica:**
+
+- filtros por periodo y periodo personalizado;
+- comparación contra el periodo anterior;
+- KPIs de ventas, unidades, ticket promedio, margen, gastos y resultado neto;
+- ventas por canal y tasa de anulaciones/devoluciones;
+- ranking separado de volumen, facturación y rentabilidad;
+- cobertura y rotación de inventario;
+- ledger de consumo real de insumos para reemplazar la aproximación por compras.
+
 ---
 
 ## 10. Prioridad P2: arquitectura y mantenimiento

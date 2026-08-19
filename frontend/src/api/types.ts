@@ -18,3 +18,26 @@ export interface TokenResponse {
   token_type: string
   rol: string
 }
+
+export interface AnaliticosPeriodo {
+  desde?: string
+  hasta?: string
+}
+
+export interface AnaliticosResumen {
+  desde: string
+  hasta: string
+  ventas_total: string
+  cantidad_ventas: number
+  unidades_vendidas: string
+  ticket_promedio: string
+  margen_total: string
+  gastos_total: string
+  resultado_neto: string
+  unidades_periodo_anterior: string
+  ticket_periodo_anterior: string
+  ventas_periodo_anterior: string
+  margen_periodo_anterior: string
+  gastos_periodo_anterior: string
+  resultado_periodo_anterior: string
+}

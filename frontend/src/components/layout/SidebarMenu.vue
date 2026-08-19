@@ -25,12 +25,12 @@ const items = computed(() => RoleMenuFilter(auth.role))
 
 /** Exact-path match against the current route for active highlighting. */
 function isActive(path: string): boolean {
-  return route.path === path
+  return route.path === path || route.path.startsWith(`${path}/`)
 }
 </script>
 
 <template>
-  <nav class="sidebar-menu" aria-label="Navegación principal">
+  <nav id="app-navigation" class="sidebar-menu" aria-label="Navegación principal">
     <router-link
       v-for="item in items"
       :key="item.path"
@@ -38,6 +38,7 @@ function isActive(path: string): boolean {
       class="sidebar-menu__item"
       :class="{ 'sidebar-menu__item--active': isActive(item.path) }"
     >
+      <i :class="['pi', item.icon]" aria-hidden="true" />
       {{ item.label }}
     </router-link>
   </nav>
@@ -60,6 +61,28 @@ function isActive(path: string): boolean {
   letter-spacing: 0.08em;
   color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.sidebar-menu__item:focus-visible {
+  outline: 2px solid var(--arpia-primary-soft);
+  outline-offset: -2px;
+}
+
+.sidebar-menu__item .pi {
+  width: 1rem;
+  flex: 0 0 1rem;
+  font-size: 0.9rem;
+  text-align: center;
+  color: var(--arpia-text-muted);
+}
+
+.sidebar-menu__item--active .pi,
+.sidebar-menu__item:hover .pi {
+  color: currentColor;
 }
 
 .sidebar-menu__item:hover {

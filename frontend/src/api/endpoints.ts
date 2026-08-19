@@ -9,7 +9,7 @@
  * Regenerate with: `npm run gen:api` (see package.json).
  */
 import type { paths, components } from '@/types/api.d'
-import type { TokenResponse } from './types'
+import type { AnaliticosPeriodo, AnaliticosResumen, TokenResponse } from './types'
 import { client } from './client'
 
 // --- type helpers over the generated schema --------------------------------
@@ -28,7 +28,7 @@ type Res<Path extends keyof paths, Method extends HttpMethod> =
       ? T2
       : void
 type Query<Path extends keyof paths, Method extends 'get'> =
-  NonNullable<NonNullable<Op<Path, Method>>['parameters']> extends { query: infer T } ? T : never
+  NonNullable<NonNullable<Op<Path, Method>>['parameters']> extends { query?: infer T } ? T : never
 type PathParams<Path extends keyof paths, Method extends HttpMethod> =
   NonNullable<NonNullable<Op<Path, Method>>['parameters']> extends { path: infer T } ? T : never
 
@@ -166,23 +166,26 @@ export const finanzasApi = {
 // --- analiticos -------------------------------------------------------------
 
 export const analiticosApi = {
-  ventasMensuales(): Promise<VentasMensualesRow[]> {
-    return client.get('/analiticos/ventas-mensuales').then((r) => r.data)
+  ventasMensuales(params?: AnaliticosPeriodo): Promise<VentasMensualesRow[]> {
+    return client.get('/analiticos/ventas-mensuales', { params }).then((r) => r.data)
   },
   insumosBajoStock(): Promise<InsumoBajoStock[]> {
     return client.get('/analiticos/insumos-bajo-stock').then((r) => r.data)
   },
-  margenPorProducto(): Promise<MargenProducto[]> {
-    return client.get('/analiticos/margen-por-producto').then((r) => r.data)
+  margenPorProducto(params?: AnaliticosPeriodo): Promise<MargenProducto[]> {
+    return client.get('/analiticos/margen-por-producto', { params }).then((r) => r.data)
   },
-  topProductos(): Promise<TopProducto[]> {
-    return client.get('/analiticos/top-productos').then((r) => r.data)
+  topProductos(params?: AnaliticosPeriodo): Promise<TopProducto[]> {
+    return client.get('/analiticos/top-productos', { params }).then((r) => r.data)
   },
-  topInsumos(): Promise<TopInsumo[]> {
-    return client.get('/analiticos/top-insumos').then((r) => r.data)
+  topInsumos(params?: AnaliticosPeriodo): Promise<TopInsumo[]> {
+    return client.get('/analiticos/top-insumos', { params }).then((r) => r.data)
   },
-  finanzasMensuales(): Promise<FinanzasMensualesRow[]> {
-    return client.get('/analiticos/finanzas-mensuales').then((r) => r.data)
+  finanzasMensuales(params?: AnaliticosPeriodo): Promise<FinanzasMensualesRow[]> {
+    return client.get('/analiticos/finanzas-mensuales', { params }).then((r) => r.data)
+  },
+  resumen(params?: AnaliticosPeriodo): Promise<AnaliticosResumen> {
+    return client.get('/analiticos/resumen', { params }).then((r) => r.data)
   },
 }
 

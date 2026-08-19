@@ -51,3 +51,21 @@ class FinanzasMensualesRead(BaseModel):
     mes: date
     ingresos: Decimal
     gastos: Decimal
+
+
+class AnaliticosResumenRead(BaseModel):
+    desde: date
+    hasta: date
+    ventas_total: Decimal
+    cantidad_ventas: int
+    unidades_vendidas: Decimal
+    ticket_promedio: Decimal
+    margen_total: Decimal
+    gastos_total: Decimal
+    resultado_neto: Decimal
+    unidades_periodo_anterior: Decimal
+    ticket_periodo_anterior: Decimal
+    ventas_periodo_anterior: Decimal
+    margen_periodo_anterior: Decimal
+    gastos_periodo_anterior: Decimal
+    resultado_periodo_anterior: Decimal

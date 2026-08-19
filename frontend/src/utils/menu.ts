@@ -17,21 +17,23 @@ export interface MenuItem {
   path: string
   /** es-CO sidebar label. */
   label: string
+  /** PrimeIcon class used by the responsive navigation. */
+  icon: string
   /** Roles allowed to see this item. */
   roles: MenuRole[]
 }
 
 export const MENU_ITEMS: MenuItem[] = [
-  { name: 'dashboard', path: '/dashboard', label: 'Dashboard', roles: ['admin', 'operador', 'consulta'] },
-  { name: 'analisis', path: '/analisis', label: 'Análisis', roles: ['admin', 'operador', 'consulta'] },
-  { name: 'ventas', path: '/ventas', label: 'Ventas', roles: ['admin', 'operador', 'consulta'] },
-  { name: 'devoluciones', path: '/devoluciones', label: 'Devoluciones', roles: ['admin', 'operador', 'consulta'] },
-  { name: 'finanzas', path: '/finanzas', label: 'Finanzas', roles: ['admin', 'operador', 'consulta'] },
-  { name: 'inventario', path: '/inventario', label: 'Inventario', roles: ['admin', 'operador', 'consulta'] },
-  { name: 'productos', path: '/productos', label: 'Productos', roles: ['admin', 'operador', 'consulta'] },
-  { name: 'maestros', path: '/maestros', label: 'Maestros', roles: ['admin', 'operador', 'consulta'] },
-  { name: 'omisiones', path: '/omisiones', label: 'Omisiones', roles: ['admin', 'operador', 'consulta'] },
-  { name: 'usuarios', path: '/usuarios', label: 'Usuarios', roles: ['admin'] },
+  { name: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: 'pi-chart-bar', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'analisis', path: '/analisis', label: 'Análisis', icon: 'pi-chart-line', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'ventas', path: '/ventas', label: 'Ventas', icon: 'pi-shopping-cart', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'devoluciones', path: '/devoluciones', label: 'Devoluciones', icon: 'pi-replay', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'finanzas', path: '/finanzas', label: 'Finanzas', icon: 'pi-wallet', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'inventario', path: '/inventario', label: 'Inventario', icon: 'pi-box', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'productos', path: '/productos', label: 'Productos', icon: 'pi-tag', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'maestros', path: '/maestros', label: 'Maestros', icon: 'pi-book', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'omisiones', path: '/omisiones', label: 'Omisiones', icon: 'pi-flag', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'usuarios', path: '/usuarios', label: 'Usuarios', icon: 'pi-users', roles: ['admin'] },
 ]
 
 /** Human es-CO role names for the header badge. */

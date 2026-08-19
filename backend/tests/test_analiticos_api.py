@@ -280,6 +280,57 @@ def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
+def test_resumen_periodo_compara_con_periodo_anterior(client, admin_token):
+    """The summary returns current KPIs and the preceding equal-length period."""
+    tipo_id = _make_tipo()
+    producto_id = _make_producto(tipo_id)
+    venta_actual = _insertar_venta(
+        producto_id,
+        datetime(2026, 1, 15, 12, 0, 0),
+        "100",
+        precio="50",
+        costo="20",
+        cantidad="2",
+    )
+    venta_anterior = _insertar_venta(
+        producto_id,
+        datetime(2025, 12, 15, 12, 0, 0),
+        "80",
+        precio="80",
+        costo="50",
+    )
+    gasto_actual = _insertar_movimiento(datetime(2026, 1, 20, 12, 0, 0), "Gasto", "10")
+    gasto_anterior = _insertar_movimiento(datetime(2025, 12, 20, 12, 0, 0), "Gasto", "5")
+    try:
+        resp = client.get(
+            "/api/v1/analiticos/resumen?desde=2026-01-01&hasta=2026-01-31",
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "desde": "2026-01-01",
+            "hasta": "2026-01-31",
+            "ventas_total": "100.0000",
+            "cantidad_ventas": 1,
+            "unidades_vendidas": "2.0000",
+            "ticket_promedio": "100.0000",
+            "margen_total": "60.0000",
+            "gastos_total": "10.0000",
+            "resultado_neto": "50.0000",
+            "unidades_periodo_anterior": "1.0000",
+            "ticket_periodo_anterior": "80.0000",
+            "ventas_periodo_anterior": "80.0000",
+            "margen_periodo_anterior": "30.0000",
+            "gastos_periodo_anterior": "5.0000",
+            "resultado_periodo_anterior": "25.0000",
+        }
+    finally:
+        _cleanup_ventas([venta_actual, venta_anterior])
+        _cleanup_movimientos([gasto_actual, gasto_anterior])
+        _cleanup_producto(producto_id)
+        _cleanup_tipo(tipo_id)
+
+
 # ---------------------------------------------------------------------------
 # ANA-1: monthly sales (exclude anuladas)
 # ---------------------------------------------------------------------------
