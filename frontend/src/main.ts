@@ -30,11 +30,15 @@ app.use(ElementPlus, { locale: es })
 
 // Hybrid dual-registration (MIG-2): Element Plus stays registered through
 // slice 4; PrimeVue runs alongside from slice 0 with the Arpia dark preset
-// (D1/D2 — Aura, 14px-calibrated, dark forced via darkModeSelector 'html'),
-// the es-CO locale (BEH-7), and the Toast/ConfirmDialog services consumed
-// by the App.vue hosts (D4). v-tooltip directive (D8).
+// (D1/D2 - Aura, 14px-calibrated, dark forced via darkModeSelector class
+// '.dark-mode' on <html>; a class selector is required — a bare 'html'
+// type selector has lower specificity than Aura's ':root,:host' light
+// variables, so the dark colorScheme would lose the cascade and text
+// tokens would fall back to the light slate values), the es-CO locale
+// (BEH-7), and the Toast/ConfirmDialog services consumed by the App.vue
+// hosts (D4). v-tooltip directive (D8).
 app.use(PrimeVue, {
-  theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } },
+  theme: { preset: ArpiaPreset, options: { darkModeSelector: '.dark-mode' } },
   locale: esCO,
 })
 app.use(ToastService)

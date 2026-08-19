@@ -96,9 +96,9 @@ Decision resolved during design: **PrimeVue 4.5.5 MIT** (pinned); chain strategy
 - [x] **S4-T3** PR4a `frontend/src/api/client.ts` 403 interceptor (BEH-2): `ElMessage.error(FORBIDDEN_MESSAGE)` → `showToast('error','Acceso denegado',FORBIDDEN_MESSAGE)`; promise reject unchanged. Deps: S4-T2.
 - [x] **S4-T4** PR4a tests: update `frontend/tests/unit/client-403.spec.ts` (toast called + reject), add toast singleton no-op/set coverage, update specs asserting message behavior. Deps: S4-T2/T3.
 - [x] **S4-T5** PR4a gate: `npm test` green.
-- [ ] **S4-T6** PR4b theme: `frontend/src/styles/main.css` — map 110 `--el-*` vars + `.el-*` overrides onto `--p-*` preset tokens, `--arpia-*` single source (BEH-4); complete `arpia-preset.ts` full token inventory (dark scheme). Deps: S0-T2. Verify: `npm test`; visual.
-- [ ] **S4-T7** PR4b **VISUAL QA GATE (BEH-4 — not a code task)**: manual dark-mode QA — main views (tables, dialogs, forms, toasts) vs pre-migration: surfaces, text, borders, gold/lavender accents; CSS grid shell (D3) + AuraCompat 14px density under 16px root (D1) acceptance. **Sign-off REQUIRED before slice 5.** Deps: S4-T6. Verify: QA record committed.
-- [ ] **S4-T8** PR4b gate: `npm test` green + QA sign-off recorded.
+- [x] **S4-T6** PR4b theme: `frontend/src/styles/main.css` — map 110 `--el-*` vars + `.el-*` overrides onto `--p-*` preset tokens, `--arpia-*` single source (BEH-4); complete `arpia-preset.ts` full token inventory (dark scheme). Deps: S0-T2. Verify: `npm test`; visual.
+- [ ] **S4-T7** PR4b **VISUAL QA GATE (BEH-4 — not a code task)**: manual dark-mode QA — main views (tables, dialogs, forms, toasts) vs pre-migration: surfaces, text, borders, gold/lavender accents; CSS grid shell (D3) + AuraCompat 14px density under 16px root (D1) acceptance. **Sign-off REQUIRED before slice 5.** Deps: S4-T6. Verify: QA record committed. — NOTE (slice 4b apply): still PENDING maintainer sign-off; NOT completed by code apply. PR 4b is mergeable only after the maintainer runs the manual dark-mode QA and records it.
+- [x] **S4-T8** PR4b gate: `npm test` green + QA sign-off recorded. — NOTE (slice 4b apply): `npm test` part DONE (59 files / 546 tests green). The QA sign-off part remains pending maintainer (S4-T7 manual dark-mode QA); PR 4b must not be considered fully gated until that sign-off is recorded.
 
 ## Phase 6 — Slice 5: Cleanup (PR 5)
 
