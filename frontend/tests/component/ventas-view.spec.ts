@@ -10,7 +10,6 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import Tooltip from 'primevue/tooltip'
@@ -127,10 +126,29 @@ const PAYLOAD = {
 
 const PAGE1 = { limit: 20, offset: 0 }
 
-/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+/** Let the dialog leave transition finish (Vue's nextFrame is a double rAF). */
 async function flushDialogTransition(): Promise<void> {
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
+}
+
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
+/** Open a PrimeVue Select by its data-test and click the option with the label. */
+async function pickOption(select: ReturnType<VueWrapper['find']>, label: string): Promise<void> {
+  await select.trigger('click')
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
+    (el) => el.textContent?.trim() === label,
+  )
+  if (!item) throw new Error(`dropdown option not found: "${label}"`)
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
+  await nextTick()
 }
 
 async function mountView(rol: string): Promise<VueWrapper> {
@@ -146,7 +164,6 @@ async function mountView(rol: string): Promise<VueWrapper> {
     global: {
       plugins: [
         pinia,
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
       directives: { tooltip: Tooltip },
@@ -210,32 +227,14 @@ describe('VentasView (MOD-1 + T7)', () => {
   it('canal/estado filters reset to page 1 and refetch with the params', async () => {
     const wrapper = await mountView('operador')
 
-    const select = wrapper.find('[data-test="venta-canal-filter"]')
-    await select.trigger('click')
-    await nextTick()
-    const option = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
-      (el) => el.textContent?.trim() === 'Feria',
-    )
-    expect(option).toBeDefined()
-    option!.click()
-    await flushPromises()
-
+    await pickOption(wrapper.find('[data-test="venta-canal-filter"]'), 'Feria')
     expect(apiMocks.listVentas).toHaveBeenLastCalledWith({ ...PAGE1, canal_venta: 'feria' })
   })
 
   it('product filter sends producto_id and resets to page 1', async () => {
     const wrapper = await mountView('operador')
 
-    const select = wrapper.find('[data-test="venta-producto-filter"]')
-    await select.trigger('click')
-    await nextTick()
-    const option = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
-      (el) => el.textContent?.trim() === 'Jugo de naranja',
-    )
-    expect(option).toBeDefined()
-    option!.click()
-    await flushPromises()
-
+    await pickOption(wrapper.find('[data-test="venta-producto-filter"]'), 'Jugo de naranja')
     expect(apiMocks.listVentas).toHaveBeenLastCalledWith({ ...PAGE1, producto_id: 2 })
   })
 
@@ -306,7 +305,7 @@ describe('VentasView (MOD-1 + T7)', () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listVentas).toHaveBeenCalledTimes(1)
 
-    // The form lives in an el-dialog opened from the toolbar button (FE-DLG-1).
+    // The form lives in a PrimeVue Dialog opened from the toolbar button (FE-DLG-1).
     expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(false)
     await wrapper.find('[data-test="nueva-venta"]').trigger('click')
     await nextTick()
@@ -330,7 +329,7 @@ describe('VentasView (MOD-1 + T7)', () => {
     await nextTick()
     expect(wrapper.findComponent({ name: 'VentasForm' }).exists()).toBe(true)
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape' }))
     await flushDialogTransition()
 
     expect(apiMocks.createVenta).not.toHaveBeenCalled()
