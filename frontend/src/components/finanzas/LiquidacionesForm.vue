@@ -10,6 +10,7 @@
  */
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
 
@@ -74,9 +75,9 @@ function submit(): void {
       <span class="form-hint">
         La liquidación se procesa una sola vez y genera un Retiro por socio según su participación.
       </span>
-      <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-liquidacion">
+      <Button type="submit" :loading="saving" data-test="submit-liquidacion">
         Procesar liquidación
-      </el-button>
+      </Button>
     </div>
   </form>
 </template>

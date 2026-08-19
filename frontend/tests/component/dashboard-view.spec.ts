@@ -7,7 +7,7 @@
  * data, and the loading/error/refresh lifecycle.
  *
  * BajoStockTable/MargenTable are PrimeVue DataTables since slice 1c; the
- * el-card/el-alert/el-button shell stays until S2/S3.
+ * el-card/el-row shell stays (el-alert/el-button migrated in slices 2b/3a).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
@@ -151,6 +151,8 @@ describe('DashboardView (DASH-1..3)', () => {
     const wrapper = await mountDashboard()
 
     expect(wrapper.text()).toContain('No se pudo cargar el tablero')
+    // el-alert replaced by PrimeVue Message (slice 3a).
+    expect(wrapper.find('.p-message').exists()).toBe(true)
   })
 
   it('reloads all panels when the refresh button is clicked', async () => {

@@ -11,9 +11,10 @@
  * forms, the confirm dialog and the API calls. The entity's `emptyText`
  * drives the empty state.
  *
- * Migrated to PrimeVue DataTable (lazy) in slice 1c. el-button cells stay
- * until slice 2b.
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. Button cells were
+ * migrated in slice 2b.
  */
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import type { MaestroColumn, MaestroRow } from '@/utils/maestros'
@@ -61,12 +62,12 @@ function columnStyle(column: MaestroColumn): Record<string, string> {
 
     <Column v-if="canEdit" header="Acciones" style="width: 150px" align="center">
       <template #body="{ data: row }">
-        <el-button link type="primary" size="small" data-test="edit-maestro" @click="emit('edit', row)">
+        <Button link size="small" data-test="edit-maestro" @click="emit('edit', row)">
           Editar
-        </el-button>
-        <el-button link type="danger" size="small" data-test="delete-maestro" @click="emit('delete', row)">
+        </Button>
+        <Button text severity="danger" size="small" data-test="delete-maestro" @click="emit('delete', row)">
           Eliminar
-        </el-button>
+        </Button>
       </template>
     </Column>
 

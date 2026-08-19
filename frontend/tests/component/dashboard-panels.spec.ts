@@ -19,10 +19,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { ArpiaPreset } from '@/styles/arpia-preset'
 import esCO from '@/utils/locales/es-CO'
 import BajoStockTable from '@/components/dashboard/BajoStockTable.vue'
+import FinanzasMensualesChart from '@/components/dashboard/FinanzasMensualesChart.vue'
 import KpiCards from '@/components/dashboard/KpiCards.vue'
 import MargenTable from '@/components/dashboard/MargenTable.vue'
 import VentasMensualesChart from '@/components/dashboard/VentasMensualesChart.vue'
-import type { FilledMonthRow, MargenRow } from '@/utils/dashboard'
+import type { FilledMonthRow, FinanzasMonthRow, MargenRow } from '@/utils/dashboard'
 import type { components } from '@/types/api.d'
 
 type InsumoBajoStockRead = components['schemas']['InsumoBajoStockRead']
@@ -129,6 +130,31 @@ describe('VentasMensualesChart (DASH-1)', () => {
 
     expect(wrapper.findComponent(VChartStub).exists()).toBe(false)
     expect(wrapper.text()).toContain('Sin ventas en el período')
+    // el-empty replaced by custom markup (slice 3a, BEH-6).
+    expect(wrapper.find('.chart-empty').exists()).toBe(true)
+  })
+})
+
+describe('FinanzasMensualesChart (ANA-6)', () => {
+  const rows: FinanzasMonthRow[] = [
+    { mes: '2026-01', label: 'ene 2026', ingresos: 1000, gastos: 400 },
+  ]
+
+  it('passes the gap-filled months to ECharts as grouped bars', async () => {
+    const wrapper = await mountPanel(FinanzasMensualesChart, { rows })
+
+    const option = wrapper.findComponent(VChartStub).props('option')
+    expect(option.series[0].data).toEqual([1000])
+    expect(option.series[1].data).toEqual([400])
+    expect(option.legend.data).toEqual(['Ingresos', 'Gastos'])
+  })
+
+  it('shows an empty state instead of the chart when there are no months', async () => {
+    const wrapper = await mountPanel(FinanzasMensualesChart, { rows: [] })
+
+    expect(wrapper.findComponent(VChartStub).exists()).toBe(false)
+    expect(wrapper.text()).toContain('Sin datos en el período')
+    expect(wrapper.find('.chart-empty').exists()).toBe(true)
   })
 })
 

@@ -13,6 +13,7 @@
  */
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 
@@ -106,9 +107,9 @@ function submit(): void {
         </div>
       </div>
       <div class="form-col submit-col" style="--md: 6">
-        <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-compra">
+        <Button type="submit" :loading="saving" data-test="submit-compra">
           Registrar compra
-        </el-button>
+        </Button>
       </div>
     </div>
 

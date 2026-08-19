@@ -13,6 +13,7 @@ import App from './App.vue'
 import { router } from './router'
 import { ArpiaPreset } from './styles/arpia-preset'
 import esCO from './utils/locales/es-CO'
+import 'primeicons/primeicons.css'
 import './styles/main.css'
 
 // Initialize the API client singleton (baseURL from VITE_API_BASE_URL,

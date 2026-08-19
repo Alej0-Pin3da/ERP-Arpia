@@ -9,7 +9,7 @@
  * The view owns the POST (WAC runs server-side) and the two-tab refresh.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus, { ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -49,7 +49,6 @@ async function mountForm(saving = false): Promise<VueWrapper> {
     props: { insumos: INSUMOS, saving },
     global: {
       plugins: [
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
     },

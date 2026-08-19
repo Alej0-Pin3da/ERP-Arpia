@@ -6,11 +6,12 @@
  * severity tag per row (every row is below its minimum by definition; how
  * far below decides Crítico vs Bajo). Row tint follows the same severity.
  *
- * Migrated to PrimeVue DataTable (lazy) in slice 1c. el-tag cells stay until
- * slice 2b.
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. The Tag cell was
+ * migrated in slice 2b.
  */
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import Tag from 'primevue/tag'
 import { formatQty } from '@/utils/format'
 import { stockSeverity, type StockSeverity } from '@/utils/dashboard'
 import type { InsumoBajoStockRead } from '@/types/api.d'
@@ -27,9 +28,9 @@ const SEVERITY_LABEL: Record<Criticality, string> = {
   warning: 'Bajo',
 }
 
-const SEVERITY_TAG: Record<Criticality, 'danger' | 'warning'> = {
+const SEVERITY_TAG: Record<Criticality, 'danger' | 'warn'> = {
   danger: 'danger',
-  warning: 'warning',
+  warning: 'warn',
 }
 
 function criticalityOf(row: InsumoBajoStockRead): Criticality {
@@ -54,9 +55,9 @@ function rowClass(row: InsumoBajoStockRead): string {
     </Column>
     <Column header="Estado" style="width: 110px" align="center">
       <template #body="{ data }">
-        <el-tag :type="SEVERITY_TAG[criticalityOf(data)]" size="small">
+        <Tag :severity="SEVERITY_TAG[criticalityOf(data)]">
           {{ SEVERITY_LABEL[criticalityOf(data)] }}
-        </el-tag>
+        </Tag>
       </template>
     </Column>
 

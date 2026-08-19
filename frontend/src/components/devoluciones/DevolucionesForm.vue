@@ -17,6 +17,7 @@
  */
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
@@ -149,9 +150,9 @@ function submit(): void {
     <div v-if="isParcial" class="items-section">
       <div class="items-header">
         <span>Items a devolver</span>
-        <el-button size="small" type="primary" plain data-test="add-item" @click="addItem">
+        <Button size="small" text data-test="add-item" @click="addItem">
           Agregar item
-        </el-button>
+        </Button>
       </div>
 
       <div v-for="(row, index) in items" :key="index" class="item-row" data-test="devolucion-item">
@@ -197,9 +198,9 @@ function submit(): void {
           data-test="precio-input"
         />
 
-        <el-button size="small" type="danger" plain data-test="remove-item" @click="removeItem(index)">
+        <Button size="small" text severity="danger" data-test="remove-item" @click="removeItem(index)">
           Quitar
-        </el-button>
+        </Button>
       </div>
 
       <p class="price-note">
@@ -209,9 +210,9 @@ function submit(): void {
 
     <div class="form-footer">
       <span class="form-hint">La devolución total anula la venta completa.</span>
-      <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-devolucion">
+      <Button type="submit" :loading="saving" data-test="submit-devolucion">
         Registrar devolución
-      </el-button>
+      </Button>
     </div>
   </form>
 </template>

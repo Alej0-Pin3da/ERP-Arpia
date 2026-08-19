@@ -27,9 +27,16 @@ import MovimientosForm from '@/components/finanzas/MovimientosForm.vue'
 import MovimientosTable from '@/components/finanzas/MovimientosTable.vue'
 import SociosForm from '@/components/finanzas/SociosForm.vue'
 import SociosTable from '@/components/finanzas/SociosTable.vue'
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
 import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/utils/format'
 import { buildListParams } from '@/utils/pagination'
@@ -354,20 +361,21 @@ onMounted(load)
   <section class="finanzas">
     <header class="finanzas-header">
       <h2>Finanzas</h2>
-      <el-button :loading="loading" data-test="refresh-finanzas" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-finanzas" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="finanzas-error"
-    />
+    <div v-if="error" class="finanzas-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
-    <el-tabs v-model="activeTab">
-      <el-tab-pane label="Movimientos" name="movimientos">
+    <Tabs v-model:value="activeTab">
+      <TabList>
+        <Tab value="movimientos">Movimientos</Tab>
+        <Tab v-if="canRegister" value="liquidaciones">Liquidaciones</Tab>
+        <Tab value="socios">Socios</Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="movimientos">
         <div class="finanzas-toolbar">
           <el-select
             v-model="filterTipo"
@@ -380,9 +388,9 @@ onMounted(load)
             <el-option label="Inversión" value="Inversion" />
             <el-option label="Retiro" value="Retiro" />
           </el-select>
-          <el-button v-if="canRegister" type="primary" data-test="nuevo-movimiento" @click="openCreateMovimiento">
+          <Button v-if="canRegister" data-test="nuevo-movimiento" @click="openCreateMovimiento">
             Nuevo movimiento
-          </el-button>
+          </Button>
         </div>
         <MovimientosTable
           :rows="movimientoRows"
@@ -421,9 +429,9 @@ onMounted(load)
             @submit="submitMovimiento"
           />
         </el-dialog>
-      </el-tab-pane>
+      </TabPanel>
 
-      <el-tab-pane v-if="canRegister" label="Liquidaciones" name="liquidaciones">
+      <TabPanel v-if="canRegister" value="liquidaciones">
         <LiquidacionesForm :saving="savingLiquidacion" @submit="onCreateLiquidacion" />
 
         <div v-if="liquidacionRows.length > 0" class="liquidacion-result" data-test="liquidacion-result">
@@ -435,13 +443,13 @@ onMounted(load)
             </Column>
           </DataTable>
         </div>
-      </el-tab-pane>
+      </TabPanel>
 
-      <el-tab-pane label="Socios" name="socios">
+      <TabPanel value="socios">
         <div class="socios-toolbar">
-          <el-button v-if="canRegister" type="primary" data-test="nuevo-socio" @click="openCreateSocio">
+          <Button v-if="canRegister" data-test="nuevo-socio" @click="openCreateSocio">
             Nuevo socio
-          </el-button>
+          </Button>
         </div>
         <SociosTable
           :rows="socios"
@@ -477,8 +485,9 @@ onMounted(load)
             @submit="submitSocio"
           />
         </el-dialog>
-      </el-tab-pane>
-    </el-tabs>
+      </TabPanel>
+      </TabPanels>
+    </Tabs>
   </section>
 </template>
 

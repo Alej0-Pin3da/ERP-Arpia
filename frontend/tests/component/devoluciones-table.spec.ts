@@ -12,7 +12,6 @@
  * slice 2b.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { describe, expect, it } from 'vitest'
@@ -51,7 +50,6 @@ async function mountTable(rows: DevolucionRow[], loading = false): Promise<VueWr
     props: { rows, loading },
     global: {
       plugins: [
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
     },

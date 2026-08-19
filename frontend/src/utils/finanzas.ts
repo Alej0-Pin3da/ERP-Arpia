@@ -49,13 +49,13 @@ export function tipoMovimientoLabel(tipo: string): string {
 }
 
 /**
- * el-tag type per movement type: Gasto danger (money out), Inversion primary
- * (capital in), Retiro warning (partner payout).
+ * PrimeVue Tag severity per movement type: Gasto danger (money out),
+ * Inversion primary (capital in), Retiro warn (partner payout).
  */
-export function tipoMovimientoTagType(tipo: string): 'success' | 'warning' | 'danger' | 'info' | 'primary' {
+export function tipoMovimientoTagType(tipo: string): 'success' | 'warn' | 'danger' | 'info' | 'primary' {
   if (tipo === 'Gasto') return 'danger'
   if (tipo === 'Inversion') return 'primary'
-  if (tipo === 'Retiro') return 'warning'
+  if (tipo === 'Retiro') return 'warn'
   return 'info'
 }
 

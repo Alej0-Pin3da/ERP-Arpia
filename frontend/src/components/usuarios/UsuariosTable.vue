@@ -9,11 +9,13 @@
  * DELETE /usuarios/{self} with 400 "Cannot delete your own user"). The view
  * owns the edit form and the API calls.
  *
- * Migrated to PrimeVue DataTable (lazy) in slice 1c. el-tag/el-button cells
- * stay until slice 2b.
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. Tag/Button cells were
+ * migrated in slice 2b.
  */
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import Tag from 'primevue/tag'
 import { roleLabel } from '@/utils/menu'
 import { rolTagType } from '@/utils/usuarios'
 import type { UsuarioRead } from '@/types/api.d'
@@ -39,24 +41,24 @@ function isSelf(row: UsuarioRead): boolean {
     <Column field="email" header="Email" style="min-width: 220px" />
     <Column field="rol" header="Rol" style="width: 150px" align="center">
       <template #body="{ data }">
-        <el-tag :type="rolTagType(data.rol)" size="small">{{ roleLabel(data.rol) }}</el-tag>
+        <Tag :severity="rolTagType(data.rol)">{{ roleLabel(data.rol) }}</Tag>
       </template>
     </Column>
     <Column header="Acciones" style="width: 150px" align="center">
       <template #body="{ data: row }">
-        <el-button link type="primary" size="small" data-test="edit-usuario" @click="emit('edit', row)">
+        <Button link size="small" data-test="edit-usuario" @click="emit('edit', row)">
           Editar
-        </el-button>
-        <el-button
+        </Button>
+        <Button
           v-if="!isSelf(row)"
-          link
-          type="danger"
+          text
+          severity="danger"
           size="small"
           data-test="delete-usuario"
           @click="emit('delete', row)"
         >
           Eliminar
-        </el-button>
+        </Button>
       </template>
     </Column>
 

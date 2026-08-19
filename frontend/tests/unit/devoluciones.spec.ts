@@ -68,9 +68,9 @@ describe('devoluciones mappers (MOD-2)', () => {
     expect(tipoLabel('extra')).toBe('extra')
   })
 
-  it('tipoTagType colors total danger, parcial warning, unknown info', () => {
+  it('tipoTagType colors total danger, parcial warn, unknown info', () => {
     expect(tipoTagType('total')).toBe('danger')
-    expect(tipoTagType('parcial')).toBe('warning')
+    expect(tipoTagType('parcial')).toBe('warn')
     expect(tipoTagType('extra')).toBe('info')
   })
 

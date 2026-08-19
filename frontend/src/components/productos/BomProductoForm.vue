@@ -11,6 +11,7 @@
  */
 import { computed, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 
@@ -101,9 +102,9 @@ function onSubmit(): void {
         </div>
       </div>
       <div class="form-col submit-col" style="--md: 24">
-        <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-bom-producto">
+        <Button type="submit" :loading="saving" data-test="submit-bom-producto">
           {{ submitLabel }}
-        </el-button>
+        </Button>
       </div>
     </div>
   </form>

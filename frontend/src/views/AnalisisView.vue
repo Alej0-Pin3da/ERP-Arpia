@@ -15,8 +15,10 @@ import { computed, onMounted, ref } from 'vue'
 
 import { analiticosApi, productosApi } from '@/api/endpoints'
 import FinanzasMensualesChart from '@/components/dashboard/FinanzasMensualesChart.vue'
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import Message from 'primevue/message'
 import { fillFinanzasMonths, type FinanzasMonthRow } from '@/utils/dashboard'
 import { formatMoney, parseDecimal } from '@/utils/format'
 import type {
@@ -75,17 +77,12 @@ onMounted(load)
   <section class="analisis">
     <header class="analisis-header">
       <h2>Análisis</h2>
-      <el-button :loading="loading" data-test="refresh-analisis" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-analisis" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="analisis-error"
-    />
+    <div v-if="error" class="analisis-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
     <el-row :gutter="16">
       <el-col :xs="24" :md="12">

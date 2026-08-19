@@ -14,6 +14,7 @@
  */
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 
 import type { MaestroField, MaestroRow } from '@/utils/maestros'
@@ -89,9 +90,9 @@ function submit(): void {
       </div>
     </div>
     <div class="submit-row">
-      <el-button type="primary" native-type="submit" :loading="saving" data-test="submit-maestro">
+      <Button type="submit" :loading="saving" data-test="submit-maestro">
         {{ mode === 'edit' ? 'Guardar cambios' : `Crear ${singular}` }}
-      </el-button>
+      </Button>
     </div>
   </form>
 </template>

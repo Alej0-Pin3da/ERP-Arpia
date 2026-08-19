@@ -15,7 +15,6 @@
  * slice 2b.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
 import DataTable from 'primevue/datatable'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -58,7 +57,6 @@ async function mountTable(canEdit = true, rows: ProductoRow[] = ROWS): Promise<V
     props: { rows, loading: false, canEdit },
     global: {
       plugins: [
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
     },

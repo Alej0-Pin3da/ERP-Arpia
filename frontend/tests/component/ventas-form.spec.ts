@@ -12,10 +12,10 @@
  *
  * Migrated to PrimeVue (slice 2a): dropdown options are `.p-select-option`
  * (teleported to body), input-number commits on blur, ToggleSwitch toggles
- * through its inner checkbox. el-button stays Element Plus until S2b.
+ * through its inner checkbox. el-button migrated to PrimeVue in slice 2b.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus, { ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -128,7 +128,6 @@ async function mountForm(saving = false): Promise<VueWrapper> {
     props: { productos: PRODUCTOS, clientes: CLIENTES, loadVariantes, saving },
     global: {
       plugins: [
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
     },
@@ -149,7 +148,6 @@ async function mountEditForm(initial: VentaRead = VENTA_EDIT): Promise<VueWrappe
     },
     global: {
       plugins: [
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
     },

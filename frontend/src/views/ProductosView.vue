@@ -20,7 +20,14 @@ import ProductoForm from '@/components/productos/ProductoForm.vue'
 import ProductosTable from '@/components/productos/ProductosTable.vue'
 import VarianteForm from '@/components/productos/VarianteForm.vue'
 import VariantesTable from '@/components/productos/VariantesTable.vue'
+import Button from 'primevue/button'
+import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
 import { useProductosBom } from '@/composables/useProductosBom'
 import { useProductosCatalog } from '@/composables/useProductosCatalog'
 import { useProductosCosto } from '@/composables/useProductosCosto'
@@ -77,20 +84,21 @@ onMounted(load)
   <section class="productos">
     <header class="productos-header">
       <h2>Productos</h2>
-      <el-button :loading="loading" data-test="refresh-productos" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-productos" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="productos-error"
-    />
+    <div v-if="error" class="productos-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
-    <el-tabs v-model="activeTab">
-      <el-tab-pane label="Productos" name="productos">
+    <Tabs v-model:value="activeTab">
+      <TabList>
+        <Tab value="productos">Productos</Tab>
+        <Tab value="bom">BOM</Tab>
+        <Tab value="costo">Costo</Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="productos">
         <div class="producto-toolbar">
           <el-input
             v-model="productoQ"
@@ -111,9 +119,9 @@ onMounted(load)
           >
             <el-option v-for="t in tipos" :key="t.id" :label="t.nombre" :value="t.id" />
           </el-select>
-          <el-button v-if="canManage" type="primary" data-test="nuevo-producto" @click="openCreateProducto">
+          <Button v-if="canManage" data-test="nuevo-producto" @click="openCreateProducto">
             Nuevo producto
-          </el-button>
+          </Button>
         </div>
 
         <ProductosTable
@@ -157,12 +165,12 @@ onMounted(load)
           <header class="variantes-header">
             <h3>Variantes de {{ selectedProducto.nombre }}</h3>
             <div class="variantes-actions">
-              <el-button v-if="canManage" size="small" type="primary" data-test="nueva-variante" @click="openCreateVariante">
+              <Button v-if="canManage" size="small" data-test="nueva-variante" @click="openCreateVariante">
                 Nueva variante
-              </el-button>
-              <el-button size="small" data-test="close-variantes" @click="selectedProducto = null">
+              </Button>
+              <Button size="small" severity="secondary" data-test="close-variantes" @click="selectedProducto = null">
                 Cerrar
-              </el-button>
+              </Button>
             </div>
           </header>
 
@@ -192,9 +200,9 @@ onMounted(load)
             />
           </el-dialog>
         </div>
-      </el-tab-pane>
+      </TabPanel>
 
-      <el-tab-pane label="BOM" name="bom">
+      <TabPanel value="bom">
         <div class="bom-select">
           <el-select
             v-model="bomProductoId"
@@ -213,15 +221,14 @@ onMounted(load)
           <section class="bom-subsection">
             <header class="bom-subsection-header">
               <h3>Insumos</h3>
-              <el-button
+              <Button
                 v-if="canManage"
                 size="small"
-                type="primary"
                 data-test="nueva-linea-insumo"
                 @click="openCreateBomInsumo"
               >
                 Nueva línea
-              </el-button>
+              </Button>
             </header>
             <BomInsumosTable
               :rows="bomInsumoRows"
@@ -254,15 +261,14 @@ onMounted(load)
           <section class="bom-subsection">
             <header class="bom-subsection-header">
               <h3>Productos del combo</h3>
-              <el-button
+              <Button
                 v-if="canManage"
                 size="small"
-                type="primary"
                 data-test="nueva-linea-combo"
                 @click="openCreateBomProducto"
               >
                 Nueva línea
-              </el-button>
+              </Button>
             </header>
             <BomProductosTable
               :rows="bomProductoRows"
@@ -292,9 +298,9 @@ onMounted(load)
             </el-dialog>
           </section>
         </template>
-      </el-tab-pane>
+      </TabPanel>
 
-      <el-tab-pane label="Costo" name="costo">
+      <TabPanel value="costo">
         <div class="costo-selects">
           <el-select
             v-model="costoProductoId"
@@ -321,8 +327,9 @@ onMounted(load)
         </div>
 
         <CostoTree :tree="costoTree" :loading="costoLoading" />
-      </el-tab-pane>
-    </el-tabs>
+      </TabPanel>
+      </TabPanels>
+    </Tabs>
   </section>
 </template>
 

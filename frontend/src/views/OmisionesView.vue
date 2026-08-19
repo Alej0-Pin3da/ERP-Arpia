@@ -17,6 +17,8 @@ import { ElMessage } from 'element-plus'
 
 import { omisionesApi } from '@/api/endpoints'
 import OmisionesTable from '@/components/omisiones/OmisionesTable.vue'
+import Button from 'primevue/button'
+import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
@@ -98,17 +100,12 @@ onMounted(load)
   <section class="omisiones">
     <header class="omisiones-header">
       <h2>Omisiones de migración</h2>
-      <el-button :loading="loading" data-test="refresh-omisiones" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-omisiones" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="omisiones-error"
-    />
+    <div v-if="error" class="omisiones-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
     <div class="omisiones-toolbar">
       <el-input

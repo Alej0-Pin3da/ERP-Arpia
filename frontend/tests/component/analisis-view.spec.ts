@@ -123,5 +123,7 @@ describe('AnalisisView (ANA-4..6)', () => {
     const wrapper = await mountView()
 
     expect(wrapper.text()).toContain('No se pudo cargar el análisis')
+    // el-alert replaced by PrimeVue Message (slice 3a).
+    expect(wrapper.find('.p-message').exists()).toBe(true)
   })
 })

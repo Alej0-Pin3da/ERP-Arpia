@@ -17,6 +17,8 @@ import { ElMessage } from 'element-plus'
 import { devolucionesApi, productosApi } from '@/api/endpoints'
 import DevolucionesForm from '@/components/devoluciones/DevolucionesForm.vue'
 import DevolucionesTable from '@/components/devoluciones/DevolucionesTable.vue'
+import Button from 'primevue/button'
+import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
@@ -134,17 +136,12 @@ onMounted(load)
   <section class="devoluciones">
     <header class="devoluciones-header">
       <h2>Devoluciones</h2>
-      <el-button :loading="loading" data-test="refresh-devoluciones" @click="load">Actualizar</el-button>
+      <Button :loading="loading" data-test="refresh-devoluciones" @click="load">Actualizar</Button>
     </header>
 
-    <el-alert
-      v-if="error"
-      type="error"
-      :title="error"
-      show-icon
-      :closable="false"
-      class="devoluciones-error"
-    />
+    <div v-if="error" class="devoluciones-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    </div>
 
     <div class="filters" data-test="filters">
       <el-input-number
@@ -172,11 +169,11 @@ onMounted(load)
         class="filter-field"
         data-test="filtro-hasta"
       />
-      <el-button type="primary" plain data-test="apply-filters" @click="applyFilters">Filtrar</el-button>
-      <el-button data-test="clear-filters" @click="clearFilters">Limpiar</el-button>
-      <el-button v-if="canRegister" type="primary" data-test="nueva-devolucion" @click="openCreateDevolucion">
+      <Button text data-test="apply-filters" @click="applyFilters">Filtrar</Button>
+      <Button severity="secondary" data-test="clear-filters" @click="clearFilters">Limpiar</Button>
+      <Button v-if="canRegister" data-test="nueva-devolucion" @click="openCreateDevolucion">
         Nueva devolución
-      </el-button>
+      </Button>
     </div>
 
     <el-tabs v-model="activeTab">

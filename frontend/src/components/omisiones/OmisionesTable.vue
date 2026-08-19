@@ -7,11 +7,13 @@
  * ONLY when the view grants it (admin-only, D9 — the PATCH endpoint is
  * require_admin server-side; the UI is the read-side mirror).
  *
- * Migrated to PrimeVue DataTable (lazy) in slice 1c. el-tag/el-button cells
- * stay until slice 2b.
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. Tag/Button cells were
+ * migrated in slice 2b.
  */
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import Tag from 'primevue/tag'
 import type { OmisionRead } from '@/types/api.d'
 
 defineProps<{
@@ -34,24 +36,24 @@ const emit = defineEmits<{ toggle: [row: OmisionRead] }>()
     <Column field="celda" header="Celda" style="width: 90px" align="center" />
     <Column header="Nivel" style="width: 100px" align="center">
       <template #body="{ data }">
-        <el-tag :type="data.nivel === 'ERROR' ? 'danger' : 'warning'" size="small">
+        <Tag :severity="data.nivel === 'ERROR' ? 'danger' : 'warn'">
           {{ data.nivel }}
-        </el-tag>
+        </Tag>
       </template>
     </Column>
     <Column field="mensaje" header="Mensaje" style="min-width: 260px" />
     <Column header="Resuelta" style="width: 110px" align="center">
       <template #body="{ data }">
-        <el-tag :type="data.resuelta ? 'success' : 'info'" size="small">
+        <Tag :severity="data.resuelta ? 'success' : 'info'">
           {{ data.resuelta ? 'Sí' : 'No' }}
-        </el-tag>
+        </Tag>
       </template>
     </Column>
     <Column v-if="canResolve" header="Acciones" style="width: 150px" align="center">
       <template #body="{ data: row }">
-        <el-button link type="primary" size="small" data-test="toggle-omision" @click="emit('toggle', row)">
+        <Button link size="small" data-test="toggle-omision" @click="emit('toggle', row)">
           {{ row.resuelta ? 'Reabrir' : 'Marcar resuelta' }}
-        </el-button>
+        </Button>
       </template>
     </Column>
 
