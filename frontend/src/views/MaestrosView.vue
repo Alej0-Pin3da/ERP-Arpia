@@ -30,6 +30,8 @@ import {
 import MaestroForm from '@/components/maestros/MaestroForm.vue'
 import MaestrosTable from '@/components/maestros/MaestrosTable.vue'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import Tab from 'primevue/tab'
@@ -95,7 +97,7 @@ const saving = ref<Record<EntityKey, boolean>>({
   'tipos-producto': false,
   'categorias-insumos': false,
 })
-/** T8/FE-DLG-1: one el-dialog per entity, opened from the toolbar button. */
+/** T8/FE-DLG-1: one PrimeVue Dialog per entity, opened from the toolbar. */
 const dialogVisible = ref<Record<EntityKey, boolean>>({
   clientes: false,
   'tipos-producto': false,
@@ -176,6 +178,13 @@ async function load(): Promise<void> {
 /** FE-2: a busqueda change resets that entity's table to page 1 and refetches. */
 function onSearch(entityKey: EntityKey): void {
   pages.value[entityKey] = 1
+  load()
+}
+
+/** Paginator @page: recompute the entity's 1-based page from the 0-based
+ *  first index (typed handler; the template passes $event + the key). */
+function onEntityPage(e: { first: number; rows: number }, entityKey: EntityKey): void {
+  pages.value[entityKey] = Math.floor(e.first / e.rows) + 1
   load()
 }
 
@@ -298,14 +307,12 @@ onMounted(load)
       <TabPanels>
         <TabPanel v-for="entity in MAESTRO_ENTITIES" :key="entity.key" :value="entity.key">
         <div class="maestro-toolbar">
-          <el-input
+          <InputText
             v-model="searchQ[entity.key]"
-            clearable
             :placeholder="`Buscar ${entity.singular.toLowerCase()}…`"
             :data-test="`maestro-search-${entity.key}`"
             class="maestro-search"
             @keyup.enter="onSearch(entity.key)"
-            @clear="onSearch(entity.key)"
           />
           <Button
             v-if="canManage"
@@ -331,17 +338,19 @@ onMounted(load)
           :rows="pageSize"
           :first="(pages[entity.key] - 1) * pageSize"
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="(e: { first: number; rows: number }) => { pages[entity.key] = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onEntityPage($event, entity.key)"
         />
 
-        <el-dialog
-          v-model="dialogVisible[entity.key]"
-          :title="editing[entity.key] === null ? `Crear ${entity.singular}` : `Editar ${entity.singular}`"
-          :close-on-click-modal="false"
-          :close-on-press-escape="!saving[entity.key]"
-          :show-close="!saving[entity.key]"
-          width="560px"
-          @closed="resetDialog(entity.key)"
+        <Dialog
+          v-model:visible="dialogVisible[entity.key]"
+          :header="editing[entity.key] === null ? `Crear ${entity.singular}` : `Editar ${entity.singular}`"
+          modal
+          position="top"
+          style="width: 560px"
+          :dismissable-mask="false"
+          :close-on-escape="!saving[entity.key]"
+          :closable="!saving[entity.key]"
+          @after-hide="resetDialog(entity.key)"
         >
           <MaestroForm
             v-if="dialogVisible[entity.key]"
@@ -352,7 +361,7 @@ onMounted(load)
             :saving="saving[entity.key]"
             @submit="(values) => submitEntity(entity.key, values)"
           />
-        </el-dialog>
+        </Dialog>
       </TabPanel>
       </TabPanels>
     </Tabs>

@@ -7,8 +7,8 @@
  * user's own row ("can't delete self" — the backend also rejects it with
  * 400 "Cannot delete your own user").
  *
- * Migrated to PrimeVue DataTable (lazy) in slice 1c. el-tag/el-button cells
- * el-button cells migrated to PrimeVue in slice 2b.
+ * Migrated to PrimeVue DataTable (lazy) in slice 1c. Element Plus was fully
+ * dropped in slice 5 (MIG-2).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import DataTable from 'primevue/datatable'

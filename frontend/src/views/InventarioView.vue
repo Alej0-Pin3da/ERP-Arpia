@@ -24,8 +24,11 @@ import ComprasTable from '@/components/inventario/ComprasTable.vue'
 import InsumoForm from '@/components/inventario/InsumoForm.vue'
 import InsumosTable from '@/components/inventario/InsumosTable.vue'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
+import Select from 'primevue/select'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
@@ -85,7 +88,7 @@ const savingCompra = ref(false)
 const savingInsumo = ref(false)
 const editingInsumo = ref<InsumoRead | null>(null)
 
-/** T8/FE-DLG-1: the forms live in el-dialog at the usage site. */
+/** T8/FE-DLG-1: the forms live in PrimeVue Dialogs at the usage site. */
 const insumoDialogVisible = ref(false)
 const comprasDialogVisible = ref(false)
 
@@ -166,6 +169,18 @@ function onComprasSearch(): void {
 
 function onComprasFilterChange(): void {
   comprasPage.value = 1
+  load()
+}
+
+/** Paginator @page (insumos): recompute the 1-based page from first index. */
+function onInsumosPage(e: { first: number; rows: number }): void {
+  insumosPage.value = Math.floor(e.first / e.rows) + 1
+  load()
+}
+
+/** Paginator @page (compras): recompute the 1-based page from first index. */
+function onComprasPage(e: { first: number; rows: number }): void {
+  comprasPage.value = Math.floor(e.first / e.rows) + 1
   load()
 }
 
@@ -312,25 +327,25 @@ onMounted(load)
       <TabPanels>
         <TabPanel value="insumos">
         <div class="insumo-toolbar">
-          <el-input
+          <InputText
             v-model="insumoQ"
-            clearable
             placeholder="Buscar insumo…"
             data-test="insumo-search"
             class="insumo-search"
             @keyup.enter="onInsumosSearch"
-            @clear="onInsumosSearch"
           />
-          <el-select
+          <Select
             v-model="filterCategoriaId"
-            clearable
-            filterable
+            :options="categorias"
+            optionLabel="nombre"
+            optionValue="id"
             placeholder="Filtrar por categoría"
+            filter
+            :show-clear="true"
             data-test="insumo-categoria-filter"
+            class="insumo-categoria-filter"
             @change="onInsumosFilterChange"
-          >
-            <el-option v-for="c in categorias" :key="c.id" :label="c.nombre" :value="c.id" />
-          </el-select>
+          />
           <Button v-if="canManage" data-test="nuevo-insumo" @click="openCreateInsumo">
             Nuevo insumo
           </Button>
@@ -352,17 +367,19 @@ onMounted(load)
           :rows="insumosPageSize"
           :first="(insumosPage - 1) * insumosPageSize"
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="(e: { first: number; rows: number }) => { insumosPage = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onInsumosPage"
         />
 
-        <el-dialog
-          v-model="insumoDialogVisible"
-          :title="editingInsumo === null ? 'Crear insumo' : 'Editar insumo'"
-          :close-on-click-modal="false"
-          :close-on-press-escape="!savingInsumo"
-          :show-close="!savingInsumo"
-          width="720px"
-          @closed="resetInsumoDialog"
+        <Dialog
+          v-model:visible="insumoDialogVisible"
+          :header="editingInsumo === null ? 'Crear insumo' : 'Editar insumo'"
+          modal
+          position="top"
+          style="width: 720px"
+          :dismissable-mask="false"
+          :close-on-escape="!savingInsumo"
+          :closable="!savingInsumo"
+          @after-hide="resetInsumoDialog"
         >
           <InsumoForm
             v-if="insumoDialogVisible"
@@ -372,30 +389,30 @@ onMounted(load)
             :saving="savingInsumo"
             @submit="submitInsumo"
           />
-        </el-dialog>
+        </Dialog>
       </TabPanel>
 
       <TabPanel value="compras">
         <div class="compras-filtro">
-          <el-input
+          <InputText
             v-model="compraQ"
-            clearable
             placeholder="Buscar por insumo…"
             data-test="compra-search"
             class="compra-search"
             @keyup.enter="onComprasSearch"
-            @clear="onComprasSearch"
           />
-          <el-select
+          <Select
             v-model="filterInsumoId"
-            clearable
-            filterable
+            :options="insumosLookup"
+            optionLabel="nombre"
+            optionValue="id"
             placeholder="Filtrar por insumo"
+            filter
+            :show-clear="true"
             data-test="compra-filter-select"
+            class="compra-filter-select"
             @change="onComprasFilterChange"
-          >
-            <el-option v-for="i in insumosLookup" :key="i.id" :label="i.nombre" :value="i.id" />
-          </el-select>
+          />
           <Button v-if="canRegister" data-test="nueva-compra" @click="openCreateCompra">
             Nueva compra
           </Button>
@@ -414,16 +431,18 @@ onMounted(load)
           :rows="comprasPageSize"
           :first="(comprasPage - 1) * comprasPageSize"
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="(e: { first: number; rows: number }) => { comprasPage = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onComprasPage"
         />
 
-        <el-dialog
-          v-model="comprasDialogVisible"
-          title="Nueva compra"
-          :close-on-click-modal="false"
-          :close-on-press-escape="!savingCompra"
-          :show-close="!savingCompra"
-          width="720px"
+        <Dialog
+          v-model:visible="comprasDialogVisible"
+          header="Nueva compra"
+          modal
+          position="top"
+          style="width: 720px"
+          :dismissable-mask="false"
+          :close-on-escape="!savingCompra"
+          :closable="!savingCompra"
         >
           <ComprasForm
             v-if="comprasDialogVisible"
@@ -431,7 +450,7 @@ onMounted(load)
             :saving="savingCompra"
             @submit="onCreateCompra"
           />
-        </el-dialog>
+        </Dialog>
       </TabPanel>
       </TabPanels>
     </Tabs>
@@ -467,7 +486,8 @@ onMounted(load)
   width: 14rem;
 }
 
-.compras-filtro .el-select {
+.insumo-categoria-filter,
+.compra-filter-select {
   width: 12rem;
 }
 

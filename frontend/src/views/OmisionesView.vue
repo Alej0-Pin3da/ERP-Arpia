@@ -11,14 +11,20 @@
  *
  * The presentational pattern is intact: the view owns page/filtros state,
  * calls the API, and passes rows down to OmisionesTable.
+ *
+ * Slice 5 (MIG-2): toolbar el-input/el-select migrated to PrimeVue
+ * InputText/Select (InputText has no clear icon — clear via select-all +
+ * delete, then Enter, matching the migrated form convention).
  */
 import { computed, onMounted, ref } from 'vue'
 
 import { omisionesApi } from '@/api/endpoints'
 import OmisionesTable from '@/components/omisiones/OmisionesTable.vue'
 import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
+import Select from 'primevue/select'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
 import { showToast } from '@/utils/toast'
@@ -41,6 +47,15 @@ const filterFase = ref('')
 const filterNivel = ref<'WARN' | 'ERROR' | null>(null)
 const filterHoja = ref('')
 const filterResuelta = ref<boolean | null>(null)
+
+const nivelOptions = [
+  { label: 'WARN', value: 'WARN' },
+  { label: 'ERROR', value: 'ERROR' },
+]
+const resueltaOptions = [
+  { label: 'Sí', value: true },
+  { label: 'No', value: false },
+]
 
 async function load(): Promise<void> {
   loading.value = true
@@ -79,6 +94,12 @@ function onFilterChange(): void {
   load()
 }
 
+/** Paginator @page: recompute the 1-based page from the 0-based first index. */
+function onPage(e: { first: number; rows: number }): void {
+  page.value = Math.floor(e.first / e.rows) + 1
+  load()
+}
+
 /** MIG-4: marca/desmarca resuelta (admin-only, D9). */
 async function onToggleResuelta(row: OmisionRead): Promise<void> {
   try {
@@ -108,55 +129,49 @@ onMounted(load)
     </div>
 
     <div class="omisiones-toolbar">
-      <el-input
+      <InputText
         v-model="searchQ"
-        clearable
         placeholder="Buscar en mensaje…"
         data-test="omision-search"
         class="omision-search"
         @keyup.enter="onSearch"
-        @clear="onSearch"
       />
-      <el-input
+      <InputText
         v-model="filterFase"
-        clearable
         placeholder="Fase (F1…F7)"
         data-test="omision-fase-filter"
         class="omision-fase"
         @keyup.enter="onFilterChange"
-        @clear="onFilterChange"
       />
-      <el-select
+      <Select
         v-model="filterNivel"
-        clearable
+        :options="nivelOptions"
+        optionLabel="label"
+        optionValue="value"
         placeholder="Nivel"
+        :show-clear="true"
         data-test="omision-nivel-filter"
         class="omision-nivel"
         @change="onFilterChange"
-      >
-        <el-option label="WARN" value="WARN" />
-        <el-option label="ERROR" value="ERROR" />
-      </el-select>
-      <el-input
+      />
+      <InputText
         v-model="filterHoja"
-        clearable
         placeholder="Hoja"
         data-test="omision-hoja-filter"
         class="omision-hoja"
         @keyup.enter="onFilterChange"
-        @clear="onFilterChange"
       />
-      <el-select
+      <Select
         v-model="filterResuelta"
-        clearable
+        :options="resueltaOptions"
+        optionLabel="label"
+        optionValue="value"
         placeholder="Resuelta"
+        :show-clear="true"
         data-test="omision-resuelta-filter"
         class="omision-resuelta"
         @change="onFilterChange"
-      >
-        <el-option label="Sí" :value="true" />
-        <el-option label="No" :value="false" />
-      </el-select>
+      />
     </div>
 
     <OmisionesTable :rows="omisiones" :loading="loading" :can-resolve="canResolve" @toggle="onToggleResuelta" />
@@ -166,7 +181,7 @@ onMounted(load)
       :rows="pageSize"
       :first="(page - 1) * pageSize"
       template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-      @page="(e: { first: number; rows: number }) => { page = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onPage"
     />
   </section>
 </template>

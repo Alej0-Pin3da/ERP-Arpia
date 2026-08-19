@@ -97,7 +97,7 @@ function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
   display: block;
   margin-bottom: 0.25rem;
   font-size: 0.9rem;
-  color: var(--el-text-color-regular);
+  color: var(--arpia-text-regular);
 }
 
 .socios-progress-bar {
@@ -115,7 +115,7 @@ function onDataTableSort(s: { sortField?: string; sortOrder?: number }): void {
 }
 
 .socio-empty {
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   padding: 2rem 0;
   text-align: center;
 }

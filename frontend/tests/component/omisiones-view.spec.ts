@@ -12,11 +12,11 @@
  *    refreshes; consulta sees NO action button
  *  - network error renders the error state (FE-3); empty renders the
  *    DataTable #empty template
- * OmisionesTable migrated to PrimeVue DataTable in slice 1c.
+ * OmisionesTable migrated to PrimeVue DataTable in slice 1c; the toolbar
+ * filters (InputText + Select) migrated in slice 5 (MIG-2).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -86,7 +86,6 @@ async function mountView(rol = 'admin'): Promise<VueWrapper> {
     global: {
       plugins: [
         pinia,
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
     },
@@ -95,6 +94,25 @@ async function mountView(rol = 'admin'): Promise<VueWrapper> {
   await flushPromises()
   await flushPromises()
   return wrapper
+}
+
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
+/** Open a PrimeVue Select by its data-test and click the option with the label. */
+async function pickOption(select: ReturnType<VueWrapper['find']>, label: string): Promise<void> {
+  await select.trigger('click')
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
+    (el) => el.textContent?.trim() === label,
+  )
+  if (!item) throw new Error(`dropdown option not found: "${label}"`)
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
+  await nextTick()
 }
 
 describe('OmisionesView (MIG-3/MIG-4 + T10)', () => {
@@ -148,15 +166,7 @@ describe('OmisionesView (MIG-3/MIG-4 + T10)', () => {
     expect(apiMocks.listOmisiones).toHaveBeenLastCalledWith({ limit: 20, offset: 0, q: 'canal' })
 
     // nivel select
-    const nivel = wrapper.find('[data-test="omision-nivel-filter"]')
-    await nivel.trigger('click')
-    await nextTick()
-    const warnOption = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
-      (el) => el.textContent?.trim() === 'WARN',
-    )
-    expect(warnOption).toBeDefined()
-    warnOption!.click()
-    await flushPromises()
+    await pickOption(wrapper.find('[data-test="omision-nivel-filter"]'), 'WARN')
     // q persists and combines with the new filter (API-3: AND semantics).
     expect(apiMocks.listOmisiones).toHaveBeenLastCalledWith({
       limit: 20,
@@ -166,15 +176,7 @@ describe('OmisionesView (MIG-3/MIG-4 + T10)', () => {
     })
 
     // resuelta=false must be sent (FE-2: pending-only filter is meaningful)
-    const resuelta = wrapper.find('[data-test="omision-resuelta-filter"]')
-    await resuelta.trigger('click')
-    await nextTick()
-    const noOption = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
-      (el) => el.textContent?.trim() === 'No',
-    )
-    expect(noOption).toBeDefined()
-    noOption!.click()
-    await flushPromises()
+    await pickOption(wrapper.find('[data-test="omision-resuelta-filter"]'), 'No')
     // AND-combined with the still-active q + nivel filters.
     expect(apiMocks.listOmisiones).toHaveBeenLastCalledWith({
       limit: 20,

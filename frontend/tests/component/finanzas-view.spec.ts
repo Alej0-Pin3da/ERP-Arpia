@@ -11,7 +11,6 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -105,7 +104,6 @@ async function mountView(rol: string): Promise<VueWrapper> {
     global: {
       plugins: [
         pinia,
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
       stubs: { transition: false },
@@ -126,7 +124,26 @@ async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
   await flushPromises()
 }
 
-/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
+/** Open a PrimeVue Select by its data-test and click the option with the label. */
+async function pickOption(select: ReturnType<VueWrapper['find']>, label: string): Promise<void> {
+  await select.trigger('click')
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
+    (el) => el.textContent?.trim() === label,
+  )
+  if (!item) throw new Error(`dropdown option not found: "${label}"`)
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
+  await nextTick()
+}
+
+/** Let the dialog leave transition finish (Vue's nextFrame is a double rAF). */
 async function flushDialogTransition(): Promise<void> {
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
@@ -174,7 +191,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     expect(apiMocks.listSocios).toHaveBeenCalledWith({ limit: 20, offset: 0 })
     expect(apiMocks.listSocios).toHaveBeenCalledWith({ limit: 1000 })
 
-    // Write buttons present for operador; the forms live in el-dialogs (FE-DLG-1).
+    // Write buttons present for operador; the forms live in PrimeVue Dialogs (FE-DLG-1).
     expect(wrapper.find('[data-test="nuevo-movimiento"]').exists()).toBe(true)
     await activateTab(wrapper, 'Liquidaciones')
     expect(wrapper.text()).toContain('Procesar liquidación')
@@ -200,16 +217,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
   it('filters movimientos by tipo with page reset', async () => {
     const wrapper = await mountView('operador')
 
-    const select = wrapper.find('[data-test="movimiento-tipo-filter"]')
-    await select.trigger('click')
-    await nextTick()
-    const option = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
-      (el) => el.textContent?.trim() === 'Gasto',
-    )
-    expect(option).toBeDefined()
-    option!.click()
-    await flushPromises()
-
+    await pickOption(wrapper.find('[data-test="movimiento-tipo-filter"]'), 'Gasto')
     expect(apiMocks.listMovimientos).toHaveBeenLastCalledWith({
       limit: 20,
       offset: 0,
@@ -286,7 +294,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     const wrapper = await mountView('operador')
     expect(apiMocks.listMovimientos).toHaveBeenCalledTimes(1)
 
-    // The form lives in an el-dialog opened from the toolbar button (FE-DLG-1).
+    // The form lives in a PrimeVue Dialog opened from the toolbar button (FE-DLG-1).
     expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(false)
     await wrapper.find('[data-test="nuevo-movimiento"]').trigger('click')
     await nextTick()
@@ -314,7 +322,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     await nextTick()
     expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(true)
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape' }))
     await flushDialogTransition()
 
     expect(apiMocks.createMovimiento).not.toHaveBeenCalled()
@@ -416,7 +424,8 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     await nextTick()
 
     // The edit form lives in the dialog; the name is read-only in edit mode.
-    expect(wrapper.text()).toContain('Editar socio')
+    // The Dialog teleports to body (MIG-2), so the title lives in document.body.
+    expect(document.body.textContent).toContain('Editar socio')
     expect(wrapper.findComponent({ name: 'SociosForm' }).exists()).toBe(true)
     expect(wrapper.find('[data-test="nombre-socio-input"]').exists()).toBe(false)
 
@@ -471,7 +480,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
     await nextTick()
 
     // The edit form lives in the dialog with the create form replaced (T9 -> dialog).
-    expect(wrapper.text()).toContain('Editar movimiento')
+    expect(document.body.textContent).toContain('Editar movimiento')
     expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'MovimientosForm' }).vm.$emit('submit', {
@@ -511,7 +520,7 @@ describe('FinanzasView (MOD-3 + T7)', () => {
 
     await wrapper.findAll('[data-test="edit-movimiento"]')[0].trigger('click')
     await nextTick()
-    expect(wrapper.text()).toContain('Editar movimiento')
+    expect(document.body.textContent).toContain('Editar movimiento')
     expect(wrapper.findComponent({ name: 'MovimientosForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'MovimientosForm' }).vm.$emit('submit', {

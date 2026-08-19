@@ -9,8 +9,14 @@
  *
  * Presentational: the view owns GET /productos/{id}/costo?variante_id and
  * passes the mapped tree.
+ *
+ * Migrated to PrimeVue DataTable (plain value mode) in slice 5 (MIG-2):
+ * size small keeps the compact EP look; the formatted cells use the
+ * Column #body slot with the same es-CO formatters.
  */
 import type { CostoTree as CostoTreeType } from '@/utils/productos'
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import Skeleton from 'primevue/skeleton'
 import { formatMoney, formatQty } from '@/utils/format'
 
@@ -39,18 +45,18 @@ defineProps<{
             Subtotal: {{ formatMoney(group.subtotal) }}
           </span>
         </header>
-        <el-table :data="group.lineas" size="small">
-          <el-table-column prop="nombre" label="Concepto" min-width="200" />
-          <el-table-column label="Cantidad" width="110" align="right">
-            <template #default="{ row }">{{ formatQty(row.cantidad) }}</template>
-          </el-table-column>
-          <el-table-column label="Costo unitario" width="130" align="right">
-            <template #default="{ row }">{{ formatMoney(row.costo_unitario) }}</template>
-          </el-table-column>
-          <el-table-column label="Costo total" width="130" align="right">
-            <template #default="{ row }">{{ formatMoney(row.costo_total) }}</template>
-          </el-table-column>
-        </el-table>
+        <DataTable :value="group.lineas" size="small">
+          <Column field="nombre" header="Concepto" style="min-width: 200px" />
+          <Column header="Cantidad" style="width: 110px" align="right">
+            <template #body="{ data }">{{ formatQty(data.cantidad) }}</template>
+          </Column>
+          <Column header="Costo unitario" style="width: 130px" align="right">
+            <template #body="{ data }">{{ formatMoney(data.costo_unitario) }}</template>
+          </Column>
+          <Column header="Costo total" style="width: 130px" align="right">
+            <template #body="{ data }">{{ formatMoney(data.costo_total) }}</template>
+          </Column>
+        </DataTable>
       </section>
     </template>
     <div v-else-if="tree" class="costo-empty">El producto no tiene costos desglosables</div>
@@ -66,14 +72,14 @@ defineProps<{
   gap: 0.5rem;
   margin-bottom: 1rem;
   padding: 0.75rem 1rem;
-  background: var(--el-color-primary-light-9);
+  background: color-mix(in srgb, var(--arpia-primary-deep) 13%, transparent);
   border-radius: 0.375rem;
 }
 
 .costo-total-value {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--el-color-primary);
+  color: var(--arpia-primary);
 }
 
 .costo-group {
@@ -92,7 +98,7 @@ defineProps<{
 }
 
 .costo-group-subtotal {
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   font-size: 0.875rem;
 }
 
@@ -103,7 +109,7 @@ defineProps<{
 }
 
 .costo-empty {
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   padding: 2rem 0;
   text-align: center;
 }

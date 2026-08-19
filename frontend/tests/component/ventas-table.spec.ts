@@ -9,8 +9,8 @@
  * paints `p-row-even`/`p-row-odd` body rows — there is no `.p-datatable-row`
  * class), expansion uses `.p-datatable-row-toggle-button`, and the header
  * funnels are DataTable filter menus (`filterDisplay="menu"`) hosting a
- * Select per column. el-tag/el-button cells still need the ElementPlus plugin;
- * the v-tooltip gift action needs the PrimeVue Tooltip directive.
+ * Select per column. Element Plus was fully dropped in slice 5 (MIG-2); the
+ * v-tooltip gift action needs the PrimeVue Tooltip directive.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import DataTable from 'primevue/datatable'

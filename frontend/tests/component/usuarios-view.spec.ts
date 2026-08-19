@@ -12,11 +12,11 @@
  *    self"), and a forced self-demote surfaces the server 400 "Cannot
  *    change your own role away from admin"
  *  - delete other users after a confirm (204)
- * el-dialog/el-input/el-select stay until S2/S3 (el-alert migrated in 3a).
+ * Toolbar filters + dialog migrated to PrimeVue in slice 5 (MIG-2): the
+ * Dialog teleports to body, so dialog titles are asserted on document.body.
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -70,7 +70,6 @@ async function mountView(): Promise<VueWrapper> {
     global: {
       plugins: [
         pinia,
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
       stubs: { transition: false },
@@ -82,7 +81,26 @@ async function mountView(): Promise<VueWrapper> {
   return wrapper
 }
 
-/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
+/** Open a PrimeVue Select by its data-test and click the option with the label. */
+async function pickOption(select: ReturnType<VueWrapper['find']>, label: string): Promise<void> {
+  await select.trigger('click')
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
+    (el) => el.textContent?.trim() === label,
+  )
+  if (!item) throw new Error(`dropdown option not found: "${label}"`)
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
+  await nextTick()
+}
+
+/** Let the dialog leave transition finish (Vue's nextFrame is a double rAF). */
 async function flushDialogTransition(): Promise<void> {
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
@@ -141,15 +159,7 @@ describe('UsuariosView (MOD-5 usuarios + T6)', () => {
     await input.trigger('keyup.enter')
     await flushPromises()
 
-    const select = wrapper.find('[data-test="usuario-rol-filter"]')
-    await select.trigger('click')
-    await nextTick()
-    const option = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
-      (el) => el.textContent?.trim() === 'Operador',
-    )
-    expect(option).toBeDefined()
-    option!.click()
-    await flushPromises()
+    await pickOption(wrapper.find('[data-test="usuario-rol-filter"]'), 'Operador')
     expect(apiMocks.list).toHaveBeenLastCalledWith({ limit: 20, offset: 0, rol: 'operador' })
   })
 
@@ -216,7 +226,8 @@ describe('UsuariosView (MOD-5 usuarios + T6)', () => {
 
     await wrapper.findAll('[data-test="edit-usuario"]')[2].trigger('click') // Coni (id 3)
     await nextTick()
-    expect(wrapper.text()).toContain('Editar usuario')
+    // The Dialog teleports to body (MIG-2), so the title lives in document.body.
+    expect(document.body.textContent).toContain('Editar usuario')
     expect(wrapper.findComponent({ name: 'UsuarioForm' }).exists()).toBe(true)
 
     wrapper.findComponent({ name: 'UsuarioForm' }).vm.$emit('submit', { rol: 'operador' })
@@ -254,7 +265,7 @@ describe('UsuariosView (MOD-5 usuarios + T6)', () => {
     await nextTick()
     expect(wrapper.findComponent({ name: 'UsuarioForm' }).exists()).toBe(true)
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape' }))
     await flushDialogTransition()
 
     expect(apiMocks.create).not.toHaveBeenCalled()

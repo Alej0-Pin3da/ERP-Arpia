@@ -11,8 +11,7 @@
  *    then lazy-fetches GET /productos/{id}/variantes)
  *  - the empty state renders
  * Column sort re-emits the SAME typed event via the parsePrimeVueSort
- * adapter. el-tag/el-button cells still need the ElementPlus plugin until
- * slice 2b.
+ * adapter. Element Plus was fully dropped in slice 5 (MIG-2).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import DataTable from 'primevue/datatable'

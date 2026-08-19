@@ -54,7 +54,7 @@ defineEmits<{
 
 <style scoped>
 .bom-producto-empty {
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   padding: 2rem 0;
   text-align: center;
 }

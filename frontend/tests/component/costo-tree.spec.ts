@@ -1,8 +1,9 @@
 /**
  * CostoTree component tests (PR10, spec MOD-5).
  *
- * Mounts the REAL CostoTree with Element Plus — the cost breakdown tree from
- * GET /productos/{id}/costo, pre-grouped by buildCostoTree:
+ * Mounts the REAL CostoTree with PrimeVue (DataTable, slice 5 / MIG-2) — the
+ * cost breakdown tree from GET /productos/{id}/costo, pre-grouped by
+ * buildCostoTree:
  *  - renders each group section label (Insumos / Productos / Costos
  *    operativos fijos), its lines (nombre, cantidad es-CO, costo_unitario
  *    es-CO, costo_total es-CO), the group subtotal and the grand total
@@ -10,10 +11,12 @@
  *  - renders the empty state when the tree has no groups
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
+import PrimeVue from 'primevue/config'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import CostoTree from '@/components/productos/CostoTree.vue'
+import { ArpiaPreset } from '@/styles/arpia-preset'
+import esCO from '@/utils/locales/es-CO'
 import type { CostoTree as CostoTreeType } from '@/utils/productos'
 
 const TREE: CostoTreeType = {
@@ -49,7 +52,11 @@ const TREE: CostoTreeType = {
 async function mountTree(tree: CostoTreeType | null = TREE, loading = false): Promise<VueWrapper> {
   const wrapper = mount(CostoTree, {
     props: { tree, loading },
-    global: { plugins: [ElementPlus] },
+    global: {
+      plugins: [
+        [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
+      ],
+    },
   })
   await flushPromises()
   return wrapper

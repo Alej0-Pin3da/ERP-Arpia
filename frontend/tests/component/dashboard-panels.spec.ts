@@ -10,7 +10,6 @@
  * KpiCards/VentasMensualesChart migrated to PrimeVue in slice 2a.
  */
 import { mount, type VueWrapper } from '@vue/test-utils'
-import ElementPlus from 'element-plus'
 import DataTable from 'primevue/datatable'
 import PrimeVue from 'primevue/config'
 import { nextTick, type Component } from 'vue'
@@ -44,7 +43,6 @@ async function mountPanel(component: Component, props: Record<string, unknown>):
     props,
     global: {
       plugins: [
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
     },

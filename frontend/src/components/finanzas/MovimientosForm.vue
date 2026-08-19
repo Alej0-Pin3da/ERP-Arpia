@@ -277,7 +277,7 @@ function submit(): void {
 .form-label {
   margin-bottom: 0.25rem;
   font-size: 0.875rem;
-  color: var(--el-text-color-primary);
+  color: var(--arpia-text-primary);
 }
 
 .form-footer {
@@ -288,7 +288,7 @@ function submit(): void {
 }
 
 .form-hint {
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   font-size: 0.85rem;
 }
 </style>

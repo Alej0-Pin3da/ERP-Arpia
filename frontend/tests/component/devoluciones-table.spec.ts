@@ -8,8 +8,7 @@
  * Migrated to PrimeVue DataTable (slice 1b): rows are `tbody tr` (DataTable
  * paints `p-row-even`/`p-row-odd` body rows), expansion uses the expander
  * column's `.p-datatable-row-toggle-button` opening the `#expansion` nested
- * DataTable (BEH-6). el-tag cells still need the ElementPlus plugin until
- * slice 2b.
+ * DataTable (BEH-6). Element Plus was fully dropped in slice 5 (MIG-2).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import PrimeVue from 'primevue/config'

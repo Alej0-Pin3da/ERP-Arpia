@@ -69,7 +69,7 @@ function rowClass(row: InsumoBajoStockRead): string {
 
 <style scoped>
 .bajo-stock-empty {
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   padding: 2rem 0;
   text-align: center;
 }

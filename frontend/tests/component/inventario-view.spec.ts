@@ -3,16 +3,15 @@
  *
  * Mounts the REAL InventarioView + all inventario components against mocked
  * insumosApi/comprasApi/categoriasInsumosApi: the two tabs (Insumos /
- * Compras), server-side pagination ({items,total} + el-pagination driving
+ * Compras), server-side pagination ({items,total} + PrimeVue Paginator driving
  * limit/offset refetches), toolbar filters (q + categoria_id insumos,
  * insumo_id compras) that reset to page 1, the server-joined insumos list,
  * below-minimum row highlighting, role visibility, the compras register flow
  * and the admin insumo create/edit/delete flows. Lookup joins keep limit:1000
- * against `.items` (design D3).
+ * against `.items` (design D3). Toolbar/dialog migrated to PrimeVue (MIG-2).
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -125,7 +124,6 @@ async function mountView(rol: string): Promise<VueWrapper> {
     global: {
       plugins: [
         pinia,
-        ElementPlus,
         [PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }],
       ],
       stubs: { transition: false },
@@ -146,7 +144,26 @@ async function activateTab(wrapper: VueWrapper, label: string): Promise<void> {
   await flushPromises()
 }
 
-/** Let the el-dialog leave transition finish (Vue's nextFrame is a double rAF). */
+/** Let a PrimeVue Select overlay open (Teleport + transition) before interacting. */
+async function flushOverlay(): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+  await flushPromises()
+}
+
+/** Open a PrimeVue Select by its data-test and click the option with the label. */
+async function pickOption(select: ReturnType<VueWrapper['find']>, label: string): Promise<void> {
+  await select.trigger('click')
+  await flushOverlay()
+  const item = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find(
+    (el) => el.textContent?.trim() === label,
+  )
+  if (!item) throw new Error(`dropdown option not found: "${label}"`)
+  item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  await flushOverlay()
+  await nextTick()
+}
+
+/** Let the dialog leave transition finish (Vue's nextFrame is a double rAF). */
 async function flushDialogTransition(): Promise<void> {
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   await flushPromises()
@@ -215,7 +232,7 @@ describe('InventarioView (MOD-4 + T6)', () => {
     expect(apiMocks.listCategorias).not.toHaveBeenCalled() // categorias only for admin form
 
     await activateTab(wrapper, 'Compras')
-    // The create form lives in an el-dialog opened from the toolbar button (FE-DLG-1).
+    // The create form lives in a PrimeVue Dialog opened from the toolbar button (FE-DLG-1).
     expect(wrapper.findComponent({ name: 'ComprasForm' }).exists()).toBe(false)
     expect(wrapper.find('[data-test="nueva-compra"]').exists()).toBe(true)
     await wrapper.find('[data-test="nueva-compra"]').trigger('click')
@@ -281,16 +298,7 @@ describe('InventarioView (MOD-4 + T6)', () => {
     expect(apiMocks.listCompras).toHaveBeenCalledWith(PAGE1)
 
     // Pick 'Aceite' (id 2) from the filter select -> reload with the filter.
-    const select = wrapper.find('[data-test="compra-filter-select"]')
-    await select.trigger('click')
-    await nextTick()
-    const option = [...document.querySelectorAll<HTMLElement>('.el-select-dropdown__item')].find(
-      (el) => el.textContent?.trim() === 'Aceite',
-    )
-    expect(option).toBeDefined()
-    option!.click()
-    await flushPromises()
-
+    await pickOption(wrapper.find('[data-test="compra-filter-select"]'), 'Aceite')
     expect(apiMocks.listCompras).toHaveBeenCalledTimes(2)
     expect(apiMocks.listCompras).toHaveBeenLastCalledWith({ ...PAGE1, insumo_id: 2 })
   })
@@ -409,7 +417,8 @@ describe('InventarioView (MOD-4 + T6)', () => {
     await wrapper.findAll('[data-test="edit-insumo"]')[0].trigger('click')
     await nextTick()
 
-    expect(wrapper.text()).toContain('Editar insumo')
+    // The Dialog teleports to body (MIG-2), so the title lives in document.body.
+    expect(document.body.textContent).toContain('Editar insumo')
     expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(true)
     wrapper.findComponent({ name: 'InsumoForm' }).vm.$emit('submit', {
       categoria_id: 1,
@@ -447,7 +456,7 @@ describe('InventarioView (MOD-4 + T6)', () => {
     expect(wrapper.findComponent({ name: 'InsumoForm' }).exists()).toBe(true)
 
     // Esc closes the dialog without a submit (FE-DLG-3).
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape' }))
     await flushDialogTransition()
 
     expect(apiMocks.createInsumo).not.toHaveBeenCalled()

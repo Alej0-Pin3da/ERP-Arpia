@@ -13,8 +13,15 @@
  */
 import { computed, onMounted, ref } from 'vue'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
+import Select from 'primevue/select'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
 
 import { confirmAction } from '@/utils/confirm'
 import { showToast } from '@/utils/toast'
@@ -57,12 +64,23 @@ const sortOrder = ref<'asc' | 'desc' | null>(null)
 const productos = ref<ProductoRead[]>([])
 const clientes = ref<ClienteRead[]>([])
 
-/** T8/FE-DLG-1: the register form lives in an el-dialog opened from the toolbar. */
+/** T8/FE-DLG-1: the register form lives in a PrimeVue Dialog opened from the toolbar. */
 const ventaDialogVisible = ref(false)
 /** The venta being edited; null = create mode (the dialog routes PUT vs POST). */
 const editingVenta = ref<VentaRead | null>(null)
 /** Raw page items (VentaRead) so edit resolves the full record from the row. */
 const rawVentas = ref<VentaRead[]>([])
+
+const canalOptions = [
+  { label: 'Web', value: 'web' },
+  { label: 'WhatsApp', value: 'whatsapp' },
+  { label: 'Instagram', value: 'instagram' },
+  { label: 'Feria', value: 'feria' },
+]
+const estadoOptions = [
+  { label: 'Completada', value: 'completada' },
+  { label: 'Anulada', value: 'anulada' },
+]
 
 /** Variante fetcher handed to the form (productosApi.listVariantes). */
 async function loadVariantes(productoId: number): Promise<VarianteProductoRead[]> {
@@ -265,46 +283,47 @@ onMounted(load)
       <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
     </div>
 
-    <el-tabs v-model="activeTab">
-      <el-tab-pane label="Listado" name="listado">
+    <Tabs v-model:value="activeTab">
+      <TabList>
+        <Tab value="listado">Listado</Tab>
+      </TabList>
+      <TabPanels>
+        <TabPanel value="listado">
         <div class="venta-toolbar">
-          <el-select
+          <Select
             v-model="filterCanal"
-            clearable
+            :options="canalOptions"
+            optionLabel="label"
+            optionValue="value"
             placeholder="Canal de venta"
+            :show-clear="true"
             data-test="venta-canal-filter"
+            class="venta-filter"
             @change="onFilterChange"
-          >
-            <el-option label="Web" value="web" />
-            <el-option label="WhatsApp" value="whatsapp" />
-            <el-option label="Instagram" value="instagram" />
-            <el-option label="Feria" value="feria" />
-          </el-select>
-          <el-select
+          />
+          <Select
             v-model="filterEstado"
-            clearable
+            :options="estadoOptions"
+            optionLabel="label"
+            optionValue="value"
             placeholder="Estado"
+            :show-clear="true"
             data-test="venta-estado-filter"
+            class="venta-filter"
             @change="onFilterChange"
-          >
-            <el-option label="Completada" value="completada" />
-            <el-option label="Anulada" value="anulada" />
-          </el-select>
-          <el-select
+          />
+          <Select
             v-model="filterProductoId"
-            clearable
-            filterable
+            :options="productos"
+            optionLabel="nombre"
+            optionValue="id"
             placeholder="Producto"
+            filter
+            :show-clear="true"
             data-test="venta-producto-filter"
+            class="venta-filter"
             @change="onFilterChange"
-          >
-            <el-option
-              v-for="producto in productos"
-              :key="producto.id"
-              :label="producto.nombre"
-              :value="producto.id"
-            />
-          </el-select>
+          />
           <Button v-if="canRegister" data-test="nueva-venta" @click="openCreateVenta">
             Nueva venta
           </Button>
@@ -328,14 +347,16 @@ onMounted(load)
           @page="onPage"
         />
 
-        <el-dialog
-          v-model="ventaDialogVisible"
-          :title="editingVenta === null ? 'Nueva venta' : 'Editar venta'"
-          :close-on-click-modal="false"
-          :close-on-press-escape="!saving"
-          :show-close="!saving"
-          width="640px"
-          @closed="resetVentaDialog"
+        <Dialog
+          v-model:visible="ventaDialogVisible"
+          :header="editingVenta === null ? 'Nueva venta' : 'Editar venta'"
+          modal
+          position="top"
+          style="width: 640px"
+          :dismissable-mask="false"
+          :close-on-escape="!saving"
+          :closable="!saving"
+          @after-hide="resetVentaDialog"
         >
           <VentasForm
             v-if="ventaDialogVisible"
@@ -347,9 +368,10 @@ onMounted(load)
             :saving="saving"
             @submit="submitVenta"
           />
-        </el-dialog>
-      </el-tab-pane>
-    </el-tabs>
+        </Dialog>
+      </TabPanel>
+    </TabPanels>
+    </Tabs>
   </section>
 </template>
 
@@ -377,7 +399,7 @@ onMounted(load)
   margin-bottom: 1rem;
 }
 
-.venta-toolbar .el-select {
+.venta-filter {
   width: 12rem;
 }
 

@@ -29,8 +29,10 @@ import SociosTable from '@/components/finanzas/SociosTable.vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import Dialog from 'primevue/dialog'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
+import Select from 'primevue/select'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
@@ -72,6 +74,11 @@ const movimientosTotal = ref(0)
 const movimientosPage = ref(1)
 const movimientosPageSize = 20
 const filterTipo = ref<'Gasto' | 'Inversion' | 'Retiro' | null>(null)
+const tipoOptions = [
+  { label: 'Gasto', value: 'Gasto' },
+  { label: 'Inversión', value: 'Inversion' },
+  { label: 'Retiro', value: 'Retiro' },
+]
 const movimientosSortBy = ref<string | null>(null)
 const movimientosSortOrder = ref<'asc' | 'desc' | null>(null)
 
@@ -240,9 +247,20 @@ function onEditMovimiento(row: MovimientoRow): void {
   movimientoDialogVisible.value = true
 }
 
+/** Paginator @page (movimientos): recompute the 1-based page from first index. */
+function onMovimientosPage(e: { first: number; rows: number }): void {
+  movimientosPage.value = Math.floor(e.first / e.rows) + 1
+  load()
+}
+
+/** Paginator @page (socios): recompute the 1-based page from first index. */
+function onSociosPage(e: { first: number; rows: number }): void {
+  sociosPage.value = Math.floor(e.first / e.rows) + 1
+  load()
+}
+
 /** FE-DLG-1: the toolbar button opens the dialog in create mode. */
 function openCreateMovimiento(): void {
-  editingMovimiento.value = null
   movimientoDialogVisible.value = true
 }
 
@@ -374,17 +392,17 @@ onMounted(load)
       <TabPanels>
         <TabPanel value="movimientos">
         <div class="finanzas-toolbar">
-          <el-select
+          <Select
             v-model="filterTipo"
-            clearable
+            :options="tipoOptions"
+            optionLabel="label"
+            optionValue="value"
             placeholder="Filtrar por tipo"
+            :show-clear="true"
             data-test="movimiento-tipo-filter"
+            class="movimiento-tipo-filter"
             @change="onMovimientoFilterChange"
-          >
-            <el-option label="Gasto" value="Gasto" />
-            <el-option label="Inversión" value="Inversion" />
-            <el-option label="Retiro" value="Retiro" />
-          </el-select>
+          />
           <Button v-if="canRegister" data-test="nuevo-movimiento" @click="openCreateMovimiento">
             Nuevo movimiento
           </Button>
@@ -405,17 +423,19 @@ onMounted(load)
           :rows="movimientosPageSize"
           :first="(movimientosPage - 1) * movimientosPageSize"
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="(e: { first: number; rows: number }) => { movimientosPage = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onMovimientosPage"
         />
 
-        <el-dialog
-          v-model="movimientoDialogVisible"
-          :title="editingMovimiento === null ? 'Registrar movimiento' : 'Editar movimiento'"
-          :close-on-click-modal="false"
-          :close-on-press-escape="!savingMovimiento"
-          :show-close="!savingMovimiento"
-          width="720px"
-          @closed="resetMovimientoDialog"
+        <Dialog
+          v-model:visible="movimientoDialogVisible"
+          :header="editingMovimiento === null ? 'Registrar movimiento' : 'Editar movimiento'"
+          modal
+          position="top"
+          style="width: 720px"
+          :dismissable-mask="false"
+          :close-on-escape="!savingMovimiento"
+          :closable="!savingMovimiento"
+          @after-hide="resetMovimientoDialog"
         >
           <MovimientosForm
             v-if="movimientoDialogVisible"
@@ -425,7 +445,7 @@ onMounted(load)
             :saving="savingMovimiento"
             @submit="submitMovimiento"
           />
-        </el-dialog>
+        </Dialog>
       </TabPanel>
 
       <TabPanel v-if="canRegister" value="liquidaciones">
@@ -462,17 +482,19 @@ onMounted(load)
           :rows="sociosPageSize"
           :first="(sociosPage - 1) * sociosPageSize"
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="(e: { first: number; rows: number }) => { sociosPage = Math.floor(e.first / e.rows) + 1; load() }"
+          @page="onSociosPage"
         />
 
-        <el-dialog
-          v-model="socioDialogVisible"
-          :title="editingSocio === null ? 'Crear socio' : 'Editar socio'"
-          :close-on-click-modal="false"
-          :close-on-press-escape="!savingSocio"
-          :show-close="!savingSocio"
-          width="560px"
-          @closed="resetSocioDialog"
+        <Dialog
+          v-model:visible="socioDialogVisible"
+          :header="editingSocio === null ? 'Crear socio' : 'Editar socio'"
+          modal
+          position="top"
+          style="width: 560px"
+          :dismissable-mask="false"
+          :close-on-escape="!savingSocio"
+          :closable="!savingSocio"
+          @after-hide="resetSocioDialog"
         >
           <SociosForm
             v-if="socioDialogVisible"
@@ -481,7 +503,7 @@ onMounted(load)
             :saving="savingSocio"
             @submit="submitSocio"
           />
-        </el-dialog>
+        </Dialog>
       </TabPanel>
       </TabPanels>
     </Tabs>
@@ -511,7 +533,7 @@ onMounted(load)
   margin-bottom: 1rem;
 }
 
-.finanzas-toolbar .el-select {
+.movimiento-tipo-filter {
   width: 12rem;
 }
 

@@ -10,12 +10,16 @@
  *    (ingresos vs gastos), months zero-filled between first and last.
  * Mirrors DashboardView: one refresh button reloads everything; failures
  * surface as an alert. Audited for admin|operador|consulta.
+ *
+ * Slice 5 (MIG-2): el-row/el-col/el-card replaced by a scoped CSS grid and
+ * PrimeVue Card panels (same responsive behavior, no EP dependency).
  */
 import { computed, onMounted, ref } from 'vue'
 
 import { analiticosApi, productosApi } from '@/api/endpoints'
 import FinanzasMensualesChart from '@/components/dashboard/FinanzasMensualesChart.vue'
 import Button from 'primevue/button'
+import Card from 'primevue/card'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Message from 'primevue/message'
@@ -84,10 +88,11 @@ onMounted(load)
       <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
     </div>
 
-    <el-row :gutter="16">
-      <el-col :xs="24" :md="12">
-        <el-card shadow="never" class="panel-card">
-          <template #header>Productos más vendidos</template>
+    <div class="analisis-grid">
+      <div>
+        <Card class="panel-card">
+          <template #title>Productos más vendidos</template>
+          <template #content>
           <DataTable :value="topProductoRows" :loading="loading" scrollable scroll-height="400px">
             <Column field="nombre" header="Producto" style="min-width: 180px" />
             <Column header="Unidades" style="width: 110px" align="right">
@@ -100,11 +105,13 @@ onMounted(load)
               <div class="analisis-empty">Sin ventas registradas</div>
             </template>
           </DataTable>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :md="12">
-        <el-card shadow="never" class="panel-card">
-          <template #header>Insumos más usados</template>
+          </template>
+        </Card>
+      </div>
+      <div>
+        <Card class="panel-card">
+          <template #title>Insumos más usados</template>
+          <template #content>
           <DataTable :value="topInsumos" :loading="loading" scrollable scroll-height="400px">
             <Column field="nombre" header="Insumo" style="min-width: 180px" />
             <Column field="unidad_medida" header="Unidad" style="width: 100px" />
@@ -115,14 +122,17 @@ onMounted(load)
               <div class="analisis-empty">Sin compras de insumos</div>
             </template>
           </DataTable>
-        </el-card>
-      </el-col>
-    </el-row>
+          </template>
+        </Card>
+      </div>
+    </div>
 
-    <el-card shadow="never" class="panel-card">
-      <template #header>Tendencia mensual de finanzas</template>
+    <Card class="panel-card">
+      <template #title>Tendencia mensual de finanzas</template>
+      <template #content>
       <FinanzasMensualesChart :rows="chartRows" :loading="loading" />
-    </el-card>
+      </template>
+    </Card>
   </section>
 </template>
 
@@ -142,12 +152,25 @@ onMounted(load)
   margin-bottom: 1rem;
 }
 
+.analisis-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 992px) {
+  .analisis-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .panel-card {
   margin-bottom: 1rem;
 }
 
 .analisis-empty {
-  color: var(--el-text-color-secondary);
+  color: var(--arpia-text-muted);
   padding: 2rem 0;
   text-align: center;
 }
