@@ -13,10 +13,10 @@
  * utils/maestros (the generic form cannot know the entity's API schema).
  */
 import { ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 
+import { showToast } from '@/utils/toast'
 import type { MaestroField, MaestroRow } from '@/utils/maestros'
 
 const props = defineProps<{
@@ -66,7 +66,7 @@ watch(
 function submit(): void {
   for (const field of props.fields) {
     if (field.required && (values.value[field.key] ?? '').trim() === '') {
-      ElMessage.warning(`${field.label} es obligatorio.`)
+      showToast('warn', `${field.label} es obligatorio.`)
       return
     }
   }

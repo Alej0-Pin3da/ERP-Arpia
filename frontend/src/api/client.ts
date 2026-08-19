@@ -7,11 +7,11 @@
  * - unrecoverable 401 / refresh failure -> session cleared + /login
  */
 import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from 'axios'
-import { ElMessage } from 'element-plus'
 
 import { readAccessToken } from './storage'
 import { refreshSession, setRefreshClient } from './refresh'
 import { FORBIDDEN_MESSAGE } from './errors'
+import { showToast } from '@/utils/toast'
 
 export interface ClientOptions extends AxiosRequestConfig {
   /** Override the configured base URL (tests inject mocks via `adapter`). */
@@ -54,12 +54,12 @@ function attachInterceptors(instance: AxiosInstance): void {
       const status = error.response?.status
       const isAuthEndpoint = config?.url?.includes('/auth/')
 
-      // Runtime 403 (SHELL-5): the session's role cannot perform this action.
-      // Surface a role-appropriate es-CO message, then keep the pass-through
-      // contract — the promise still rejects so views can react (hide the
-      // offending action, etc.).
+      // Runtime 403 (SHELL-5/BEH-2): the session's role cannot perform this
+      // action. Surface a role-appropriate es-CO toast via the Toast
+      // singleton, then keep the pass-through contract — the promise still
+      // rejects so views can react (hide the offending action, etc.).
       if (status === 403) {
-        ElMessage.error(FORBIDDEN_MESSAGE)
+        showToast('error', 'Acceso denegado', FORBIDDEN_MESSAGE)
         return Promise.reject(error)
       }
 

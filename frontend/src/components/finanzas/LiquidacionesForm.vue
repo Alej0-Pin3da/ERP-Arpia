@@ -9,12 +9,12 @@
  * per-socio result table and the 409 surfacing.
  */
 import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Textarea from 'primevue/textarea'
 
 import { buildLiquidacionPayload, type LiquidacionCreate } from '@/utils/finanzas'
+import { showToast } from '@/utils/toast'
 
 defineProps<{
   /** True while the parent is POSTing — disables the submit button. */
@@ -29,7 +29,7 @@ const notas = ref('')
 /** MOD-3: client gate — monto is required (> 0). */
 function submit(): void {
   if (monto.value === null || monto.value <= 0) {
-    ElMessage.warning('Indica el monto a liquidar.')
+    showToast('warn', 'Indica el monto a liquidar.')
     return
   }
   emit(

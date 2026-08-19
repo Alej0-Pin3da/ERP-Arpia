@@ -12,12 +12,12 @@
  *    trusted server-side (snapshot pricing)
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { ElMessage } from 'element-plus'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ArpiaPreset } from '@/styles/arpia-preset'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 import esCO from '@/utils/locales/es-CO'
 import DevolucionesForm from '@/components/devoluciones/DevolucionesForm.vue'
 import type { components } from '@/types/api.d'
@@ -95,8 +95,10 @@ async function setTipo(wrapper: VueWrapper, label: string): Promise<void> {
   await pickOption(wrapper.find('[data-test="tipo-select"]'), label)
 }
 
+mountToastHost()
+
 afterEach(() => {
-  ElMessage.closeAll()
+  clearToastHost()
 })
 
 describe('DevolucionesForm (MOD-2 create)', () => {

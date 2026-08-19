@@ -16,7 +16,7 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage } from 'element-plus'
+import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -26,6 +26,7 @@ import { ArpiaPreset } from '@/styles/arpia-preset'
 import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import OmisionesView from '@/views/OmisionesView.vue'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 
 const { apiMocks } = vi.hoisted(() => ({
   apiMocks: {
@@ -39,6 +40,9 @@ vi.mock('@/api/endpoints', () => ({
     updateOmision: apiMocks.updateOmision,
   },
 }))
+
+// Fake PrimeVue Toast host: renders showToast() messages into <body>.
+mountToastHost()
 
 const OMISIONES = [
   {
@@ -101,7 +105,7 @@ describe('OmisionesView (MIG-3/MIG-4 + T10)', () => {
   })
 
   afterEach(() => {
-    ElMessage.closeAll()
+    clearToastHost()
     vi.restoreAllMocks()
   })
 

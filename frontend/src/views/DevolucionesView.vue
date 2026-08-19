@@ -12,7 +12,6 @@
  *    consulta (read-only role).
  */
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 
 import { devolucionesApi, productosApi } from '@/api/endpoints'
 import DevolucionesForm from '@/components/devoluciones/DevolucionesForm.vue'
@@ -22,6 +21,7 @@ import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
 import { buildListParams } from '@/utils/pagination'
+import { showToast } from '@/utils/toast'
 import { buildDevolucionRows, type DevolucionCreate, type DevolucionRow } from '@/utils/devoluciones'
 import type { ProductoRead, VarianteProductoRead } from '@/types/api.d'
 
@@ -119,11 +119,11 @@ async function onSubmit(payload: DevolucionCreate): Promise<void> {
   saving.value = true
   try {
     await devolucionesApi.create(payload)
-    ElMessage.success('Devolución registrada correctamente')
+    showToast('success', 'Devolución registrada correctamente')
     devolucionDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo registrar la devolución. Verifica los datos e inténtalo de nuevo.')
+    showToast('error', serverDetail(err) ?? 'No se pudo registrar la devolución. Verifica los datos e inténtalo de nuevo.')
   } finally {
     saving.value = false
   }

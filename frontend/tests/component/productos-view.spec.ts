@@ -12,7 +12,7 @@
  */
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import ElementPlus, { ElMessage, ElMessageBox } from 'element-plus'
+import ElementPlus from 'element-plus'
 import Paginator from 'primevue/paginator'
 import PrimeVue from 'primevue/config'
 import { nextTick } from 'vue'
@@ -23,6 +23,7 @@ import esCO from '@/utils/locales/es-CO'
 import { useAuthStore } from '@/stores/auth'
 import ProductosView from '@/views/ProductosView.vue'
 import type { components } from '@/types/api.d'
+import { clearToastHost, mountToastHost } from '../helpers/toast-host'
 
 type ProductoRead = components['schemas']['ProductoRead']
 type TipoProductoRead = components['schemas']['TipoProductoRead']
@@ -78,6 +79,11 @@ vi.mock('@/api/endpoints', () => ({
   tiposProductoApi: { list: apiMocks.listTipos },
   insumosApi: { list: apiMocks.listInsumos },
 }))
+const confirmMocks = vi.hoisted(() => ({ confirmAction: vi.fn() }))
+vi.mock('@/utils/confirm', () => ({ confirmAction: confirmMocks.confirmAction }))
+
+// Fake PrimeVue Toast host: renders showToast() messages into <body>.
+mountToastHost()
 
 const TIPOS: TipoProductoRead[] = [{ id: 1, nombre: 'Alimentos' }]
 
@@ -204,6 +210,7 @@ async function flushDialogTransition(): Promise<void> {
 describe('ProductosView (MOD-5 + T6)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    confirmMocks.confirmAction.mockReset()
     // Table page uses the {items,total} contract; lookups keep limit:1000.
     apiMocks.listProductos.mockResolvedValue({ items: PRODUCTOS, total: 2 })
     apiMocks.listTipos.mockResolvedValue({ items: TIPOS, total: 1 })
@@ -227,7 +234,7 @@ describe('ProductosView (MOD-5 + T6)', () => {
   })
 
   afterEach(() => {
-    ElMessage.closeAll()
+    clearToastHost()
     vi.restoreAllMocks()
   })
 
@@ -422,7 +429,7 @@ describe('ProductosView (MOD-5 + T6)', () => {
   })
 
   it('deletes a product after the confirm dialog (204) and refreshes', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     const wrapper = await mountView('admin')
     expect(apiMocks.listProductos).toHaveBeenCalledTimes(2)
 
@@ -436,7 +443,7 @@ describe('ProductosView (MOD-5 + T6)', () => {
   })
 
   it('surfaces the 409 when deleting a product that is in use', async () => {
-    vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue('confirm' as never)
+    confirmMocks.confirmAction.mockResolvedValue('accept')
     apiMocks.deleteProducto.mockRejectedValue({
       response: { data: { detail: 'Producto is in use and cannot be deleted' } },
     })

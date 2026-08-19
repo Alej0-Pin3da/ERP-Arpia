@@ -11,7 +11,6 @@
  * The view owns the POST/PATCH, the 422 surfacing and the refresh.
  */
 import { ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -22,6 +21,7 @@ import {
   type SocioConfiguracionCreate,
   type SocioConfiguracionUpdate,
 } from '@/utils/finanzas'
+import { showToast } from '@/utils/toast'
 import type { SocioConfiguracionRead } from '@/types/api.d'
 
 const props = withDefaults(
@@ -56,11 +56,11 @@ watch(
 /** MOD-3: client gates — create requires nombre; every mode requires a share. */
 function submit(): void {
   if (props.mode === 'create' && nombre.value.trim() === '') {
-    ElMessage.warning('Escribe el nombre del socio.')
+    showToast('warn', 'Escribe el nombre del socio.')
     return
   }
   if (porcentaje.value === null || porcentaje.value <= 0) {
-    ElMessage.warning('El porcentaje debe ser mayor a cero.')
+    showToast('warn', 'El porcentaje debe ser mayor a cero.')
     return
   }
   if (props.mode === 'edit') {

@@ -16,7 +16,6 @@
  *    table ("can't delete self"; the backend also rejects it with 400)
  */
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { usuariosApi } from '@/api/endpoints'
 import UsuarioForm from '@/components/usuarios/UsuarioForm.vue'
@@ -25,7 +24,9 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
 import { useAuthStore } from '@/stores/auth'
+import { confirmAction } from '@/utils/confirm'
 import { buildListParams } from '@/utils/pagination'
+import { showToast } from '@/utils/toast'
 import type { UsuarioCreate, UsuarioRead, UsuarioUpdate } from '@/types/api.d'
 
 const auth = useAuthStore()
@@ -101,11 +102,11 @@ async function onCreate(payload: UsuarioCreate): Promise<void> {
   saving.value = true
   try {
     await usuariosApi.create(payload)
-    ElMessage.success('Usuario creado correctamente')
+    showToast('success', 'Usuario creado correctamente')
     usuarioDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo crear el usuario.')
+    showToast('error', serverDetail(err) ?? 'No se pudo crear el usuario.')
   } finally {
     saving.value = false
   }
@@ -142,11 +143,11 @@ async function onUpdate(payload: UsuarioUpdate): Promise<void> {
   saving.value = true
   try {
     await usuariosApi.update({ usuario_id: editing.value.id }, payload)
-    ElMessage.success('Usuario actualizado correctamente')
+    showToast('success', 'Usuario actualizado correctamente')
     usuarioDialogVisible.value = false // FE-DLG-2: success closes the dialog
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo actualizar el usuario.')
+    showToast('error', serverDetail(err) ?? 'No se pudo actualizar el usuario.')
   } finally {
     saving.value = false
   }
@@ -154,21 +155,19 @@ async function onUpdate(payload: UsuarioUpdate): Promise<void> {
 
 /** DELETE /usuarios/{id} (204). The self row never reaches here (hidden). */
 async function onDelete(row: UsuarioRead): Promise<void> {
-  try {
-    await ElMessageBox.confirm(`¿Eliminar el usuario "${row.nombre}"?`, 'Confirmar eliminación', {
-      type: 'warning',
-      confirmButtonText: 'Eliminar',
-      cancelButtonText: 'Cancelar',
-    })
-  } catch {
-    return // cancelled
-  }
+  const choice = await confirmAction({
+    message: `¿Eliminar el usuario "${row.nombre}"?`,
+    header: 'Confirmar eliminación',
+    acceptLabel: 'Eliminar',
+    rejectLabel: 'Cancelar',
+  })
+  if (choice !== 'accept') return // cancelled
   try {
     await usuariosApi.delete({ usuario_id: row.id })
-    ElMessage.success('Usuario eliminado correctamente')
+    showToast('success', 'Usuario eliminado correctamente')
     await load()
   } catch (err) {
-    ElMessage.error(serverDetail(err) ?? 'No se pudo eliminar el usuario.')
+    showToast('error', serverDetail(err) ?? 'No se pudo eliminar el usuario.')
   }
 }
 

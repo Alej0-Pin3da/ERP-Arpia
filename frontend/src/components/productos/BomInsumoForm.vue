@@ -12,13 +12,13 @@
  * is omitted when null (the base rule row applies to all variants).
  */
 import { computed, reactive, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 
 import type { components } from '@/types/api.d'
 import { parseDecimal } from '@/utils/format'
+import { showToast } from '@/utils/toast'
 import {
   buildBomInsumoPayload,
   buildBomInsumoUpdatePayload,
@@ -64,11 +64,11 @@ const submitLabel = computed(() => (props.mode === 'create' ? 'Agregar insumo' :
 
 function onSubmit(): void {
   if (form.insumo_id === null) {
-    ElMessage.warning('Selecciona el insumo')
+    showToast('warn', 'Selecciona el insumo')
     return
   }
   if (form.cantidad_requerida === null || form.cantidad_requerida <= 0) {
-    ElMessage.warning('Indica la cantidad requerida')
+    showToast('warn', 'Indica la cantidad requerida')
     return
   }
   emit('submit', props.mode === 'edit' ? buildBomInsumoUpdatePayload(form) : buildBomInsumoPayload(form))

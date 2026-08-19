@@ -13,7 +13,6 @@
  * refresh.
  */
 import { computed, reactive, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -22,6 +21,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 
 import type { components } from '@/types/api.d'
 import { parseDecimal } from '@/utils/format'
+import { showToast } from '@/utils/toast'
 import { buildProductoPayload, buildProductoUpdatePayload, type ProductoPayloadInput } from '@/utils/productos'
 
 type ProductoRead = components['schemas']['ProductoRead']
@@ -62,11 +62,11 @@ const submitLabel = computed(() => (props.mode === 'create' ? 'Crear producto' :
 
 function onSubmit(): void {
   if (form.nombre.trim() === '') {
-    ElMessage.warning('Escribe el nombre del producto')
+    showToast('warn', 'Escribe el nombre del producto')
     return
   }
   if (form.tipo_producto_id === null) {
-    ElMessage.warning('Selecciona el tipo de producto')
+    showToast('warn', 'Selecciona el tipo de producto')
     return
   }
   emit('submit', props.mode === 'edit' ? buildProductoUpdatePayload(form) : buildProductoPayload(form))

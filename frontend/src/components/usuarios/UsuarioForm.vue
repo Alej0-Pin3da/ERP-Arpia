@@ -14,13 +14,13 @@
  *  The view owns the POST/PATCH, the admin-only gate and the refresh.
  */
 import { computed, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import Select from 'primevue/select'
 
 import { roleLabel } from '@/utils/menu'
+import { showToast } from '@/utils/toast'
 import {
   buildUsuarioPayload,
   buildUsuarioUpdatePayload,
@@ -61,7 +61,7 @@ watch(
 function submit(): void {
   if (props.mode === 'edit') {
     if (rol.value === null) {
-      ElMessage.warning('Selecciona el rol.')
+      showToast('warn', 'Selecciona el rol.')
       return
     }
     emit('submit', buildUsuarioUpdatePayload(rol.value))
@@ -69,23 +69,23 @@ function submit(): void {
   }
 
   if (nombre.value.trim() === '') {
-    ElMessage.warning('Escribe el nombre del usuario.')
+    showToast('warn', 'Escribe el nombre del usuario.')
     return
   }
   if (email.value.trim() === '') {
-    ElMessage.warning('Escribe el correo del usuario.')
+    showToast('warn', 'Escribe el correo del usuario.')
     return
   }
   if (rol.value === null) {
-    ElMessage.warning('Selecciona el rol.')
+    showToast('warn', 'Selecciona el rol.')
     return
   }
   if (password.value === '') {
-    ElMessage.warning('Escribe la contraseña.')
+    showToast('warn', 'Escribe la contraseña.')
     return
   }
   if (password.value.length < 6) {
-    ElMessage.warning('La contraseña debe tener al menos 6 caracteres.')
+    showToast('warn', 'La contraseña debe tener al menos 6 caracteres.')
     return
   }
   emit(

@@ -11,7 +11,6 @@
  * calculation: subtotal * (1 - descuento/100).
  */
 import { computed, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
@@ -31,6 +30,7 @@ import {
   type VentasFormDetalle,
 } from '@/utils/ventas'
 import type { components } from '@/types/api.d'
+import { showToast } from '@/utils/toast'
 
 type ClienteRead = components['schemas']['ClienteRead']
 type ProductoRead = components['schemas']['ProductoRead']
@@ -150,7 +150,7 @@ function removeRow(index: number): void {
  */
 async function submit(): Promise<void> {
   if (!hasValidDetalles(detalles.value)) {
-    ElMessage.warning('Agrega al menos un detalle con producto y cantidad mayor a cero.')
+    showToast('warn', 'Agrega al menos un detalle con producto y cantidad mayor a cero.')
     return
   }
 
@@ -164,7 +164,7 @@ async function submit(): Promise<void> {
   await Promise.all(ids.map(loadVariantesFor))
 
   if (detallesSinVariante(detalles.value, variantesPorProducto.value).length > 0) {
-    ElMessage.warning('Los productos con talla requieren seleccionar una variante.')
+    showToast('warn', 'Los productos con talla requieren seleccionar una variante.')
     return
   }
   emit('submit', buildVentaPayload({
