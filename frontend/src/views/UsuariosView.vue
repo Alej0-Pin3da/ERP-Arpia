@@ -21,8 +21,11 @@ import { usuariosApi } from '@/api/endpoints'
 import UsuarioForm from '@/components/usuarios/UsuarioForm.vue'
 import UsuariosTable from '@/components/usuarios/UsuariosTable.vue'
 import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Paginator from 'primevue/paginator'
+import Select from 'primevue/select'
 import { useAuthStore } from '@/stores/auth'
 import { confirmAction } from '@/utils/confirm'
 import { buildListParams } from '@/utils/pagination'
@@ -46,8 +49,14 @@ const filterRol = ref<'admin' | 'operador' | 'consulta' | null>(null)
 const saving = ref(false)
 const editing = ref<UsuarioRead | null>(null)
 
-/** T8/FE-DLG-1: the form lives in an el-dialog opened from the toolbar button. */
+/** T8/FE-DLG-1: the form lives in a PrimeVue Dialog opened from the toolbar. */
 const usuarioDialogVisible = ref(false)
+
+const rolOptions = [
+  { label: 'Admin', value: 'admin' },
+  { label: 'Operador', value: 'operador' },
+  { label: 'Consulta', value: 'consulta' },
+]
 
 async function load(): Promise<void> {
   loading.value = true
@@ -186,26 +195,24 @@ onMounted(load)
     </div>
 
     <div class="usuario-toolbar">
-      <el-input
+      <InputText
         v-model="searchQ"
-        clearable
         placeholder="Buscar usuario…"
         data-test="usuario-search"
         class="usuario-search"
         @keyup.enter="onSearch"
-        @clear="onSearch"
       />
-      <el-select
+      <Select
         v-model="filterRol"
-        clearable
+        :options="rolOptions"
+        optionLabel="label"
+        optionValue="value"
         placeholder="Filtrar por rol"
+        :show-clear="true"
         data-test="usuario-rol-filter"
+        class="usuario-rol-filter"
         @change="onFilterChange"
-      >
-        <el-option label="Admin" value="admin" />
-        <el-option label="Operador" value="operador" />
-        <el-option label="Consulta" value="consulta" />
-      </el-select>
+      />
       <Button data-test="nuevo-usuario" @click="openCreateUsuario">
         Nuevo usuario
       </Button>
@@ -227,14 +234,16 @@ onMounted(load)
       @page="(e: { first: number; rows: number }) => { page = Math.floor(e.first / e.rows) + 1; load() }"
     />
 
-    <el-dialog
-      v-model="usuarioDialogVisible"
-      :title="editing === null ? 'Crear usuario' : 'Editar usuario'"
-      :close-on-click-modal="false"
-      :close-on-press-escape="!saving"
-      :show-close="!saving"
-      width="560px"
-      @closed="resetUsuarioDialog"
+    <Dialog
+      v-model:visible="usuarioDialogVisible"
+      :header="editing === null ? 'Crear usuario' : 'Editar usuario'"
+      modal
+      position="top"
+      style="width: 560px"
+      :dismissable-mask="false"
+      :close-on-escape="!saving"
+      :closable="!saving"
+      @after-hide="resetUsuarioDialog"
     >
       <UsuarioForm
         v-if="usuarioDialogVisible"
@@ -243,7 +252,7 @@ onMounted(load)
         :saving="saving"
         @submit="submitUsuario"
       />
-    </el-dialog>
+    </Dialog>
   </section>
 </template>
 
@@ -274,7 +283,7 @@ onMounted(load)
   width: 14rem;
 }
 
-.usuario-toolbar .el-select {
+.usuario-rol-filter {
   width: 12rem;
 }
 
