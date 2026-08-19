@@ -102,10 +102,10 @@ Decision resolved during design: **PrimeVue 4.5.5 MIT** (pinned); chain strategy
 
 ## Phase 6 — Slice 5: Cleanup (PR 5)
 
-- [ ] **S5-T1** Remove EP (MIG-2): drop `element-plus` from `frontend/package.json`, `app.use(ElementPlus)` + `element-plus/dist/index.css` from `main.ts`; strip last `plugins:[ElementPlus]` in specs; audit zero `el-*`/`element-plus` refs in `frontend/src` + `frontend/tests` (MIG-1: diff isolated to `frontend/`). Deps: S4 gates. Verify: `npm test`.
-- [ ] **S5-T2** Lint/typecheck/format: `npm run lint`, `npm run format`, `npx vue-tsc --noEmit` (or `npx tsc --noEmit` as configured). Deps: S5-T1.
-- [ ] **S5-T3** Final build size (MIG-3): `npm run build` → S ≤ B×1.10 (B from S0-T8); record comparison. Deps: S5-T1.
-- [ ] **S5-T4** Final gate: `npm test` green (55 specs) + zero EP refs + budget met → merge PR 5 (only after S4-T7 QA sign-off). Deps: S5-T1..T3.
+- [x] **S5-T1** Remove EP (MIG-2): drop `element-plus` from `frontend/package.json`, `app.use(ElementPlus)` + `element-plus/dist/index.css` from `main.ts`; strip last `plugins:[ElementPlus]` in specs; audit zero `el-*`/`element-plus` refs in `frontend/src` + `frontend/tests` (MIG-1: diff isolated to `frontend/`). Deps: S4 gates. Verify: `npm test`. DONE: `npm uninstall element-plus`; main.ts/src/tests cleaned; 43 files −417 lines (commit ccc34ec); zero `el-*`/`--el-*`/`.el-`/`ElementPlus` code refs remain (only historical comments).
+- [x] **S5-T2** Lint/typecheck/format: `npm run lint`, `npm run format`, `npx vue-tsc --noEmit` (or `npx tsc --noEmit` as configured). Deps: S5-T1. DONE: `npm run lint` clean. Typecheck: repo has no vue-tsc/typecheck script; vue-tsc 2.x fails at BASELINE on pre-existing issues (generated api.d.ts exposes no top-level `*Read` types; endpoint generics; DataTable event typings — ~150 errors, present at f00579f). Slice-5-introduced parse failures (inline typed template arrows) fixed by converting 11 handlers to named script functions.
+- [x] **S5-T3** Final build size (MIG-3): `npm run build` → S ≤ B×1.10 (B from S0-T8); record comparison. Deps: S5-T1. DONE: main chunk `assets/index-*.js` = 1,410.53 kB (gzip 382.45 kB) ≤ 2,585.46 kB budget (B 2,350.42 × 1.10).
+- [x] **S5-T4** Final gate: `npm test` green (55 specs) + zero EP refs + budget met → merge PR 5 (only after S4-T7 QA sign-off). Deps: S5-T1..T3. DONE: 59 test files / 546 tests green; zero EP refs audited; budget met.
 
 ## Task Coverage Matrix
 
