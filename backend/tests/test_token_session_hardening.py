@@ -10,17 +10,8 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.refresh import generate_refresh_token, hash_refresh_token, refresh_expiry
 from app.core.security import create_access_token, decode_token
-from app.core.login_tracker import LoginAttemptTracker
 from app.models.refresh_token import RefreshToken
 from app.models.usuarios import Usuario
-
-
-@pytest.fixture(autouse=True)
-def reset_login_tracker():
-    """Reset login tracker between tests for isolation."""
-    LoginAttemptTracker.reset()
-    yield
-    LoginAttemptTracker.reset()
 
 
 class TestShortAccessToken:

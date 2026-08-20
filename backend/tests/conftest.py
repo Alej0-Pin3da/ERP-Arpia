@@ -26,6 +26,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 
+from app.core.login_tracker import LoginAttemptTracker
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.main import app
@@ -34,6 +35,14 @@ from app.seeder import seed_categorias, seed_usuarios
 
 ADMIN_EMAIL = "admin@arpia.com"
 ADMIN_PASSWORD = "Admin123!"
+
+
+@pytest.fixture(autouse=True)
+def _reset_login_tracker():
+    """Reset login attempt tracker before each test for isolation."""
+    LoginAttemptTracker.reset()
+    yield
+    LoginAttemptTracker.reset()
 
 
 def _crear_bd_test_si_no_existe() -> None:

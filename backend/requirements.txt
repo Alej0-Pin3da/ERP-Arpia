@@ -16,3 +16,4 @@ httpx==0.28.1
 openpyxl==3.1.5
 slowapi>=0.1.9
 ruff==0.16.3
+pyotp==2.9.0

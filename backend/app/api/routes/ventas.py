@@ -1,10 +1,13 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from slowapi import Limiter
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.deps import get_db, require_roles
+from app.core.limiter import get_rate_limit_config, user_limiter
 from app.models.clientes import Cliente
 from app.models.ventas import DetalleVenta, Venta
 from app.schemas.common import Paginated
@@ -19,6 +22,9 @@ from app.services.inventory import (
 from app.services.paginacion import aplicar_orden, paginar
 
 router = APIRouter(prefix="/ventas", tags=["ventas"])
+
+# Rate limiter for critical write endpoints
+_critical_limiter = user_limiter if settings.ENVIRONMENT != "test" else Limiter(key_func=lambda r: "test", enabled=False)
 
 mutation_user = require_roles("admin", "operador")
 audited_user = require_roles("admin", "operador", "consulta")
@@ -36,7 +42,9 @@ _SORTABLE_VENTAS = {
 
 
 @router.post("", response_model=VentaRead, status_code=status.HTTP_201_CREATED)
+@_critical_limiter.limit("30/minute")
 def create_venta(
+    request: Request,
     payload: VentaCreate,
     db: Session = Depends(get_db),
     _: Venta = Depends(mutation_user),
@@ -50,7 +58,9 @@ def create_venta(
 
 
 @router.get("", response_model=Paginated[VentaRead])
+@user_limiter.limit("300/minute")
 def list_ventas(
+    request: Request,
     limit: int = 50,
     offset: int = 0,
     canal_venta: Literal["web", "whatsapp", "instagram", "feria"] | None = None,
@@ -74,7 +84,9 @@ def list_ventas(
 
 
 @router.patch("/{venta_id}", response_model=VentaRead)
+@_critical_limiter.limit("30/minute")
 def update_venta_es_regalo(
+    request: Request,
     venta_id: int,
     payload: VentaUpdate,
     db: Session = Depends(get_db),
@@ -96,7 +108,9 @@ def update_venta_es_regalo(
 
 
 @router.put("/{venta_id}", response_model=VentaRead)
+@_critical_limiter.limit("30/minute")
 def update_venta(
+    request: Request,
     venta_id: int,
     payload: VentaCreate,
     db: Session = Depends(get_db),
@@ -116,7 +130,9 @@ def update_venta(
 
 
 @router.delete("/{venta_id}", response_model=VentaRead)
+@_critical_limiter.limit("30/minute")
 def anular_venta(
+    request: Request,
     venta_id: int,
     db: Session = Depends(get_db),
     _: Venta = Depends(mutation_user),

@@ -10,11 +10,14 @@ payloads/roles and passes the authenticated user id for audit.
 """
 
 from datetime import date
-
-from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
+from fastapi import APIRouter, Depends, Query, Request, status
+from slowapi import Limiter
+
+from app.core.config import settings
 from app.core.deps import get_db, require_roles
+from app.core.limiter import user_limiter
 from app.models.usuarios import Usuario
 from app.schemas.common import Paginated
 from app.schemas.devoluciones import DevolucionCreate, DevolucionRead
@@ -22,12 +25,17 @@ from app.services.devoluciones import listar_devoluciones, registrar_devolucion
 
 router = APIRouter(prefix="/devoluciones", tags=["devoluciones"])
 
+# Rate limiter for critical write endpoints
+_critical_limiter = user_limiter if settings.ENVIRONMENT != "test" else Limiter(key_func=lambda r: "test", enabled=False)
+
 mutation_user = require_roles("admin", "operador")
 audited_user = require_roles("admin", "operador", "consulta")
 
 
 @router.post("", response_model=DevolucionRead, status_code=status.HTTP_201_CREATED)
+@_critical_limiter.limit("30/minute")
 def create_devolucion(
+    request: Request,
     payload: DevolucionCreate,
     db: Session = Depends(get_db),
     user: Usuario = Depends(mutation_user),
@@ -39,7 +47,9 @@ def create_devolucion(
 
 
 @router.get("", response_model=Paginated[DevolucionRead])
+@user_limiter.limit("300/minute")
 def list_devoluciones(
+    request: Request,
     db: Session = Depends(get_db),
     _: Usuario = Depends(audited_user),
     venta_id: int | None = None,

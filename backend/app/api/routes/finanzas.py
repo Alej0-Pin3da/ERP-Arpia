@@ -12,11 +12,14 @@ Mutations require admin|operador; lists are audited (admin|operador|consulta).
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
+from slowapi import Limiter
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.deps import get_db, require_roles
+from app.core.limiter import user_limiter
 from app.models.finanzas import MovimientoFinanciero, SociosConfiguracion
 from app.models.usuarios import Usuario
 from app.schemas.common import Paginated
@@ -41,6 +44,9 @@ from app.services.finanzas import (
 from app.services.paginacion import aplicar_orden, paginar
 
 router = APIRouter(prefix="/finanzas", tags=["finanzas"])
+
+# Rate limiter for critical write endpoints
+_critical_limiter = user_limiter if settings.ENVIRONMENT != "test" else Limiter(key_func=lambda r: "test", enabled=False)
 
 mutation_user = require_roles("admin", "operador")
 audited_user = require_roles("admin", "operador", "consulta")
@@ -73,7 +79,9 @@ _SORTABLE_SOCIOS = {
     response_model=MovimientoRead,
     status_code=status.HTTP_201_CREATED,
 )
+@_critical_limiter.limit("30/minute")
 def create_movimiento(
+    request: Request,
     payload: MovimientoCreate,
     db: Session = Depends(get_db),
     _: Usuario = Depends(mutation_user),
@@ -83,7 +91,9 @@ def create_movimiento(
 
 
 @router.get("/movimientos", response_model=Paginated[MovimientoRead])
+@user_limiter.limit("300/minute")
 def list_movimientos_route(
+    request: Request,
     limit: int = 50,
     offset: int = 0,
     tipo: Literal["Gasto", "Inversion", "Retiro"] | None = None,
@@ -110,7 +120,9 @@ def list_movimientos_route(
 
 
 @router.delete("/movimientos/{movimiento_id}", response_model=MovimientoRead)
+@_critical_limiter.limit("30/minute")
 def delete_movimiento(
+    request: Request,
     movimiento_id: int,
     db: Session = Depends(get_db),
     _: Usuario = Depends(mutation_user),
@@ -120,7 +132,9 @@ def delete_movimiento(
 
 
 @router.patch("/movimientos/{movimiento_id}", response_model=MovimientoRead)
+@_critical_limiter.limit("30/minute")
 def update_movimiento_route(
+    request: Request,
     movimiento_id: int,
     payload: MovimientoUpdate,
     db: Session = Depends(get_db),
@@ -142,7 +156,9 @@ def update_movimiento_route(
     response_model=list[MovimientoRead],
     status_code=status.HTTP_201_CREATED,
 )
+@_critical_limiter.limit("30/minute")
 def crear_liquidacion(
+    request: Request,
     payload: LiquidacionCreate,
     db: Session = Depends(get_db),
     _: Usuario = Depends(mutation_user),
@@ -158,7 +174,9 @@ def crear_liquidacion(
 
 
 @router.get("/socios", response_model=Paginated[SocioConfiguracionRead])
+@user_limiter.limit("300/minute")
 def list_socios(
+    request: Request,
     limit: int = 50,
     offset: int = 0,
     q: str | None = None,
@@ -183,7 +201,9 @@ def list_socios(
     response_model=SocioConfiguracionRead,
     status_code=status.HTTP_201_CREATED,
 )
+@_critical_limiter.limit("30/minute")
 def create_socio(
+    request: Request,
     payload: SocioConfiguracionCreate,
     db: Session = Depends(get_db),
     _: Usuario = Depends(mutation_user),
@@ -194,7 +214,9 @@ def create_socio(
 
 
 @router.patch("/socios/{socio_id}", response_model=SocioConfiguracionRead)
+@_critical_limiter.limit("30/minute")
 def update_socio(
+    request: Request,
     socio_id: int,
     payload: SocioConfiguracionUpdate,
     db: Session = Depends(get_db),
@@ -206,7 +228,9 @@ def update_socio(
 
 
 @router.delete("/socios/{socio_id}", status_code=status.HTTP_204_NO_CONTENT)
+@_critical_limiter.limit("30/minute")
 def delete_socio(
+    request: Request,
     socio_id: int,
     db: Session = Depends(get_db),
     _: Usuario = Depends(mutation_user),

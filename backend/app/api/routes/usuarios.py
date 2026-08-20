@@ -1,11 +1,13 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_admin
-from app.core.security import hash_password
+from app.core.password_policy import validate_password_strength
+from app.core.security import hash_password, verify_password
 from app.models.usuarios import Usuario
 from app.schemas.common import Paginated
 from app.schemas.usuario import UsuarioCreate, UsuarioRead, UsuarioUpdate
@@ -107,4 +109,46 @@ def delete_usuario(
     if usuario.id == current_admin.id:
         raise HTTPException(status_code=400, detail="Cannot delete your own user")
     db.delete(usuario)
+    db.commit()
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.patch("/{usuario_id}/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    usuario_id: int,
+    payload: PasswordChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin),
+):
+    """Change user password with strength validation.
+
+    Admins can change any user's password. Users can only change their own
+    password (via /auth/me/password endpoint in future).
+    """
+    # Admin can change any password, but for security we verify current password
+    # only when changing own password. For admin changing others, skip verification.
+    target_user = db.get(Usuario, usuario_id)
+    if target_user is None:
+        raise HTTPException(status_code=404, detail="Usuario not found")
+
+    # If admin is changing someone else's password, don't require current password
+    # If changing own password, verify current password
+    if target_user.id == current_user.id:
+        if not verify_password(payload.current_password, target_user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Contraseña actual incorrecta",
+            )
+
+    # Validate new password strength
+    try:
+        validate_password_strength(payload.new_password)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    target_user.password_hash = hash_password(payload.new_password)
     db.commit()
