@@ -351,16 +351,18 @@ onMounted(load)
           </Button>
         </div>
 
-        <InsumosTable
-          :rows="insumos"
-          :loading="loading"
-          :categorias="categorias"
-          :can-edit="canManage"
-          @edit="onEditInsumo"
-          @delete="onDeleteInsumo"
-          @filter-change="onInsumosTableFilterChange"
-          @sort-change="onInsumosTableSortChange"
-        />
+        <div class="inventario-table-wrap">
+          <InsumosTable
+            :rows="insumos"
+            :loading="loading"
+            :categorias="categorias"
+            :can-edit="canManage"
+            @edit="onEditInsumo"
+            @delete="onDeleteInsumo"
+            @filter-change="onInsumosTableFilterChange"
+            @sort-change="onInsumosTableSortChange"
+          />
+        </div>
         <Paginator
           class="tabla-paginacion"
           :total-records="insumosTotal"
@@ -375,7 +377,7 @@ onMounted(load)
           :header="editingInsumo === null ? 'Crear insumo' : 'Editar insumo'"
           modal
           position="top"
-          style="width: 720px"
+          :style="{ width: '90vw', maxWidth: '720px' }"
           :dismissable-mask="false"
           :close-on-escape="!savingInsumo"
           :closable="!savingInsumo"
@@ -418,13 +420,15 @@ onMounted(load)
           </Button>
         </div>
 
-        <ComprasTable
-          :rows="compraRows"
-          :loading="loading"
-          :insumos="insumosLookup"
-          @filter-change="onComprasTableFilterChange"
-          @sort-change="onComprasTableSortChange"
-        />
+        <div class="inventario-table-wrap">
+          <ComprasTable
+            :rows="compraRows"
+            :loading="loading"
+            :insumos="insumosLookup"
+            @filter-change="onComprasTableFilterChange"
+            @sort-change="onComprasTableSortChange"
+          />
+        </div>
         <Paginator
           class="tabla-paginacion"
           :total-records="comprasTotal"
@@ -439,7 +443,7 @@ onMounted(load)
           header="Nueva compra"
           modal
           position="top"
-          style="width: 720px"
+          :style="{ width: '90vw', maxWidth: '720px' }"
           :dismissable-mask="false"
           :close-on-escape="!savingCompra"
           :closable="!savingCompra"
@@ -494,5 +498,43 @@ onMounted(load)
 .tabla-paginacion {
   margin-top: 1rem;
   justify-content: flex-end;
+}
+
+.inventario-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+@media (max-width: 767px) {
+  .inventario-header {
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .inventario-header h2 {
+    font-size: 1.35rem;
+  }
+
+  .insumo-toolbar,
+  .compras-filtro {
+    max-width: none;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .insumo-search,
+  .compra-search,
+  .insumo-categoria-filter,
+  .compra-filter-select,
+  .insumo-toolbar :deep(.p-button),
+  .compras-filtro :deep(.p-button) {
+    width: 100%;
+  }
+
+  .tabla-paginacion {
+    justify-content: center;
+    overflow-x: auto;
+  }
 }
 </style>

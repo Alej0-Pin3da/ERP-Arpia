@@ -1,7 +1,42 @@
 # Sugerencias de Mejoras de Arquitectura V2 — ERP/MRP ARPIA
 
-**Fecha:** 2026-08-18  
+**Fecha de actualización:** 2026-08-19  
 **Alcance:** mejoras pendientes después de las implementaciones documentadas en `SUGERENCIAS_MEJORAS_ARQUITECTURA.md`.
+
+---
+
+## Estado de avance al 2026-08-19
+
+### Implementado en esta iteración
+
+- Hardening de configuración productiva: se rechazan el secreto JWT y la URL de base de datos por defecto en `production`/`staging`.
+- Seeder administrativo sin contraseña fija: requiere `ARPIA_ADMIN_PASSWORD` cuando debe crear el usuario inicial.
+- Health checks separados: `/health/live` y `/health/ready`, conservando `/health` por compatibilidad.
+- Deploy local con Docker validado mediante reconstrucción exclusiva de `arpia-api`; la base de datos no se recrea.
+- Shell visual responsive: drawer móvil, overlay, botón de menú, cierre al navegar e iconos de navegación.
+- Vista Ventas responsive: filtros apilables, scroll horizontal controlado e iconos en acciones principales.
+- Vista Análisis ampliada con rentabilidad por producto.
+- Vista Análisis con periodos de 12 meses, año actual y periodo personalizado.
+- KPIs comparables: ventas, unidades, ticket promedio, margen, gastos y resultado neto.
+- Comparación automática contra el periodo anterior equivalente.
+- Filtros temporales propagados a ventas, productos, márgenes, compras de insumos y finanzas.
+- Endpoint backend `GET /api/v1/analiticos/resumen`.
+- Tipos TypeScript regenerados desde el OpenAPI local actualizado.
+- Documentación de que “insumos comprados” no equivale todavía a consumo real de producción.
+
+### Validación realizada
+
+- Frontend: `547` tests aprobados en `59` archivos.
+- Backend: `516` tests aprobados.
+- Backend: `4` fallos conocidos y preexistentes en `test_migrate_stock.py`, relacionados con alias de migración.
+- Tests específicos de analíticos: `22` aprobados.
+- ESLint, Ruff y build de Vite aprobados.
+- API local verificada con login, `/health` y `/api/v1/analiticos/resumen`.
+- El despliegue remoto no se ha ejecutado; cPanel/Passenger queda para una etapa posterior de aprobación.
+
+### Punto exacto para retomar
+
+La siguiente tarea recomendada es completar la experiencia responsive de Inventario y Finanzas. Después conviene resolver el chunk principal de aproximadamente `1,4 MB` y finalmente abordar los cuatro tests históricos de `test_migrate_stock.py` para dejar la suite completamente verde.
 
 ---
 
@@ -35,6 +70,9 @@ Estas propuestas no deberían repetirse como trabajo pendiente salvo que se quie
 - code splitting parcial en rutas de Vue;
 - limpieza de refresh tokens;
 - pipeline CI con Ruff, pytest, ESLint, Vitest y build de frontend.
+- validación productiva de configuración y readiness en el flujo local de API.
+- shell responsive con navegación por iconos y mejora responsive inicial de Ventas.
+- resumen analítico por periodo, KPIs comparables y filtros temporales.
 
 ---
 

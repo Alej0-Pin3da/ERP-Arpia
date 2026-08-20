@@ -42,6 +42,16 @@ P_TELA = f"{P} Stock Tela"
 P_ARG = f"{P} Stock Argolla"
 P_LINO = f"{P} Stock Lino"
 
+# Canonical insumo names created only by alias tests (not in the DB otherwise).
+_ALIAS_CANONICOS = [
+    "Tira de Brasier blanco 10 mts",
+    "Tira de Brasier negro 10 mts",
+    "Argolla numero 8 mm",
+    "ARCO METALICO 2001 34",
+    "Elastico plano negro",
+    "Framilon elastico plano 20 mts",
+]
+
 
 # --------------------------------------------------------------------------- #
 # Mini workbook builder (real layout: header R8, data R9+ per SHEET_BOUNDS)
@@ -107,13 +117,14 @@ def mini_stock(tmp_path) -> Path:
 
 def _borrar_filas_test(db) -> None:
     """Remove rows this test module injected (exact-name matches only)."""
-    insumos = db.query(Insumo).filter(Insumo.nombre.in_([P_TELA, P_ARG, P_LINO])).all()
+    todos_test = [P_TELA, P_ARG, P_LINO] + _ALIAS_CANONICOS
+    insumos = db.query(Insumo).filter(Insumo.nombre.in_(todos_test)).all()
     for ins in insumos:
         # registrar_compra lega CompraInsumo (FK al insumo); borrar primero.
         db.query(CompraInsumo).filter(CompraInsumo.insumo_id == ins.id).delete(
             synchronize_session=False
         )
-    db.query(Insumo).filter(Insumo.nombre.in_([P_TELA, P_ARG, P_LINO])).delete(
+    db.query(Insumo).filter(Insumo.nombre.in_(todos_test)).delete(
         synchronize_session=False
     )
     # Remove the canonical catalog tipos that bootstrap_catalogo() inserts.
@@ -279,6 +290,7 @@ def test_aplicar_stock_alias_tira_brasier_blanca(db, tmp_path):
 
     _preparar_insumos(db)
     canonico = upsert_insumo(db, "Tira de Brasier blanco 10 mts")
+    canonico.stock_actual = Decimal("0")  # reset: may persist from a prior run
     db.commit()
 
     path = tmp_path / "alias-tira.xlsx"
@@ -302,6 +314,7 @@ def test_aplicar_stock_alias_argollas_medianas_estrella(db, tmp_path):
 
     _preparar_insumos(db)
     canonico = upsert_insumo(db, "Argolla numero 8 mm")
+    canonico.stock_actual = Decimal("0")  # reset: may persist from a prior run
     db.commit()
 
     path = tmp_path / "alias-argollas.xlsx"
@@ -323,6 +336,7 @@ def test_aplicar_stock_alias_varilla_copa_talla_34(db, tmp_path):
 
     _preparar_insumos(db)
     canonico = upsert_insumo(db, "ARCO METALICO 2001 34")
+    canonico.stock_actual = Decimal("0")  # reset: may persist from a prior run
     db.commit()
 
     path = tmp_path / "alias-varilla.xlsx"
@@ -367,9 +381,11 @@ def test_aplicar_stock_exacto_primero_no_usa_alias_equivocado(db, tmp_path):
 
     _preparar_insumos(db)
     real = upsert_insumo(db, "Elastico plano negro", categoria_nombre="Telas")
+    real.stock_actual = Decimal("0")  # reset: may persist from a prior run
     # El antiguo destino del alias tambien existe en el catalogo viejo; el
     # stock OCT25 debe ir al insumo con el nombre real, NO al alias viejo.
     otro = upsert_insumo(db, "Framilon elastico plano 20 mts", categoria_nombre="Telas")
+    otro.stock_actual = Decimal("0")  # reset: may persist from a prior run
     db.commit()
 
     path = tmp_path / "exacto-gana.xlsx"

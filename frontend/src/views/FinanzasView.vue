@@ -407,16 +407,18 @@ onMounted(load)
             Nuevo movimiento
           </Button>
         </div>
-        <MovimientosTable
-          :rows="movimientoRows"
-          :loading="loading"
-          :can-delete="canRegister"
-          :can-edit="canRegister"
-          @delete="onDeleteMovimiento"
-          @edit="onEditMovimiento"
-          @filter-change="onMovimientoTableFilterChange"
-          @sort-change="onMovimientoTableSortChange"
-        />
+        <div class="finanzas-table-wrap">
+          <MovimientosTable
+            :rows="movimientoRows"
+            :loading="loading"
+            :can-delete="canRegister"
+            :can-edit="canRegister"
+            @delete="onDeleteMovimiento"
+            @edit="onEditMovimiento"
+            @filter-change="onMovimientoTableFilterChange"
+            @sort-change="onMovimientoTableSortChange"
+          />
+        </div>
         <Paginator
           class="tabla-paginacion"
           :total-records="movimientosTotal"
@@ -431,7 +433,7 @@ onMounted(load)
           :header="editingMovimiento === null ? 'Registrar movimiento' : 'Editar movimiento'"
           modal
           position="top"
-          style="width: 720px"
+          :style="{ width: '90vw', maxWidth: '720px' }"
           :dismissable-mask="false"
           :close-on-escape="!savingMovimiento"
           :closable="!savingMovimiento"
@@ -453,12 +455,14 @@ onMounted(load)
 
         <div v-if="liquidacionRows.length > 0" class="liquidacion-result" data-test="liquidacion-result">
           <h3>Resultado de la liquidación</h3>
-          <DataTable :value="liquidacionRows">
-            <Column field="socio" header="Socio" style="min-width: 220px" />
-            <Column header="Monto" style="width: 180px" align="right">
-              <template #body="{ data }">{{ formatMoney(data.monto) }}</template>
-            </Column>
-          </DataTable>
+          <div class="finanzas-table-wrap">
+            <DataTable :value="liquidacionRows">
+              <Column field="socio" header="Socio" style="min-width: 220px" />
+              <Column header="Monto" style="width: 180px" align="right">
+                <template #body="{ data }">{{ formatMoney(data.monto) }}</template>
+              </Column>
+            </DataTable>
+          </div>
         </div>
       </TabPanel>
 
@@ -468,14 +472,16 @@ onMounted(load)
             Nuevo socio
           </Button>
         </div>
-        <SociosTable
-          :rows="socios"
-          :loading="loading"
-          :can-edit="canRegister"
-          @edit="onEditSocio"
-          @delete="onDeleteSocio"
-          @sort-change="onSociosTableSortChange"
-        />
+        <div class="finanzas-table-wrap">
+          <SociosTable
+            :rows="socios"
+            :loading="loading"
+            :can-edit="canRegister"
+            @edit="onEditSocio"
+            @delete="onDeleteSocio"
+            @sort-change="onSociosTableSortChange"
+          />
+        </div>
         <Paginator
           class="tabla-paginacion"
           :total-records="sociosTotal"
@@ -490,7 +496,7 @@ onMounted(load)
           :header="editingSocio === null ? 'Crear socio' : 'Editar socio'"
           modal
           position="top"
-          style="width: 560px"
+          :style="{ width: '90vw', maxWidth: '560px' }"
           :dismissable-mask="false"
           :close-on-escape="!savingSocio"
           :closable="!savingSocio"
@@ -553,5 +559,43 @@ onMounted(load)
 
 .liquidacion-result h3 {
   margin: 0 0 0.5rem;
+}
+
+.finanzas-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+@media (max-width: 767px) {
+  .finanzas-header {
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .finanzas-header h2 {
+    font-size: 1.35rem;
+  }
+
+  .finanzas-toolbar {
+    max-width: none;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .movimiento-tipo-filter,
+  .finanzas-toolbar :deep(.p-button),
+  .socios-toolbar :deep(.p-button) {
+    width: 100%;
+  }
+
+  .tabla-paginacion {
+    justify-content: center;
+    overflow-x: auto;
+  }
+
+  .liquidacion-result {
+    max-width: none;
+  }
 }
 </style>
