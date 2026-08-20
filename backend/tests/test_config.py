@@ -20,6 +20,8 @@ def test_settings_production_accepts_secure_secret():
         ENVIRONMENT="production",
         JWT_SECRET_KEY="super_secure_production_secret_key_12345",
         DATABASE_URL="postgresql+psycopg://arpia:secret@db.example.com:5432/arpia",
+        CORS_ORIGINS="https://arpia.com.co,https://app.arpia.com.co",
+        ACCESS_TOKEN_EXPIRE_MINUTES=15,
     )
     assert s.JWT_SECRET_KEY == "super_secure_production_secret_key_12345"
 

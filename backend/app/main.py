@@ -13,6 +13,7 @@ from app.core.exceptions import DomainError
 from app.core.limiter import limiter
 from app.core.logging_config import setup_logging
 from app.core.logging_middleware import RequestContextMiddleware
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.db.session import engine
 from app.models import Base  # noqa: F401  # ensure all models are registered
 
@@ -29,13 +30,36 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Security headers middleware (added first so headers apply to all responses)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Strict CORS per environment
+cors_kwargs = {
+    "allow_origins": settings.cors_origins_list,
+    "allow_credentials": True,
+    "allow_methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    "allow_headers": [
+        "Authorization",
+        "Content-Type",
+        "X-Requested-With",
+        "X-Request-ID",
+        "Idempotency-Key",
+    ],
+    "expose_headers": ["X-Request-ID"],
+    "max_age": 600 if settings.ENVIRONMENT in ("production", "staging") else 0,
+}
+# In production/staging, be more restrictive
+if settings.ENVIRONMENT in ("production", "staging"):
+    cors_kwargs["allow_methods"] = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    cors_kwargs["allow_headers"] = [
+        "Authorization",
+        "Content-Type",
+        "X-Requested-With",
+        "X-Request-ID",
+        "Idempotency-Key",
+    ]
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 app.add_middleware(RequestContextMiddleware)
 
 
