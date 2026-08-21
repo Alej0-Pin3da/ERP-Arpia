@@ -16,6 +16,7 @@ import { ref } from 'vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import DatePicker from 'primevue/datepicker'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
@@ -47,7 +48,8 @@ const emit = defineEmits<{
       estado?: string | null
       cliente?: string | null
       producto?: string | null
-      fecha?: string | null
+      fecha_desde?: string | null
+      fecha_hasta?: string | null
       total_venta?: string | null
     },
   ]
@@ -68,11 +70,38 @@ const estadoFilters = (['completada', 'anulada'] as const).map((e) => ({
 const filters = ref<Record<string, PrimeVueFilterConstraint>>({
   canal_venta: { value: null, matchMode: 'equals' },
   estado: { value: null, matchMode: 'equals' },
-  fecha: { value: null, matchMode: 'contains' },
+  fecha: { value: null, matchMode: 'between' },
   nombre: { value: null, matchMode: 'contains' },
   cliente: { value: null, matchMode: 'contains' },
   total_venta: { value: null, matchMode: 'contains' },
 })
+
+/** Fecha presets helpers for the rango filter. */
+function last7Days(): Date[] {
+  const end = new Date()
+  const start = new Date()
+  start.setDate(end.getDate() - 6)
+  // strip time for consistent ISO date boundaries
+  start.setHours(0, 0, 0, 0)
+  end.setHours(0, 0, 0, 0)
+  return [start, end]
+}
+
+function thisMonth(): Date[] {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), 1)
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  start.setHours(0, 0, 0, 0)
+  end.setHours(0, 0, 0, 0)
+  return [start, end]
+}
+
+function todayRange(): Date[] {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  const c = new Date(d)
+  return [d, c]
+}
 
 /** Expanded rows keyed by row id (nested detail table). */
 const expandedRows = ref<Record<string, boolean>>({})
@@ -86,14 +115,36 @@ function onDataTableFilter(e: {
   const estado = parseColumnFilter(normalized.estado)
   const cliente = parseColumnFilter(normalized.cliente)
   const producto = parseColumnFilter(normalized.nombre)
-  const fecha = parseColumnFilter(normalized.fecha)
   const total_venta = parseColumnFilter(normalized.total_venta)
+
+  // fecha is a Date range [Date, Date] | null with matchMode 'between'
+  let fecha_desde: string | null = null
+  let fecha_hasta: string | null = null
+  const rawFecha = normalized.fecha as unknown
+  let fechaRange: unknown = null
+  if (Array.isArray(rawFecha) && rawFecha.length > 0) {
+    // parsePrimeVueFilters wraps constraint.value => [value]; for range, value is Date[]
+    fechaRange = rawFecha[0]
+  }
+  if (Array.isArray(fechaRange) && fechaRange.length === 2 && fechaRange[0] && fechaRange[1]) {
+    const d0 = fechaRange[0] as Date
+    const d1 = fechaRange[1] as Date
+    if (d0 instanceof Date && d1 instanceof Date && !isNaN(d0.getTime()) && !isNaN(d1.getTime())) {
+      fecha_desde = d0.toISOString().split('T')[0]
+      fecha_hasta = d1.toISOString().split('T')[0]
+    }
+  } else if (fechaRange === null || fechaRange === undefined) {
+    fecha_desde = null
+    fecha_hasta = null
+  }
+
   emit('filter-change', {
     canal_venta: canal_venta === null ? null : String(canal_venta),
     estado: estado === null ? null : String(estado),
     cliente: cliente === null ? null : String(cliente),
     producto: producto === null ? null : String(producto),
-    fecha: fecha === null ? null : String(fecha),
+    fecha_desde,
+    fecha_hasta,
     total_venta: total_venta === null ? null : String(total_venta),
   })
 }
@@ -156,12 +207,40 @@ function productSummary(row: VentaRow): string {
     >
       <template #body="{ data }">{{ formatDateTime(data.fecha) }}</template>
       <template #filter="{ filterModel, filterCallback }">
-        <InputText
-          v-model="filterModel.value"
-          placeholder="Filtrar fecha"
-          style="min-width: 12rem"
-          @keydown.enter="filterCallback()"
-        />
+        <div class="fecha-filter-menu" style="min-width: 280px; padding: 0.5rem">
+          <div class="fecha-presets" style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem">
+            <Button
+              label="Hoy"
+              size="small"
+              severity="secondary"
+              @click="() => { filterModel.value = todayRange(); filterCallback(); }"
+            />
+            <Button
+              label="7 días"
+              size="small"
+              severity="secondary"
+              @click="() => { const r = last7Days(); filterModel.value = r; filterCallback(); }"
+            />
+            <Button
+              label="Este mes"
+              size="small"
+              severity="secondary"
+              @click="() => { const r = thisMonth(); filterModel.value = r; filterCallback(); }"
+            />
+            <Button label="Limpiar" size="small" text @click="() => { filterModel.value = null; filterCallback(); }" />
+          </div>
+          <DatePicker
+            v-model="filterModel.value"
+            selectionMode="range"
+            dateFormat="dd/mm/yy"
+            placeholder="Rango de fechas"
+            :manualInput="false"
+            showIcon
+            fluid
+            @update:modelValue="() => { /* no auto filterCallback para permitir selección completa */ }"
+            @hide="() => { if (filterModel.value && filterModel.value[1]) filterCallback(); }"
+          />
+        </div>
       </template>
     </Column>
     <Column
@@ -348,6 +427,15 @@ function productSummary(row: VentaRow): string {
   color: var(--arpia-text-muted);
   padding: 2rem 0;
   text-align: center;
+}
+
+.fecha-filter-menu {
+  background: var(--arpia-card);
+  border-radius: 0.5rem;
+}
+
+.fecha-presets {
+  flex-wrap: wrap;
 }
 
 /* Header funnel contrast on dark theme — PrimeVue 4.5.5 uses .p-column-filter-menu-button */

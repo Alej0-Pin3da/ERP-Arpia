@@ -59,6 +59,8 @@ const pageSize = 20
 const filterCanal = ref<'web' | 'whatsapp' | 'instagram' | 'feria' | null>(null)
 const filterEstado = ref<'completada' | 'anulada' | null>(null)
 const filterProductoId = ref<number | null>(null)
+const filterFechaDesde = ref<string | null>(null)
+const filterFechaHasta = ref<string | null>(null)
 const filterSearch = ref<string | null>(null)
 const sortBy = ref<string | null>(null)
 const sortOrder = ref<'asc' | 'desc' | null>(null)
@@ -109,6 +111,8 @@ async function load(): Promise<void> {
             canal_venta: filterCanal.value,
             estado: filterEstado.value,
             producto_id: filterProductoId.value,
+            fecha_desde: filterFechaDesde.value,
+            fecha_hasta: filterFechaHasta.value,
           },
           q: filterSearch.value ?? undefined,
           sortBy: sortBy.value ?? undefined,
@@ -151,16 +155,18 @@ function onTableFilterChange(filters: {
   estado?: string | null
   cliente?: string | null
   producto?: string | null
-  fecha?: string | null
+  fecha_desde?: string | null
+  fecha_hasta?: string | null
   total_venta?: string | null
 }): void {
   filterCanal.value = (filters.canal_venta ?? null) as typeof filterCanal.value
   filterEstado.value = (filters.estado ?? null) as typeof filterEstado.value
-  // Text filters (cliente/producto/fecha/total) have no dedicated backend
+  filterFechaDesde.value = filters.fecha_desde ?? null
+  filterFechaHasta.value = filters.fecha_hasta ?? null
+  // Text filters (cliente/producto/total) have no dedicated backend
   // column filter; map them to the global `q` search param so the funnel is
-  // functional even without per-field backend support (client-side fallback
-  // would also satisfy the slice goal — event emits + visible funnel).
-  const qParts = [filters.cliente, filters.producto, filters.fecha, filters.total_venta]
+  // functional even without per-field backend support.
+  const qParts = [filters.cliente, filters.producto, filters.total_venta]
     .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
     .map((v) => v.trim())
   filterSearch.value = qParts.length > 0 ? qParts.join(' ') : null

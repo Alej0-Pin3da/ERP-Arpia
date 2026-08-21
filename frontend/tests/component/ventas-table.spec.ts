@@ -161,15 +161,18 @@ describe('VentasTable (MOD-1 list)', () => {
     const wrapper = await mountTable([ROW])
 
     // Config-level: the lazy filter state declares one constraint per column
-    // and funnels render for canal/estado (equals) + fecha/nombre/cliente/total_venta (contains) (filterDisplay="menu").
+    // and funnels render for canal/estado (equals) + fecha (between, DatePicker rango) + nombre/cliente/total_venta (contains) (filterDisplay="menu").
     expect(wrapper.findComponent(DataTable).props('filters')).toEqual({
       canal_venta: { value: null, matchMode: 'equals' },
       estado: { value: null, matchMode: 'equals' },
-      fecha: { value: null, matchMode: 'contains' },
+      fecha: { value: null, matchMode: 'between' },
       nombre: { value: null, matchMode: 'contains' },
       cliente: { value: null, matchMode: 'contains' },
       total_venta: { value: null, matchMode: 'contains' },
     })
+    // fecha filter is now a DatePicker rango (array or null), not InputText
+    const fechaFilter = wrapper.findComponent(DataTable).props('filters').fecha
+    expect(fechaFilter.value === null || Array.isArray(fechaFilter.value)).toBe(true)
     expect(wrapper.findAll('.p-datatable-column-filter-button')).toHaveLength(6)
 
     // Behavioral: opening the canal funnel mounts the Select with labeled options.
@@ -204,7 +207,8 @@ describe('VentasTable (MOD-1 list)', () => {
       estado: 'anulada',
       cliente: null,
       producto: null,
-      fecha: null,
+      fecha_desde: null,
+      fecha_hasta: null,
       total_venta: null,
     })
   })
@@ -225,7 +229,31 @@ describe('VentasTable (MOD-1 list)', () => {
       estado: null,
       cliente: null,
       producto: null,
-      fecha: null,
+      fecha_desde: null,
+      fecha_hasta: null,
+      total_venta: null,
+    })
+  })
+
+  it('emits fecha_desde/hasta as ISO dates when the fecha range is set', async () => {
+    const wrapper = await mountTable([ROW])
+
+    const d1 = new Date('2026-08-01T00:00:00.000Z')
+    const d2 = new Date('2026-08-10T00:00:00.000Z')
+    wrapper.findComponent(DataTable).vm.$emit('filter', {
+      filters: {
+        fecha: { value: [d1, d2], matchMode: 'between' },
+      },
+    })
+    await nextTick()
+
+    expect(wrapper.emitted('filter-change')![0][0]).toEqual({
+      canal_venta: null,
+      estado: null,
+      cliente: null,
+      producto: null,
+      fecha_desde: '2026-08-01',
+      fecha_hasta: '2026-08-10',
       total_venta: null,
     })
   })
