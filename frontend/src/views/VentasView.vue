@@ -124,12 +124,27 @@ async function load(): Promise<void> {
     ])
     productos.value = productosList.items
     clientes.value = clientesList.items
-    total.value = ventasPage.total
     rawVentas.value = ventasPage.items
     const variantes = await fetchVariantesForVentas(
       buildVentaRows(ventasPage.items, productos.value, [], clientes.value),
     )
-    rows.value = buildVentaRows(ventasPage.items, productos.value, variantes, clientes.value)
+    let filtered = buildVentaRows(ventasPage.items, productos.value, variantes, clientes.value)
+
+    // Client-side date filter: backend ignores fecha_desde/hasta, so filter in-memory
+    if (filterFechaDesde.value || filterFechaHasta.value) {
+      const desde = filterFechaDesde.value ? new Date(filterFechaDesde.value) : null
+      const hasta = filterFechaHasta.value ? new Date(filterFechaHasta.value) : null
+      if (hasta) hasta.setHours(23, 59, 59, 999)
+      filtered = filtered.filter((r) => {
+        const d = new Date(r.fecha)
+        if (desde && d < desde) return false
+        if (hasta && d > hasta) return false
+        return true
+      })
+    }
+
+    rows.value = filtered
+    total.value = filterFechaDesde.value || filterFechaHasta.value ? filtered.length : ventasPage.total
   } catch {
     error.value = 'No se pudo cargar la lista de ventas. Verifica la conexión con el servidor.'
   } finally {
