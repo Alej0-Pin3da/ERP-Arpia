@@ -8,17 +8,22 @@
  *    rows below their minimum are highlighted (stockSeverity, dashboard
  *    pattern). Toolbar: global q + categoria_id filter (server-side, reset to
  *    page 1). The create/edit form + Editar/Eliminar actions are ADMIN ONLY.
+ *    **Migrated (UX slice 1): Insumos uses usePaginatedList + EmptyState /
+ *    LoadingSkeleton / ErrorState (reference example for other views).**
  *  - Compras: server-side paginated GET /compras-insumos with q +
  *    insumo_id filters. POST runs the WAC service server-side
  *    (updates stock/cost), so a successful compra refreshes BOTH tabs.
  *
  * Lookup joins (ComprasForm options, filter select, compra name join) fetch
- * the full insumos set with limit:1000 against `.items` (design D3) — table
- * views use real pagination, join fetches keep the lookup hack.
+ * the full insumos set via src/api/lookups (limit:1000 stop-gap, design D3).
  */
 import { computed, onMounted, ref } from 'vue'
 
-import { categoriasInsumosApi, comprasApi, insumosApi } from '@/api/endpoints'
+import { comprasApi, insumosApi } from '@/api/endpoints'
+import { fetchCategoriasLookup, fetchInsumosLookup } from '@/api/lookups'
+import EmptyState from '@/components/common/EmptyState.vue'
+import ErrorState from '@/components/common/ErrorState.vue'
+import LoadingSkeleton from '@/components/common/LoadingSkeleton.vue'
 import ComprasForm from '@/components/inventario/ComprasForm.vue'
 import ComprasTable from '@/components/inventario/ComprasTable.vue'
 import InsumoForm from '@/components/inventario/InsumoForm.vue'
@@ -34,6 +39,7 @@ import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
+import { usePaginatedList } from '@/composables/usePaginatedList'
 import { useAuthStore } from '@/stores/auth'
 import { confirmAction } from '@/utils/confirm'
 import { buildListParams } from '@/utils/pagination'
@@ -56,15 +62,20 @@ const activeTab = ref('insumos')
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-// --- insumos table: server-side pagination + filters -----------------------
-const insumos = ref<InsumoRead[]>([])
-const insumosTotal = ref(0)
-const insumosPage = ref(1)
-const insumosPageSize = ref(20)
-const insumoQ = ref('')
-const filterCategoriaId = ref<number | null>(null)
-const insumosSortBy = ref<string | null>(null)
-const insumosSortOrder = ref<'asc' | 'desc' | null>(null)
+// --- insumos table: via usePaginatedList (UX slice 1 reference) ---------------
+const insumosList = usePaginatedList<InsumoRead>((params) => insumosApi.list(params), {
+  pageSize: 20,
+  initialFilters: { categoria_id: null },
+  debounceMs: 300,
+})
+
+// Proxy for toolbar Select v-model (Select expects number|null bound)
+const filterCategoriaId = computed<number | null>({
+  get: () => (insumosList.filters.value.categoria_id as number | null) ?? null,
+  set: (v: number | null) => {
+    insumosList.filters.value.categoria_id = v
+  },
+})
 
 // --- compras table: server-side pagination + filters -----------------------
 const compras = ref<CompraInsumoRead[]>([])
@@ -77,7 +88,7 @@ const filterInsumoId = ref<number | null>(null)
 const comprasSortBy = ref<string | null>(null)
 const comprasSortOrder = ref<'asc' | 'desc' | null>(null)
 
-// --- lookups (full sets, limit:1000 — design D3) ---------------------------
+// --- lookups (full sets via src/api/lookups, limit:1000 stop-gap) -----------
 const insumosLookup = ref<InsumoRead[]>([])
 const categorias = ref<CategoriaInsumoRead[]>([])
 
@@ -96,17 +107,10 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    const [insumosPage_, comprasPage_, categoriasList, insumosLookup_] = await Promise.all([
-      insumosApi.list(
-        buildListParams({
-          page: insumosPage.value,
-          pageSize: insumosPageSize.value,
-          filtros: { categoria_id: filterCategoriaId.value },
-          q: insumoQ.value,
-          sortBy: insumosSortBy.value ?? undefined,
-          sortOrder: insumosSortOrder.value ?? undefined,
-        }),
-      ),
+    // Insumos paginated via composable (keeps its own loading/error but we
+    // await it here for the initial joint load to satisfy tests).
+    const [, comprasPage_, categoriasList, insumosLookup_] = await Promise.all([
+      insumosList.load(),
       comprasApi.list(
         buildListParams({
           page: comprasPage.value,
@@ -118,16 +122,16 @@ async function load(): Promise<void> {
         }),
       ),
       // Categoria options only feed the admin-only form — skip for other roles.
-      canManage.value ? categoriasInsumosApi.list() : Promise.resolve({ items: [] as CategoriaInsumoRead[], total: 0 }),
+      canManage.value ? fetchCategoriasLookup().then((items) => ({ items, total: items.length })) : Promise.resolve({ items: [] as CategoriaInsumoRead[], total: 0 }),
       // D3: join fetches keep the full set (no pagination on lookups).
-      insumosApi.list({ limit: 1000 }),
+      fetchInsumosLookup().then((items) => ({ items, total: items.length })),
     ])
-    insumos.value = insumosPage_.items
-    insumosTotal.value = insumosPage_.total
     compras.value = comprasPage_.items
     comprasTotal.value = comprasPage_.total
     categorias.value = categoriasList.items
     insumosLookup.value = insumosLookup_.items
+    // Propagate insumosList error to global error for the header Message fallback
+    if (insumosList.error.value) error.value = insumosList.error.value
   } catch {
     error.value = 'No se pudo cargar la información del inventario. Verifica la conexión con el servidor.'
   } finally {
@@ -153,13 +157,23 @@ function serverDetail(err: unknown): string | null {
 
 /** FE-2: every filter/busqueda change resets to page 1 and refetches. */
 function onInsumosSearch(): void {
-  insumosPage.value = 1
-  load()
+  // q is already bound via v-model to insumosList.q; force immediate load
+  // (bypass the 300ms debounce for explicit Enter/search).
+  void insumosList.load()
 }
 
 function onInsumosFilterChange(): void {
-  insumosPage.value = 1
-  load()
+  // Toolbar Select changed — delegate to composable (resets to page 1)
+  insumosList.onFilterChange({ categoria_id: filterCategoriaId.value ?? null })
+  // Keep lookup-dependent compras in sync only for insumos tab side-effects:
+  // the joint load also refreshes compras/lookups, so trigger full reload.
+  // But for filter-only we can just let the composable reload insumos;
+  // to keep test expectations (full Promise.all on filter), reload lookups too.
+  // Simpler: reload via full load() after the composable's own load — however
+  // onFilterChange already called load(), so we avoid double. For now the
+  // composable's load suffices for insumos; refresh lookups lazily on create.
+  // To keep existing test (expects list called with new filter), the composable
+  // already did it. No extra work.
 }
 
 function onComprasSearch(): void {
@@ -172,10 +186,9 @@ function onComprasFilterChange(): void {
   load()
 }
 
-/** Paginator @page (insumos): recompute the 1-based page from first index. */
+/** Paginator @page (insumos): delegate to composable. */
 function onInsumosPage(e: { first: number; rows: number }): void {
-  insumosPage.value = Math.floor(e.first / e.rows) + 1
-  load()
+  insumosList.onPage(e)
 }
 
 /** Paginator @page (compras): recompute the 1-based page from first index. */
@@ -184,10 +197,9 @@ function onComprasPage(e: { first: number; rows: number }): void {
   load()
 }
 
-/** Header column filter (InsumosTable) maps into the categoria_id ref. */
+/** Header column filter (InsumosTable) maps into the composable filters. */
 function onInsumosTableFilterChange(filters: { categoria_id?: number | null }): void {
-  filterCategoriaId.value = filters.categoria_id ?? null
-  onInsumosFilterChange()
+  insumosList.onFilterChange({ categoria_id: filters.categoria_id ?? null })
 }
 
 /** Header column filter (ComprasTable) maps into the insumo ref. */
@@ -196,11 +208,9 @@ function onComprasTableFilterChange(filters: { insumo_id?: number | null }): voi
   onComprasFilterChange()
 }
 
-/** Server-side column sort (insumos): reset to page 1; null clears the sort. */
+/** Server-side column sort (insumos): delegate to composable. */
 function onInsumosTableSortChange(sort: { prop: string; order: 'asc' | 'desc' | null }): void {
-  insumosSortBy.value = sort.order === null ? null : sort.prop
-  insumosSortOrder.value = sort.order
-  onInsumosFilterChange()
+  insumosList.onSort(sort)
 }
 
 /** Server-side column sort (compras): reset to page 1; null clears the sort. */
@@ -312,11 +322,11 @@ onMounted(load)
   <section class="inventario">
     <header class="inventario-header">
       <h2>Inventario</h2>
-      <Button :loading="loading" data-test="refresh-inventario" @click="load">Actualizar</Button>
+      <Button :loading="loading || insumosList.loading.value" data-test="refresh-inventario" @click="load">Actualizar</Button>
     </header>
 
-    <div v-if="error" class="inventario-error">
-      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error }}</Message>
+    <div v-if="error || insumosList.error.value" class="inventario-error">
+      <Message severity="error" :closable="false" icon="pi pi-times-circle">{{ error ?? insumosList.error.value }}</Message>
     </div>
 
     <Tabs v-model:value="activeTab">
@@ -328,7 +338,7 @@ onMounted(load)
         <TabPanel value="insumos">
         <div class="insumo-toolbar">
           <InputText
-            v-model="insumoQ"
+            v-model="insumosList.q.value"
             placeholder="Buscar insumo…"
             data-test="insumo-search"
             class="insumo-search"
@@ -351,26 +361,42 @@ onMounted(load)
           </Button>
         </div>
 
-        <div class="inventario-table-wrap">
-          <InsumosTable
-            :rows="insumos"
-            :loading="loading"
-            :categorias="categorias"
-            :can-edit="canManage"
-            @edit="onEditInsumo"
-            @delete="onDeleteInsumo"
-            @filter-change="onInsumosTableFilterChange"
-            @sort-change="onInsumosTableSortChange"
-          />
-        </div>
-        <Paginator
-          class="tabla-paginacion"
-          :total-records="insumosTotal"
-          :rows="insumosPageSize"
-          :first="(insumosPage - 1) * insumosPageSize"
-          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-          @page="onInsumosPage"
+        <LoadingSkeleton v-if="insumosList.loading.value && insumosList.items.value.length === 0" :rows="5" :columns="6" />
+        <ErrorState
+          v-else-if="insumosList.error.value"
+          :message="insumosList.error.value"
+          @retry="insumosList.load"
         />
+        <EmptyState
+          v-else-if="!insumosList.loading.value && insumosList.items.value.length === 0"
+          icon="pi pi-inbox"
+          title="Sin insumos registrados"
+          description="No se encontraron insumos con los filtros actuales."
+          action-label="Recargar"
+          @action="insumosList.load"
+        />
+        <template v-else>
+          <div class="inventario-table-wrap">
+            <InsumosTable
+              :rows="insumosList.items.value"
+              :loading="insumosList.loading.value"
+              :categorias="categorias"
+              :can-edit="canManage"
+              @edit="onEditInsumo"
+              @delete="onDeleteInsumo"
+              @filter-change="onInsumosTableFilterChange"
+              @sort-change="onInsumosTableSortChange"
+            />
+          </div>
+          <Paginator
+            class="tabla-paginacion"
+            :total-records="insumosList.total.value"
+            :rows="insumosList.pageSize.value"
+            :first="(insumosList.page.value - 1) * insumosList.pageSize.value"
+            template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+            @page="onInsumosPage"
+          />
+        </template>
 
         <Dialog
           v-model:visible="insumoDialogVisible"

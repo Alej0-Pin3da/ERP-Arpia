@@ -45,6 +45,7 @@ function getView(name: string) {
     throw new Error(`View ${name} not found in glob paths`)
   }
   return import.meta.env.MODE === 'test'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ? (match as any).default
     : match
 }
