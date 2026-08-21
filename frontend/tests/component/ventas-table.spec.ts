@@ -160,16 +160,21 @@ describe('VentasTable (MOD-1 list)', () => {
   it('declares header funnel filters on the canal/estado columns with labeled options', async () => {
     const wrapper = await mountTable([ROW])
 
-    // Config-level: the lazy filter state declares one 'equals' constraint per
-    // column and both funnels render (filterDisplay="menu").
+    // Config-level: the lazy filter state declares one constraint per column
+    // and funnels render for canal/estado (equals) + fecha/nombre/cliente/total_venta (contains) (filterDisplay="menu").
     expect(wrapper.findComponent(DataTable).props('filters')).toEqual({
       canal_venta: { value: null, matchMode: 'equals' },
       estado: { value: null, matchMode: 'equals' },
+      fecha: { value: null, matchMode: 'contains' },
+      nombre: { value: null, matchMode: 'contains' },
+      cliente: { value: null, matchMode: 'contains' },
+      total_venta: { value: null, matchMode: 'contains' },
     })
-    expect(wrapper.findAll('.p-datatable-column-filter-button')).toHaveLength(2)
+    expect(wrapper.findAll('.p-datatable-column-filter-button')).toHaveLength(6)
 
     // Behavioral: opening the canal funnel mounts the Select with labeled options.
-    await wrapper.findAll('.p-datatable-column-filter-button')[0].trigger('click')
+    // Fecha is the first filterable column (InputText), canal is second.
+    await wrapper.findAll('.p-datatable-column-filter-button')[1].trigger('click')
     await flushOverlay()
 
     const canalSelect = wrapper.findComponent(Select)
@@ -194,7 +199,14 @@ describe('VentasTable (MOD-1 list)', () => {
     await nextTick()
 
     expect(wrapper.emitted('filter-change')).toBeDefined()
-    expect(wrapper.emitted('filter-change')![0][0]).toEqual({ canal_venta: 'feria', estado: 'anulada' })
+    expect(wrapper.emitted('filter-change')![0][0]).toEqual({
+      canal_venta: 'feria',
+      estado: 'anulada',
+      cliente: null,
+      producto: null,
+      fecha: null,
+      total_venta: null,
+    })
   })
 
   it('emits nulls when a column filter is cleared (null constraint)', async () => {
@@ -208,7 +220,14 @@ describe('VentasTable (MOD-1 list)', () => {
     })
     await nextTick()
 
-    expect(wrapper.emitted('filter-change')![0][0]).toEqual({ canal_venta: null, estado: null })
+    expect(wrapper.emitted('filter-change')![0][0]).toEqual({
+      canal_venta: null,
+      estado: null,
+      cliente: null,
+      producto: null,
+      fecha: null,
+      total_venta: null,
+    })
   })
 
   it('maps a PrimeVue sort payload into a typed {prop, order} emit', async () => {

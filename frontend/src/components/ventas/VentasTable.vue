@@ -16,6 +16,7 @@ import { ref } from 'vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
+import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import { formatDateTime, formatMoney, formatQty } from '@/utils/format'
@@ -40,7 +41,16 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'filter-change': [filters: { canal_venta?: string | null; estado?: string | null }]
+  'filter-change': [
+    filters: {
+      canal_venta?: string | null
+      estado?: string | null
+      cliente?: string | null
+      producto?: string | null
+      fecha?: string | null
+      total_venta?: string | null
+    },
+  ]
   'sort-change': [sort: { prop: string; order: 'asc' | 'desc' | null }]
   'marcar-regalo': [ventaId: number]
   'editar': [row: VentaRow]
@@ -58,6 +68,10 @@ const estadoFilters = (['completada', 'anulada'] as const).map((e) => ({
 const filters = ref<Record<string, PrimeVueFilterConstraint>>({
   canal_venta: { value: null, matchMode: 'equals' },
   estado: { value: null, matchMode: 'equals' },
+  fecha: { value: null, matchMode: 'contains' },
+  nombre: { value: null, matchMode: 'contains' },
+  cliente: { value: null, matchMode: 'contains' },
+  total_venta: { value: null, matchMode: 'contains' },
 })
 
 /** Expanded rows keyed by row id (nested detail table). */
@@ -70,9 +84,17 @@ function onDataTableFilter(e: {
   const normalized = parsePrimeVueFilters(e.filters)
   const canal_venta = parseColumnFilter(normalized.canal_venta)
   const estado = parseColumnFilter(normalized.estado)
+  const cliente = parseColumnFilter(normalized.cliente)
+  const producto = parseColumnFilter(normalized.nombre)
+  const fecha = parseColumnFilter(normalized.fecha)
+  const total_venta = parseColumnFilter(normalized.total_venta)
   emit('filter-change', {
     canal_venta: canal_venta === null ? null : String(canal_venta),
     estado: estado === null ? null : String(estado),
+    cliente: cliente === null ? null : String(cliente),
+    producto: producto === null ? null : String(producto),
+    fecha: fecha === null ? null : String(fecha),
+    total_venta: total_venta === null ? null : String(total_venta),
   })
 }
 
@@ -121,8 +143,26 @@ function productSummary(row: VentaRow): string {
     </template>
 
     <Column field="id" header="#" sortable style="width: 70px" />
-    <Column field="fecha" header="Fecha" sortable style="width: 110px">
+    <Column
+      field="fecha"
+      header="Fecha"
+      sortable
+      :show-filter-operator="false"
+      :show-filter-match-modes="false"
+      :show-filter-add-button="false"
+      :show-filter-apply-button="false"
+      :show-clear-button="false"
+      style="width: 110px"
+    >
       <template #body="{ data }">{{ formatDateTime(data.fecha) }}</template>
+      <template #filter="{ filterModel, filterCallback }">
+        <InputText
+          v-model="filterModel.value"
+          placeholder="Filtrar fecha"
+          style="min-width: 12rem"
+          @keydown.enter="filterCallback()"
+        />
+      </template>
     </Column>
     <Column
       field="canal_venta"
@@ -177,16 +217,71 @@ function productSummary(row: VentaRow): string {
         />
       </template>
     </Column>
-    <Column field="nombre" header="Productos" style="min-width: 220px">
+    <Column
+      field="nombre"
+      header="Productos"
+      :show-filter-operator="false"
+      :show-filter-match-modes="false"
+      :show-filter-add-button="false"
+      :show-filter-apply-button="false"
+      :show-clear-button="false"
+      style="min-width: 220px"
+    >
       <template #body="{ data }">{{ productSummary(data) }}</template>
+      <template #filter="{ filterModel, filterCallback }">
+        <InputText
+          v-model="filterModel.value"
+          placeholder="Filtrar producto"
+          style="min-width: 12rem"
+          @keydown.enter="filterCallback()"
+        />
+      </template>
     </Column>
-    <Column field="cliente" header="Cliente" sortable style="min-width: 150px" />
+    <Column
+      field="cliente"
+      header="Cliente"
+      sortable
+      :show-filter-operator="false"
+      :show-filter-match-modes="false"
+      :show-filter-add-button="false"
+      :show-filter-apply-button="false"
+      :show-clear-button="false"
+      style="min-width: 150px"
+    >
+      <template #filter="{ filterModel, filterCallback }">
+        <InputText
+          v-model="filterModel.value"
+          placeholder="Filtrar cliente"
+          style="min-width: 12rem"
+          @keydown.enter="filterCallback()"
+        />
+      </template>
+    </Column>
     <Column field="detalle_count" header="Detalles" style="width: 90px" align="right" />
-    <Column field="total_venta" header="Total" sortable style="width: 130px" align="right">
+    <Column
+      field="total_venta"
+      header="Total"
+      sortable
+      :show-filter-operator="false"
+      :show-filter-match-modes="false"
+      :show-filter-add-button="false"
+      :show-filter-apply-button="false"
+      :show-clear-button="false"
+      style="width: 130px"
+      align="right"
+    >
       <template #body="{ data }">
         <span :class="{ 'total-regalo': data.es_regalo }">
           {{ formatMoney(data.es_regalo ? 0 : data.total_venta) }}
         </span>
+      </template>
+      <template #filter="{ filterModel, filterCallback }">
+        <InputText
+          v-model="filterModel.value"
+          placeholder="Filtrar total"
+          style="min-width: 12rem"
+          @keydown.enter="filterCallback()"
+        />
       </template>
     </Column>
     <Column v-if="canMarkRegalo" header="Acciones" style="width: 210px" align="center">
@@ -253,5 +348,33 @@ function productSummary(row: VentaRow): string {
   color: var(--arpia-text-muted);
   padding: 2rem 0;
   text-align: center;
+}
+
+/* Header funnel contrast on dark theme — PrimeVue 4.5.5 uses .p-column-filter-menu-button */
+:deep(.p-column-filter-menu-button),
+:deep(.p-datatable-column-filter-button) {
+  color: var(--arpia-text-primary) !important;
+  opacity: 0.9 !important;
+}
+
+:deep(.p-column-filter-menu-button:hover),
+:deep(.p-datatable-column-filter-button:hover),
+:deep(.p-column-filter-menu-button.p-column-filter-menu-button-active),
+:deep(.p-datatable-column-filter-button.p-datatable-column-filter-button-active),
+:deep(.p-column-filter-menu-button.p-column-filter-menu-button-open),
+:deep(.p-datatable-column-filter-button.p-datatable-column-filter-button-active) {
+  color: var(--arpia-primary) !important;
+  opacity: 1 !important;
+}
+
+:deep(.p-column-filter-menu-button .p-icon),
+:deep(.p-datatable-column-filter-button .p-icon) {
+  color: inherit !important;
+}
+
+:deep(.p-datatable-column-header-content:hover .p-column-filter-menu-button),
+:deep(.p-datatable-column-header-content:hover .p-datatable-column-filter-button) {
+  color: var(--arpia-gold) !important;
+  opacity: 1 !important;
 }
 </style>

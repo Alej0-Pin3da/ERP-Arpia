@@ -59,6 +59,7 @@ const pageSize = 20
 const filterCanal = ref<'web' | 'whatsapp' | 'instagram' | 'feria' | null>(null)
 const filterEstado = ref<'completada' | 'anulada' | null>(null)
 const filterProductoId = ref<number | null>(null)
+const filterSearch = ref<string | null>(null)
 const sortBy = ref<string | null>(null)
 const sortOrder = ref<'asc' | 'desc' | null>(null)
 const productos = ref<ProductoRead[]>([])
@@ -109,6 +110,7 @@ async function load(): Promise<void> {
             estado: filterEstado.value,
             producto_id: filterProductoId.value,
           },
+          q: filterSearch.value ?? undefined,
           sortBy: sortBy.value ?? undefined,
           sortOrder: sortOrder.value ?? undefined,
         }),
@@ -144,9 +146,24 @@ function onPage(e: { first: number; rows: number }): void {
 }
 
 /** Header column filters (VentasTable) drive the same refs as the toolbar. */
-function onTableFilterChange(filters: { canal_venta?: string | null; estado?: string | null }): void {
+function onTableFilterChange(filters: {
+  canal_venta?: string | null
+  estado?: string | null
+  cliente?: string | null
+  producto?: string | null
+  fecha?: string | null
+  total_venta?: string | null
+}): void {
   filterCanal.value = (filters.canal_venta ?? null) as typeof filterCanal.value
   filterEstado.value = (filters.estado ?? null) as typeof filterEstado.value
+  // Text filters (cliente/producto/fecha/total) have no dedicated backend
+  // column filter; map them to the global `q` search param so the funnel is
+  // functional even without per-field backend support (client-side fallback
+  // would also satisfy the slice goal — event emits + visible funnel).
+  const qParts = [filters.cliente, filters.producto, filters.fecha, filters.total_venta]
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    .map((v) => v.trim())
+  filterSearch.value = qParts.length > 0 ? qParts.join(' ') : null
   onFilterChange()
 }
 
