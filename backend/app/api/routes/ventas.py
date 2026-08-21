@@ -6,12 +6,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.deps import get_db, require_roles
+from app.core.deps import get_current_user, get_db, require_roles
 from app.core.limiter import get_rate_limit_config, user_limiter
 from app.models.clientes import Cliente
-from app.models.ventas import DetalleVenta, Venta
+from app.models.ventas import DetalleVenta, Venta, DocumentState
 from app.schemas.common import Paginated
-from app.schemas.venta import VentaCreate, VentaRead, VentaUpdate
+from app.schemas.venta import VentaCreate, VentaRead, VentaUpdate, VentaStateTransition
 from app.services.inventory import (
     actualizar_venta,
     registrar_venta,
@@ -64,7 +64,7 @@ def list_ventas(
     limit: int = 50,
     offset: int = 0,
     canal_venta: Literal["web", "whatsapp", "instagram", "feria"] | None = None,
-    estado: Literal["completada", "anulada"] | None = None,
+    estado: Literal["draft", "confirmed", "cancelled", "reversed"] | None = None,
     producto_id: int | None = None,
     sort_by: str | None = None,
     order: Literal["asc", "desc"] = "asc",
@@ -145,4 +145,42 @@ def anular_venta(
     refresh. 404 when the venta does not exist, 400 when already anulada.
     """
     venta: Venta = anular_venta_service(db, venta_id)
+    return venta
+
+
+@router.patch("/{venta_id}/state", response_model=VentaRead)
+@_critical_limiter.limit("30/minute")
+def transition_venta_state(
+    request: Request,
+    venta_id: int,
+    payload: VentaStateTransition,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """Transition venta to a new state with validation.
+
+    Valid transitions:
+    - draft -> confirmed, cancelled
+    - confirmed -> cancelled, reversed
+    - cancelled -> reversed
+    - reversed -> (terminal, no transitions allowed)
+
+    Reversal (cancelled -> reversed) requires a motivo (reason).
+    """
+    venta = db.get(Venta, venta_id)
+    if venta is None:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+
+    try:
+        new_state = DocumentState(payload.estado)
+        venta.transition_to(
+            new_state,
+            motivo=payload.motivo,
+            reversed_by=current_user.id if new_state == DocumentState.REVERSED else None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    db.commit()
+    db.refresh(venta)
     return venta

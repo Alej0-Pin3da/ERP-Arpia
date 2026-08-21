@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     analiticos,
+    audit,
     auth,
     bom,
     categorias_insumos,
@@ -34,3 +35,4 @@ api_router.include_router(devoluciones.router)
 api_router.include_router(finanzas.router)
 api_router.include_router(analiticos.router)
 api_router.include_router(omisiones.router)
+api_router.include_router(audit.router)

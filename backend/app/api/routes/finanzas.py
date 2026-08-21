@@ -1,7 +1,6 @@
 """Finanzas API routes — thin HTTP surface over the finanzas engine.
 
-- POST/GET/DELETE /finanzas/movimientos: MovimientoFinanciero CRUD (soft
-  delete via estado -> 'inactivo').
+- POST/GET/DELETE /finanzas/movimientos: MovimientoFinanciero CRUD with state transitions.
 - POST /finanzas/liquidaciones: one-time proportional settlement across socios
   (per-socio Retiro rows; replay of the same liquidacion_id -> 409).
 - GET/POST/PATCH/DELETE /finanzas/socios: SociosConfiguracion management with
@@ -12,21 +11,23 @@ Mutations require admin|operador; lists are audited (admin|operador|consulta).
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from slowapi import Limiter
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.deps import get_db, require_roles
+from app.core.deps import get_current_user, get_db, require_roles
 from app.core.limiter import user_limiter
 from app.models.finanzas import MovimientoFinanciero, SociosConfiguracion
 from app.models.usuarios import Usuario
+from app.models.ventas import DocumentState
 from app.schemas.common import Paginated
 from app.schemas.finanzas import (
     LiquidacionCreate,
     MovimientoCreate,
     MovimientoRead,
+    MovimientoStateTransition,
     MovimientoUpdate,
     SocioConfiguracionCreate,
     SocioConfiguracionRead,
@@ -97,21 +98,23 @@ def list_movimientos_route(
     limit: int = 50,
     offset: int = 0,
     tipo: Literal["Gasto", "Inversion", "Retiro"] | None = None,
+    estado: Literal["draft", "confirmed", "cancelled", "reversed"] | None = None,
     sort_by: str | None = None,
     order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
     _: Usuario = Depends(audited_user),
 ):
-    """List active movements (soft-deleted rows are excluded), paginated with
-    {items, total} and an optional tipo filter (API-1/API-3)."""
+    """List movements (soft-deleted rows are excluded), paginated with
+    {items, total} and optional tipo/estado filters."""
     # Socio joined once up-front so the socio sort key works; outer join since
     # socio_id is nullable.
     stmt = (
         select(MovimientoFinanciero)
         .outerjoin(MovimientoFinanciero.socio)
-        .where(MovimientoFinanciero.estado == "activo")
     )
-    if tipo is not None:
+    if estado is not None:
+        stmt = stmt.where(MovimientoFinanciero.estado == estado)
+    elif tipo is not None:
         stmt = stmt.where(MovimientoFinanciero.tipo == tipo)
     stmt = stmt.order_by(MovimientoFinanciero.id)
     stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_MOVIMIENTOS)
@@ -127,7 +130,7 @@ def delete_movimiento(
     db: Session = Depends(get_db),
     _: Usuario = Depends(mutation_user),
 ):
-    """Soft delete a movement (estado -> 'inactivo')."""
+    """Soft delete a movement (estado -> 'cancelled')."""
     return eliminar_movimiento(db, movimiento_id)
 
 
@@ -144,6 +147,44 @@ def update_movimiento_route(
     socio_id, only the sent fields applied. Liquidacion-born rows freeze
     monto/socio_id server-side (FIN-2 -> 422)."""
     return actualizar_movimiento(db, movimiento_id, payload.model_dump(exclude_unset=True))
+
+
+@router.patch("/movimientos/{movimiento_id}/state", response_model=MovimientoRead)
+@_critical_limiter.limit("30/minute")
+def transition_movimiento_state(
+    request: Request,
+    movimiento_id: int,
+    payload: MovimientoStateTransition,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """Transition movimiento to a new state with validation.
+
+    Valid transitions:
+    - draft -> confirmed, cancelled
+    - confirmed -> cancelled, reversed
+    - cancelled -> reversed
+    - reversed -> (terminal, no transitions allowed)
+
+    Reversal (cancelled -> reversed) requires a motivo (reason).
+    """
+    movimiento = db.get(MovimientoFinanciero, movimiento_id)
+    if movimiento is None:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+
+    try:
+        new_state = DocumentState(payload.estado)
+        movimiento.transition_to(
+            new_state,
+            motivo=payload.motivo,
+            reversed_by=current_user.id if new_state == DocumentState.REVERSED else None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    db.commit()
+    db.refresh(movimiento)
+    return movimiento
 
 
 # ---------------------------------------------------------------------------

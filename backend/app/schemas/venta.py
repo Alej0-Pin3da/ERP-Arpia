@@ -24,6 +24,12 @@ class VentaUpdate(BaseModel):
     es_regalo: bool
 
 
+class VentaStateTransition(BaseModel):
+    """Schema for document state transitions."""
+    estado: Literal["draft", "confirmed", "cancelled", "reversed"]
+    motivo: str | None = None
+
+
 class DetalleVentaRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,3 +53,7 @@ class VentaRead(BaseModel):
     total_venta: Decimal
     es_regalo: bool
     detalles: list[DetalleVentaRead]
+    # Reversal fields
+    reversed_motivo: str | None = None
+    reversed_by: int | None = None
+    reversed_at: datetime | None = None

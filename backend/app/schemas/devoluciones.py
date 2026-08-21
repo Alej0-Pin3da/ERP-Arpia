@@ -37,6 +37,12 @@ class DevolucionCreate(BaseModel):
         return self
 
 
+class DevolucionStateTransition(BaseModel):
+    """Schema for document state transitions."""
+    estado: Literal["draft", "confirmed", "cancelled", "reversed"]
+    motivo: str | None = None
+
+
 class DevolucionItemRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -57,5 +63,10 @@ class DevolucionRead(BaseModel):
     motivo: str | None
     monto_reembolsado: Decimal
     tipo: str
+    estado: str
     usuario_id: int | None
     items: list[DevolucionItemRead]
+    # Reversal fields
+    reversed_motivo: str | None = None
+    reversed_by: int | None = None
+    reversed_at: datetime | None = None

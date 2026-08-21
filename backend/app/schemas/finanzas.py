@@ -34,6 +34,12 @@ class MovimientoUpdate(BaseModel):
     socio_id: int | None = None
 
 
+class MovimientoStateTransition(BaseModel):
+    """Schema for document state transitions."""
+    estado: Literal["draft", "confirmed", "cancelled", "reversed"]
+    motivo: str | None = None
+
+
 class MovimientoRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -45,6 +51,10 @@ class MovimientoRead(BaseModel):
     socio_id: int | None
     estado: str
     liquidacion_id: str | None
+    # Reversal fields
+    reversed_motivo: str | None = None
+    reversed_by: int | None = None
+    reversed_at: datetime | None = None
 
 
 class LiquidacionCreate(BaseModel):

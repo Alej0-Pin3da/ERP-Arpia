@@ -4,6 +4,7 @@ POST /devoluciones (admin|operador) -> registrar_devolucion (full cancel or
 partial return, atomic with FOR-UPDATE inventory restore).
 GET  /devoluciones (audited) -> listar_devoluciones with items + sale
 reference, optional venta_id / fecha range filters, limit/offset.
+PATCH /devoluciones/{id}/state (admin|operador) -> state transition with validation
 
 Business rules stay in app.services.devoluciones; this router only maps
 payloads/roles and passes the authenticated user id for audit.
@@ -12,15 +13,16 @@ payloads/roles and passes the authenticated user id for audit.
 from datetime import date
 from sqlalchemy.orm import Session
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from slowapi import Limiter
 
 from app.core.config import settings
-from app.core.deps import get_db, require_roles
+from app.core.deps import get_current_user, get_db, require_roles
 from app.core.limiter import user_limiter
 from app.models.usuarios import Usuario
+from app.models.ventas import Devolucion, DocumentState
 from app.schemas.common import Paginated
-from app.schemas.devoluciones import DevolucionCreate, DevolucionRead
+from app.schemas.devoluciones import DevolucionCreate, DevolucionRead, DevolucionStateTransition
 from app.services.devoluciones import listar_devoluciones, registrar_devolucion
 
 router = APIRouter(prefix="/devoluciones", tags=["devoluciones"])
@@ -72,3 +74,41 @@ def list_devoluciones(
         offset=offset,
     )
     return Paginated[DevolucionRead](items=list(rows), total=total)
+
+
+@router.patch("/{devolucion_id}/state", response_model=DevolucionRead)
+@_critical_limiter.limit("30/minute")
+def transition_devolucion_state(
+    request: Request,
+    devolucion_id: int,
+    payload: DevolucionStateTransition,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """Transition devolucion to a new state with validation.
+
+    Valid transitions:
+    - draft -> confirmed, cancelled
+    - confirmed -> cancelled, reversed
+    - cancelled -> reversed
+    - reversed -> (terminal, no transitions allowed)
+
+    Reversal (cancelled -> reversed) requires a motivo (reason).
+    """
+    devolucion = db.get(Devolucion, devolucion_id)
+    if devolucion is None:
+        raise HTTPException(status_code=404, detail="Devolución no encontrada")
+
+    try:
+        new_state = DocumentState(payload.estado)
+        devolucion.transition_to(
+            new_state,
+            motivo=payload.motivo,
+            reversed_by=current_user.id if new_state == DocumentState.REVERSED else None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    db.commit()
+    db.refresh(devolucion)
+    return devolucion

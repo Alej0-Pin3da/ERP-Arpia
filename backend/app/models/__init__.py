@@ -1,4 +1,5 @@
 from app.db.base import Base
+from app.models.audit import AuditLog
 from app.models.clientes import Cliente
 from app.models.finanzas import MovimientoFinanciero, SociosConfiguracion
 from app.models.insumos import CategoriaInsumo, CompraInsumo, Insumo
@@ -16,6 +17,7 @@ from app.models.ventas import DetalleVenta, Devolucion, DevolucionItem, Venta
 
 __all__ = [
     "Base",
+    "AuditLog",
     "Usuario",
     "Cliente",
     "RefreshToken",

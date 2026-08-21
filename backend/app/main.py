@@ -10,6 +10,7 @@ from sqlalchemy import text
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.exceptions import DomainError
+from app.core.idempotency import create_idempotency_middleware
 from app.core.limiter import limiter
 from app.core.logging_config import setup_logging
 from app.core.logging_middleware import RequestContextMiddleware
@@ -45,7 +46,7 @@ cors_kwargs = {
         "X-Request-ID",
         "Idempotency-Key",
     ],
-    "expose_headers": ["X-Request-ID"],
+    "expose_headers": ["X-Request-ID", "Idempotency-Key"],
     "max_age": 600 if settings.ENVIRONMENT in ("production", "staging") else 0,
 }
 # In production/staging, be more restrictive
@@ -61,6 +62,9 @@ if settings.ENVIRONMENT in ("production", "staging"):
 
 app.add_middleware(CORSMiddleware, **cors_kwargs)
 app.add_middleware(RequestContextMiddleware)
+
+# Idempotency middleware for critical endpoints
+app.add_middleware(create_idempotency_middleware())
 
 
 @app.exception_handler(DomainError)
