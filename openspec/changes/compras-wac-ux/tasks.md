@@ -34,14 +34,14 @@ Chain strategy: stacked-to-main
 
 - [x] 2.1 `backend/app/services/wac.py` — handle `modo/costo_total/factura/proveedor_id`, `price=costo_total/qty` Decimal if TOTAL, keep `SELECT FOR UPDATE` + atomic commit/rollback, `commit=False` → REQ-WAC-001/002/004 SCN-WAC-001/002
 - [x] 2.2 `backend/app/api/routes/compras_insumos.py` — pass new fields, gate `gt0/isFinite→422`, 404 insumo/400 proveedor, force `fecha_compra DESC` → REQ-CI-001/003 SCN-CI-002/003
-- [ ] 2.3 `frontend/src/utils/inventario.ts` — extend `CompraPayloadInput`, update `buildCompraPayload` TOTAL branch, add `buildHistorialCsv` + `CSV_HEADER` → REQ-CI-003 REQ-WAC-003
-- [ ] 2.4 `frontend/src/components/inventario/ComprasForm.vue` — TOTAL/UNIT toggle, `computed newStock/newWAC/valuation` mirroring `(stock*cost+qty*unit)/newStock`, disable Confirm if `qty<=0||cost<=0||!isFinite` → REQ-WAC-003 SCN-WAC-004
+- [x] 2.3 `frontend/src/utils/inventario.ts` — extend `CompraPayloadInput`, update `buildCompraPayload` TOTAL branch, add `buildHistorialCsv` + `CSV_HEADER` → REQ-CI-003 REQ-WAC-003
+- [x] 2.4 `frontend/src/components/inventario/ComprasForm.vue` — TOTAL/UNIT toggle, `computed newStock/newWAC/valuation` mirroring `(stock*cost+qty*unit)/newStock`, disable Confirm if `qty<=0||cost<=0||!isFinite` → REQ-WAC-003 SCN-WAC-004
 
 ## Phase 3: Integration / Wiring
 
-- [ ] 3.1 `frontend/src/components/inventario/HistorialDrawer.vue` — Drawer: date/qty/prev→new stock/cost/total/factura + CSV → REQ-CI-003 SCN-CI-005
+- [x] 3.1 `frontend/src/components/inventario/HistorialDrawer.vue` — Drawer: date/qty/prev→new stock/cost/total/factura + CSV → REQ-CI-003 SCN-CI-005
 - [ ] 3.2 `frontend/src/views/InventarioView.vue` — per-row `+ Compra` (pre-filled) + `History`, hide `+ Compra` for consulta → REQ-CI-004 SCN-CI-006
-- [ ] 3.3 `frontend/src/api/endpoints.ts` — typed `comprasApi` for new fields → REQ-CI-002
+- [x] 3.3 `frontend/src/api/endpoints.ts` — typed `comprasApi` for new fields → REQ-CI-002
 
 ## Phase 4: Testing
 

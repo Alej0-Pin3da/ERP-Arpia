@@ -217,14 +217,20 @@ export const insumosApi = {
   },
 }
 
+/** PR2 (REQ-CI-001): extended create payload with modo/factura (api.d.ts pending regen). */
+export type CompraCreatePayload = ReqBody<'/api/v1/compras-insumos', 'post'> & {
+  modo?: 'TOTAL' | 'UNIT'
+  costo_total?: number | string
+  factura?: string | null
+  proveedor_id?: number | null
+}
+
 export const comprasApi = {
-  /** GET /compras-insumos — optional insumo_id filter + limit/offset. */
+  /** GET /compras-insumos — optional insumo_id filter + limit/offset, ordered fecha_compra DESC (REQ-CI-003). */
   list(params?: Query<'/api/v1/compras-insumos', 'get'>): Promise<Res<'/api/v1/compras-insumos', 'get'>> {
     return client.get('/compras-insumos', { params }).then((r) => r.data)
   },
-  create(
-    body: ReqBody<'/api/v1/compras-insumos', 'post'>,
-  ): Promise<Res<'/api/v1/compras-insumos', 'post'>> {
+  create(body: CompraCreatePayload): Promise<Res<'/api/v1/compras-insumos', 'post'>> {
     return client.post('/compras-insumos', body).then((r) => r.data)
   },
 }
