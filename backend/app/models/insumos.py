@@ -54,11 +54,18 @@ class CompraInsumo(Base):
     insumo_id: Mapped[int] = mapped_column(
         ForeignKey("Insumos.id", ondelete="RESTRICT"), nullable=False, index=True
     )
+    # Proveedores entity was removed (0008_remove_proveedores). Keep column nullable
+    # without FK so history can store an optional external reference; no constraint.
+    proveedor_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
     fecha_compra: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )
     cantidad_comprada: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
     precio_unitario_compra: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
+    costo_unitario_aplicado: Mapped[Decimal | None] = mapped_column(
+        Numeric(15, 4), nullable=True
+    )
+    factura: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     insumo: Mapped[Insumo] = relationship(back_populates="compras")
 

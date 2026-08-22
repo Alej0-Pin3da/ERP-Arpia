@@ -1,8 +1,8 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from slowapi import Limiter
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -40,11 +40,33 @@ def create_compra_insumo(
     db: Session = Depends(get_db),
     _: Usuario = Depends(mutation_user),
 ):
+    # Proveedor validation: Proveedores was removed (0008). If proveedor_id is provided,
+    # treat as 400 unless the table exists and the id is found. This keeps the
+    # spec's 400 contract while respecting the current schema without FK.
+    if payload.proveedor_id is not None:
+        try:
+            has_table = db.execute(text("SELECT to_regclass('public.Proveedores')")).scalar()
+        except Exception:
+            has_table = None
+        if has_table is None:
+            raise HTTPException(status_code=400, detail="Proveedor not found")
+        # Table exists — verify id exists via raw SQL to avoid model import
+        found = db.execute(
+            text("SELECT 1 FROM \"Proveedores\" WHERE id = :pid"),
+            {"pid": payload.proveedor_id},
+        ).scalar()
+        if not found:
+            raise HTTPException(status_code=400, detail="Proveedor not found")
+
     compra = registrar_compra(
         db,
         insumo_id=payload.insumo_id,
         cantidad=payload.cantidad_comprada,
         precio_unitario=payload.precio_unitario_compra,
+        costo_total=payload.costo_total,
+        modo=payload.modo,
+        factura=payload.factura,
+        proveedor_id=payload.proveedor_id,
     )
     return compra
 
@@ -69,7 +91,12 @@ def list_compras_insumos(
         stmt = stmt.where(CompraInsumo.insumo_id == insumo_id)
     if q is not None:
         stmt = stmt.where(Insumo.nombre.ilike(f"%{q}%"))
-    stmt = stmt.order_by(CompraInsumo.id)
-    stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_COMPRAS)
+    # Default ordering: fecha_compra DESC for history (REQ-CI-003). Custom sort
+    # via sort_by/order still allowed through aplicar_orden.
+    if sort_by is None:
+        stmt = stmt.order_by(CompraInsumo.fecha_compra.desc(), CompraInsumo.id.desc())
+    else:
+        stmt = stmt.order_by(CompraInsumo.id)
+        stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_COMPRAS)
     rows, total = paginar(db, stmt, limit, offset)
     return Paginated[CompraInsumoRead](items=list(rows), total=total)

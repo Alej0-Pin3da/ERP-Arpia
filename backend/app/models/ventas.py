@@ -181,7 +181,12 @@ class Devolucion(Base):
 
     venta: Mapped[Venta] = relationship()
     items: Mapped[list[DevolucionItem]] = relationship(back_populates="devolucion", lazy="selectin")
-    reversed_by_user: Mapped[Usuario | None] = relationship(lazy="selectin")  # noqa: F821
+    reversed_by_user: Mapped[Usuario | None] = relationship(  # noqa: F821
+        foreign_keys="[Devolucion.reversed_by]", lazy="selectin"
+    )
+    usuario: Mapped[Usuario | None] = relationship(  # noqa: F821
+        foreign_keys="[Devolucion.usuario_id]", lazy="selectin"
+    )
 
     def __repr__(self) -> str:
         return f"<Devolucion id={self.id} venta_id={self.venta_id} tipo={self.tipo!r} estado={self.estado!r}>"
