@@ -1,0 +1,464 @@
+/*
+ * Global styles — ERP ARPIA Luxury Atelier Theme.
+ *
+ * Inspired by Arpía (arpia.com.co) — Haute couture corsetry & autor lingerie.
+ * Palette: Deep Noir & Velvet Obsidian, Champagne Gold & Burnished Brass accents,
+ * Velvet Burgundy highlights, Emerald Malachite financials, and refined typography
+ * (Cinzel, Cormorant Garamond, Plus Jakarta Sans, Inter).
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* ---------------------------------------------------------------------
+   * ARPIA Atelier Design Tokens (arpia.com.co)
+   * ------------------------------------------------------------------- */
+  --arpia-font-display: 'Cinzel', serif;
+  --arpia-font-serif: 'Cormorant Garamond', Georgia, serif;
+  --arpia-font-heading: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --arpia-font-body: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --arpia-font-button: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --arpia-font-mono: 'JetBrains Mono', monospace;
+
+  /* Primary Brand (Champagne Gold / Burnished Gold) */
+  --arpia-primary: #c5a059;
+  --arpia-primary-hover: #dfb15b;
+  --arpia-primary-deep: #9e7d3b;
+  --arpia-primary-soft: #f3e5ab;
+  --arpia-primary-rgb: 197, 160, 89;
+  --arpia-on-primary: #09090b;
+
+  /* Secondary Accent (Velvet Noir / Burgundy Couture) */
+  --arpia-secondary: #9f1239;
+  --arpia-secondary-hover: #be123c;
+  --arpia-secondary-soft: #fecdd3;
+
+  /* Luxury Atelier Surfaces (Deep Noir & Velvet Charcoal) */
+  --arpia-dark-bg: #08080a;
+  --arpia-dark: #0f0f13;
+  --arpia-dark-elevated: #15151b;
+  --arpia-card: #131318;
+  --arpia-card-hover: #191921;
+  --arpia-surface-popover: #181820;
+  --arpia-gold: #c5a059;
+  --arpia-gold-soft: #f3e5ab;
+  --arpia-accent: #f5f5f4;
+  --arpia-mint: #34d399;
+
+  /* Semantic Status Colors */
+  --arpia-success: #10b981;
+  --arpia-success-dark: #059669;
+  --arpia-success-rgb: 16, 185, 129;
+  --arpia-warning: #d97706;
+  --arpia-warning-dark: #b45309;
+  --arpia-warning-rgb: 217, 119, 6;
+  --arpia-danger: #e11d48;
+  --arpia-danger-dark: #be123c;
+  --arpia-danger-rgb: 225, 29, 72;
+  --arpia-error: var(--arpia-danger);
+  --arpia-error-dark: var(--arpia-danger-dark);
+  --arpia-error-rgb: var(--arpia-danger-rgb);
+  --arpia-info: #c5a059;
+  --arpia-info-dark: #9e7d3b;
+  --arpia-info-rgb: 197, 160, 89;
+
+  --arpia-stock-ok: var(--arpia-success);
+  --arpia-stock-low: var(--arpia-danger);
+  --arpia-whatsapp: #22c55e;
+  --arpia-whatsapp-hover: #16a34a;
+
+  /* Text on dark */
+  --arpia-text-primary: #fafaf9;
+  --arpia-text-regular: #d6d3d1;
+  --arpia-text-muted: #a8a29e;
+  --arpia-text-faint: #78716c;
+  --arpia-text-disabled: #57534e;
+
+  /* Fill scale */
+  --arpia-fill-extra-light: #15151b;
+  --arpia-fill-light: #191921;
+  --arpia-fill-dark: #1d1d27;
+  --arpia-fill-darker: #22222d;
+
+  /* Luxury Gold-infused Borders */
+  --arpia-border: rgba(197, 160, 89, 0.14);
+  --arpia-border-strong: rgba(197, 160, 89, 0.28);
+  --arpia-border-subtle: rgba(255, 255, 255, 0.05);
+  --arpia-border-faint: rgba(255, 255, 255, 0.03);
+  --arpia-border-dark: rgba(197, 160, 89, 0.35);
+  --arpia-border-darker: rgba(197, 160, 89, 0.5);
+  --arpia-border-hover: rgba(223, 177, 91, 0.5);
+
+  /* Radius + Shadows */
+  --arpia-radius-sm: 6px;
+  --arpia-radius: 8px;
+  --arpia-radius-lg: 12px;
+  --arpia-radius-xl: 16px;
+  --arpia-shadow-card: 0 4px 24px -2px rgba(0, 0, 0, 0.6), 0 2px 8px -1px rgba(197, 160, 89, 0.04);
+  --arpia-shadow-overlay: 0 20px 45px -8px rgba(0, 0, 0, 0.85), 0 10px 20px -5px rgba(0, 0, 0, 0.7);
+  --arpia-shadow-pop: 0 10px 30px -3px rgba(0, 0, 0, 0.7);
+  --arpia-shadow-glow: 0 0 20px rgba(197, 160, 89, 0.25);
+  --arpia-shadow-deep: 0 25px 60px -12px rgba(0, 0, 0, 0.95);
+
+  /* Overlay masks & Gradients */
+  --arpia-overlay: rgba(8, 8, 10, 0.82);
+  --arpia-overlay-light: rgba(8, 8, 10, 0.65);
+  --arpia-overlay-lighter: rgba(8, 8, 10, 0.45);
+
+  --arpia-bg-gradient: radial-gradient(ellipse at 50% 0%, #16151c 0%, #08080a 70%);
+  --arpia-brand-gradient: linear-gradient(135deg, #dfb15b 0%, #9e7d3b 100%);
+  --arpia-card-gradient: linear-gradient(180deg, rgba(197, 160, 89, 0.03) 0%, rgba(255, 255, 255, 0) 100%);
+  --arpia-rule-gradient: linear-gradient(90deg, transparent, rgba(197, 160, 89, 0.25), transparent);
+  --arpia-gold-text: linear-gradient(135deg, #f3e5ab 0%, #c5a059 50%, #dfb15b 100%);
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--arpia-dark-bg);
+  background-image: var(--arpia-bg-gradient);
+  background-attachment: fixed;
+  color: var(--arpia-text-primary);
+  font-family: var(--arpia-font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------------------------------------------------------------------
+   Typography & Atelier Headings
+ * ------------------------------------------------------------------- */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--arpia-font-heading);
+  font-weight: 700;
+  color: var(--arpia-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.arpia-brand-font {
+  font-family: var(--arpia-font-display);
+  letter-spacing: 0.15em;
+}
+
+.arpia-eyebrow {
+  font-family: var(--arpia-font-heading);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--arpia-primary);
+}
+
+.arpia-display {
+  font-family: var(--arpia-font-display);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--arpia-text-primary);
+}
+
+.arpia-heading {
+  font-family: var(--arpia-font-heading);
+  font-weight: 600;
+  color: var(--arpia-text-primary);
+}
+
+.arpia-gold-text {
+  font-family: var(--arpia-font-heading);
+  font-weight: 700;
+  color: var(--arpia-gold);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .arpia-gold-text {
+    background: var(--arpia-gold-text);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+}
+
+.arpia-rule {
+  height: 1px;
+  margin: 0;
+  border: none;
+  background: var(--arpia-rule-gradient);
+}
+
+/* ---------------------------------------------------------------------
+   Scrollbars
+ * ------------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(197, 160, 89, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(197, 160, 89, 0.4);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(197, 160, 89, 0.2) transparent;
+}
+
+/* ---------------------------------------------------------------------
+   PrimeVue Enterprise Enhancements
+ * ------------------------------------------------------------------- */
+.p-button {
+  font-family: var(--arpia-font-button);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: var(--arpia-radius);
+  transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.p-button:hover {
+  transform: translateY(-1px);
+}
+
+.p-button:active {
+  transform: translateY(0);
+}
+
+.p-tag {
+  font-family: var(--arpia-font-heading);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  border-radius: 9999px;
+  padding: 0.25rem 0.65rem;
+}
+
+.p-card {
+  border: 1px solid var(--arpia-border);
+  border-radius: var(--arpia-radius-lg);
+  background: var(--arpia-card);
+  box-shadow: var(--arpia-shadow-card);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.p-card:hover {
+  border-color: var(--arpia-border-strong);
+}
+
+.p-datatable {
+  border-radius: var(--arpia-radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--arpia-border);
+}
+
+.p-datatable-header {
+  background: var(--arpia-card);
+  border-bottom: 1px solid var(--arpia-border);
+  padding: 1rem 1.25rem;
+}
+
+.p-datatable-thead > tr > th {
+  font-family: var(--arpia-font-heading);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--arpia-dark-elevated);
+  color: var(--arpia-text-muted);
+  border-bottom: 1px solid var(--arpia-border);
+  padding: 0.85rem 1rem;
+}
+
+.p-datatable-tbody > tr {
+  transition: background-color 150ms ease;
+}
+
+.p-datatable-tbody > tr > td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--arpia-border-subtle);
+  color: var(--arpia-text-primary);
+}
+
+.p-datatable-tbody > tr:hover {
+  background-color: rgba(197, 160, 89, 0.06) !important;
+}
+
+.p-dialog {
+  border: 1px solid var(--arpia-border-strong);
+  border-radius: var(--arpia-radius-xl);
+  box-shadow: var(--arpia-shadow-deep);
+  background: var(--arpia-surface-popover);
+  backdrop-filter: blur(16px);
+}
+
+.p-dialog-header {
+  border-bottom: 1px solid var(--arpia-border);
+  padding: 1.25rem 1.5rem;
+}
+
+.p-dialog-content {
+  padding: 1.5rem;
+}
+
+.p-dialog-footer {
+  border-top: 1px solid var(--arpia-border);
+  padding: 1rem 1.5rem;
+}
+
+.p-inputtext,
+.p-select,
+.p-inputnumber input,
+.p-textarea {
+  border-radius: var(--arpia-radius);
+  border: 1px solid var(--arpia-border);
+  background: var(--arpia-dark-elevated);
+  color: var(--arpia-text-primary);
+  transition: all 180ms ease;
+}
+
+.p-inputtext:focus,
+.p-select:focus,
+.p-inputnumber input:focus,
+.p-textarea:focus {
+  border-color: var(--arpia-primary);
+  box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.2);
+}
+
+.p-toast-message {
+  border-radius: var(--arpia-radius-lg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--arpia-border-strong);
+}
+
+/* Tabs */
+.p-tablist {
+  background: var(--arpia-dark-elevated) !important;
+  border-bottom: 1px solid var(--arpia-border) !important;
+  border-radius: var(--arpia-radius-lg) var(--arpia-radius-lg) 0 0;
+  padding: 0.35rem 0.5rem 0;
+}
+
+.p-tab {
+  font-family: var(--arpia-font-heading);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--arpia-text-muted) !important;
+  padding: 0.75rem 1.25rem !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  background: transparent !important;
+  transition: all 180ms ease !important;
+}
+
+.p-tab:hover {
+  color: var(--arpia-text-primary) !important;
+}
+
+.p-tab-active {
+  color: var(--arpia-primary) !important;
+  border-bottom-color: var(--arpia-primary) !important;
+  font-weight: 700;
+}
+
+.p-tabpanels {
+  background: var(--arpia-card) !important;
+  border: 1px solid var(--arpia-border);
+  border-top: none;
+  border-radius: 0 0 var(--arpia-radius-lg) var(--arpia-radius-lg);
+  padding: 1.25rem;
+}
+
+/* Paginator */
+.p-paginator {
+  background: var(--arpia-card) !important;
+  border: 1px solid var(--arpia-border) !important;
+  border-top: none !important;
+  border-radius: 0 0 var(--arpia-radius-lg) var(--arpia-radius-lg);
+  padding: 0.75rem 1rem;
+}
+
+.p-paginator-page,
+.p-paginator-first,
+.p-paginator-prev,
+.p-paginator-next,
+.p-paginator-last {
+  border-radius: var(--arpia-radius);
+  color: var(--arpia-text-muted);
+  min-width: 2.25rem;
+  height: 2.25rem;
+  transition: all 150ms ease;
+}
+
+.p-paginator-page.p-paginator-page-selected {
+  background: var(--arpia-primary) !important;
+  color: var(--arpia-on-primary) !important;
+  font-weight: 700;
+}
+
+/* View Headings & Toolbars */
+.ventas-header,
+.inventario-header,
+.productos-header,
+.finanzas-header,
+.analisis-header,
+.maestros-header,
+.devoluciones-header,
+.omisiones-header,
+.usuarios-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.ventas-header h2,
+.inventario-header h2,
+.productos-header h2,
+.finanzas-header h2,
+.analisis-header h2,
+.maestros-header h2,
+.devoluciones-header h2,
+.omisiones-header h2,
+.usuarios-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.venta-toolbar,
+.insumo-toolbar,
+.compras-toolbar,
+.productos-toolbar,
+.finanzas-toolbar,
+.devoluciones-toolbar,
+.maestros-toolbar,
+.omisiones-toolbar,
+.usuarios-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+

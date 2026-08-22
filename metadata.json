@@ -1,0 +1,6 @@
+{
+  "name": "ERP Arpia",
+  "description": "Sistema ERP y de Atelier de Alta Costura para Arpía: gestión de confección personalizada, recetas BOM, inventario de insumos textiles, perchero showroom, optimizador de corte y liquidación de utilidades.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

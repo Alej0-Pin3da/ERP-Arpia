@@ -1,4 +1,0 @@
-dist/
-node_modules/
-coverage/
-src/types/api.d.ts
