@@ -22,27 +22,19 @@ The WAC recomputation SHALL run inside the SAME transaction as the `CompraInsumo
 - WHEN the patch fails
 - THEN the transaction rolls back and the insumo and purchases show no change
 
-### Requirement: Weighted-average cost formula
+### Requirement: REQ-WAC-001 — WAC formula with TOTAL
 
-The engine MUST compute `nuevo_costo = (stock_actual * costo_promedio_actual + cantidad_comprada * precio_unitario_compra) / (stock_actual + cantidad_comprada)` in `Decimal`. The engine MUST set `stock_actual = stock_actual + cantidad_comprada` and `costo_promedio_actual = nuevo_costo`.
+Engine MUST compute `nuevo=(stock*cost+qty*price)/(stock+qty)` in Decimal `NUMERIC(15,4)`. If TOTAL, `price=costo_total/qty` in Decimal before. If `stock==0`, MUST yield `nuevo==price`. MUST set `stock+=qty`, `cost=nuevo` atomically with purchase row. No FLOAT/Infinity. (Prev: no TOTAL.)
 
-#### Scenario: Equal unit price keeps cost stable
+#### Scenario: SCN-WAC-001 — TOTAL + zero-stock
+- GIVEN 10@5 + buy10 costo_total90 TOTAL
+- WHEN WAC runs
+- THEN price9 newCost7.0000 stock20; stock0+20@7→7.0000
 
-- GIVEN 10 units at cost 5, then a purchase of 10 at price 5
-- WHEN the WAC runs
-- THEN `costo_promedio_actual` stays 5.0000
-
-#### Scenario: Price fluctuation moves the average
-
-- GIVEN 10 units at cost 5 and a purchase of 10 units at price 9
-- WHEN the WAC runs
-- THEN `stock_actual` is 20.0000 and `costo_promedio_actual` is 7.0000
-
-#### Scenario: Cost rises on higher-priced lot
-
-- GIVEN 100 units at 5 and 50 units bought at 8
-- WHEN the WAC runs
-- THEN `costo_promedio_actual` becomes 6.0000
+#### Scenario: SCN-WAC-002 — Stable
+- GIVEN 10@5 +10@5 UNIT
+- WHEN runs
+- THEN cost5.0000
 
 ### Requirement: Row locking for concurrency
 
@@ -64,24 +56,29 @@ Before reading `stock_actual` and `costo_promedio_actual` the engine MUST `SELEC
 
 - Test MUST issue concurrent POSTs for the same insumo and MUST assert final stock+cost equals the expected serialized result and no lost update occurs
 
-### Requirement: Edge cases and precision
+### Requirement: REQ-WAC-002 — Edge cases precision
 
-The denominator `stock_actual + cantidad_comprada` MUST always be > 0 because `cantidad_comprada` is enforced > 0. When `stock_actual == 0`, the formula MUST yield `nuevo_costo == precio_unitario_compra`. All arithmetic MUST use `Decimal` with `NUMERIC(15,4)` storage and MUST NOT round inside the engine; rounding MAY occur only at presentation. Non-positive or otherwise invalid purchase values MUST be rejected (400/422) BEFORE any DB write.
+Denominator MUST be >0 (`qty>0` 422). `qty<=0|cost<=0|Infinity|NaN` MUST 422 before write. Decimal `NUMERIC(15,4)`; engine MUST NOT round, display-only rounding. (Prev: generic no Infinity.)
 
-#### Scenario: Zero prior stock
+#### Scenario: SCN-WAC-003 — Rejects + precision
+- GIVEN qty<=0 or Infinity or fractional WAC
+- WHEN POST or stored
+- THEN 422 no write; else 4 decimals preserved (e.g. 3.2308)
 
-- GIVEN an insumo with zero stock and a purchase of 20 at price 7
-- WHEN the WAC runs
-- THEN `costo_promedio_actual` equals 7.0000
+### Requirement: REQ-WAC-003 — Live preview contract
 
-#### Scenario: Precision preserved
+`ComprasForm.vue` MUST compute preview via `computed` mirroring backend: `unit=TOTAL?total/qty:unitInput; newStock=stock+qty; newWAC=(stock*cost+qty*unit)/newStock; valuation=newStock*newWAC` (JS Number display-only; backend authoritative). MUST disable Confirm if `qty<=0||cost<=0||!isFinite`. Toggle TOTAL|UNIT MUST recalc instantly. Preview MUST match backend to 4 decimals on `10@5+10@9→7.0000`. (Prev: none.)
 
-- GIVEN a purchase whose WAC result has a fractional value
-- WHEN stored
-- THEN cost is stored to 4 decimal places with no rounding at the engine layer
+#### Scenario: SCN-WAC-004 — Preview parity + disabled
+- GIVEN 10@5 input qty10 TOTAL90
+- WHEN preview computed
+- THEN newStock20 newWAC7.0000 valuation140 matches backend; qty0 disables Confirm; toggle recalculates
 
-#### Scenario: Precondition before writes
+### Requirement: REQ-WAC-004 — Atomicity and row locking
 
-- GIVEN a nonexistent `Insumo` or invalid quantity
-- WHEN posting the purchase
-- THEN the system returns 404/422 and writes nothing
+WAC MUST run in same tx as insert with `SELECT ... FOR UPDATE` on `Insumo`; commit atomically or full rollback. Concurrent same-insumo MUST serialize; different insumos MAY parallelize; lost update MUST NOT occur. Covers and extends the atomic and row-locking requirements above.
+
+#### Scenario: SCN-WAC-005 — Concurrent
+- GIVEN 2 simultaneous POSTs same insumo and distinct insumos
+- WHEN run
+- THEN same serializes to correct stock/cost no lost update; distinct no blocking
