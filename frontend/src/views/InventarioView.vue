@@ -26,6 +26,7 @@ import ErrorState from '@/components/common/ErrorState.vue'
 import LoadingSkeleton from '@/components/common/LoadingSkeleton.vue'
 import ComprasForm from '@/components/inventario/ComprasForm.vue'
 import ComprasTable from '@/components/inventario/ComprasTable.vue'
+import HistorialDrawer from '@/components/inventario/HistorialDrawer.vue'
 import InsumoForm from '@/components/inventario/InsumoForm.vue'
 import InsumosTable from '@/components/inventario/InsumosTable.vue'
 import Button from 'primevue/button'
@@ -102,6 +103,13 @@ const editingInsumo = ref<InsumoRead | null>(null)
 /** T8/FE-DLG-1: the forms live in PrimeVue Dialogs at the usage site. */
 const insumoDialogVisible = ref(false)
 const comprasDialogVisible = ref(false)
+
+/** REQ-CI-004: per-row +Compra prefill + History drawer wiring */
+const comprasPrefillId = ref<number | null>(null)
+const historialVisible = ref(false)
+const historialInsumo = ref<InsumoRead | null>(null)
+const historialCompras = ref<CompraInsumoRead[]>([])
+const historialLoading = ref(false)
 
 async function load(): Promise<void> {
   loading.value = true
@@ -273,7 +281,47 @@ function openCreateInsumo(): void {
 
 /** FE-DLG-1: the toolbar button opens the compras dialog in create mode. */
 function openCreateCompra(): void {
+  comprasPrefillId.value = null
   comprasDialogVisible.value = true
+}
+
+function resetCompraDialog(): void {
+  comprasPrefillId.value = null
+}
+
+/** REQ-CI-004: per-row +Compra — opens ComprasForm with insumo_id pre-filled */
+function openCompraForRow(row: InsumoRead): void {
+  comprasPrefillId.value = row.id
+  comprasDialogVisible.value = true
+}
+
+/** REQ-CI-004: per-row History — opens HistorialDrawer with GET ?insumo_id */
+async function openHistoryForRow(row: InsumoRead): Promise<void> {
+  historialInsumo.value = row
+  historialVisible.value = true
+  historialLoading.value = true
+  historialCompras.value = []
+  try {
+    const res = await comprasApi.list({ insumo_id: row.id } as unknown as Record<string, unknown>)
+    // backend returns Paginated {items, total} or array in some mocks
+    if (res && typeof res === 'object' && 'items' in (res as Record<string, unknown>)) {
+      historialCompras.value = (res as { items: CompraInsumoRead[] }).items
+    } else if (Array.isArray(res)) {
+      historialCompras.value = res as CompraInsumoRead[]
+    }
+  } catch {
+    historialCompras.value = []
+  } finally {
+    historialLoading.value = false
+  }
+}
+
+function onHistorialVisibleChange(v: boolean): void {
+  historialVisible.value = v
+  if (!v) {
+    historialInsumo.value = null
+    historialCompras.value = []
+  }
 }
 
 /** FE-DLG-2/3: closing without saving discards the edit prefill. */
@@ -382,6 +430,9 @@ onMounted(load)
               :loading="insumosList.loading.value"
               :categorias="categorias"
               :can-edit="canManage"
+              :can-purchase="canRegister"
+              @compra="openCompraForRow"
+              @history="openHistoryForRow"
               @edit="onEditInsumo"
               @delete="onDeleteInsumo"
               @filter-change="onInsumosTableFilterChange"
@@ -473,14 +524,25 @@ onMounted(load)
           :dismissable-mask="false"
           :close-on-escape="!savingCompra"
           :closable="!savingCompra"
+          @after-hide="resetCompraDialog"
         >
           <ComprasForm
             v-if="comprasDialogVisible"
+            :key="comprasPrefillId ?? 'create'"
             :insumos="insumosLookup"
+            :initial-insumo-id="comprasPrefillId"
             :saving="savingCompra"
             @submit="onCreateCompra"
           />
         </Dialog>
+
+        <HistorialDrawer
+          :visible="historialVisible"
+          :insumo="historialInsumo"
+          :compras="historialCompras"
+          :loading="historialLoading"
+          @update:visible="onHistorialVisibleChange"
+        />
       </TabPanel>
       </TabPanels>
     </Tabs>

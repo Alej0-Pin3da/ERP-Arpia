@@ -157,4 +157,92 @@ describe('ComprasForm (MOD-4)', () => {
       precio_unitario_compra: 4500,
     })
   })
+
+  // --- compras-wac-ux SCN-WAC-004: preview parity, toggle, disabled gate ---
+
+  it('preview parity 10@5 +10@9 -> 7.0000 matches backend (UNIT)', async () => {
+    const insumos = [
+      { id: 1, categoria_id: 1, nombre: 'X', unidad_medida: 'kg', stock_actual: '10.00', stock_minimo: '0', costo_promedio_actual: '5.00', nombre_categoria: 'C' },
+    ] as unknown as InsumoRead[]
+    const wrapper = mount(ComprasForm, {
+      props: { insumos, saving: false },
+      global: { plugins: [[PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }]] },
+    })
+    await nextTick()
+    // pick insumo 1
+    await wrapper.find('[data-test="compra-insumo-select"]').trigger('click')
+    await flushOverlay()
+    const opt = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find((el) => el.textContent?.trim() === 'X')
+    opt!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await flushOverlay()
+    await nextTick()
+    await setNumber(wrapper, 'compra-cantidad-input', '10')
+    await setNumber(wrapper, 'compra-precio-input', '9')
+    await nextTick()
+    const preview = wrapper.find('[data-test="compra-preview"]')
+    expect(preview.exists()).toBe(true)
+    expect(preview.text()).toContain('7.0000')
+    expect(preview.text()).toContain('20.00')
+  })
+
+  it('TOTAL modo derives unit = total/qty and recalculates preview instantly', async () => {
+    const insumos = [
+      { id: 1, categoria_id: 1, nombre: 'X', unidad_medida: 'kg', stock_actual: '10.00', stock_minimo: '0', costo_promedio_actual: '5.00', nombre_categoria: 'C' },
+    ] as unknown as InsumoRead[]
+    const wrapper = mount(ComprasForm, {
+      props: { insumos, saving: false },
+      global: { plugins: [[PrimeVue, { theme: { preset: ArpiaPreset, options: { darkModeSelector: 'html' } }, locale: esCO }]] },
+    })
+    await nextTick()
+    await wrapper.find('[data-test="compra-insumo-select"]').trigger('click')
+    await flushOverlay()
+    const opt2 = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find((el) => el.textContent?.trim() === 'X')
+    opt2!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await flushOverlay()
+    await setNumber(wrapper, 'compra-cantidad-input', '10')
+    // switch to TOTAL
+    await wrapper.find('[data-test="compra-modo-select"]').trigger('click')
+    await flushOverlay()
+    const totalOpt = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find((el) => el.textContent?.trim() === 'TOTAL')
+    totalOpt!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await flushOverlay()
+    await nextTick()
+    await setNumber(wrapper, 'compra-costo-total-input', '90')
+    await nextTick()
+    const preview2 = wrapper.find('[data-test="compra-preview"]')
+    expect(preview2.text()).toContain('7.0000')
+    // toggle back to UNIT should recalc via precio field (empty -> no preview)
+    await wrapper.find('[data-test="compra-modo-select"]').trigger('click')
+    await flushOverlay()
+    const unitOpt = [...document.querySelectorAll<HTMLElement>('.p-select-option')].find((el) => el.textContent?.trim() === 'UNIT')
+    unitOpt!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await flushOverlay()
+    await nextTick()
+    // after toggle to UNIT without precio, preview should disappear or change
+    expect(wrapper.find('[data-test="compra-preview"]').exists()).toBe(false)
+  })
+
+  it('disables Confirm when qty<=0 or cost<=0 or not finite', async () => {
+    const wrapper = await mountForm()
+    await pickInsumo(wrapper, 'Harina de maíz')
+    // directly mutate vm to bypass InputNumber min clamp
+    const vm = wrapper.vm as unknown as { cantidad: number | null; precioUnitario: number | null; costoTotal: number | null; isConfirmDisabled: boolean }
+    vm.cantidad = 0
+    vm.precioUnitario = 5
+    await nextTick()
+    expect(vm.isConfirmDisabled).toBe(true)
+    vm.cantidad = 10
+    vm.precioUnitario = 0
+    await nextTick()
+    expect(vm.isConfirmDisabled).toBe(true)
+    vm.cantidad = 10
+    vm.precioUnitario = Infinity
+    await nextTick()
+    expect(vm.isConfirmDisabled).toBe(true)
+  })
+
+  it('CSV header constant matches spec exactly', async () => {
+    const { CSV_HEADER } = await import('@/utils/inventario')
+    expect(CSV_HEADER).toBe('fecha,cantidad,prevStock,newStock,prevCost,newCost,total,factura')
+  })
 })

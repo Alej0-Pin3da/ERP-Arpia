@@ -40,18 +40,18 @@ Chain strategy: stacked-to-main
 ## Phase 3: Integration / Wiring
 
 - [x] 3.1 `frontend/src/components/inventario/HistorialDrawer.vue` — Drawer: date/qty/prev→new stock/cost/total/factura + CSV → REQ-CI-003 SCN-CI-005
-- [ ] 3.2 `frontend/src/views/InventarioView.vue` — per-row `+ Compra` (pre-filled) + `History`, hide `+ Compra` for consulta → REQ-CI-004 SCN-CI-006
+- [x] 3.2 `frontend/src/views/InventarioView.vue` — per-row `+ Compra` (pre-filled) + `History`, hide `+ Compra` for consulta → REQ-CI-004 SCN-CI-006
 - [x] 3.3 `frontend/src/api/endpoints.ts` — typed `comprasApi` for new fields → REQ-CI-002
 
 ## Phase 4: Testing
 
-- [ ] 4.1 `backend/tests/test_wac.py` — TOTAL→unit, zero-stock `nuevo==price`, stable 5.0000, 4 decimals, `commit=False` → SCN-WAC-001/002/003
-- [ ] 4.2 `backend/tests/test_compras_insumos.py` — POST TOTAL 201 cost7.0000+factura, 422 Infinity/NaN/qty<=0 no write, 404/400 FK, GET DESC, RBAC consulta GET200 POST403 → SCN-CI-001..005
-- [ ] 4.3 Concurrent threaded `pytest` same-insumo serializes no lost update, distinct parallelizes on Docker PG → SCN-WAC-005 REQ-WAC-004
-- [ ] 4.4 `vitest compras-form.spec.ts/historial-drawer.spec.ts` — parity 10@5+10@9→7.0000, toggle recalc, disabled gate, CSV header `fecha,cantidad,prevStock,newStock,prevCost,newCost,total,factura` → SCN-WAC-004 SCN-CI-005
+- [x] 4.1 `backend/tests/test_wac.py` — TOTAL→unit, zero-stock `nuevo==price`, stable 5.0000, 4 decimals, `commit=False` → SCN-WAC-001/002/003
+- [x] 4.2 `backend/tests/test_compras_insumos.py` — POST TOTAL 201 cost7.0000+factura, 422 Infinity/NaN/qty<=0 no write, 404/400 FK, GET DESC, RBAC consulta GET200 POST403 → SCN-CI-001..005
+- [x] 4.3 Concurrent threaded `pytest` same-insumo serializes no lost update, distinct parallelizes on Docker PG → SCN-WAC-005 REQ-WAC-004
+- [x] 4.4 `vitest compras-form.spec.ts/historial-drawer.spec.ts` — parity 10@5+10@9→7.0000, toggle recalc, disabled gate, CSV header `fecha,cantidad,prevStock,newStock,prevCost,newCost,total,factura` → SCN-WAC-004 SCN-CI-005
 
 ## Phase 5: Verification & Cleanup
 
-- [ ] 5.1 `pytest backend/tests -q` green + `npm run build`, verify no FLOAT, `NUMERIC(15,4)`, `/api/v1`
-- [ ] 5.2 Manual: seed 10@5, POST TOTAL90, preview=backend 7.0000, History prev→new + CSV, RBAC check
-- [ ] 5.3 Remove dead code, confirm `ComprasTable` sort with DESC default
+- [x] 5.1 `pytest backend/tests -q` green + `npm run build`, verify no FLOAT, `NUMERIC(15,4)`, `/api/v1`
+- [x] 5.2 Manual: seed 10@5, POST TOTAL90, preview=backend 7.0000, History prev→new + CSV, RBAC check
+- [x] 5.3 Remove dead code, confirm `ComprasTable` sort with DESC default

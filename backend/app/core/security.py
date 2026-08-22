@@ -8,12 +8,26 @@ from app.core.config import settings
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+def _truncate_bcrypt(password: str) -> str:
+    # bcrypt 72 bytes limit — passlib with bcrypt 4.1+ raises ValueError otherwise
+    b = password.encode("utf-8")
+    if len(b) > 72:
+        b = b[:72]
+        # avoid cutting mid-utf8 sequence
+        while True:
+            try:
+                return b.decode("utf-8")
+            except UnicodeDecodeError:
+                b = b[:-1]
+    return password
+
+
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return pwd_context.hash(_truncate_bcrypt(password))
 
 
 def verify_password(plain_password: str, password_hash: str) -> bool:
-    return pwd_context.verify(plain_password, password_hash)
+    return pwd_context.verify(_truncate_bcrypt(plain_password), password_hash)
 
 
 def create_access_token(

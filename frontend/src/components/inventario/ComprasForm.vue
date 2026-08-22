@@ -9,7 +9,7 @@
  * `(stock*cost+qty*unit)/newStock` in JS Number for display (backend remains
  * authoritative Decimal). Confirm is disabled when qty<=0||cost<=0||!isFinite.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -32,6 +32,12 @@ const props = defineProps<{
 const emit = defineEmits<{ submit: [payload: CompraInsumoCreate] }>()
 
 const insumoId = ref<number | null>(props.initialInsumoId ?? null)
+watch(
+  () => props.initialInsumoId,
+  (v) => {
+    insumoId.value = v ?? null
+  },
+)
 const cantidad = ref<number | null>(null)
 const modo = ref<'TOTAL' | 'UNIT'>('UNIT')
 const precioUnitario = ref<number | null>(null)

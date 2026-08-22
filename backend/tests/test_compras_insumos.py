@@ -6,6 +6,7 @@ ordering by id, and read-shape completeness. Exercises the FastAPI routes
 through the TestClient against the real test PostgreSQL.
 """
 
+import uuid
 from decimal import Decimal
 
 import pytest
@@ -51,7 +52,11 @@ def _cleanup_insumo(insumo_id: int) -> None:
 
 
 def _auth(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+    return {"Authorization": f"Bearer {token}", "Idempotency-Key": str(uuid.uuid4())}
+
+
+def _idem() -> dict:
+    return {"Idempotency-Key": str(uuid.uuid4())}
 
 
 def _valid_payload(insumo_id: int, **overrides) -> dict:
@@ -70,7 +75,7 @@ def _valid_payload(insumo_id: int, **overrides) -> dict:
 
 
 def test_post_unauth_401(client):
-    resp = client.post(URL, json=_valid_payload(1))
+    resp = client.post(URL, json=_valid_payload(1), headers=_idem())
     assert resp.status_code == 401
 
 
@@ -203,7 +208,8 @@ def test_list_paginated_limit_offset(client, operador_token, categoria_fixture):
         rows = body["items"]
         assert len(rows) == 2
         assert body["total"] == 4  # count of the filtered set, limit ignored
-        assert [row["id"] for row in rows] == created_ids[2:4]
+        # Default ordering is fecha_compra DESC (REQ-CI-003) — newest first
+        assert [row["id"] for row in rows] == sorted(created_ids, reverse=True)[2:4]
     finally:
         _cleanup_insumo(insumo_id)
 
@@ -243,7 +249,8 @@ def test_list_ordered_by_id(client, operador_token, categoria_fixture):
 
         resp = client.get(URL, params={"insumo_id": insumo_id}, headers=_auth(operador_token))
         rows = resp.json()["items"]
-        assert [row["id"] for row in rows] == sorted(created_ids)
+        # Default DESC by fecha_compra
+        assert [row["id"] for row in rows] == sorted(created_ids, reverse=True)
     finally:
         _cleanup_insumo(insumo_id)
 
@@ -346,5 +353,139 @@ def test_read_shape_completeness(client, operador_token, categoria_fixture):
         assert "fecha_compra" in data and data["fecha_compra"]
         assert Decimal(data["cantidad_comprada"]) == Decimal("10")
         assert Decimal(data["precio_unitario_compra"]) == Decimal("9")
+    finally:
+        _cleanup_insumo(insumo_id)
+
+
+# ---------------------------------------------------------------------------
+# Requirement: compras-wac-ux  — TOTAL, factura, Infinity/NaN, FK, DESC, RBAC
+# ---------------------------------------------------------------------------
+
+
+def test_post_total_201_with_factura_and_wac(client, operador_token, categoria_fixture):
+    """POST TOTAL qty10 costo_total90 facturaF-001 -> 201 unit9 stock20 cost7.0000 factura stored."""
+    # Seed insumo with 10@5 so WAC 10@5+10@9=7 is verifiable via direct DB read
+    db = SessionLocal()
+    from app.models import Insumo as _Insumo
+
+    insumo_id = _make_insumo(categoria_fixture["id"])
+    # set stock 10 cost 5 explicitly
+    try:
+        dbs = SessionLocal()
+        try:
+            ins = dbs.get(_Insumo, insumo_id)
+            assert ins is not None
+            ins.stock_actual = Decimal("10")
+            ins.costo_promedio_actual = Decimal("5")
+            dbs.commit()
+        finally:
+            dbs.close()
+        resp = client.post(
+            URL,
+            json={
+                "insumo_id": insumo_id,
+                "cantidad_comprada": 10,
+                "modo": "TOTAL",
+                "costo_total": 90,
+                "factura": "F-001",
+            },
+            headers=_auth(operador_token),
+        )
+        assert resp.status_code == 201, resp.text
+        data = resp.json()
+        assert Decimal(data["precio_unitario_compra"]) == Decimal("9")
+        assert Decimal(data["costo_unitario_aplicado"]) == Decimal("7")
+        assert data["factura"] == "F-001"
+        # Verify stock/cost updated
+        dbs2 = SessionLocal()
+        try:
+            ins2 = dbs2.get(_Insumo, insumo_id)
+            assert ins2 is not None
+            assert ins2.stock_actual == Decimal("20")
+            assert ins2.costo_promedio_actual == Decimal("7")
+        finally:
+            dbs2.close()
+    finally:
+        _cleanup_insumo(insumo_id)
+
+
+def test_post_total_422_no_write_infinity_nan(client, operador_token, categoria_fixture):
+    """Infinity/NaN/ qty<=0 -> 422 no write (REQ-WAC-002)."""
+    insumo_id = _make_insumo(categoria_fixture["id"])
+    db_check = SessionLocal()
+    try:
+        # Quantity zero -> 422
+        resp = client.post(
+            URL,
+            json=_valid_payload(insumo_id, cantidad_comprada=0),
+            headers=_auth(operador_token),
+        )
+        assert resp.status_code == 422
+        # Infinity as string via JSON large number not encodable; use string payload that pydantic parses as Decimal
+        # Send 1e999 which Decimal would be Infinity if allowed — pydantic should 422 finite
+        resp = client.post(
+            URL,
+            json={"insumo_id": insumo_id, "cantidad_comprada": 10, "precio_unitario_compra": "Infinity"},
+            headers=_auth(operador_token),
+        )
+        assert resp.status_code == 422
+        resp = client.post(
+            URL,
+            json={"insumo_id": insumo_id, "cantidad_comprada": 10, "precio_unitario_compra": "NaN"},
+            headers=_auth(operador_token),
+        )
+        assert resp.status_code == 422
+        # Ensure no purchase written
+        resp2 = client.get(URL, params={"insumo_id": insumo_id}, headers=_auth(operador_token))
+        assert resp2.json()["total"] == 0
+    finally:
+        _cleanup_insumo(insumo_id)
+
+
+def test_post_404_insumo_and_400_proveedor(client, operador_token, categoria_fixture):
+    """Unknown insumo -> 404; unknown proveedor -> 400 (Proveedores missing -> 400)."""
+    resp = client.post(
+        URL,
+        json=_valid_payload(99999999),
+        headers=_auth(operador_token),
+    )
+    assert resp.status_code == 404
+    insumo_id = _make_insumo(categoria_fixture["id"])
+    try:
+        resp = client.post(
+            URL,
+            json={**_valid_payload(insumo_id), "proveedor_id": 999999},
+            headers=_auth(operador_token),
+        )
+        # Proveedores table removed -> expect 400 not FK violation
+        assert resp.status_code == 400, resp.text
+        assert "Proveedor" in resp.text
+    finally:
+        _cleanup_insumo(insumo_id)
+
+
+def test_get_desc_order_and_rbac(client, operador_token, consulta_token, categoria_fixture):
+    """GET ?insumo_id ordered fecha_compra DESC; consulta GET200 POST403."""
+    insumo_id = _make_insumo(categoria_fixture["id"])
+    try:
+        # Create two purchases with slight delay to ensure distinct timestamps
+        import time
+
+        resp1 = client.post(URL, json=_valid_payload(insumo_id, precio_unitario_compra=5), headers=_auth(operador_token))
+        assert resp1.status_code == 201
+        time.sleep(0.05)
+        resp2 = client.post(URL, json=_valid_payload(insumo_id, precio_unitario_compra=9), headers=_auth(operador_token))
+        assert resp2.status_code == 201
+        # GET as consulta should be 200 and DESC (newest first)
+        resp = client.get(URL, params={"insumo_id": insumo_id}, headers=_auth(consulta_token))
+        assert resp.status_code == 200
+        rows = resp.json()["items"]
+        assert len(rows) == 2
+        # DESC by fecha_compra: second purchase first
+        assert rows[0]["id"] == resp2.json()["id"]
+        assert rows[1]["id"] == resp1.json()["id"]
+        # consulta POST must be 403
+        resp_forbidden = client.post(URL, json=_valid_payload(insumo_id), headers=_auth(consulta_token))
+        assert resp_forbidden.status_code == 403
     finally:
         _cleanup_insumo(insumo_id)

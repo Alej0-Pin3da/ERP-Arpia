@@ -41,11 +41,15 @@ const props = defineProps<{
   categorias?: { id: number; nombre: string }[]
   /** False for operador/consulta — hides the admin Editar/Eliminar actions. */
   canEdit?: boolean
+  /** True for admin/operador — shows per-row +Compra (REQ-CI-004). */
+  canPurchase?: boolean
 }>()
 
 const emit = defineEmits<{
   edit: [row: InsumoRead]
   delete: [row: InsumoRead]
+  compra: [row: InsumoRead]
+  history: [row: InsumoRead]
   'filter-change': [filters: { categoria_id?: number | null }]
   'sort-change': [sort: { prop: string; order: 'asc' | 'desc' | null }]
 }>()
@@ -151,14 +155,22 @@ function rowClass(row: InsumoRead): string {
         </Tag>
       </template>
     </Column>
-    <Column v-if="canEdit" header="Acciones" style="width: 150px" align="center">
+    <Column header="Acciones" style="width: 240px" align="center">
       <template #body="{ data: row }">
-        <Button link size="small" data-test="edit-insumo" @click="emit('edit', row)">
-          Editar
+        <Button v-if="canPurchase" link size="small" data-test="compra-insumo" @click="emit('compra', row)">
+          + Compra
         </Button>
-        <Button text severity="danger" size="small" data-test="delete-insumo" @click="emit('delete', row)">
-          Eliminar
+        <Button link size="small" data-test="historial-insumo" @click="emit('history', row)">
+          Historial
         </Button>
+        <template v-if="canEdit">
+          <Button link size="small" data-test="edit-insumo" @click="emit('edit', row)">
+            Editar
+          </Button>
+          <Button text severity="danger" size="small" data-test="delete-insumo" @click="emit('delete', row)">
+            Eliminar
+          </Button>
+        </template>
       </template>
     </Column>
 

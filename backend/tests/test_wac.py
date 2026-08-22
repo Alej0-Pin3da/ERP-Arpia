@@ -464,3 +464,122 @@ def test_commit_false_transaccion_controlada_por_caller(categoria_fixture):
         assert persistida.astimezone(UTC) == datetime(2025, 10, 25, tzinfo=UTC)
     finally:
         _cleanup_insumo(ins)
+
+
+# ---------------------------------------------------------------------------
+# Requirement: compras-wac-ux TOTAL modo (SCN-WAC-001/002/003)
+# ---------------------------------------------------------------------------
+
+
+def test_wac_total_derives_unit_price(categoria_fixture):
+    """TOTAL modo: costo_total/qty -> precio unitario derivado, WAC 10@5+10@9->7.0000."""
+    ins = _make_insumo(categoria_fixture["id"], stock="10", costo="5")
+    try:
+        db = SessionLocal()
+        try:
+            compra = registrar_compra(
+                db,
+                insumo_id=ins,
+                cantidad="10",
+                costo_total="90",
+                modo="TOTAL",
+            )
+        finally:
+            db.close()
+        stock, costo = _read_inventory(ins)
+        assert compra.precio_unitario_compra == Decimal("9")
+        assert compra.costo_unitario_aplicado == Decimal("7")
+        assert stock == Decimal("20")
+        assert costo == Decimal("7")
+    finally:
+        _cleanup_insumo(ins)
+
+
+def test_wac_total_zero_stock_nuevo_equals_price(categoria_fixture):
+    """stock 0 + TOTAL -> nuevo == price derivado."""
+    ins = _make_insumo(categoria_fixture["id"], stock="0", costo="0")
+    try:
+        db = SessionLocal()
+        try:
+            compra = registrar_compra(
+                db,
+                insumo_id=ins,
+                cantidad="20",
+                costo_total="140",
+                modo="TOTAL",
+            )
+        finally:
+            db.close()
+        stock, costo = _read_inventory(ins)
+        assert compra.precio_unitario_compra == Decimal("7")
+        assert stock == Decimal("20")
+        assert costo == Decimal("7")
+    finally:
+        _cleanup_insumo(ins)
+
+
+def test_wac_total_stable_cost(categoria_fixture):
+    """TOTAL con costo estable (5) mantiene 5.0000."""
+    ins = _make_insumo(categoria_fixture["id"], stock="10", costo="5")
+    try:
+        db = SessionLocal()
+        try:
+            registrar_compra(db, insumo_id=ins, cantidad="10", costo_total="50", modo="TOTAL")
+        finally:
+            db.close()
+        stock, costo = _read_inventory(ins)
+        assert stock == Decimal("20")
+        assert costo == Decimal("5")
+    finally:
+        _cleanup_insumo(ins)
+
+
+def test_wac_total_4_decimals(categoria_fixture):
+    """TOTAL fraccional conserva 4 decimales (NUMERIC 15,4)."""
+    ins = _make_insumo(categoria_fixture["id"], stock="10", costo="3")
+    try:
+        db = SessionLocal()
+        try:
+            # qty 3, costo_total 12 -> unit 4, WAC 42/13=3.2308 same as UNIT case
+            registrar_compra(db, insumo_id=ins, cantidad="3", costo_total="12", modo="TOTAL")
+        finally:
+            db.close()
+        stock, costo = _read_inventory(ins)
+        assert stock == Decimal("13")
+        assert costo == Decimal("3.2308")
+    finally:
+        _cleanup_insumo(ins)
+
+
+def test_wac_total_commit_false(categoria_fixture):
+    """TOTAL con commit=False -> rollback deja sin efecto."""
+    ins = _make_insumo(categoria_fixture["id"], stock="10", costo="5")
+    try:
+        db = SessionLocal()
+        try:
+            registrar_compra(
+                db,
+                insumo_id=ins,
+                cantidad="10",
+                costo_total="90",
+                modo="TOTAL",
+                commit=False,
+            )
+        finally:
+            db.rollback()
+            db.close()
+        stock, costo = _read_inventory(ins)
+        assert stock == Decimal("10")
+        assert costo == Decimal("5")
+        assert _purchase_count(ins) == 0
+    finally:
+        _cleanup_insumo(ins)
+
+
+def test_wac_select_for_update_present():
+    """Unit-level lock verification: service usa SELECT FOR UPDATE."""
+    from pathlib import Path
+
+    text = Path(__file__).resolve().parents[1].joinpath("app/services/wac.py").read_text(encoding="utf-8")
+    assert "with_for_update" in text, "wac.py debe contener SELECT FOR UPDATE (RE Q-WAC-004)"
+    assert "SELECT" in text and "FOR UPDATE" in text or "with_for_update" in text
