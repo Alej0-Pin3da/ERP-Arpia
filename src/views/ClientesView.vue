@@ -2,15 +2,18 @@
 import { ref, computed } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import { useAtelierStore, type ClienteCRM } from '@/stores/atelier'
+import { useAtelierStore, type ClienteCRM, type MedidasAnatomicas } from '@/stores/atelier'
 import NuevoClienteModal from '@/components/atelier/NuevoClienteModal.vue'
+import MedidasAnatomicasModal from '@/components/atelier/MedidasAnatomicasModal.vue'
 import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
 const search = ref('')
 
 const showModal = ref(false)
+const showMedidasModal = ref(false)
 const clienteEditar = ref<ClienteCRM | null>(null)
+const clienteMedidas = ref<ClienteCRM | null>(null)
 
 const clientesFiltrados = computed(() => {
   return atelier.clientes.filter((c) => {
@@ -57,6 +60,15 @@ function abrirWhatsApp(c: ClienteCRM) {
   const msg = encodeURIComponent(`¡Hola ${c.nombre}! Te escribimos de Atelier Arpía para coordinar detalles de tu prenda y medidas. ✨`)
   const url = `https://wa.me/${cleanPhone || '573124567890'}?text=${msg}`
   window.open(url, '_blank')
+}
+
+function guardarMedidasCliente(medidas: MedidasAnatomicas) {
+  if (clienteMedidas.value) {
+    const cl = atelier.clientes.find((c) => c.id === clienteMedidas.value?.id)
+    if (cl) {
+      cl.medidas = { ...medidas }
+    }
+  }
 }
 </script>
 
@@ -163,8 +175,18 @@ function abrirWhatsApp(c: ClienteCRM) {
 
           <!-- Anatomical Measures Box -->
           <div class="bg-stone-950/70 border border-stone-800 rounded-xl p-3 space-y-2">
-            <div class="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
-              Medidas Anatómicas (cm)
+            <div class="flex items-center justify-between">
+              <div class="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
+                Medidas Anatómicas (cm)
+              </div>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 text-[10px] text-amber-300/90 hover:text-amber-200 font-mono font-semibold px-2 py-0.5 rounded bg-amber-950/60 border border-amber-500/30 transition"
+                @click="clienteMedidas = c; showMedidasModal = true"
+              >
+                <i class="pi pi-compass text-[10px]" />
+                <span>Silueta & Varillas</span>
+              </button>
             </div>
             <div class="grid grid-cols-3 gap-2 text-center text-xs font-mono">
               <div class="bg-stone-900/60 p-1.5 rounded border border-stone-800/60">
@@ -203,7 +225,12 @@ function abrirWhatsApp(c: ClienteCRM) {
       </div>
     </div>
 
-    <!-- Modal -->
+    <!-- Modals -->
     <NuevoClienteModal v-model:visible="showModal" :cliente-editar="clienteEditar" />
+    <MedidasAnatomicasModal
+      v-model:visible="showMedidasModal"
+      :cliente="clienteMedidas"
+      @guardar="guardarMedidasCliente"
+    />
   </div>
 </template>

@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import { useAtelierStore, type PedidoProduccion, type EstadoPedido } from '@/stores/atelier'
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
+import DetallePedidoTallerModal from '@/components/atelier/DetallePedidoTallerModal.vue'
 import { showToast } from '@/utils/toast'
 
 const router = useRouter()
@@ -13,6 +14,13 @@ const atelier = useAtelierStore()
 const search = ref('')
 const viewMode = ref<'kanban' | 'tabla'>('kanban')
 const showNuevoPedidoModal = ref(false)
+const showDetallePedidoModal = ref(false)
+const pedidoSeleccionado = ref<PedidoProduccion | null>(null)
+
+function abrirFichaTaller(p: PedidoProduccion) {
+  pedidoSeleccionado.value = p
+  showDetallePedidoModal.value = true
+}
 
 const estados: EstadoPedido[] = [
   'COTIZADO',
@@ -173,18 +181,31 @@ function abrirWhatsApp(p: PedidoProduccion) {
                     <span class="font-mono text-xs font-bold text-amber-300">{{ p.codigo }}</span>
                     <h4 class="text-xs font-bold text-stone-100 m-0 mt-0.5">{{ p.cliente_nombre }}</h4>
                   </div>
-                  <button
-                    type="button"
-                    class="text-emerald-400 hover:text-emerald-300 transition"
-                    title="WhatsApp"
-                    @click="abrirWhatsApp(p)"
-                  >
-                    <i class="pi pi-whatsapp text-sm" />
-                  </button>
+                  <div class="flex items-center gap-1">
+                    <button
+                      type="button"
+                      class="text-amber-400 hover:text-amber-300 transition p-1"
+                      title="Ver Ficha de Taller & Tiempos"
+                      @click="abrirFichaTaller(p)"
+                    >
+                      <i class="pi pi-clock text-xs" />
+                    </button>
+                    <button
+                      type="button"
+                      class="text-emerald-400 hover:text-emerald-300 transition p-1"
+                      title="WhatsApp"
+                      @click="abrirWhatsApp(p)"
+                    >
+                      <i class="pi pi-whatsapp text-sm" />
+                    </button>
+                  </div>
                 </div>
 
                 <!-- Garment Info -->
-                <div class="text-xs text-stone-300 bg-stone-900/60 p-2 rounded border border-stone-800/60 leading-snug">
+                <div
+                  class="text-xs text-stone-300 bg-stone-900/60 p-2 rounded border border-stone-800/60 leading-snug cursor-pointer hover:border-amber-500/40 transition"
+                  @click="abrirFichaTaller(p)"
+                >
                   {{ p.prenda_nombre }}
                 </div>
 
@@ -284,5 +305,9 @@ function abrirWhatsApp(p: PedidoProduccion) {
 
     <!-- Modals -->
     <NuevoPedidoModal v-model:visible="showNuevoPedidoModal" />
+    <DetallePedidoTallerModal
+      v-model:visible="showDetallePedidoModal"
+      :pedido="pedidoSeleccionado"
+    />
   </div>
 </template>

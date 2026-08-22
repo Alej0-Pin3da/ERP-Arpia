@@ -2,11 +2,16 @@
 import { ref, computed } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import { useAtelierStore } from '@/stores/atelier'
+import { useAtelierStore, type PrendaConfeccionada, type PrendaVariante } from '@/stores/atelier'
+import EtiquetaPrendaModal from '@/components/atelier/EtiquetaPrendaModal.vue'
 import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
 const search = ref('')
+
+const showEtiquetaModal = ref(false)
+const selectedPrenda = ref<PrendaConfeccionada | null>(null)
+const selectedVariante = ref<PrendaVariante | null>(null)
 
 const prendasFiltradas = computed(() => {
   return atelier.prendasListas.filter((p) => {
@@ -26,6 +31,12 @@ function formatCOP(val: number) {
 
 function ajustarStock(productoId: number, varianteId: number, delta: number) {
   atelier.ajustarStockPrenda(productoId, varianteId, delta)
+}
+
+function verEtiqueta(p: PrendaConfeccionada, v?: PrendaVariante) {
+  selectedPrenda.value = p
+  selectedVariante.value = v || (p.variantes && p.variantes[0]) || null
+  showEtiquetaModal.value = true
 }
 
 function ingresarPrendaModal() {
@@ -147,6 +158,15 @@ function ingresarPrendaModal() {
               <span class="font-sans">Disponible: </span>
               <strong class="font-bold">{{ p.disponible_total }}</strong>
             </div>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-950/70 border border-amber-500/40 text-amber-300 hover:text-amber-200 text-xs font-semibold transition"
+              title="Generar Etiqueta de Autor & QR"
+              @click="verEtiqueta(p)"
+            >
+              <i class="pi pi-qrcode text-xs" />
+              <span>Etiqueta QR</span>
+            </button>
           </div>
         </div>
 
@@ -161,7 +181,7 @@ function ingresarPrendaModal() {
                 <th class="py-2.5 px-4 text-center">Stock Físico</th>
                 <th class="py-2.5 px-4 text-center">Reservado</th>
                 <th class="py-2.5 px-4 text-center">Disponible</th>
-                <th class="py-2.5 px-4 text-right">Ajuste de Stock</th>
+                <th class="py-2.5 px-4 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-stone-800/50 text-stone-200 font-mono">
@@ -173,21 +193,31 @@ function ingresarPrendaModal() {
                 <td class="py-2.5 px-4 text-center text-amber-400">{{ v.reservado }}</td>
                 <td class="py-2.5 px-4 text-center font-bold text-emerald-400">{{ v.disponible }}</td>
                 <td class="py-2.5 px-4 text-right font-sans">
-                  <div class="inline-flex items-center bg-stone-950 border border-stone-800 rounded-lg p-0.5">
+                  <div class="inline-flex items-center gap-1.5">
                     <button
                       type="button"
-                      class="px-2 py-0.5 text-stone-400 hover:text-white hover:bg-stone-800 rounded text-xs transition"
-                      @click="ajustarStock(p.id, v.id, -1)"
+                      class="p-1 text-stone-400 hover:text-amber-300 rounded transition"
+                      title="Ver Etiqueta de esta Talla"
+                      @click="verEtiqueta(p, v)"
                     >
-                      -1
+                      <i class="pi pi-qrcode text-xs" />
                     </button>
-                    <button
-                      type="button"
-                      class="px-2 py-0.5 text-amber-400 hover:text-amber-300 hover:bg-stone-800 rounded text-xs font-bold transition"
-                      @click="ajustarStock(p.id, v.id, 1)"
-                    >
-                      +1
-                    </button>
+                    <div class="inline-flex items-center bg-stone-950 border border-stone-800 rounded-lg p-0.5">
+                      <button
+                        type="button"
+                        class="px-2 py-0.5 text-stone-400 hover:text-white hover:bg-stone-800 rounded text-xs transition"
+                        @click="ajustarStock(p.id, v.id, -1)"
+                      >
+                        -1
+                      </button>
+                      <button
+                        type="button"
+                        class="px-2 py-0.5 text-amber-400 hover:text-amber-300 hover:bg-stone-800 rounded text-xs font-bold transition"
+                        @click="ajustarStock(p.id, v.id, 1)"
+                      >
+                        +1
+                      </button>
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -196,5 +226,12 @@ function ingresarPrendaModal() {
         </div>
       </div>
     </div>
+
+    <!-- Etiqueta Modal -->
+    <EtiquetaPrendaModal
+      v-model:visible="showEtiquetaModal"
+      :prenda="selectedPrenda"
+      :variante="selectedVariante"
+    />
   </div>
 </template>

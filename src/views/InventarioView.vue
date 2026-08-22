@@ -7,6 +7,7 @@ import { useAtelierStore, type InsumoAtelier } from '@/stores/atelier'
 import NuevoInsumoModal from '@/components/atelier/NuevoInsumoModal.vue'
 import CompraInsumoModal from '@/components/atelier/CompraInsumoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
+import OrdenCompraProveedorModal from '@/components/atelier/OrdenCompraProveedorModal.vue'
 import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
@@ -19,6 +20,7 @@ const soloBajoStock = ref(false)
 const showNuevoModal = ref(false)
 const showCompraModal = ref(false)
 const showSugerirModal = ref(false)
+const showOrdenProveedorModal = ref(false)
 const insumoSeleccionado = ref<InsumoAtelier | null>(null)
 
 const categoriasDisponibles = computed(() => {
@@ -95,7 +97,16 @@ function eliminar(item: InsumoAtelier) {
 
       <div class="flex flex-wrap items-center gap-2">
         <Button
-          :label="`Sugerir Orden de Compra (${atelier.insumosCriticos.length})`"
+          label="Orden a Proveedores"
+          icon="pi pi-truck"
+          size="small"
+          severity="secondary"
+          outlined
+          class="text-xs font-semibold"
+          @click="showOrdenProveedorModal = true"
+        />
+        <Button
+          :label="`Sugerir Orden (${atelier.insumosCriticos.length})`"
           icon="pi pi-shopping-cart"
           size="small"
           severity="secondary"
@@ -349,5 +360,6 @@ function eliminar(item: InsumoAtelier) {
     <NuevoInsumoModal v-model:visible="showNuevoModal" />
     <CompraInsumoModal v-model:visible="showCompraModal" :insumo="insumoSeleccionado" />
     <SugerirOrdenModal v-model:visible="showSugerirModal" />
+    <OrdenCompraProveedorModal v-model:visible="showOrdenProveedorModal" />
   </div>
 </template>
