@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputText'
+import InputText from 'primevue/inputtext'
 import { useAtelierStore, type ClienteCRM } from '@/stores/atelier'
 import NuevoClienteModal from '@/components/atelier/NuevoClienteModal.vue'
 import { showToast } from '@/utils/toast'

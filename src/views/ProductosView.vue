@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputText'
+import InputText from 'primevue/inputtext'
 import { useAtelierStore, type RecetaBOM } from '@/stores/atelier'
 import FichaTecnicaModal from '@/components/atelier/FichaTecnicaModal.vue'
 import NuevaRecetaModal from '@/components/atelier/NuevaRecetaModal.vue'

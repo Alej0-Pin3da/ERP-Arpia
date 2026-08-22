@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputText'
+import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
 import { useAtelierStore, type InsumoAtelier } from '@/stores/atelier'
 import NuevoInsumoModal from '@/components/atelier/NuevoInsumoModal.vue'

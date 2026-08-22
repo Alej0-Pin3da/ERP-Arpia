@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /*
  * Global styles — ERP ARPIA Luxury Atelier Theme.
  *
@@ -224,7 +226,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ---------------------------------------------------------------------
-   PrimeVue Enterprise Enhancements
+   PrimeVue Enterprise Enhancements & Luxury Atelier Palette
  * ------------------------------------------------------------------- */
 .p-button {
   font-family: var(--arpia-font-button);
@@ -232,14 +234,75 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: 0.01em;
   border-radius: var(--arpia-radius);
   transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--arpia-primary);
+  border-color: var(--arpia-primary);
+  color: #09090b;
 }
 
 .p-button:hover {
   transform: translateY(-1px);
+  background: var(--arpia-primary-hover);
+  border-color: var(--arpia-primary-hover);
+  color: #09090b;
 }
 
 .p-button:active {
   transform: translateY(0);
+}
+
+.p-button.p-button-warning,
+.p-button-warning {
+  background: linear-gradient(135deg, #dfb15b 0%, #c5a059 50%, #9e7d3b 100%) !important;
+  border: 1px solid rgba(223, 177, 91, 0.6) !important;
+  color: #09090b !important;
+  box-shadow: 0 2px 10px rgba(197, 160, 89, 0.25);
+}
+
+.p-button.p-button-warning:hover,
+.p-button-warning:hover {
+  background: linear-gradient(135deg, #f3e5ab 0%, #dfb15b 50%, #c5a059 100%) !important;
+  border-color: rgba(243, 229, 171, 0.8) !important;
+  box-shadow: 0 4px 16px rgba(197, 160, 89, 0.4);
+}
+
+.p-button.p-button-secondary,
+.p-button-secondary {
+  background: #191921 !important;
+  border: 1px solid rgba(197, 160, 89, 0.2) !important;
+  color: #fafaf9 !important;
+}
+
+.p-button.p-button-secondary:hover,
+.p-button-secondary:hover {
+  background: #22222d !important;
+  border-color: rgba(197, 160, 89, 0.4) !important;
+  color: #f3e5ab !important;
+}
+
+.p-button.p-button-outlined {
+  background: transparent !important;
+  border: 1px solid rgba(197, 160, 89, 0.3) !important;
+  color: #c5a059 !important;
+}
+
+.p-button.p-button-outlined:hover {
+  background: rgba(197, 160, 89, 0.1) !important;
+  border-color: #dfb15b !important;
+  color: #f3e5ab !important;
+}
+
+.p-button.p-button-outlined.p-button-danger,
+.p-button-danger.p-button-outlined {
+  background: transparent !important;
+  border: 1px solid rgba(225, 29, 72, 0.4) !important;
+  color: #fb7185 !important;
+}
+
+.p-button.p-button-outlined.p-button-danger:hover,
+.p-button-danger.p-button-outlined:hover {
+  background: rgba(225, 29, 72, 0.15) !important;
+  border-color: #f43f5e !important;
+  color: #ffe4e6 !important;
 }
 
 .p-tag {
@@ -249,6 +312,12 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: 0.02em;
   border-radius: 9999px;
   padding: 0.25rem 0.65rem;
+}
+
+.p-tag.p-tag-secondary {
+  background: #1c1917 !important;
+  color: #d6d3d1 !important;
+  border: 1px solid #44403c !important;
 }
 
 .p-card {

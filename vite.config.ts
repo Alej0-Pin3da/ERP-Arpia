@@ -1,6 +1,7 @@
 import { fileURLToPath, URL } from 'node:url'
 import type { Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vitest/config'
 import { handleMockApiRequest } from './src/server/mockApi'
 
@@ -53,7 +54,7 @@ function mockApiPlugin(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   base: '/',
-  plugins: [vue(), mockApiPlugin()],
+  plugins: [vue(), tailwindcss(), mockApiPlugin()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

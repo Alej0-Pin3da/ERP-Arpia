@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputText'
+import InputText from 'primevue/inputtext'
 import { useAtelierStore, type ClienteCRM } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
 

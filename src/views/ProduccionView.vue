@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputText'
+import InputText from 'primevue/inputtext'
 import { useAtelierStore, type PedidoProduccion, type EstadoPedido } from '@/stores/atelier'
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import { showToast } from '@/utils/toast'
