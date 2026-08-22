@@ -1069,10 +1069,21 @@ export interface components {
         CompraInsumoCreate: {
             /** Insumo Id */
             insumo_id: number;
+            /** Proveedor Id */
+            proveedor_id?: number | null;
             /** Cantidad Comprada */
             cantidad_comprada: number | string;
+            /**
+             * Modo
+             * @default UNIT
+             */
+            modo?: 'TOTAL' | 'UNIT';
             /** Precio Unitario Compra */
-            precio_unitario_compra: number | string;
+            precio_unitario_compra?: number | string | null;
+            /** Costo Total */
+            costo_total?: number | string | null;
+            /** Factura */
+            factura?: string | null;
         };
         /** CompraInsumoRead */
         CompraInsumoRead: {
@@ -1080,6 +1091,8 @@ export interface components {
             id: number;
             /** Insumo Id */
             insumo_id: number;
+            /** Proveedor Id */
+            proveedor_id?: number | null;
             /**
              * Fecha Compra
              * Format: date-time
@@ -1089,6 +1102,10 @@ export interface components {
             cantidad_comprada: string;
             /** Precio Unitario Compra */
             precio_unitario_compra: string;
+            /** Costo Unitario Aplicado */
+            costo_unitario_aplicado?: string | null;
+            /** Factura */
+            factura?: string | null;
         };
         /** CostoLineaRead */
         CostoLineaRead: {

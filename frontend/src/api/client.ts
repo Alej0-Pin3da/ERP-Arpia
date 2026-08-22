@@ -38,11 +38,44 @@ export function createClient(options: ClientOptions = {}): AxiosInstance {
   return instance
 }
 
+const IDEMPOTENT_PREFIXES = [
+  '/ventas',
+  '/devoluciones',
+  '/compras',
+  '/finanzas/movimientos',
+  '/finanzas/liquidaciones',
+  '/inventario/ajustes',
+]
+
+function requiresIdempotency(url?: string, method?: string): boolean {
+  if (!url || !method) return false
+  const m = method.toUpperCase()
+  if (!['POST', 'PUT', 'PATCH'].includes(m)) return false
+  return IDEMPOTENT_PREFIXES.some((p) => url.includes(p))
+}
+
+function hasIdempotencyHeader(headers: unknown): boolean {
+  if (!headers) return false
+  const h = headers as Record<string, unknown> & { get?: (k: string) => string | undefined }
+  if (typeof h.get === 'function') return Boolean(h.get('Idempotency-Key'))
+  return Boolean((h as Record<string, unknown>)['Idempotency-Key'])
+}
+
 function attachInterceptors(instance: AxiosInstance): void {
   instance.interceptors.request.use((config) => {
     const token = readAccessToken()
     if (token) {
       config.headers.set('Authorization', `Bearer ${token}`)
+    }
+    if (requiresIdempotency(config.url, config.method) && !hasIdempotencyHeader(config.headers)) {
+      const uuid =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+      // AxiosHeaders has .set, plain object fallback uses bracket
+      const headers = config.headers as unknown as { set?: (k: string, v: string) => void } & Record<string, string>
+      if (typeof headers.set === 'function') headers.set('Idempotency-Key', uuid)
+      else (config.headers as Record<string, string>)['Idempotency-Key'] = uuid
     }
     return config
   })
