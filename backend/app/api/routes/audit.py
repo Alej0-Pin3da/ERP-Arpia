@@ -1,5 +1,5 @@
 """Audit API routes — read-only access to audit logs."""
-from datetime import datetime
+from datetime import date, datetime, time
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, status
@@ -26,8 +26,8 @@ def list_audit_logs(
     entidad: str | None = Query(default=None, description="Filter by entity"),
     entity_id: int | None = Query(default=None, description="Filter by entity ID"),
     accion: str | None = Query(default=None, description="Filter by action"),
-    fecha_desde: datetime | None = Query(default=None, description="Filter from date"),
-    fecha_hasta: datetime | None = Query(default=None, description="Filter to date"),
+    fecha_desde: datetime | date | None = Query(default=None, description="Filter from date (YYYY-MM-DD or ISO datetime)"),
+    fecha_hasta: datetime | date | None = Query(default=None, description="Filter to date (YYYY-MM-DD or ISO datetime)"),
     request_id: str | None = Query(default=None, description="Filter by request ID"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -51,8 +51,14 @@ def list_audit_logs(
     if accion is not None:
         stmt = stmt.where(AuditLog.accion == accion)
     if fecha_desde is not None:
+        # Accept date-only (YYYY-MM-DD) as midnight start of day
+        if isinstance(fecha_desde, date) and not isinstance(fecha_desde, datetime):
+            fecha_desde = datetime.combine(fecha_desde, time.min)
         stmt = stmt.where(AuditLog.timestamp >= fecha_desde)
     if fecha_hasta is not None:
+        # Accept date-only as end of day inclusive
+        if isinstance(fecha_hasta, date) and not isinstance(fecha_hasta, datetime):
+            fecha_hasta = datetime.combine(fecha_hasta, time.max)
         stmt = stmt.where(AuditLog.timestamp <= fecha_hasta)
     if request_id is not None:
         stmt = stmt.where(AuditLog.request_id == request_id)
