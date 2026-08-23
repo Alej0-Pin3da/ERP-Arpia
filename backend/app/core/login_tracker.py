@@ -1,7 +1,8 @@
 """Login attempt tracking and lockout mechanism."""
+
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from threading import Lock
 from typing import ClassVar
 

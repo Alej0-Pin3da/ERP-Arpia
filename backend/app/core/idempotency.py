@@ -4,12 +4,13 @@ Ensures that retries with the same Idempotency-Key return the same response
 without executing the operation twice. Uses Redis for distributed storage
 with automatic TTL expiration.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import re
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
@@ -45,7 +46,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
     def __init__(
         self,
         app: ASGIApp,
-        redis_client: Optional[object] = None,
+        redis_client: object | None = None,
         ttl: int = IDEMPOTENCY_TTL,
     ):
         super().__init__(app)
@@ -134,7 +135,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # Basic validation - alphanumeric, dash, underscore
         return bool(re.match(r"^[a-zA-Z0-9_-]+$", key))
 
-    async def _get_cached_response(self, key: str) -> Optional[tuple[bytes, int, dict]]:
+    async def _get_cached_response(self, key: str) -> tuple[bytes, int, dict] | None:
         """Get cached response from Redis or memory fallback."""
         try:
             if self.redis:
@@ -186,13 +187,14 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 
 def create_idempotency_middleware() -> type[IdempotencyMiddleware]:
     """Create IdempotencyMiddleware class with Redis client configured.
-    
+
     This factory creates a middleware class that can be used with
     app.add_middleware(). The Redis client is initialized at class creation time.
     """
     redis_client = None
     try:
         import redis.asyncio as redis
+
         redis_client = redis.from_url(
             getattr(settings, "REDIS_URL", "redis://localhost:6379/0"),
             encoding="utf-8",

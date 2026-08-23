@@ -11,14 +11,18 @@ from app.core.limiter import user_limiter
 from app.models import CompraInsumo, Insumo, Usuario
 from app.schemas.common import Paginated
 from app.schemas.compra_insumo import CompraInsumoCreate, CompraInsumoRead
-from app.services.paginacion import aplicar_orden, paginar
 from app.services.audit import audit_compra_create
+from app.services.paginacion import aplicar_orden, paginar
 from app.services.wac import registrar_compra
 
 router = APIRouter(prefix="/compras-insumos", tags=["compras-insumos"])
 
 # Rate limiter for critical write endpoints
-_critical_limiter = user_limiter if settings.ENVIRONMENT != "test" else Limiter(key_func=lambda r: "test", enabled=False)
+_critical_limiter = (
+    user_limiter
+    if settings.ENVIRONMENT != "test"
+    else Limiter(key_func=lambda r: "test", enabled=False)
+)
 
 audited_user = require_roles("admin", "operador", "consulta")
 mutation_user = require_roles("admin", "operador")
@@ -53,7 +57,7 @@ def create_compra_insumo(
             raise HTTPException(status_code=400, detail="Proveedor not found")
         # Table exists — verify id exists via raw SQL to avoid model import
         found = db.execute(
-            text("SELECT 1 FROM \"Proveedores\" WHERE id = :pid"),
+            text('SELECT 1 FROM "Proveedores" WHERE id = :pid'),
             {"pid": payload.proveedor_id},
         ).scalar()
         if not found:

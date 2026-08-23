@@ -1,8 +1,6 @@
 """Tests for security headers middleware and strict CORS per environment."""
-import pytest
-from fastapi.testclient import TestClient
 
-from app.main import app
+from fastapi.testclient import TestClient
 
 
 class TestSecurityHeaders:
@@ -75,8 +73,9 @@ class TestDockerComposeNoDefaults:
     """Docker compose should not have default secrets."""
 
     def test_docker_compose_no_default_jwt_secret(self):
-        import yaml
         from pathlib import Path
+
+        import yaml
 
         compose_path = Path(__file__).resolve().parents[2] / "docker-compose.yml"
         with open(compose_path) as f:
@@ -89,8 +88,9 @@ class TestDockerComposeNoDefaults:
         assert ":-" not in jwt_secret or "dev_secret" not in jwt_secret
 
     def test_docker_compose_no_default_postgres_password(self):
-        import yaml
         from pathlib import Path
+
+        import yaml
 
         compose_path = Path(__file__).resolve().parents[2] / "docker-compose.yml"
         with open(compose_path) as f:
@@ -102,8 +102,9 @@ class TestDockerComposeNoDefaults:
         assert ":-" not in pg_password or "arpia_secret" not in pg_password
 
     def test_docker_compose_no_default_database_url(self):
-        import yaml
         from pathlib import Path
+
+        import yaml
 
         compose_path = Path(__file__).resolve().parents[2] / "docker-compose.yml"
         with open(compose_path) as f:

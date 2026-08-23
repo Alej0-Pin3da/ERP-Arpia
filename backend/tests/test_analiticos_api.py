@@ -698,7 +698,9 @@ def test_finanzas_mensuales_mezcla_ingresos_y_gastos(client, admin_token):
         mov_ids = [
             _insertar_movimiento(datetime(2026, 4, 2, 12, 0, 0), "Gasto", "80"),
             _insertar_movimiento(datetime(2026, 4, 3, 12, 0, 0), "Inversion", "20"),
-            _insertar_movimiento(datetime(2026, 4, 4, 12, 0, 0), "Gasto", "999", estado="cancelled"),
+            _insertar_movimiento(
+                datetime(2026, 4, 4, 12, 0, 0), "Gasto", "999", estado="cancelled"
+            ),
             _insertar_movimiento(datetime(2026, 4, 6, 12, 0, 0), "Retiro", "999"),
             _insertar_movimiento(datetime(2026, 6, 8, 12, 0, 0), "Gasto", "30"),
         ]

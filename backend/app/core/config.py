@@ -42,7 +42,10 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         if self.ENVIRONMENT in ("production", "staging"):
-            if self.JWT_SECRET_KEY in ("dev_secret_change_me", "CHANGE_ME_USE_SECURE_RANDOM_32_BYTES"):
+            if self.JWT_SECRET_KEY in (
+                "dev_secret_change_me",
+                "CHANGE_ME_USE_SECURE_RANDOM_32_BYTES",
+            ):
                 raise ValueError(
                     "JWT_SECRET_KEY must be configured with a secure secret in production/staging!"
                 )
@@ -51,7 +54,8 @@ class Settings(BaseSettings):
                 "postgresql+psycopg://arpia:CHANGE_ME@db:5432/arpia",
             ):
                 raise ValueError(
-                    "DATABASE_URL must be configured with the production database in production/staging!"
+                    "DATABASE_URL must be configured with the production database "
+                    "in production/staging!"
                 )
             if self.CORS_ORIGINS in ("", "http://localhost:5173,http://localhost:3000"):
                 raise ValueError(

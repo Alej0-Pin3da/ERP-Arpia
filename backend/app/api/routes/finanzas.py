@@ -47,7 +47,11 @@ from app.services.paginacion import aplicar_orden, paginar
 router = APIRouter(prefix="/finanzas", tags=["finanzas"])
 
 # Rate limiter for critical write endpoints
-_critical_limiter = user_limiter if settings.ENVIRONMENT != "test" else Limiter(key_func=lambda r: "test", enabled=False)
+_critical_limiter = (
+    user_limiter
+    if settings.ENVIRONMENT != "test"
+    else Limiter(key_func=lambda r: "test", enabled=False)
+)
 
 mutation_user = require_roles("admin", "operador")
 audited_user = require_roles("admin", "operador", "consulta")
@@ -116,10 +120,7 @@ def list_movimientos_route(
     {items, total} and optional tipo/estado filters."""
     # Socio joined once up-front so the socio sort key works; outer join since
     # socio_id is nullable.
-    stmt = (
-        select(MovimientoFinanciero)
-        .outerjoin(MovimientoFinanciero.socio)
-    )
+    stmt = select(MovimientoFinanciero).outerjoin(MovimientoFinanciero.socio)
     if estado is not None:
         stmt = stmt.where(MovimientoFinanciero.estado == estado)
     else:
@@ -167,7 +168,7 @@ def transition_movimiento_state(
     movimiento_id: int,
     payload: MovimientoStateTransition,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     """Transition movimiento to a new state with validation.
 
@@ -191,7 +192,7 @@ def transition_movimiento_state(
             reversed_by=current_user.id if new_state == DocumentState.REVERSED else None,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     db.commit()
     db.refresh(movimiento)

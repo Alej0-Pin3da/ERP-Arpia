@@ -9,8 +9,8 @@ and the base seed (admin + categories) runs once per session.
 """
 
 import os
-from pathlib import Path
 import uuid
+from pathlib import Path
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
@@ -142,9 +142,8 @@ class IdempotentTestClient(TestClient):
     def request(self, method: str, url: str, **kwargs):
         if method.upper() in IDEMPOTENT_METHODS and url.startswith(IDEMPOTENT_ENDPOINTS):
             headers = kwargs.get("headers") or {}
-            has_key = (
-                (isinstance(headers, dict) and "Idempotency-Key" in headers)
-                or (hasattr(headers, "get") and headers.get("Idempotency-Key"))
+            has_key = (isinstance(headers, dict) and "Idempotency-Key" in headers) or (
+                hasattr(headers, "get") and headers.get("Idempotency-Key")
             )
             if not has_key:
                 merged = dict(headers)

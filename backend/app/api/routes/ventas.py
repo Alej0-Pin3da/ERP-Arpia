@@ -7,12 +7,12 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import get_current_user, get_db, require_roles
-from app.core.limiter import get_rate_limit_config, user_limiter
+from app.core.limiter import user_limiter
 from app.models.clientes import Cliente
 from app.models.usuarios import Usuario
 from app.models.ventas import DetalleVenta, DocumentState, Venta
 from app.schemas.common import Paginated
-from app.schemas.venta import VentaCreate, VentaRead, VentaUpdate, VentaStateTransition
+from app.schemas.venta import VentaCreate, VentaRead, VentaStateTransition, VentaUpdate
 from app.services.audit import audit_venta_create, audit_venta_delete, audit_venta_update
 from app.services.inventory import (
     actualizar_venta,
@@ -26,7 +26,11 @@ from app.services.paginacion import aplicar_orden, paginar
 router = APIRouter(prefix="/ventas", tags=["ventas"])
 
 # Rate limiter for critical write endpoints
-_critical_limiter = user_limiter if settings.ENVIRONMENT != "test" else Limiter(key_func=lambda r: "test", enabled=False)
+_critical_limiter = (
+    user_limiter
+    if settings.ENVIRONMENT != "test"
+    else Limiter(key_func=lambda r: "test", enabled=False)
+)
 
 mutation_user = require_roles("admin", "operador")
 audited_user = require_roles("admin", "operador", "consulta")
@@ -136,12 +140,19 @@ def update_venta(
     exist, 400 when it is already anulada.
     """
     old_venta = db.get(Venta, venta_id)
-    old_values = {"estado": old_venta.estado, "total_venta": str(old_venta.total_venta)} if old_venta else {}
+    old_values = (
+        {"estado": old_venta.estado, "total_venta": str(old_venta.total_venta)} if old_venta else {}
+    )
     venta: Venta = actualizar_venta(db, venta_id, payload.model_dump())
     try:
         audit_venta_update(
-            db, request, current_user.id, current_user.rol, venta_id,
-            old_values, {"estado": venta.estado, "total_venta": str(venta.total_venta)},
+            db,
+            request,
+            current_user.id,
+            current_user.rol,
+            venta_id,
+            old_values,
+            {"estado": venta.estado, "total_venta": str(venta.total_venta)},
         )
         db.commit()
     except Exception:
@@ -184,7 +195,7 @@ def transition_venta_state(
     venta_id: int,
     payload: VentaStateTransition,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     """Transition venta to a new state with validation.
 
@@ -208,7 +219,7 @@ def transition_venta_state(
             reversed_by=current_user.id if new_state == DocumentState.REVERSED else None,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     db.commit()
     db.refresh(venta)

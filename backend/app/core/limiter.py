@@ -1,4 +1,5 @@
 """Rate limiting configuration with per-user/IP/endpoint policies."""
+
 from functools import lru_cache
 
 from slowapi import Limiter
@@ -36,9 +37,10 @@ def get_rate_limit_config() -> dict:
         return {
             "auth_login": "10/minute",
             "auth_refresh": "20/minute",
-            "api_write": "100/minute",      # POST/PUT/PATCH/DELETE
-            "api_read": "300/minute",       # GET
-            "critical_write": "30/minute",  # ventas, devoluciones, compras, finanzas, stock adjustments
+            "api_write": "100/minute",  # POST/PUT/PATCH/DELETE
+            "api_read": "300/minute",  # GET
+            # ventas, devoluciones, compras, finanzas, stock adjustments
+            "critical_write": "30/minute",
         }
     elif settings.ENVIRONMENT == "development":
         return {

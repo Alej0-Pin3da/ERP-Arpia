@@ -107,7 +107,9 @@ def refresh(request: Request, payload: RefreshRequest, db: Session = Depends(get
             extra={
                 "usuario_id": record.usuario_id,
                 "token_id": record.id,
-                "original_revoked_at": record.revocado_en.isoformat() if record.revocado_en else None,
+                "original_revoked_at": record.revocado_en.isoformat()
+                if record.revocado_en
+                else None,
                 "reuse_attempt_at": now.isoformat(),
                 "request_id": getattr(request.state, "request_id", None),
             },

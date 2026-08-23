@@ -363,9 +363,9 @@ def test_read_shape_completeness(client, operador_token, categoria_fixture):
 
 
 def test_post_total_201_with_factura_and_wac(client, operador_token, categoria_fixture):
-    """POST TOTAL qty10 costo_total90 facturaF-001 -> 201 unit9 stock20 cost7.0000 factura stored."""
+    """POST TOTAL qty10 costo_total90 facturaF-001 -> 201 unit9 stock20 cost7.0000
+    factura stored."""
     # Seed insumo with 10@5 so WAC 10@5+10@9=7 is verifiable via direct DB read
-    db = SessionLocal()
     from app.models import Insumo as _Insumo
 
     insumo_id = _make_insumo(categoria_fixture["id"])
@@ -412,7 +412,6 @@ def test_post_total_201_with_factura_and_wac(client, operador_token, categoria_f
 def test_post_total_422_no_write_infinity_nan(client, operador_token, categoria_fixture):
     """Infinity/NaN/ qty<=0 -> 422 no write (REQ-WAC-002)."""
     insumo_id = _make_insumo(categoria_fixture["id"])
-    db_check = SessionLocal()
     try:
         # Quantity zero -> 422
         resp = client.post(
@@ -421,11 +420,16 @@ def test_post_total_422_no_write_infinity_nan(client, operador_token, categoria_
             headers=_auth(operador_token),
         )
         assert resp.status_code == 422
-        # Infinity as string via JSON large number not encodable; use string payload that pydantic parses as Decimal
+        # Infinity as string via JSON large number not encodable; use string payload
+        # that pydantic parses as Decimal
         # Send 1e999 which Decimal would be Infinity if allowed — pydantic should 422 finite
         resp = client.post(
             URL,
-            json={"insumo_id": insumo_id, "cantidad_comprada": 10, "precio_unitario_compra": "Infinity"},
+            json={
+                "insumo_id": insumo_id,
+                "cantidad_comprada": 10,
+                "precio_unitario_compra": "Infinity",
+            },
             headers=_auth(operador_token),
         )
         assert resp.status_code == 422
@@ -471,10 +475,18 @@ def test_get_desc_order_and_rbac(client, operador_token, consulta_token, categor
         # Create two purchases with slight delay to ensure distinct timestamps
         import time
 
-        resp1 = client.post(URL, json=_valid_payload(insumo_id, precio_unitario_compra=5), headers=_auth(operador_token))
+        resp1 = client.post(
+            URL,
+            json=_valid_payload(insumo_id, precio_unitario_compra=5),
+            headers=_auth(operador_token),
+        )
         assert resp1.status_code == 201
         time.sleep(0.05)
-        resp2 = client.post(URL, json=_valid_payload(insumo_id, precio_unitario_compra=9), headers=_auth(operador_token))
+        resp2 = client.post(
+            URL,
+            json=_valid_payload(insumo_id, precio_unitario_compra=9),
+            headers=_auth(operador_token),
+        )
         assert resp2.status_code == 201
         # GET as consulta should be 200 and DESC (newest first)
         resp = client.get(URL, params={"insumo_id": insumo_id}, headers=_auth(consulta_token))
@@ -485,7 +497,9 @@ def test_get_desc_order_and_rbac(client, operador_token, consulta_token, categor
         assert rows[0]["id"] == resp2.json()["id"]
         assert rows[1]["id"] == resp1.json()["id"]
         # consulta POST must be 403
-        resp_forbidden = client.post(URL, json=_valid_payload(insumo_id), headers=_auth(consulta_token))
+        resp_forbidden = client.post(
+            URL, json=_valid_payload(insumo_id), headers=_auth(consulta_token)
+        )
         assert resp_forbidden.status_code == 403
     finally:
         _cleanup_insumo(insumo_id)

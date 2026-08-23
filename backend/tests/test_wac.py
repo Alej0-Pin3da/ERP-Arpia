@@ -580,6 +580,12 @@ def test_wac_select_for_update_present():
     """Unit-level lock verification: service usa SELECT FOR UPDATE."""
     from pathlib import Path
 
-    text = Path(__file__).resolve().parents[1].joinpath("app/services/wac.py").read_text(encoding="utf-8")
+    text = (
+        Path(__file__)
+        .resolve()
+        .parents[1]
+        .joinpath("app/services/wac.py")
+        .read_text(encoding="utf-8")
+    )
     assert "with_for_update" in text, "wac.py debe contener SELECT FOR UPDATE (RE Q-WAC-004)"
     assert "SELECT" in text and "FOR UPDATE" in text or "with_for_update" in text

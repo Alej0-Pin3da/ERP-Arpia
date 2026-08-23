@@ -497,8 +497,7 @@ def aplicar_ventas(
             variante_id is None
             and producto.variantes
             and not (
-                producto.tipo_producto is not None
-                and producto.tipo_producto.nombre == "Combo"
+                producto.tipo_producto is not None and producto.tipo_producto.nombre == "Combo"
             )
         ):
             res["omitidas"] += 1

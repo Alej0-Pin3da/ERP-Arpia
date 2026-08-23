@@ -11,10 +11,10 @@ payloads/roles and passes the authenticated user id for audit.
 """
 
 from datetime import date
-from sqlalchemy.orm import Session
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from slowapi import Limiter
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import get_current_user, get_db, require_roles
@@ -29,7 +29,11 @@ from app.services.devoluciones import listar_devoluciones, registrar_devolucion
 router = APIRouter(prefix="/devoluciones", tags=["devoluciones"])
 
 # Rate limiter for critical write endpoints
-_critical_limiter = user_limiter if settings.ENVIRONMENT != "test" else Limiter(key_func=lambda r: "test", enabled=False)
+_critical_limiter = (
+    user_limiter
+    if settings.ENVIRONMENT != "test"
+    else Limiter(key_func=lambda r: "test", enabled=False)
+)
 
 mutation_user = require_roles("admin", "operador")
 audited_user = require_roles("admin", "operador", "consulta")
@@ -92,7 +96,7 @@ def transition_devolucion_state(
     devolucion_id: int,
     payload: DevolucionStateTransition,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     """Transition devolucion to a new state with validation.
 
@@ -116,7 +120,7 @@ def transition_devolucion_state(
             reversed_by=current_user.id if new_state == DocumentState.REVERSED else None,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     db.commit()
     db.refresh(devolucion)

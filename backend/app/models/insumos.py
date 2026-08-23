@@ -62,9 +62,7 @@ class CompraInsumo(Base):
     )
     cantidad_comprada: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
     precio_unitario_compra: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
-    costo_unitario_aplicado: Mapped[Decimal | None] = mapped_column(
-        Numeric(15, 4), nullable=True
-    )
+    costo_unitario_aplicado: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True)
     factura: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     insumo: Mapped[Insumo] = relationship(back_populates="compras")

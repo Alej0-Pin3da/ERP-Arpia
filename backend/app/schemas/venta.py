@@ -26,6 +26,7 @@ class VentaUpdate(BaseModel):
 
 class VentaStateTransition(BaseModel):
     """Schema for document state transitions."""
+
     estado: Literal["draft", "confirmed", "cancelled", "reversed"]
     motivo: str | None = None
 

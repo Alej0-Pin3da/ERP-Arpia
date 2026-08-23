@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 
 from sqlalchemy import (
     Boolean,
@@ -21,8 +21,9 @@ from app.db.base import Base
 from app.models.productos import Producto, VarianteProducto
 
 
-class DocumentState(str, Enum):
+class DocumentState(StrEnum):
     """Valid document states with enforced transitions."""
+
     DRAFT = "draft"
     CONFIRMED = "confirmed"
     CANCELLED = "cancelled"
@@ -189,7 +190,10 @@ class Devolucion(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Devolucion id={self.id} venta_id={self.venta_id} tipo={self.tipo!r} estado={self.estado!r}>"
+        return (
+            f"<Devolucion id={self.id} venta_id={self.venta_id} "
+            f"tipo={self.tipo!r} estado={self.estado!r}>"
+        )
 
     def can_transition_to(self, new_state: DocumentState) -> bool:
         """Check if transition from current state to new_state is valid."""

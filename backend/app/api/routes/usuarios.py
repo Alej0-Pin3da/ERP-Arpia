@@ -157,7 +157,7 @@ def change_password(
     try:
         validate_password_strength(payload.new_password)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     target_user.password_hash = hash_password(payload.new_password)
     db.commit()

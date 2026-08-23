@@ -1,15 +1,15 @@
 """Tests for rate limiting per user/IP/endpoint and password policy + MFA."""
+
 import pytest
-import re
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.core.password_policy import (
-    validate_password_strength,
     PasswordPolicyError,
     generate_totp_secret,
-    verify_totp,
     get_totp_uri,
+    validate_password_strength,
+    verify_totp,
 )
 
 
@@ -20,22 +20,28 @@ class TestRateLimiting:
         """Login should lockout after 5 failed attempts (lockout is separate from rate limiter)."""
         # Make 5 failed attempts
         for i in range(5):
-            resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": f"wrong{i}"})
+            resp = client.post(
+                "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": f"wrong{i}"}
+            )
             assert resp.status_code == 401
 
         # 6th attempt should be locked out (429)
-        resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"}
+        )
         assert resp.status_code == 429
         assert "Demasiados intentos fallidos" in resp.json()["detail"]
 
     def test_refresh_rate_limit_disabled_in_test(self, client: TestClient):
         """In test environment, rate limiting is disabled for auth endpoints."""
         # Get a valid refresh token first
-        resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"}
+        )
         refresh_token = resp.json()["refresh_token"]
 
         # Should not be rate limited in test env
-        for i in range(25):
+        for _ in range(25):
             resp = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
             if resp.status_code == 200:
                 refresh_token = resp.json()["refresh_token"]  # Rotate
@@ -108,7 +114,10 @@ class TestPasswordPolicy:
             json={"current_password": "Admin123!", "new_password": "weak"},
         )
         assert resp.status_code == 400
-        assert "contraseña" in resp.json()["detail"].lower() or "password" in resp.json()["detail"].lower()
+        assert (
+            "contraseña" in resp.json()["detail"].lower()
+            or "password" in resp.json()["detail"].lower()
+        )
 
 
 class TestMFAOptional:
@@ -125,6 +134,7 @@ class TestMFAOptional:
         secret = generate_totp_secret()
         # Generate a valid code (at current time)
         import pyotp
+
         totp = pyotp.TOTP(secret)
         code = totp.now()
         assert verify_totp(secret, code)
@@ -145,7 +155,9 @@ class TestMFAOptional:
 
     def test_mfa_not_required_by_default(self, client: TestClient):
         """MFA should not be required by default for admin login."""
-        resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"}
+        )
         assert resp.status_code == 200
         assert "access_token" in resp.json()
 

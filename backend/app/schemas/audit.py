@@ -1,4 +1,5 @@
 """Audit API schemas."""
+
 from datetime import datetime
 from typing import Any
 
@@ -7,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 class AuditLogRead(BaseModel):
     """Audit log read schema."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -25,6 +27,7 @@ class AuditLogRead(BaseModel):
 
 class AuditLogFilter(BaseModel):
     """Filter parameters for audit log queries."""
+
     usuario_id: int | None = None
     usuario_rol: str | None = None
     entidad: str | None = None

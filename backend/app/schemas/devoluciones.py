@@ -39,6 +39,7 @@ class DevolucionCreate(BaseModel):
 
 class DevolucionStateTransition(BaseModel):
     """Schema for document state transitions."""
+
     estado: Literal["draft", "confirmed", "cancelled", "reversed"]
     motivo: str | None = None
 

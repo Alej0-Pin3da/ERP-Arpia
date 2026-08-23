@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 
 from sqlalchemy import (
     CheckConstraint,
@@ -20,8 +20,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 
-class DocumentState(str, Enum):
+class DocumentState(StrEnum):
     """Valid document states with enforced transitions."""
+
     DRAFT = "draft"
     CONFIRMED = "confirmed"
     CANCELLED = "cancelled"
@@ -88,7 +89,10 @@ class MovimientoFinanciero(Base):
         ForeignKey("Socios_Configuracion.id", ondelete="SET NULL"), nullable=True
     )
     estado: Mapped[str] = mapped_column(
-        String(20), nullable=False, server_default=DocumentState.CONFIRMED.value, default=DocumentState.CONFIRMED.value
+        String(20),
+        nullable=False,
+        server_default=DocumentState.CONFIRMED.value,
+        default=DocumentState.CONFIRMED.value,
     )
     liquidacion_id: Mapped[str | None] = mapped_column(String(12), nullable=True)
     # Reversal tracking
@@ -102,7 +106,10 @@ class MovimientoFinanciero(Base):
     reversed_by_user: Mapped[Usuario | None] = relationship(lazy="selectin")  # noqa: F821
 
     def __repr__(self) -> str:
-        return f"<MovimientoFinanciero id={self.id} tipo={self.tipo!r} monto={self.monto} estado={self.estado!r}>"
+        return (
+            f"<MovimientoFinanciero id={self.id} tipo={self.tipo!r} "
+            f"monto={self.monto} estado={self.estado!r}>"
+        )
 
     def can_transition_to(self, new_state: DocumentState) -> bool:
         """Check if transition from current state to new_state is valid."""

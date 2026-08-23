@@ -688,9 +688,7 @@ def test_aplicar_ventas_omitida_sin_talla_no_estalla(tmp_path):
         assert res["omitidas"] == 1
         assert res["insertadas"] == 1  # solo P_TOTE
         set_prod = db.query(Producto).filter(Producto.nombre == P_SET).one()
-        assert (
-            db.query(DetalleVenta).filter(DetalleVenta.producto_id == set_prod.id).count() == 0
-        )
+        assert db.query(DetalleVenta).filter(DetalleVenta.producto_id == set_prod.id).count() == 0
         assert db.query(Venta).count() == 1
     finally:
         db.rollback()
@@ -876,4 +874,3 @@ def test_cargar_ventas_dry_run_real_no_escribe():
         assert not ctx.report.tenga_errores
     finally:
         db.close()
-

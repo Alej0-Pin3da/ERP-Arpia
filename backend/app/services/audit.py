@@ -1,4 +1,5 @@
 """Audit service for structured audit logging."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -76,6 +77,7 @@ def _serialize_model(obj) -> dict[str, Any]:
 
 
 # Domain-specific audit helpers
+
 
 def audit_venta_create(
     db: Session,

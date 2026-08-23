@@ -36,6 +36,7 @@ class MovimientoUpdate(BaseModel):
 
 class MovimientoStateTransition(BaseModel):
     """Schema for document state transitions."""
+
     estado: Literal["draft", "confirmed", "cancelled", "reversed"]
     motivo: str | None = None
 

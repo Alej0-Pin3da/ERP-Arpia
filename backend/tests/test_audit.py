@@ -1,10 +1,12 @@
 """Tests for audit core: audit table, audit triggers/services, audit query API."""
-import pytest
-from datetime import datetime, date, timedelta, UTC
-from decimal import Decimal
-from sqlalchemy.orm import Session
 
+from datetime import date
+from decimal import Decimal
+
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.models.audit import AuditLog
@@ -12,23 +14,12 @@ from app.models.clientes import Cliente
 from app.models.productos import Producto, TipoProducto
 from app.services.audit import (
     AuditService,
-    audit_venta_create,
-    audit_venta_update,
-    audit_venta_delete,
-    audit_devolucion_create,
-    audit_compra_create,
-    audit_movimiento_create,
-    audit_usuario_create,
-    audit_usuario_update,
-    audit_stock_adjust,
 )
-from app.core.deps import require_admin, require_roles
-from app.models.usuarios import Usuario
-from app.schemas.audit import AuditLogRead
 
 
 def _ensure_audit_fixtures():
-    """Ensure minimal Cliente + Producto + Insumo + BOM exist for audit trigger tests (clean DB has only admin/categorias)."""
+    """Ensure minimal Cliente + Producto + Insumo + BOM exist for audit trigger tests
+    (clean DB has only admin/categorias)."""
     from app.models.insumos import CategoriaInsumo, Insumo
     from app.models.productos import BomInsumo
 
@@ -36,7 +27,9 @@ def _ensure_audit_fixtures():
     try:
         if db.get(Cliente, 1) is None:
             try:
-                c = Cliente(nombre="Audit Cliente", email="audit-cliente@test.local", telefono="3000000000")
+                c = Cliente(
+                    nombre="Audit Cliente", email="audit-cliente@test.local", telefono="3000000000"
+                )
                 db.add(c)
                 db.flush()
                 db.commit()
@@ -58,8 +51,11 @@ def _ensure_audit_fixtures():
         # Ensure Insumo + BOM for producto 1 so venta devoluciones can restore stock
         try:
             from sqlalchemy import text as _text
+
             # Check if BomInsumo exists for producto 1
-            has_bom = db.execute(_text("SELECT 1 FROM \"BOM_Insumos\" WHERE producto_id = 1 LIMIT 1")).scalar()
+            has_bom = db.execute(
+                _text('SELECT 1 FROM "BOM_Insumos" WHERE producto_id = 1 LIMIT 1')
+            ).scalar()
             if not has_bom:
                 # Ensure an insumo exists
                 insumo = db.get(Insumo, 1)
@@ -93,17 +89,22 @@ def _query_audit_fresh(entidad: str, entity_id: int, accion: str):
     """Query audit log with a fresh DB session (avoids stale fixture transaction)."""
     db = SessionLocal()
     try:
-        return db.query(AuditLog).filter(
-            AuditLog.entidad == entidad,
-            AuditLog.entity_id == entity_id,
-            AuditLog.accion == accion,
-        ).first()
+        return (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.entidad == entidad,
+                AuditLog.entity_id == entity_id,
+                AuditLog.accion == accion,
+            )
+            .first()
+        )
     finally:
         db.close()
 
 
 def _create_audit_venta_fixtures():
-    """Create a fresh Cliente + Producto (+ Insumo/BOM for devoluciones) and return IDs (isolated)."""
+    """Create a fresh Cliente + Producto (+ Insumo/BOM for devoluciones) and return IDs
+    (isolated)."""
     import uuid
 
     from app.models.insumos import CategoriaInsumo, Insumo
@@ -142,7 +143,9 @@ def _create_audit_venta_fixtures():
         )
         db.add(insumo)
         db.flush()
-        bom = BomInsumo(producto_id=producto.id, insumo_id=insumo.id, cantidad_requerida=Decimal("1"))
+        bom = BomInsumo(
+            producto_id=producto.id, insumo_id=insumo.id, cantidad_requerida=Decimal("1")
+        )
         db.add(bom)
         db.commit()
         return cliente.id, producto.id
@@ -189,7 +192,7 @@ class TestAuditModel:
         """entidad and accion should be required (DB constraint)."""
         audit = AuditLog(usuario_id=1, usuario_rol="admin", accion="create")  # missing entidad
         db_session.add(audit)
-        with pytest.raises(Exception):
+        with pytest.raises(IntegrityError):
             db_session.flush()
         db_session.rollback()
 
@@ -248,11 +251,17 @@ class TestAuditTriggers:
         cliente_id, producto_id = _create_audit_venta_fixtures()
         headers = {"Authorization": f"Bearer {admin_token}"}
         try:
-            resp = client.post("/api/v1/ventas", headers=headers, json={
-                "cliente_id": cliente_id,
-                "canal_venta": "web",
-                "detalles": [{"producto_id": producto_id, "cantidad": 1, "precio_unitario": 100}]
-            })
+            resp = client.post(
+                "/api/v1/ventas",
+                headers=headers,
+                json={
+                    "cliente_id": cliente_id,
+                    "canal_venta": "web",
+                    "detalles": [
+                        {"producto_id": producto_id, "cantidad": 1, "precio_unitario": 100}
+                    ],
+                },
+            )
             assert resp.status_code == 201
             venta_id = resp.json()["id"]
 
@@ -265,6 +274,7 @@ class TestAuditTriggers:
             try:
                 db2 = SessionLocal()
                 from app.models.ventas import Venta
+
                 db2.query(Venta).filter(Venta.cliente_id == cliente_id).delete()
                 db2.commit()
                 # Also cleanup the fresh producto/cliente if they are not reused
@@ -284,18 +294,32 @@ class TestAuditTriggers:
         venta_id = None
         try:
             # Create
-            resp = client.post("/api/v1/ventas", headers=headers, json={
-                "cliente_id": cliente_id, "canal_venta": "web",
-                "detalles": [{"producto_id": producto_id, "cantidad": 1, "precio_unitario": 100}]
-            })
+            resp = client.post(
+                "/api/v1/ventas",
+                headers=headers,
+                json={
+                    "cliente_id": cliente_id,
+                    "canal_venta": "web",
+                    "detalles": [
+                        {"producto_id": producto_id, "cantidad": 1, "precio_unitario": 100}
+                    ],
+                },
+            )
             assert resp.status_code == 201
             venta_id = resp.json()["id"]
 
             # Update
-            resp = client.put(f"/api/v1/ventas/{venta_id}", headers=headers, json={
-                "cliente_id": cliente_id, "canal_venta": "web",
-                "detalles": [{"producto_id": producto_id, "cantidad": 2, "precio_unitario": 100}]
-            })
+            resp = client.put(
+                f"/api/v1/ventas/{venta_id}",
+                headers=headers,
+                json={
+                    "cliente_id": cliente_id,
+                    "canal_venta": "web",
+                    "detalles": [
+                        {"producto_id": producto_id, "cantidad": 2, "precio_unitario": 100}
+                    ],
+                },
+            )
             assert resp.status_code == 200
 
             audit = _query_audit_fresh("ventas", venta_id, "update")
@@ -307,6 +331,7 @@ class TestAuditTriggers:
                 try:
                     db2 = SessionLocal()
                     from app.models.ventas import Venta
+
                     db2.query(Venta).filter(Venta.id == venta_id).delete()
                     db2.commit()
                 except Exception:
@@ -325,10 +350,17 @@ class TestAuditTriggers:
         cliente_id, producto_id = _create_audit_venta_fixtures()
         headers = {"Authorization": f"Bearer {admin_token}"}
         try:
-            resp = client.post("/api/v1/ventas", headers=headers, json={
-                "cliente_id": cliente_id, "canal_venta": "web",
-                "detalles": [{"producto_id": producto_id, "cantidad": 1, "precio_unitario": 100}]
-            })
+            resp = client.post(
+                "/api/v1/ventas",
+                headers=headers,
+                json={
+                    "cliente_id": cliente_id,
+                    "canal_venta": "web",
+                    "detalles": [
+                        {"producto_id": producto_id, "cantidad": 1, "precio_unitario": 100}
+                    ],
+                },
+            )
             assert resp.status_code == 201
             venta_id = resp.json()["id"]
 
@@ -341,20 +373,29 @@ class TestAuditTriggers:
             # Venta is already soft-deleted (cancelled), no extra cleanup needed for count
             pass
 
-    def test_audit_devolucion_create(self, db_session: Session, client: TestClient, admin_token: str):
+    def test_audit_devolucion_create(
+        self, db_session: Session, client: TestClient, admin_token: str
+    ):
         """Creating a devolucion should generate audit log."""
         cliente_id, producto_id = _create_audit_venta_fixtures()
         headers = {"Authorization": f"Bearer {admin_token}"}
         # Need a venta first
-        resp = client.post("/api/v1/ventas", headers=headers, json={
-            "cliente_id": cliente_id, "canal_venta": "web",
-            "detalles": [{"producto_id": producto_id, "cantidad": 1, "precio_unitario": 100}]
-        })
+        resp = client.post(
+            "/api/v1/ventas",
+            headers=headers,
+            json={
+                "cliente_id": cliente_id,
+                "canal_venta": "web",
+                "detalles": [{"producto_id": producto_id, "cantidad": 1, "precio_unitario": 100}],
+            },
+        )
         venta_id = resp.json()["id"]
 
-        resp = client.post("/api/v1/devoluciones", headers=headers, json={
-            "venta_id": venta_id, "tipo": "total", "motivo": "test"
-        })
+        resp = client.post(
+            "/api/v1/devoluciones",
+            headers=headers,
+            json={"venta_id": venta_id, "tipo": "total", "motivo": "test"},
+        )
         assert resp.status_code == 201
         devolucion_id = resp.json()["id"]
 
@@ -364,6 +405,7 @@ class TestAuditTriggers:
     def test_audit_compra_create(self, db_session: Session, client: TestClient, admin_token: str):
         """Creating a compra should generate audit log."""
         from app.models.insumos import CategoriaInsumo, Insumo
+
         db2 = SessionLocal()
         try:
             if db2.get(Insumo, 1) is None:
@@ -387,21 +429,27 @@ class TestAuditTriggers:
         finally:
             db2.close()
         headers = {"Authorization": f"Bearer {admin_token}"}
-        resp = client.post("/api/v1/compras-insumos", headers=headers, json={
-            "insumo_id": 1, "cantidad_comprada": 10, "precio_unitario_compra": 50
-        })
+        resp = client.post(
+            "/api/v1/compras-insumos",
+            headers=headers,
+            json={"insumo_id": 1, "cantidad_comprada": 10, "precio_unitario_compra": 50},
+        )
         assert resp.status_code == 201
         compra_id = resp.json()["id"]
 
         audit = _query_audit_fresh("compras_insumos", compra_id, "create")
         assert audit is not None
 
-    def test_audit_movimiento_create(self, db_session: Session, client: TestClient, admin_token: str):
+    def test_audit_movimiento_create(
+        self, db_session: Session, client: TestClient, admin_token: str
+    ):
         """Creating a movimiento financiero should generate audit log."""
         headers = {"Authorization": f"Bearer {admin_token}"}
-        resp = client.post("/api/v1/finanzas/movimientos", headers=headers, json={
-            "tipo": "Gasto", "monto": 500, "descripcion": "test", "fecha": "2024-01-15"
-        })
+        resp = client.post(
+            "/api/v1/finanzas/movimientos",
+            headers=headers,
+            json={"tipo": "Gasto", "monto": 500, "descripcion": "test", "fecha": "2024-01-15"},
+        )
         assert resp.status_code == 201
         mov_id = resp.json()["id"]
 
@@ -411,9 +459,16 @@ class TestAuditTriggers:
     def test_audit_usuario_create(self, db_session: Session, client: TestClient, admin_token: str):
         """Creating a usuario should generate audit log."""
         headers = {"Authorization": f"Bearer {admin_token}"}
-        resp = client.post("/api/v1/usuarios/", headers=headers, json={
-            "nombre": "Test User", "email": "test@test.com", "password": "Pass123!", "rol": "operador"
-        })
+        resp = client.post(
+            "/api/v1/usuarios/",
+            headers=headers,
+            json={
+                "nombre": "Test User",
+                "email": "test@test.com",
+                "password": "Pass123!",
+                "rol": "operador",
+            },
+        )
         assert resp.status_code == 201
         user_id = resp.json()["id"]
 
@@ -482,10 +537,11 @@ class TestAuditQueryAPI:
         """Filter audit logs by date range."""
         headers = {"Authorization": f"Bearer {admin_token}"}
         today = date.today().isoformat()
-        resp = client.get("/api/v1/auditoria/", headers=headers, params={
-            "fecha_desde": today,
-            "fecha_hasta": today
-        })
+        resp = client.get(
+            "/api/v1/auditoria/",
+            headers=headers,
+            params={"fecha_desde": today, "fecha_hasta": today},
+        )
         assert resp.status_code == 200
 
     def test_audit_pagination(self, client: TestClient, admin_token: str):

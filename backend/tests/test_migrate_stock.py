@@ -124,9 +124,7 @@ def _borrar_filas_test(db) -> None:
         db.query(CompraInsumo).filter(CompraInsumo.insumo_id == ins.id).delete(
             synchronize_session=False
         )
-    db.query(Insumo).filter(Insumo.nombre.in_(todos_test)).delete(
-        synchronize_session=False
-    )
+    db.query(Insumo).filter(Insumo.nombre.in_(todos_test)).delete(synchronize_session=False)
     # Remove the canonical catalog tipos that bootstrap_catalogo() inserts.
     db.query(TipoProducto).filter(
         TipoProducto.nombre.in_(["Lencería", "Corsetería", "Blusa", "Accesorio", "Set", "Combo"])

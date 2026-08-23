@@ -1,8 +1,8 @@
 """Audit API routes — read-only access to audit logs."""
-from datetime import date, datetime, time
-from typing import Any
 
-from fastapi import APIRouter, Depends, Query, status
+from datetime import date, datetime, time
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -26,8 +26,12 @@ def list_audit_logs(
     entidad: str | None = Query(default=None, description="Filter by entity"),
     entity_id: int | None = Query(default=None, description="Filter by entity ID"),
     accion: str | None = Query(default=None, description="Filter by action"),
-    fecha_desde: datetime | date | None = Query(default=None, description="Filter from date (YYYY-MM-DD or ISO datetime)"),
-    fecha_hasta: datetime | date | None = Query(default=None, description="Filter to date (YYYY-MM-DD or ISO datetime)"),
+    fecha_desde: datetime | date | None = Query(
+        default=None, description="Filter from date (YYYY-MM-DD or ISO datetime)"
+    ),
+    fecha_hasta: datetime | date | None = Query(
+        default=None, description="Filter to date (YYYY-MM-DD or ISO datetime)"
+    ),
     request_id: str | None = Query(default=None, description="Filter by request ID"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -97,5 +101,6 @@ def get_audit_log(
     audit = db.get(AuditLog, audit_id)
     if audit is None:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Audit log not found")
     return audit

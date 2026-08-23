@@ -293,7 +293,8 @@ def test_get_ventas_paginado_filtros(client, operador_token):
         )
         assert resp.status_code == 201
 
-        # limit/offset honored + total = full filtered count (isolated by producto_id; allow extra rows from other tests in the same session DB)
+        # limit/offset honored + total = full filtered count (isolated by producto_id;
+        # allow extra rows from other tests in the same session DB)
         resp = client.get(
             "/api/v1/ventas",
             params={"canal_venta": "feria", "producto_id": prod_id, "limit": 2, "offset": 0},
@@ -385,7 +386,8 @@ def test_get_ventas_filtro_producto(client, operador_token):
         assert resp.status_code == 201
         venta_ab = resp.json()["id"]
 
-        # producto_id=prod_a -> venta_a + venta_ab, never venta_b (allow extra rows from other tests in the same session DB).
+        # producto_id=prod_a -> venta_a + venta_ab, never venta_b (allow extra rows
+        # from other tests in the same session DB).
         resp = client.get(
             "/api/v1/ventas",
             params={"producto_id": prod_a},

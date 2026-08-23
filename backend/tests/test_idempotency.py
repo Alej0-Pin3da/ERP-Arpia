@@ -1,7 +1,6 @@
 """Tests for idempotency middleware."""
-import pytest
+
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 class TestIdempotencyMiddleware:
@@ -124,6 +123,7 @@ class TestIdempotencyMiddleware:
     def test_middleware_registered_in_app(self):
         """Verify idempotency middleware is registered in the app."""
         from app.main import app
+
         middleware_names = [m.cls.__name__ for m in app.user_middleware]
         assert "ConfiguredIdempotencyMiddleware" in str(middleware_names) or any(
             "idempotency" in str(m).lower() for m in app.user_middleware

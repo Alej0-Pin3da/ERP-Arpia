@@ -1,17 +1,12 @@
-"""Tests for token/session hardening: refresh rotation, short access tokens, login lockout, refresh reuse detection."""
-import pytest
-import time
-from datetime import datetime, timedelta, UTC
-from unittest.mock import patch
+"""Tests for token/session hardening: refresh rotation, short access tokens, login
+lockout, refresh reuse detection."""
+
+from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 
-from app.core.config import settings
-from app.core.refresh import generate_refresh_token, hash_refresh_token, refresh_expiry
+from app.core.refresh import refresh_expiry
 from app.core.security import create_access_token, decode_token
-from app.models.refresh_token import RefreshToken
-from app.models.usuarios import Usuario
 
 
 class TestShortAccessToken:
@@ -42,7 +37,9 @@ class TestRefreshTokenRotation:
 
     def test_refresh_rotates_token(self, client: TestClient, admin_token: str):
         # Login to get initial refresh token
-        resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"}
+        )
         assert resp.status_code == 200
         first_refresh = resp.json()["refresh_token"]
 
@@ -61,7 +58,9 @@ class TestRefreshTokenRotation:
 
     def test_refresh_reuse_detected_and_all_revoked(self, client: TestClient):
         # Login
-        resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"}
+        )
         refresh_token = resp.json()["refresh_token"]
 
         # Use refresh token once (legitimate)
@@ -79,7 +78,9 @@ class TestRefreshTokenRotation:
         assert resp.status_code == 401
 
     def test_logout_revokes_refresh_token(self, client: TestClient):
-        resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"}
+        )
         refresh_token = resp.json()["refresh_token"]
 
         # Logout
@@ -93,11 +94,15 @@ class TestRefreshTokenRotation:
     def test_multiple_refresh_tokens_per_user(self, client: TestClient):
         """User can have multiple active refresh tokens (e.g., multiple devices)."""
         # Login from "device 1"
-        resp1 = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"})
+        resp1 = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"}
+        )
         refresh1 = resp1.json()["refresh_token"]
 
         # Login from "device 2" (simulate second login)
-        resp2 = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"})
+        resp2 = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"}
+        )
         refresh2 = resp2.json()["refresh_token"]
 
         # Both should work
@@ -114,26 +119,36 @@ class TestLoginLockout:
     def test_failed_login_attempts_tracked(self, client: TestClient):
         # Make 5 failed attempts
         for i in range(5):
-            resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": f"wrong{i}"})
+            resp = client.post(
+                "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": f"wrong{i}"}
+            )
             assert resp.status_code == 401
 
         # 6th attempt should be locked out (429)
-        resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"}
+        )
         assert resp.status_code == 429
         assert "Demasiados intentos fallidos" in resp.json()["detail"]
 
     def test_lockout_resets_after_successful_login(self, client: TestClient):
         # Make 4 failed attempts
         for i in range(4):
-            resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": f"wrong{i}"})
+            resp = client.post(
+                "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": f"wrong{i}"}
+            )
             assert resp.status_code == 401
 
         # Successful login should reset counter
-        resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"}
+        )
         assert resp.status_code == 200
 
         # Next failed attempt should be count 1 again
-        resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "wrong"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "wrong"}
+        )
         assert resp.status_code == 401
 
     def test_lockout_is_per_email_and_ip(self, client: TestClient):
@@ -147,7 +162,9 @@ class TestRefreshTokenReuseAlert:
 
     def test_reuse_logs_warning(self, client: TestClient, caplog):
         """When a revoked refresh token is reused, it should be logged."""
-        resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"}
+        )
         refresh_token = resp.json()["refresh_token"]
 
         # Use once
@@ -159,7 +176,10 @@ class TestRefreshTokenReuseAlert:
 
         # Check for security warning log
         warning_logs = [r for r in caplog.records if r.levelname == "WARNING"]
-        assert any("refresh token reuse" in r.message.lower() or "revoked" in r.message.lower() for r in warning_logs)
+        assert any(
+            "refresh token reuse" in r.message.lower() or "revoked" in r.message.lower()
+            for r in warning_logs
+        )
 
 
 class TestRefreshTokenCookie:
@@ -169,7 +189,9 @@ class TestRefreshTokenCookie:
         """After cookie implementation, refresh token should not be in JSON body."""
         # This test documents the expected behavior after cookie implementation
         # For now, refresh token IS in body (current implementation)
-        resp = client.post("/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"})
+        resp = client.post(
+            "/api/v1/auth/login", json={"email": "admin@arpia.com", "password": "Admin123!"}
+        )
         assert "refresh_token" in resp.json()
 
     def test_csrf_protection_for_cookie_based_refresh(self, client: TestClient):

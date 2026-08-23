@@ -1,16 +1,16 @@
 # Mejoras prioritarias para ERP Arpia
 
-> **Progreso — 20-08-2026:** Sprint 1 (Seguridad + Auditoría foundation) ✅ completado. Ver detalle por sección abajo. `Leyenda: ✅ hecho | ⏳ pendiente | 🔄 parcial`
+> **Progreso — 23-08-2026:** Sprint 1 (Seguridad + Auditoría foundation) ✅ completado. Sprint 2 (Testing serio) ✅ mayormente entregado (605 tests green con PostgreSQL real). Ver detalle por sección abajo. `Leyenda: ✅ hecho | ⏳ pendiente | 🔄 parcial`
 
 ## Resumen ejecutivo
 
-El proyecto tiene una base sólida: arquitectura clara, dominio bien definido, stack moderno y documentación muy buena en el README. Sin embargo, el siguiente salto de calidad no es más funcionalidad, sino robustez operativa, seguridad, trazabilidad y madurez para producción.
+El proyecto tiene una base sólida: arquitectura clara, dominio bien definido, stack moderno y documentación muy buena en el README. El siguiente salto de calidad no es más funcionalidad, sino robustez operativa, integridad financiera, trazabilidad y madurez para producción.
 
-La mayor parte de las mejoras recomendadas se enfocan en tres áreas:
+Las mejoras pendientes se enfocan en tres áreas:
 
-- seguridad y control de acceso
-- integridad financiera e inventario
-- observabilidad y operación en producción
+- testing del frontend (hoy el gap más grande: 0 specs)
+- auditoría fiscal (versiones de precio/costo y cierres mensuales)
+- observabilidad, performance y operación en producción
 
 ## 1. Seguridad y hardening — ✅ Sprint 1 completado
 
@@ -21,7 +21,7 @@ La mayor parte de las mejoras recomendadas se enfocan en tres áreas:
 - 🔄 Mejorar la gestión de secretos con entorno real de producción. — validación en config.py + sin defaults en docker-compose.yml; pendiente: Vault/AWS Secrets Manager externo
 - ✅ Separar variables por entorno: desarrollo, pruebas y producción. — ENVIRONMENT dev/test/staging/production con validaciones
 - ✅ Revisar headers de seguridad y políticas CORS. — SecurityHeadersMiddleware (CSP, HSTS, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, X-Frame-Options) + CORS estricto por entorno
-- ✅ Proteger endpoints sensibles con auditoría y trazabilidad. — AuditLog + audit helpers en ventas/devoluciones/compras/finanzas + request_id correlation
+- ✅ Proteger endpoints sensibles con auditoría y trazabilidad. — AuditLog + audit helpers wireados en ventas/devoluciones/compras/finanzas/usuarios + request_id correlation
 - ✅ Añadir validación estricta de entrada y evitación de abuso de payloads. — Idempotency-Key middleware en POST críticos + validación pydantic + rate limiting
 
 ### Objetivo
@@ -38,29 +38,29 @@ Reducir exposición de datos, evitar abuso del sistema y que la API sea segura p
 
 **Extras Sprint 1:**
 - ✅ Estados de documento con transiciones válidas: `draft → confirmed → cancelled → reversed` + motivo/usuario en reversa (Venta/Devolucion/MovimientoFinanciero) + endpoints `PATCH .../state`
-- ✅ Idempotency-Key header en POST críticos (ventas, devoluciones, compras, finanzas, ajustes stock) — middleware con cache Redis (fallback memoria) + 10 tests
+- ✅ Idempotency-Key header en POST críticos (ventas, devoluciones, compras, finanzas, ajustes stock) — middleware con cache Redis (fallback memoria) + tests
 
 ---
 
-## 2. Testing más serio y más realista — ⏳ Sprint 2 (siguiente)
+## 2. Testing más serio y más realista — ✅ Sprint 2 (mayormente entregado)
 
 ### Qué mejorar
 
-- ⏳ Añadir pruebas de integración con PostgreSQL real.
-- ⏳ Cubrir transacciones complejas y condiciones de carrera.
-- ⏳ Mejorar test coverage en módulos críticos: inventario, ventas, WAC, devoluciones, finanzas.
-- ⏳ Probar casos de borde y errores de negocio, no solo flujos felices.
+- ✅ Añadir pruebas de integración con PostgreSQL real. — `conftest` recrea `arpia_test` (DROP+CREATE + alembic upgrade) y la suite entera corre contra PG real
+- ✅ Cubrir transacciones complejas y condiciones de carrera. — WAC: compras concurrentes sobre el mismo insumo, escritura atómica, rollback con commit=False
+- ✅ Mejorar test coverage en módulos críticos. — suite 605 tests green: inventario (723 líneas), ventas, WAC (503), devoluciones (775), finanzas (519), BOM (691)
+- 🔄 Probar más casos de borde y errores de negocio. — parcial; falta cubrir devoluciones parciales, BOM recursivo, costo cambiante entre fecha
 
 ### Casos críticos a cubrir
 
-- ⏳ stock negativo después de una venta
-- ⏳ compras concurrentes sobre el mismo insumo
-- ⏳ devoluciones parciales
-- ⏳ venta con descuento y costo aplicado
-- ⏳ producto compuesto con BOM recursivo
-- ⏳ ventas donde el costo cambia entre fecha y cálculo final
-- ⏳ reversiones de transacción con rollback correcto
-- ⏳ rollover de inventario por ventas anuladas o devoluciones
+- ✅ stock negativo después de una venta
+- ✅ compras concurrentes sobre el mismo insumo
+- 🔄 devoluciones parciales — parcial
+- 🔄 venta con descuento y costo aplicado — parcial
+- 🔄 producto compuesto con BOM recursivo — parcial
+- 🔄 ventas donde el costo cambia entre fecha y cálculo final — parcial
+- ✅ reversiones de transacción con rollback correcto
+- 🔄 rollover de inventario por ventas anuladas o devoluciones — parcial
 
 ### Objetivo
 
@@ -68,23 +68,23 @@ Garantizar que la lógica de negocio sea correcta y no se rompa al escalar el vo
 
 ### Recomendación
 
-Hacer una suite de pruebas para cada motor central del ERP:
+Completar los casos parciales listados arriba y añadir:
 
-- WAC (Weighted Average Cost)
-- explosión del inventario por BOM
-- cálculo de margen
-- devoluciones
-- distribución de ganancias por socios
-- movimientos financieros
+- WAC (Weighted Average Cost) — ✅ cubierto
+- explosión del inventario por BOM — ✅ cubierto
+- cálculo de margen — ✅ cubierto
+- devoluciones parciales — ⏳ completar
+- distribución de ganancias por socios — 🔄 parcial
+- movimientos financieros — ✅ cubierto
 
 ---
 
-## 3. Observabilidad y trazabilidad — ⏳ Sprint 3
+## 3. Observabilidad y trazabilidad — 🔄 Sprint 3
 
 ### Qué mejorar
 
 - ✅ Logs estructurados con request_id, user_id, entidad y operación. — RequestContextMiddleware + JSON logs ya existen
-- 🔄 Trazabilidad de cada venta, compra y ajuste de inventario. — AuditLog cubre ventas/devoluciones/compras/finanzas/stock; pendiente: compra insumo/BOM con triggers DB
+- ✅ Trazabilidad de cada venta, compra y ajuste de inventario. — AuditLog wireado en ventas/devoluciones/compras/finanzas/stock/usuarios
 - ⏳ Métricas por endpoint, duración y errores.
 - ⏳ Alertas para stock crítico, pérdidas, amortización de inventario y margen anormal.
 - 🔄 Health checks más completos: base de datos, worker jobs, dependencias externas. — `/health/live` + `/health/ready` (DB); pendiente: Redis, worker queue, APIs externas
@@ -167,10 +167,11 @@ Mantener tiempos de respuesta estables incluso cuando crezca el volumen de venta
 
 ---
 
-## 6. Mejoras de UX en frontend — ⏳ Sprint 4
+## 6. Mejoras de UX y testing en frontend — ⏳ Sprint 4 (prioridad alta)
 
 ### Qué mejorar
 
+- ⏳ **Añadir pruebas (vitest) para el frontend.** — HOY el gap más grande: vitest está configurado (`tests/setup.ts`, script `npm test` con `--passWithNoTests`) pero **no existe ningún spec**. `npm test` pasa "verde" sin probar nada.
 - ⏳ Diseñar un sistema visual consistente con un design system.
 - ⏳ Uniformar validaciones de errores y feedback de acción.
 - ⏳ Mejorar la gestión de caché y estado global.
@@ -190,16 +191,17 @@ Mantener tiempos de respuesta estables incluso cuando crezca el volumen de venta
 
 ### Objetivo
 
-Que el sistema no solo funcione, sino que sea claro y fiable para usuarios operativos.
+Que el sistema no solo funcione, sino que sea claro, fiable y *verificado* para usuarios operativos. El backend ya tiene 605 tests; el frontend debe acompañarlo con tests de componentes y flujos.
 
 ---
 
-## 7. Auditoría y control fiscal — ✅ Sprint 1 (parcial) → continúa Sprint 2-3
+## 7. Auditoría y control fiscal — ✅ Sprint 1 (base) → continúa Sprint 2-3
 
 ### Qué mejorar
 
 - ✅ Historial completo de cambios por entidad. — tabla `AuditLog` + índices + AuditService + API `/auditoria`
 - ✅ Registro de quién hizo cada cambio, cuándo y desde qué usuario. — `usuario_id`, `usuario_rol`, `request_id`, `ip`, `user_agent`, `timestamp`
+- ✅ Auditoría wireada en los módulos. — ventas, devoluciones, compras, finanzas, stock y usuarios (funciones `audit_*` conectadas a los endpoints)
 - ⏳ Añadir versión de precios y costos por fecha. — pendiente tablas `precio_versions` / `costo_versions`
 - ⏳ Tener un esquema de cierres mensuales o de operación. — pendiente tabla `cierres_mensuales`
 - ✅ Registrar anulaciones, ajustes y correcciones con motivo. — `reversed_motivo`/`reversed_by`/`reversed_at` + transiciones `cancelled → reversed` requieren motivo
@@ -222,42 +224,24 @@ Introducir tablas de auditoría o eventos de negocio para:
 
 ---
 
-## 8. CI/CD, despliegue y operación — ⏳ Sprint 3
-
-### Qué mejorar
-
-- ✅ Pipeline CI con lint, tests y build. — ruff + pytest (real PG) + frontend lint/test/build ya en CI
-- ⏳ Deploy automático por entorno.
-- ⏳ Revisión de migraciones antes del despliegue.
-- ⏳ Backups automáticos de PostgreSQL.
-- ⏳ Rollback plan para releases.
-- ⏳ Monitoreo de salud del sistema y alertas.
-- ⏳ Documentación de procedimientos de incidentes.
-
-### Objetivo
-
-Reducir riesgo operativo y que cada release sea más segura y más fácil de controlar.
-
----
-
 ## Prioridades recomendadas
 
-### Prioridad alta
+### Prioridad alta (siguiente sprint)
 
 1. ✅ Seguridad y hardening de la API — **hecho Sprint 1**
-2. ⏳ Tests de negocio críticos — **siguiente (Sprint 2)**
-3. 🔄 Auditoría y trazabilidad — **base hecha Sprint 1, falta versionado precios/cierres (Sprint 2-3)**
-4. ⏳ Observabilidad en producción — **Sprint 3**
-5. ⏳ Backups y despliegue seguro — **Sprint 3**
+2. ⏳ **Testing del frontend (vitest)** — **el gap más grande hoy: 0 specs**. Instalar y escribir tests de componentes y flujos críticos.
+3. 🔄 Completar casos de negocio parciales del Sprint 2 — devoluciones parciales, BOM recursivo, costo cambiante entre fecha, rollover.
 
 ### Prioridad media
 
-6. ⏳ Mejoras de arquitectura interna — **Sprint 3-4**
-7. ⏳ Optimización de queries y reportes — **Sprint 3**
-8. ⏳ Revisión de UX en frontend — **Sprint 4**
+4. 🔄 Auditoría fiscal — versionado precios/costos (`precio_versions`/`costo_versions`) y `cierres_mensuales`
+5. ⏳ Observabilidad en producción — métricas por endpoint, alertas, health checks completos
+6. ⏳ Mejoras de arquitectura interna — capa `domain/`, UnitOfWork, versionado de schemas
 
 ### Prioridad baja, pero valiosa
 
+7. ⏳ Optimización de queries y reportes (Redis cache, Celery para tareas pesadas)
+8. ⏳ Secret manager externo (Vault/AWS)
 9. ⏳ refactors de limpieza y normalización del código
 10. ⏳ preparación para crecimiento de volumen y operación multisalida
 
@@ -265,11 +249,13 @@ Reducir riesgo operativo y que cada release sea más segura y más fácil de con
 
 ## Conclusión
 
-El proyecto ya tiene una base muy buena y una visión sólida de negocio. El siguiente nivel no consiste en “hacer más módulos”, sino en hacer que el sistema sea más seguro, más verificable, más auditable y más confiable en producción.
+El proyecto ya tiene una base muy buena y una visión sólida de negocio, con un backend seguro y una suite de 605 tests verdes. El siguiente nivel no consiste en "hacer más módulos", sino en:
 
-La parte más importante es que el ERP no solo funcione bien en un entorno controlado, sino que soporte cambios reales del negocio sin romper inventario, costos, finanzas o trazabilidad.
+1. **darle al frontend el mismo nivel de verificación que ya tiene el backend** (tests vitest),
+2. **completar la auditoría fiscal** (versiones de precio/costo y cierres mensuales), y
+3. **hacer el sistema observable y desplegable en producción con confianza**.
 
-En otras palabras: la próxima etapa ideal es pasar de un ERP funcional a un ERP de operación profesional.
+En otras palabras: la próxima etapa ideal es pasar de un ERP funcional a un ERP de operación profesional y verificado.
 
 ---
 
@@ -277,9 +263,10 @@ En otras palabras: la próxima etapa ideal es pasar de un ERP funcional a un ERP
 
 Crear un roadmap de 90 días con estas mejoras priorizadas en entregas concretas:
 
-- ✅ Sprint 1: seguridad + auditoría — **completado 20-08-2026** (TASK-001 a TASK-012: hardening, estados de documento, idempotencia)
-- ⏳ Sprint 2: tests + validación de negocio — **siguiente recomendado**
-- ⏳ Sprint 3: observabilidad + performance + despliegue
-- ⏳ Sprint 4: refinamiento de frontend y UX
+- ✅ Sprint 1: seguridad + auditoría — **completado** (hardening, estados de documento, idempotencia)
+- ✅ Sprint 2: tests backend + validación de negocio — **mayormente entregado** (605 tests green con PG real)
+- ⏳ Sprint 3: **testing frontend (vitest) + completar casos de negocio pendientes**
+- ⏳ Sprint 4: observabilidad + performance + despliegue
+- ⏳ Sprint 5: refinamiento de frontend y UX
 
 Esto permite implementar mejoras sin bloquear la operación diaria del negocio.
