@@ -327,7 +327,7 @@ def test_post_devolucion_total_201_anula_y_restaura_stock(client, operador_token
         assert body["tipo"] == "total"
         assert Decimal(body["monto_reembolsado"]) == Decimal("10.0000")
         assert body["venta_id"] == venta["id"]
-        assert _read_venta_estado(venta["id"]) == "anulada"
+        assert _read_venta_estado(venta["id"]) == "cancelled"
         assert _read_stock(ins_id) == Decimal("10")  # fully restored
     finally:
         _cleanup_devoluciones([venta["id"]])
@@ -384,7 +384,7 @@ def test_post_devolucion_total_sin_bom_400(client, admin_token):
             headers=_auth(admin_token),
         )
         assert resp.status_code == 400
-        assert _read_venta_estado(venta["id"]) == "completada"
+        assert _read_venta_estado(venta["id"]) == "confirmed"
         assert _count_devoluciones(venta["id"]) == 0
     finally:
         _cleanup_ventas_for_producto(prod_id)
@@ -449,7 +449,7 @@ def test_post_devolucion_parcial_201_restaura_solo_linea_devuelta(client, admin_
         assert Decimal(body["items"][0]["subtotal"]) == Decimal("10.0000")
         assert _read_stock(i1) == Decimal("10")  # returned line restored
         assert _read_stock(i2) == Decimal("9")  # untouched
-        assert _read_venta_estado(venta["id"]) == "completada"
+        assert _read_venta_estado(venta["id"]) == "confirmed"
     finally:
         _cleanup_devoluciones([venta["id"]])
         _cleanup_ventas_for_producto(p1)

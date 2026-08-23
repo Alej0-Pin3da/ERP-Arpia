@@ -128,7 +128,7 @@ def _insertar_venta(
     producto_id: int,
     fecha: datetime,
     total: str,
-    estado: str = "completada",
+    estado: str = "confirmed",
     precio: str = "0",
     costo: str = "0",
     cantidad: str = "1",
@@ -184,7 +184,7 @@ def _insertar_movimiento(
     fecha: datetime,
     tipo: str,
     monto: str,
-    estado: str = "activo",
+    estado: str = "confirmed",
 ) -> int:
     """Insert a MovimientoFinanciero directly with a fixed fecha."""
     db = SessionLocal()
@@ -373,7 +373,7 @@ def test_ventas_mensuales_excluye_anuladas(client, admin_token):
                 prod_id,
                 datetime(2026, 2, 10, 12, 0, 0),
                 "9999",
-                estado="anulada",
+                estado="cancelled",
                 precio="100",
                 costo="10",
             ),
@@ -489,7 +489,7 @@ def test_margen_por_producto_usa_snapshot_y_excluye_anuladas(client, admin_token
                 prod_id,
                 datetime(2026, 2, 10, 12, 0, 0),
                 "9999",
-                estado="anulada",
+                estado="cancelled",
                 precio="100",
                 costo="10",
             ),
@@ -553,7 +553,7 @@ def test_top_productos_agrupa_por_producto_y_descarta_anuladas(client, admin_tok
                 prod_a,
                 datetime(2026, 3, 9, 12, 0, 0),
                 "9999",
-                estado="anulada",
+                estado="cancelled",
                 precio="100",
                 cantidad="8",
             ),
@@ -690,7 +690,7 @@ def test_finanzas_mensuales_mezcla_ingresos_y_gastos(client, admin_token):
                 prod_id,
                 datetime(2026, 5, 12, 12, 0, 0),
                 "9999",
-                estado="anulada",
+                estado="cancelled",
                 precio="100",
                 costo="10",
             ),
@@ -698,7 +698,7 @@ def test_finanzas_mensuales_mezcla_ingresos_y_gastos(client, admin_token):
         mov_ids = [
             _insertar_movimiento(datetime(2026, 4, 2, 12, 0, 0), "Gasto", "80"),
             _insertar_movimiento(datetime(2026, 4, 3, 12, 0, 0), "Inversion", "20"),
-            _insertar_movimiento(datetime(2026, 4, 4, 12, 0, 0), "Gasto", "999", estado="inactivo"),
+            _insertar_movimiento(datetime(2026, 4, 4, 12, 0, 0), "Gasto", "999", estado="cancelled"),
             _insertar_movimiento(datetime(2026, 4, 6, 12, 0, 0), "Retiro", "999"),
             _insertar_movimiento(datetime(2026, 6, 8, 12, 0, 0), "Gasto", "30"),
         ]

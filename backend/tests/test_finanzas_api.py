@@ -202,7 +202,7 @@ def test_delete_movimiento_soft_delete(client, admin_token):
     try:
         resp = client.delete(f"/api/v1/finanzas/movimientos/{mov_id}", headers=_auth(admin_token))
         assert resp.status_code == 200
-        assert resp.json()["estado"] == "inactivo"
+        assert resp.json()["estado"] == "cancelled"
 
         lista = client.get("/api/v1/finanzas/movimientos", headers=_auth(admin_token))
         assert lista.status_code == 200
@@ -236,7 +236,7 @@ def test_settle_liquidacion_60_40_201_y_replay_409(client, admin_token):
         movs = resp.json()
         assert len(movs) == 2
         assert all(m["tipo"] == "Retiro" for m in movs)
-        assert all(m["estado"] == "activo" for m in movs)
+        assert all(m["estado"] == "confirmed" for m in movs)
         por_socio = {m["socio_id"]: Decimal(m["monto"]) for m in movs}
         assert por_socio[a_id] == Decimal("600.0000")  # 1000 * 60 / 100
         assert por_socio[b_id] == Decimal("400.0000")  # 1000 * 40 / 100
@@ -493,7 +493,7 @@ def test_patch_movimiento_operador_200(client, operador_token):
         assert body["descripcion"] == "Editada por operador"
         assert Decimal(body["monto"]) == Decimal("25.50")
         assert body["tipo"] == "Gasto"  # no enviado -> intacto
-        assert body["estado"] == "activo"
+        assert body["estado"] == "confirmed"
     finally:
         _cleanup_all()
 

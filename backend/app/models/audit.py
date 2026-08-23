@@ -1,7 +1,7 @@
 """Audit log model for tracking all critical operations."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, func
@@ -57,7 +57,11 @@ class AuditLog(Base):
 
     # When
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        default=lambda: datetime.now(UTC),
+        index=True,
     )
 
     # Relationship (optional, for eager loading)

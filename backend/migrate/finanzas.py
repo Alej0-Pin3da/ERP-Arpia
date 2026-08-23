@@ -518,7 +518,7 @@ def _insertar_movimiento(db, mv: MovimientoPlan, socio_id: int | None) -> None:
             monto=mv.monto,  # Decimal NUMERIC(15,4)
             fecha=mv.fecha,  # fecha real del Excel (nunca now())
             socio_id=socio_id,
-            estado="activo",
+            estado="confirmed",
         )
     )
     db.flush()

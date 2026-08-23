@@ -23,6 +23,7 @@ from app.models.usuarios import Usuario
 from app.models.ventas import Devolucion, DocumentState
 from app.schemas.common import Paginated
 from app.schemas.devoluciones import DevolucionCreate, DevolucionRead, DevolucionStateTransition
+from app.services.audit import audit_devolucion_create
 from app.services.devoluciones import listar_devoluciones, registrar_devolucion
 
 router = APIRouter(prefix="/devoluciones", tags=["devoluciones"])
@@ -45,7 +46,15 @@ def create_devolucion(
     """Register a return: tipo 'total' cancels the whole sale and restores ALL
     BOM stock; tipo 'parcial' restores only the returned lines (snapshot
     pricing). 400/409/422 mapping is owned by the service."""
-    return registrar_devolucion(db, user.id, payload.model_dump())
+    devolucion = registrar_devolucion(db, user.id, payload.model_dump())
+    devolucion_id = devolucion.id
+    try:
+        audit_devolucion_create(db, request, user.id, user.rol, devolucion)
+        db.commit()
+    except Exception:
+        pass
+    devolucion = db.get(Devolucion, devolucion_id)
+    return devolucion
 
 
 @router.get("", response_model=Paginated[DevolucionRead])

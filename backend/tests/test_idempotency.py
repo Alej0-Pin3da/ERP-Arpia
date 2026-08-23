@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 class TestIdempotencyMiddleware:
     """Test idempotency key handling for critical endpoints."""
 
-    def test_idempotency_key_required_for_ventas_post(self, client: TestClient):
+    def test_idempotency_key_required_for_ventas_post(self, client_raw: TestClient):
         """POST /api/v1/ventas requires Idempotency-Key header."""
-        resp = client.post(
+        resp = client_raw.post(
             "/api/v1/ventas",
             json={
                 "cliente_id": 1,
@@ -22,27 +22,27 @@ class TestIdempotencyMiddleware:
         assert resp.status_code == 400
         assert "Idempotency-Key" in resp.json()["detail"]
 
-    def test_idempotency_key_required_for_devoluciones_post(self, client: TestClient):
+    def test_idempotency_key_required_for_devoluciones_post(self, client_raw: TestClient):
         """POST /api/v1/devoluciones requires Idempotency-Key header."""
-        resp = client.post(
+        resp = client_raw.post(
             "/api/v1/devoluciones",
             json={"venta_id": 1, "tipo": "total", "motivo": "test"},
         )
         assert resp.status_code == 400
         assert "Idempotency-Key" in resp.json()["detail"]
 
-    def test_idempotency_key_required_for_compras_post(self, client: TestClient):
+    def test_idempotency_key_required_for_compras_post(self, client_raw: TestClient):
         """POST /api/v1/compras requires Idempotency-Key header."""
-        resp = client.post(
+        resp = client_raw.post(
             "/api/v1/compras",
             json={"insumo_id": 1, "cantidad_comprada": "10", "precio_unitario_compra": "50"},
         )
         assert resp.status_code == 400
         assert "Idempotency-Key" in resp.json()["detail"]
 
-    def test_idempotency_key_required_for_movimientos_post(self, client: TestClient):
+    def test_idempotency_key_required_for_movimientos_post(self, client_raw: TestClient):
         """POST /api/v1/finanzas/movimientos requires Idempotency-Key header."""
-        resp = client.post(
+        resp = client_raw.post(
             "/api/v1/finanzas/movimientos",
             json={"tipo": "Gasto", "descripcion": "Test", "monto": "100"},
         )

@@ -536,7 +536,7 @@ def aplicar_ventas(
             cliente_id=cliente_id,
             canal_venta=canal_venta,  # decision producto: 'feria' (default modelo)
             descuento_porcentaje=Decimal("0"),  # VTA-2: precio ya descontado
-            estado="completada",
+            estado="confirmed",
             total_venta=venta.cantidad * venta.precio,
         )
         db.add(nueva)

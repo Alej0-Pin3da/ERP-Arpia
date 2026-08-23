@@ -1,7 +1,8 @@
 """Audit service for structured audit logging."""
 from __future__ import annotations
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -67,6 +68,9 @@ def _serialize_model(obj) -> dict[str, Any]:
         # Handle non-serializable types
         if hasattr(value, "isoformat"):  # datetime
             value = value.isoformat()
+        elif isinstance(value, Decimal):
+            # JSONB cannot store Decimal directly
+            value = str(value)
         result[column.name] = value
     return result
 

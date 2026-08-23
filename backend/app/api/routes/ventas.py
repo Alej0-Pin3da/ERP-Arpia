@@ -9,9 +9,11 @@ from app.core.config import settings
 from app.core.deps import get_current_user, get_db, require_roles
 from app.core.limiter import get_rate_limit_config, user_limiter
 from app.models.clientes import Cliente
-from app.models.ventas import DetalleVenta, Venta, DocumentState
+from app.models.usuarios import Usuario
+from app.models.ventas import DetalleVenta, DocumentState, Venta
 from app.schemas.common import Paginated
 from app.schemas.venta import VentaCreate, VentaRead, VentaUpdate, VentaStateTransition
+from app.services.audit import audit_venta_create, audit_venta_delete, audit_venta_update
 from app.services.inventory import (
     actualizar_venta,
     registrar_venta,
@@ -47,13 +49,21 @@ def create_venta(
     request: Request,
     payload: VentaCreate,
     db: Session = Depends(get_db),
-    _: Venta = Depends(mutation_user),
+    current_user: Usuario = Depends(mutation_user),
 ):
     # registrar_venta takes a plain dict; HTTPException->HTTP mapping is
     # handled there (404 missing producto/cliente, 400 foreign variant,
     # 409 insufficient stock). Invalid payloads (canal/cantidad/descuento)
     # are rejected by pydantic -> 422 before this runs.
     venta: Venta = registrar_venta(db, payload.model_dump())
+    venta_id = venta.id
+    try:
+        audit_venta_create(db, request, current_user.id, current_user.rol, venta)
+        db.commit()
+    except Exception:
+        db.rollback()
+    # Re-query to avoid DetachedInstanceError after commit/expire
+    venta = db.get(Venta, venta_id)
     return venta
 
 
@@ -114,7 +124,7 @@ def update_venta(
     venta_id: int,
     payload: VentaCreate,
     db: Session = Depends(get_db),
-    _: Venta = Depends(mutation_user),
+    current_user: Usuario = Depends(mutation_user),
 ):
     """Full update of a venta (PUT /ventas/{id}).
 
@@ -125,7 +135,18 @@ def update_venta(
     the new quantities exceed available stock). 404 when the venta does not
     exist, 400 when it is already anulada.
     """
+    old_venta = db.get(Venta, venta_id)
+    old_values = {"estado": old_venta.estado, "total_venta": str(old_venta.total_venta)} if old_venta else {}
     venta: Venta = actualizar_venta(db, venta_id, payload.model_dump())
+    try:
+        audit_venta_update(
+            db, request, current_user.id, current_user.rol, venta_id,
+            old_values, {"estado": venta.estado, "total_venta": str(venta.total_venta)},
+        )
+        db.commit()
+    except Exception:
+        pass
+    venta = db.get(Venta, venta_id)
     return venta
 
 
@@ -135,7 +156,7 @@ def anular_venta(
     request: Request,
     venta_id: int,
     db: Session = Depends(get_db),
-    _: Venta = Depends(mutation_user),
+    current_user: Usuario = Depends(mutation_user),
 ):
     """Anular (soft-cancel) a venta — NOT a physical delete.
 
@@ -144,7 +165,15 @@ def anular_venta(
     es_regalo flag philosophy). Returns the anulada venta so the UI can
     refresh. 404 when the venta does not exist, 400 when already anulada.
     """
+    venta_before = db.get(Venta, venta_id)
+    old_values = {"estado": venta_before.estado} if venta_before else {}
     venta: Venta = anular_venta_service(db, venta_id)
+    try:
+        audit_venta_delete(db, request, current_user.id, current_user.rol, venta_id, old_values)
+        db.commit()
+    except Exception:
+        pass
+    venta = db.get(Venta, venta_id)
     return venta
 
 

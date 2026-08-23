@@ -1,6 +1,6 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from app.core.security import hash_password, verify_password
 from app.models.usuarios import Usuario
 from app.schemas.common import Paginated
 from app.schemas.usuario import UsuarioCreate, UsuarioRead, UsuarioUpdate
+from app.services.audit import audit_usuario_create
 from app.services.paginacion import paginar
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
@@ -53,9 +54,10 @@ def get_usuario(
 
 @router.post("", response_model=UsuarioRead, status_code=status.HTTP_201_CREATED)
 def create_usuario(
+    request: Request,
     payload: UsuarioCreate,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(require_admin),
+    current_user: Usuario = Depends(require_admin),
 ):
     existing = db.scalar(select(Usuario).where(Usuario.email == payload.email))
     if existing is not None:
@@ -68,6 +70,13 @@ def create_usuario(
     db.add(usuario)
     db.commit()
     db.refresh(usuario)
+    usuario_id = usuario.id
+    try:
+        audit_usuario_create(db, request, current_user.id, current_user.rol, usuario)
+        db.commit()
+    except Exception:
+        pass
+    usuario = db.get(Usuario, usuario_id)
     return usuario
 
 

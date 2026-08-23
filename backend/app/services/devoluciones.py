@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.ventas import Devolucion, DevolucionItem, Venta
+from app.models.ventas import Devolucion, DevolucionItem, DocumentState, Venta
 from app.services.inventory import explosion_materiales, reponer_stock
 
 
@@ -44,7 +44,7 @@ def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Dev
     venta = db.get(Venta, venta_id, with_for_update=True)
     if venta is None:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
-    if venta.estado == "anulada":
+    if venta.estado == DocumentState.CANCELLED.value:
         raise HTTPException(
             status_code=400, detail="La venta ya está anulada; no se puede devolver"
         )
@@ -69,7 +69,7 @@ def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Dev
                 status_code=400,
                 detail="La venta no tiene materiales consumibles; no se puede anular",
             )
-        venta.estado = "anulada"
+        venta.transition_to(DocumentState.CANCELLED)
         devolucion = Devolucion(
             venta_id=venta_id,
             tipo="total",

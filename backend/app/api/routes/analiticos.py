@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_db, require_roles
 from app.models.finanzas import MovimientoFinanciero
 from app.models.insumos import CompraInsumo, Insumo
-from app.models.ventas import DetalleVenta, Venta
+from app.models.ventas import DetalleVenta, DocumentState, Venta
 from app.schemas.analiticos import (
     AnaliticosResumenRead,
     FinanzasMensualesRead,
@@ -74,7 +74,7 @@ def _resumen_periodo(db: Session, desde: date, hasta: date) -> dict[str, Decimal
     ventas_filter = (
         Venta.fecha >= inicio,
         Venta.fecha < fin,
-        Venta.estado != "anulada",
+        Venta.estado != DocumentState.CANCELLED.value,
         Venta.es_regalo.is_(False),
     )
     ventas_total, cantidad_ventas = db.execute(
@@ -106,7 +106,7 @@ def _resumen_periodo(db: Session, desde: date, hasta: date) -> dict[str, Decimal
             MovimientoFinanciero.fecha >= inicio,
             MovimientoFinanciero.fecha < fin,
             MovimientoFinanciero.tipo.in_(("Gasto", "Inversion")),
-            MovimientoFinanciero.estado == "activo",
+            MovimientoFinanciero.estado == DocumentState.CONFIRMED.value,
         )
     ) or Decimal("0")
     ventas_total = Decimal(ventas_total or 0).quantize(FOUR_DECIMALS)
@@ -165,7 +165,7 @@ def ventas_mensuales(
     # binds 'month' identically in every occurrence (distinct bind params
     # would make PostgreSQL treat them as different GROUP BY expressions).
     mes = func.date_trunc("month", Venta.fecha)
-    condiciones = [Venta.estado != "anulada", Venta.es_regalo.is_(False)]
+    condiciones = [Venta.estado != DocumentState.CANCELLED.value, Venta.es_regalo.is_(False)]
     rango = _optional_range(desde, hasta)
     if rango is not None:
         condiciones.extend([Venta.fecha >= rango[0], Venta.fecha < rango[1]])
@@ -215,7 +215,7 @@ def margen_por_producto(
     (precio - costo_unitario_aplicado) from the Detalle_Ventas SNAPSHOT only,
     excluding anulada sales (ANA-3)."""
     margen = DetalleVenta.precio_unitario_aplicado - DetalleVenta.costo_unitario_aplicado
-    condiciones = [Venta.estado != "anulada", Venta.es_regalo.is_(False)]
+    condiciones = [Venta.estado != DocumentState.CANCELLED.value, Venta.es_regalo.is_(False)]
     rango = _optional_range(desde, hasta)
     if rango is not None:
         condiciones.extend([Venta.fecha >= rango[0], Venta.fecha < rango[1]])
@@ -256,7 +256,7 @@ def top_productos(
     # aggregate identically in every occurrence.
     unidades_total = func.sum(DetalleVenta.cantidad)
     ingresos_total = func.sum(DetalleVenta.cantidad * DetalleVenta.precio_unitario_aplicado)
-    condiciones = [Venta.estado != "anulada", Venta.es_regalo.is_(False)]
+    condiciones = [Venta.estado != DocumentState.CANCELLED.value, Venta.es_regalo.is_(False)]
     rango = _optional_range(desde, hasta)
     if rango is not None:
         condiciones.extend([Venta.fecha >= rango[0], Venta.fecha < rango[1]])
@@ -337,10 +337,10 @@ def finanzas_mensuales(
     mes_movimientos = func.date_trunc("month", MovimientoFinanciero.fecha)
 
     rango = _optional_range(desde, hasta)
-    ventas_condiciones = [Venta.estado != "anulada", Venta.es_regalo.is_(False)]
+    ventas_condiciones = [Venta.estado != DocumentState.CANCELLED.value, Venta.es_regalo.is_(False)]
     movimientos_condiciones = [
         MovimientoFinanciero.tipo.in_(("Gasto", "Inversion")),
-        MovimientoFinanciero.estado == "activo",
+        MovimientoFinanciero.estado == DocumentState.CONFIRMED.value,
     ]
     if rango is not None:
         ventas_condiciones.extend([Venta.fecha >= rango[0], Venta.fecha < rango[1]])

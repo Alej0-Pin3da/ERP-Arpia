@@ -362,7 +362,7 @@ def test_aplicar_ventas_inserta_con_fecha_real_canal_y_snapshot(db, mini_ventas)
     assert len(ventas) == 2
     for v in ventas:
         assert v.canal_venta == "feria"  # decision producto
-        assert v.estado == "completada"
+        assert v.estado == "confirmed"
         assert v.descuento_porcentaje == Decimal("0")  # sin doble descuento
         assert v.fecha is not None  # fecha real (nunca now())
     set_venta = (
@@ -715,7 +715,7 @@ def test_aplicar_ventas_rerun_matchea_fila_null_historica(tmp_path):
             cliente_id=cli.id,
             canal_venta="feria",
             descuento_porcentaje=Decimal("0"),
-            estado="completada",
+            estado="confirmed",
             total_venta=Decimal("71250.00"),
         )
         db.add(venta_historica)
@@ -777,7 +777,7 @@ def test_aplicar_ventas_combo_sin_variante_no_matchea_fila_con_variante(tmp_path
             cliente_id=cli.id,
             canal_venta="feria",
             descuento_porcentaje=Decimal("0"),
-            estado="completada",
+            estado="confirmed",
             total_venta=Decimal("295000"),
         )
         db.add(venta_rara)

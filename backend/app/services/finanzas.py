@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.finanzas import MovimientoFinanciero, SociosConfiguracion
+from app.models.ventas import DocumentState
 
 
 def _suma_participacion(db: Session) -> Decimal:
@@ -60,7 +61,9 @@ def crear_movimiento(db: Session, payload: dict) -> MovimientoFinanciero:
         raise
 
 
-def listar_movimientos(db: Session, estado: str = "activo") -> list[MovimientoFinanciero]:
+def listar_movimientos(
+    db: Session, estado: str = DocumentState.CONFIRMED.value
+) -> list[MovimientoFinanciero]:
     """List movements ordered by id, filtered by estado (soft-delete aware)."""
     stmt = (
         select(MovimientoFinanciero)
@@ -71,14 +74,18 @@ def listar_movimientos(db: Session, estado: str = "activo") -> list[MovimientoFi
 
 
 def eliminar_movimiento(db: Session, movimiento_id: int) -> MovimientoFinanciero:
-    """Soft delete a movement (estado -> 'inactivo')."""
+    """Soft delete a movement (estado -> 'cancelled')."""
     movimiento = db.get(MovimientoFinanciero, movimiento_id)
     if movimiento is None:
         raise HTTPException(status_code=404, detail="Movimiento no encontrado")
-    movimiento.estado = "inactivo"
-    db.commit()
-    db.refresh(movimiento)
-    return movimiento
+    try:
+        movimiento.transition_to(DocumentState.CANCELLED)
+        db.commit()
+        db.refresh(movimiento)
+        return movimiento
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from None
 
 
 def actualizar_movimiento(db: Session, movimiento_id: int, payload: dict) -> MovimientoFinanciero:
@@ -94,7 +101,7 @@ def actualizar_movimiento(db: Session, movimiento_id: int, payload: dict) -> Mov
       (consistent with crear_movimiento).
     """
     movimiento = db.get(MovimientoFinanciero, movimiento_id)
-    if movimiento is None or movimiento.estado != "activo":
+    if movimiento is None or movimiento.estado != DocumentState.CONFIRMED.value:
         raise HTTPException(status_code=404, detail="Movimiento no encontrado")
 
     # FIN-2: the server is the backstop — UI disabling is not enough.

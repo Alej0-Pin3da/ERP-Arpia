@@ -299,7 +299,7 @@ def test_devolucion_total_cancela_y_restaura_todo_el_stock():
         assert dev.tipo == "total"
         assert dev.monto_reembolsado == Decimal("10.0000")
         assert dev.venta_id == venta.id
-        assert venta_r.estado == "anulada"
+        assert venta_r.estado == "cancelled"
         assert _read_stock(insumo_id) == Decimal("10")  # fully restored
     finally:
         _cleanup_devolucion(venta.id)
@@ -386,7 +386,7 @@ def test_registrar_devolucion_total_sin_bom_400():
             db.close()
         assert excinfo.value.status_code == 400
         venta_r, _ = _read_venta(venta.id)
-        assert venta_r.estado == "completada"
+        assert venta_r.estado == "confirmed"
     finally:
         _cleanup_ventas_for_producto(producto)
         _cleanup_producto(producto)
@@ -432,7 +432,7 @@ def test_registrar_devolucion_parcial_restaura_solo_linea_devuelta():
         assert items[0].precio_unitario == Decimal("10.0000")
         assert items[0].subtotal == Decimal("10.0000")
         venta_r, _ = _read_venta(ctx["venta"].id)
-        assert venta_r.estado == "completada"
+        assert venta_r.estado == "confirmed"
         assert dev_id == dev.id
     finally:
         _cleanup_ctx_dos_lineas(ctx)
@@ -661,7 +661,7 @@ def test_registrar_devolucion_rollback_si_stock_falla(monkeypatch):
         assert excinfo.value.status_code == 404
         assert _count_devoluciones(ctx["venta"].id) == 0
         venta_r, _ = _read_venta(ctx["venta"].id)
-        assert venta_r.estado == "completada"
+        assert venta_r.estado == "confirmed"
         assert _read_stock(ctx["insumo"]) == Decimal("9")
     finally:
         _cleanup_ctx_una_linea(ctx)
@@ -692,7 +692,7 @@ def test_registrar_devolucion_integrity_error_409(monkeypatch):
         assert _count_devoluciones(ctx["venta"].id) == 0
         assert _read_stock(ctx["insumo"]) == Decimal("9")  # no restaurado
         venta_r, _ = _read_venta(ctx["venta"].id)
-        assert venta_r.estado == "completada"
+        assert venta_r.estado == "confirmed"
     finally:
         _cleanup_ctx_una_linea(ctx)
 

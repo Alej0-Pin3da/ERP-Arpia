@@ -21,7 +21,7 @@ from app.core.exceptions import (
 from app.models.clientes import Cliente
 from app.models.insumos import Insumo
 from app.models.productos import BomInsumo, BomProducto, Producto, VarianteProducto
-from app.models.ventas import DetalleVenta, Venta
+from app.models.ventas import DetalleVenta, DocumentState, Venta
 from app.services.costos import _lineas_insumo_efectivas, calcular_costo_produccion
 
 
@@ -259,7 +259,7 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
     venta = db.get(Venta, venta_id, with_for_update=True)
     if venta is None:
         raise EntityNotFoundError("Venta", venta_id)
-    if venta.estado == "anulada":
+    if venta.estado == DocumentState.CANCELLED.value:
         raise DomainValidationError("No se puede editar una venta anulada")
 
     detalles = payload["detalles"]
@@ -366,13 +366,12 @@ def anular_venta(db: Session, venta_id: int) -> Venta:
     venta = db.get(Venta, venta_id, with_for_update=True)
     if venta is None:
         raise EntityNotFoundError("Venta", venta_id)
-    if venta.estado == "anulada":
+    if venta.estado == DocumentState.CANCELLED.value:
         raise DomainValidationError("La venta ya está anulada")
 
     reponer_stock(db, _explosion_venta(db, venta))
-    venta.estado = "anulada"
-
     try:
+        venta.transition_to(DocumentState.CANCELLED)
         db.commit()
         db.refresh(venta)
         return venta

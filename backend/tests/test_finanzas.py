@@ -131,7 +131,7 @@ def test_crear_movimiento_persiste_con_monto_decimal():
         db.close()
     assert mov.tipo == "Gasto"
     assert mov.monto == Decimal("123.4500")
-    assert mov.estado == "activo"
+    assert mov.estado == "confirmed"
     assert mov.socio_id is None
     _cleanup_movimientos([mov_id])
 
@@ -170,7 +170,7 @@ def test_eliminar_movimiento_soft_delete_y_404():
     try:
         mov = crear_movimiento(db, _movimiento_payload())
         eliminado = eliminar_movimiento(db, mov.id)
-        assert eliminado.estado == "inactivo"
+        assert eliminado.estado == "cancelled"
         with pytest.raises(HTTPException) as excinfo:
             eliminar_movimiento(db, 99999999)
         assert excinfo.value.status_code == 404
@@ -192,7 +192,7 @@ def test_settle_liquidacion_reparto_proporcional():
             db.close()
         assert len(movs) == 2
         assert all(m.tipo == "Retiro" for m in movs)
-        assert all(m.estado == "activo" for m in movs)
+        assert all(m.estado == "confirmed" for m in movs)
         # misma clave de liquidación, ids por fila únicos (uq_liquidacion)
         assert all(m.liquidacion_id[:10] == key for m in movs)
         assert len({m.liquidacion_id for m in movs}) == 2
@@ -402,7 +402,7 @@ def test_actualizar_movimiento_aplica_campos_parciales():
         assert actualizado.monto == Decimal("25.5000")
         assert actualizado.socio_id == a_id
         assert actualizado.tipo == "Gasto"  # no enviado -> intacto
-        assert actualizado.estado == "activo"
+        assert actualizado.estado == "confirmed"
         _cleanup_movimientos([mov_id])
     finally:
         _cleanup_socios([a_id, b_id])

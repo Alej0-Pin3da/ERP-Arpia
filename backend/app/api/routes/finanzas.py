@@ -19,9 +19,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.deps import get_current_user, get_db, require_roles
 from app.core.limiter import user_limiter
-from app.models.finanzas import MovimientoFinanciero, SociosConfiguracion
+from app.models.finanzas import DocumentState, MovimientoFinanciero, SociosConfiguracion
 from app.models.usuarios import Usuario
-from app.models.ventas import DocumentState
 from app.schemas.common import Paginated
 from app.schemas.finanzas import (
     LiquidacionCreate,
@@ -33,6 +32,7 @@ from app.schemas.finanzas import (
     SocioConfiguracionRead,
     SocioConfiguracionUpdate,
 )
+from app.services.audit import audit_movimiento_create
 from app.services.finanzas import (
     actualizar_movimiento,
     actualizar_socio_configuracion,
@@ -85,10 +85,18 @@ def create_movimiento(
     request: Request,
     payload: MovimientoCreate,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(mutation_user),
+    current_user: Usuario = Depends(mutation_user),
 ):
     """Create a financial movement (tipo Gasto|Inversion|Retiro)."""
-    return crear_movimiento(db, payload.model_dump())
+    movimiento = crear_movimiento(db, payload.model_dump())
+    movimiento_id = movimiento.id
+    try:
+        audit_movimiento_create(db, request, current_user.id, current_user.rol, movimiento)
+        db.commit()
+    except Exception:
+        pass
+    movimiento = db.get(MovimientoFinanciero, movimiento_id)
+    return movimiento
 
 
 @router.get("/movimientos", response_model=Paginated[MovimientoRead])
@@ -114,7 +122,10 @@ def list_movimientos_route(
     )
     if estado is not None:
         stmt = stmt.where(MovimientoFinanciero.estado == estado)
-    elif tipo is not None:
+    else:
+        # Default: hide soft-deleted (cancelled) and terminal reversed rows.
+        stmt = stmt.where(MovimientoFinanciero.estado != DocumentState.CANCELLED.value)
+    if tipo is not None:
         stmt = stmt.where(MovimientoFinanciero.tipo == tipo)
     stmt = stmt.order_by(MovimientoFinanciero.id)
     stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_MOVIMIENTOS)

@@ -351,7 +351,7 @@ def _preparar_entorno(db) -> None:
         canal_venta="feria",
         descuento_porcentaje=Decimal("0"),
         total_venta=PRECIO_VENTA,  # 1 x precio tal-cual (VTA-2, sin doble desc)
-        estado="completada",
+        estado="confirmed",
         cliente=None,
     )
     db.add(venta)
@@ -375,7 +375,7 @@ def _preparar_entorno(db) -> None:
             monto=Decimal("320000"),
             fecha=FECHA_MOV,
             socio_id=socio.id if socio else None,
-            estado="activo",
+            estado="confirmed",
         )
     )
     db.commit()
@@ -706,7 +706,7 @@ def test_n7g_movimiento_duplicado_error(db, mini_libro):
             monto=mov.monto,
             fecha=mov.fecha,
             socio_id=mov.socio_id,
-            estado="activo",
+            estado="confirmed",
         )
     )
     db.commit()
@@ -732,7 +732,7 @@ def test_n7g_variante_null_matching_detecta_duplicado(db, mini_libro):
         canal_venta="feria",
         descuento_porcentaje=Decimal("0"),
         total_venta=PRECIO_VENTA,
-        estado="completada",
+        estado="confirmed",
         cliente=cli,
     )
     db.add(venta_null)
@@ -771,7 +771,7 @@ def test_n7g_omitida_sin_talla_no_duplicada(db, tmp_path):
         canal_venta="feria",
         descuento_porcentaje=Decimal("0"),
         total_venta=PRECIO_VENTA,
-        estado="completada",
+        estado="confirmed",
         cliente=cli,
     )
     db.add(venta_null)

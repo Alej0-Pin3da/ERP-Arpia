@@ -12,6 +12,7 @@ from app.models import CompraInsumo, Insumo, Usuario
 from app.schemas.common import Paginated
 from app.schemas.compra_insumo import CompraInsumoCreate, CompraInsumoRead
 from app.services.paginacion import aplicar_orden, paginar
+from app.services.audit import audit_compra_create
 from app.services.wac import registrar_compra
 
 router = APIRouter(prefix="/compras-insumos", tags=["compras-insumos"])
@@ -38,7 +39,7 @@ def create_compra_insumo(
     request: Request,
     payload: CompraInsumoCreate,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(mutation_user),
+    current_user: Usuario = Depends(mutation_user),
 ):
     # Proveedor validation: Proveedores was removed (0008). If proveedor_id is provided,
     # treat as 400 unless the table exists and the id is found. This keeps the
@@ -68,6 +69,13 @@ def create_compra_insumo(
         factura=payload.factura,
         proveedor_id=payload.proveedor_id,
     )
+    compra_id = compra.id
+    try:
+        audit_compra_create(db, request, current_user.id, current_user.rol, compra)
+        db.commit()
+    except Exception:
+        pass
+    compra = db.get(CompraInsumo, compra_id)
     return compra
 
 
