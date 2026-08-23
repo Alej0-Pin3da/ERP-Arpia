@@ -109,6 +109,7 @@ def _bd_test_lista():
 
         alembic_ini = Path(__file__).resolve().parents[1] / "alembic.ini"
         cfg = AlembicConfig(str(alembic_ini))
+        cfg.set_main_option("script_location", str(alembic_ini.parent / "alembic"))
         alembic_command.upgrade(cfg, "head")
 
         with SessionLocal() as db:
