@@ -714,6 +714,13 @@ export function handleMockApiRequest(
     return { status: 200, data: paginate(list, queryParams) }
   }
 
+  if (/^\/ventas\/\d+$/.test(path) && m === 'GET') {
+    const id = Number(path.split('/')[2])
+    const item = ventas.find((v) => v.id === id)
+    if (item) return { status: 200, data: item }
+    return { status: 404, data: { detail: 'Venta no encontrada' } }
+  }
+
   if (path === '/ventas' && m === 'POST') {
     const rawItems = (body.items || []) as Array<{ producto_id: number; variante_id?: number | null; cantidad: number; precio_unitario: number }>
     let total = 0
@@ -736,14 +743,14 @@ export function handleMockApiRequest(
     const item: Venta = {
       id: nextId.venta++,
       codigo: `VEN-2026-${String(nextId.venta).padStart(3, '0')}`,
-      fecha: body.fecha || new Date().toISOString().split('T')[0],
+      fecha: (body.fecha as string) || new Date().toISOString().split('T')[0],
       cliente_id: body.cliente_id ? Number(body.cliente_id) : null,
       total: body.total ? Number(body.total) : total,
       descuento: Number(body.descuento) || 0,
-      estado: 'completada',
-      canal: body.canal || 'Tienda Online',
+      estado: (body.estado as 'completada' | 'anulada' | 'pendiente') || 'completada',
+      canal: (body.canal as string) || 'Tienda Online',
       es_regalo: Boolean(body.es_regalo),
-      observaciones: body.observaciones,
+      observaciones: body.observaciones as string | undefined,
       items: processedItems,
       created_at: new Date().toISOString(),
     }
@@ -760,6 +767,26 @@ export function handleMockApiRequest(
     })
 
     return { status: 201, data: item }
+  }
+
+  if (/^\/ventas\/\d+$/.test(path) && (m === 'PUT' || m === 'PATCH')) {
+    const id = Number(path.split('/')[2])
+    const idx = ventas.findIndex((v) => v.id === id)
+    if (idx !== -1) {
+      ventas[idx] = { ...ventas[idx], ...body }
+      return { status: 200, data: ventas[idx] }
+    }
+    return { status: 404, data: { detail: 'Venta no encontrada' } }
+  }
+
+  if (/^\/ventas\/\d+$/.test(path) && m === 'DELETE') {
+    const id = Number(path.split('/')[2])
+    const idx = ventas.findIndex((v) => v.id === id)
+    if (idx !== -1) {
+      ventas.splice(idx, 1)
+      return { status: 204, data: null }
+    }
+    return { status: 404, data: { detail: 'Venta no encontrada' } }
   }
 
   // --- Devoluciones ---

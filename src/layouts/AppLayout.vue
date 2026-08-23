@@ -17,6 +17,7 @@ import NotificacionesModal from '@/components/atelier/NotificacionesModal.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAtelierStore } from '@/stores/atelier'
 import { roleLabel } from '@/utils/menu'
+import arpiaBrandLogo from '@/assets/arpia-05-1-100x100.png'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 
@@ -40,7 +41,7 @@ const routeTitle = computed(() => {
     productos: 'Recetas de Confección & Fichas BOM',
     recetas: 'Recetas de Confección & Fichas BOM',
     prendas: 'Perchero & Prendas Confeccionadas',
-    clientes: 'Gestión de Clientes & Medidas (CRM)',
+    clientes: 'Gestión de Clientas (Tallas Estándar & CRM)',
     cotizador: 'Cotizador Rápido de Costura',
     optimizador: 'Optimizador Textil & Retazos',
     analisis: 'Análisis & Rentabilidad',
@@ -90,30 +91,13 @@ function closeSidebar(): void {
     <!-- Sidebar Navigation -->
     <aside class="app-layout__aside" :class="{ 'app-layout__aside--open': sidebarOpen }">
       <div class="app-layout__brand">
-        <div class="brand-logo-emblem">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="brand-svg">
-            <path d="M16 2L5 8V16C5 22.8 9.7 29.2 16 31C22.3 29.2 27 22.8 27 16V8L16 2Z" fill="url(#layout-gold-bg)" fill-opacity="0.25" stroke="url(#layout-gold)" stroke-width="1.6" />
-            <path d="M16 6L11 12H14V22H18V12H21L16 6Z" fill="url(#layout-gold)" />
-            <path d="M11 15L7 18M21 15L25 18M11 19L8 22M21 19L24 22" stroke="url(#layout-gold)" stroke-width="1.3" stroke-linecap="round" />
-            <defs>
-              <linearGradient id="layout-gold" x1="5" y1="2" x2="27" y2="31" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#F3E5AB" />
-                <stop offset="0.5" stop-color="#C5A059" />
-                <stop offset="1" stop-color="#DFB15B" />
-              </linearGradient>
-              <linearGradient id="layout-gold-bg" x1="5" y1="2" x2="27" y2="31" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#DFB15B" stop-opacity="0.3" />
-                <stop offset="1" stop-color="#9E7D3B" stop-opacity="0.05" />
-              </linearGradient>
-            </defs>
-          </svg>
-        </div>
-        <div class="brand-text-block">
-          <div class="brand-title">
-            <span class="brand-arpia-title">ARPÍA</span>
-          </div>
-          <span class="brand-subtitle">Atelier de Alta Costura</span>
-        </div>
+        <router-link to="/" class="app-layout__brand-link" aria-label="Inicio Atelier Arpía">
+          <img
+            :src="arpiaBrandLogo"
+            alt="Arpía Atelier"
+            class="brand-image"
+          />
+        </router-link>
       </div>
 
       <div class="sidebar-scroll-area">
@@ -245,57 +229,34 @@ function closeSidebar(): void {
 .app-layout__brand {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  padding: 1.2rem 1.25rem;
+  justify-content: center;
+  padding: 1.1rem 1.25rem;
   border-bottom: 1px solid rgba(197, 160, 89, 0.15);
   background: linear-gradient(180deg, rgba(197, 160, 89, 0.06) 0%, transparent 100%);
 }
 
-.brand-logo-emblem {
-  width: 38px;
-  height: 38px;
+.app-layout__brand-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background: rgba(197, 160, 89, 0.08);
-  border: 1px solid rgba(197, 160, 89, 0.3);
-  box-shadow: 0 0 15px rgba(197, 160, 89, 0.15);
+  text-decoration: none;
+  width: 100%;
 }
 
-.brand-svg {
-  width: 24px;
-  height: 24px;
+.brand-image {
+  max-width: 100%;
+  max-height: 52px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  filter: drop-shadow(0 2px 8px rgba(197, 160, 89, 0.25));
+  transition: transform 0.2s ease, filter 0.2s ease;
 }
 
-.brand-text-block {
-  display: flex;
-  flex-direction: column;
-}
-
-.brand-title {
-  display: flex;
-  align-items: baseline;
-  gap: 0.35rem;
-}
-
-.brand-arpia-title {
-  font-family: var(--arpia-font-display);
-  font-weight: 800;
-  font-size: 1.25rem;
-  letter-spacing: 0.16em;
-  background: var(--arpia-gold-text);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.brand-subtitle {
-  font-family: var(--arpia-font-serif);
-  font-style: italic;
-  font-size: 0.76rem;
-  color: var(--arpia-text-muted);
-  letter-spacing: 0.02em;
+.brand-image:hover {
+  transform: scale(1.03);
+  filter: drop-shadow(0 4px 12px rgba(197, 160, 89, 0.45));
 }
 
 .sidebar-scroll-area {

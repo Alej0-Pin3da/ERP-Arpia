@@ -2,9 +2,9 @@
 import { ref, watch, computed } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
-import InputNumber from 'primevue/inputnumber'
+import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
-import { type ClienteCRM, type MedidasAnatomicas } from '@/stores/atelier'
+import { type ClienteCRM, type MedidasAnatomicas, useAtelierStore } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps<{
@@ -17,62 +17,53 @@ const emit = defineEmits<{
   (e: 'guardar', medidas: MedidasAnatomicas): void
 }>()
 
-const medidasLocales = ref<MedidasAnatomicas>({
-  busto: 90,
-  cintura: 68,
-  cadera: 96,
-  espalda: 36,
-  talle: 42,
-  largo: 105,
-})
+const atelier = useAtelierStore()
 
-const bajoBusto = ref<number>(75)
-const cinturaCorse = ref<number>(60)
-const altoCadera = ref<number>(88)
-const separacionBusto = ref<number>(18)
-const alturaBusto = ref<number>(25)
-const notasCalce = ref<string>('')
+const tallaSeleccionada = ref('S')
+const tallaSuperior = ref('S')
+const tallaInferior = ref('S')
+const categoriaPreferida = ref('Corsetería & Tops')
+const notasCalce = ref('')
+
+const tablaTallasEstandar = [
+  { talla: 'XXS', busto: '78 - 82', cintura: '58 - 62', cadera: '84 - 88', tipo: 'Petite / Extra pequeña' },
+  { talla: 'XS', busto: '82 - 86', cintura: '62 - 66', cadera: '88 - 92', tipo: 'Talla pequeña estándar' },
+  { talla: 'S', busto: '86 - 90', cintura: '66 - 70', cadera: '92 - 96', tipo: 'Talla más solicitada' },
+  { talla: 'M', busto: '90 - 94', cintura: '70 - 74', cadera: '96 - 100', tipo: 'Talla media estándar' },
+  { talla: 'L', busto: '94 - 98', cintura: '74 - 78', cadera: '100 - 104', tipo: 'Talla amplia estructurada' },
+  { talla: 'XL', busto: '98 - 104', cintura: '78 - 84', cadera: '104 - 110', tipo: 'Talla máxima de catálogo' },
+]
 
 watch(
   () => props.cliente,
   (c) => {
-    if (c && c.medidas) {
-      medidasLocales.value = {
-        busto: Number(c.medidas.busto) || 90,
-        cintura: Number(c.medidas.cintura) || 68,
-        cadera: Number(c.medidas.cadera) || 96,
-        espalda: Number(c.medidas.espalda) || 36,
-        talle: Number(c.medidas.talle) || 42,
-        largo: Number(c.medidas.largo) || 105,
-      }
-      cinturaCorse.value = Math.max(45, (Number(c.medidas.cintura) || 68) - 6)
-      bajoBusto.value = Math.max(60, (Number(c.medidas.busto) || 90) - 15)
+    if (c) {
+      tallaSeleccionada.value = c.talla_habitual || 'S'
+      tallaSuperior.value = c.talla_superior || c.talla_habitual || 'S'
+      tallaInferior.value = c.talla_inferior || c.talla_habitual || 'S'
+      categoriaPreferida.value = c.categoria_preferida || 'Corsetería & Tops'
+      notasCalce.value = c.notas || ''
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 
-const reduccionCinturaCm = computed(() => {
-  const natural = Number(medidasLocales.value.cintura) || 0
-  const corse = cinturaCorse.value || 0
-  return Math.max(0, natural - corse)
-})
-
-const reduccionPct = computed(() => {
-  const natural = Number(medidasLocales.value.cintura) || 1
-  return Math.round((reduccionCinturaCm.value / natural) * 100)
-})
-
-const nivelReduccion = computed(() => {
-  if (reduccionCinturaCm.value <= 4) return { label: 'Confort / Moda Ligera (0-4 cm)', color: 'text-emerald-400', badge: 'bg-emerald-950/80 border-emerald-500/30' }
-  if (reduccionCinturaCm.value <= 8) return { label: 'Corsetería Clásica de Autor (5-8 cm)', color: 'text-amber-300', badge: 'bg-amber-950/80 border-amber-500/30' }
-  return { label: 'Tight-Lacing / Alta Reducción (9+ cm)', color: 'text-rose-400', badge: 'bg-rose-950/80 border-rose-500/30' }
+const esSinTalla = computed(() => {
+  return tallaSeleccionada.value.includes('Sin Talla') || categoriaPreferida.value.includes('Tote Bags')
 })
 
 function guardar() {
   if (props.cliente) {
-    showToast('success', 'Ficha Anatómica Guardada', `Medidas actualizadas para ${props.cliente.nombre}.`)
-    emit('guardar', { ...medidasLocales.value })
+    atelier.actualizarCliente(props.cliente.id, {
+      talla_habitual: tallaSeleccionada.value,
+      talla_superior: tallaSuperior.value,
+      talla_inferior: tallaInferior.value,
+      categoria_preferida: categoriaPreferida.value,
+      tipo_producto_frecuente: esSinTalla.value ? 'PRODUCTOS_SIN_TALLA' : 'PRENDAS_TALLAS',
+      notas: notasCalce.value.trim(),
+    })
+    showToast('success', 'Ficha de Talla Actualizada', `Talla guardada como ${tallaSeleccionada.value} para ${props.cliente.nombre}.`)
+    emit('guardar', { busto: '-', cintura: '-', cadera: '-', espalda: '-', talle: '-', largo: '-' })
   }
   emit('update:visible', false)
 }
@@ -82,184 +73,148 @@ function guardar() {
   <Dialog
     :visible="props.visible"
     modal
-    :header="`Ficha Anatómica & Patronaje: ${props.cliente?.nombre || 'Clienta'}`"
-    :style="{ width: '880px', maxWidth: '95vw' }"
+    :header="`📏 Ficha de Tallas Estándar • ${props.cliente?.nombre || 'Clienta'}`"
+    :style="{ width: '840px', maxWidth: '95vw' }"
     class="p-dialog-arpia"
     @update:visible="emit('update:visible', $event)"
   >
-    <div class="space-y-6 pt-2">
-      <!-- Top banner -->
-      <div class="rounded-xl border border-amber-500/20 bg-stone-900/80 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="space-y-5 pt-2 text-xs text-stone-200">
+      <!-- Standard sizing banner -->
+      <div class="rounded-xl border border-amber-500/30 bg-stone-900/90 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <div class="text-xs font-mono text-amber-400 font-bold uppercase tracking-wider">
-            Patrón Base de Alta Costura & Corsetería
+            Confección por Tallas de Marca (XXS, XS, S, M, L, XL)
           </div>
-          <div class="text-xs text-stone-300 mt-0.5">
-            Las medidas registradas alimentan el cálculo de varillas de acero, tensión de ojales y corte anatómico.
+          <div class="text-xs text-stone-300 mt-1">
+            En Atelier Arpía no se confecciona a medida anatómica individual. Las prendas se elaboran en tallas estándar y los productos como <strong>TOTE BAGS</strong> y accesorios son <strong>Sin Talla</strong>.
           </div>
         </div>
-        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono text-xs" :class="nivelReduccion.badge">
-          <i class="pi pi-shield" />
-          <span :class="nivelReduccion.color" class="font-bold">{{ nivelReduccion.label }}</span>
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono text-xs bg-amber-950/80 border-amber-500/40 text-amber-300 font-bold whitespace-nowrap">
+          <span>Talla: {{ tallaSeleccionada }}</span>
         </div>
       </div>
 
-      <!-- Main Layout: Mannequin Visual & Input Fields -->
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-        <!-- SVG Mannequin Diagram (Visual Interactive) -->
-        <div class="md:col-span-5 rounded-2xl border border-stone-800 bg-stone-950/90 p-4 flex flex-col items-center justify-center relative overflow-hidden">
-          <div class="text-[11px] font-mono text-amber-400/90 font-bold mb-2">
-            DIAGRAMA DE SILUETA DE ATELIER
-          </div>
-          
-          <svg viewBox="0 0 240 320" class="w-48 h-64 select-none drop-shadow-md">
-            <!-- Background Gradients -->
-            <defs>
-              <linearGradient id="corsetGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#dfb15b" stop-opacity="0.3" />
-                <stop offset="50%" stop-color="#c5a059" stop-opacity="0.15" />
-                <stop offset="100%" stop-color="#785c27" stop-opacity="0.35" />
-              </linearGradient>
-            </defs>
+      <!-- Quick size selector -->
+      <div class="bg-stone-950/80 p-4 rounded-xl border border-stone-800 space-y-3 font-mono">
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-amber-300">
+          Asignar Talla Estándar a la Clienta:
+        </label>
 
-            <!-- Mannequin Outline -->
-            <path
-              d="M120 20 C110 20 102 30 102 45 C102 52 106 58 112 62 C85 70 70 95 68 120 C72 135 90 145 92 165 C94 185 80 205 75 240 C72 260 85 295 105 310 L135 310 C155 295 168 260 165 240 C160 205 146 185 148 165 C150 145 168 135 172 120 C170 95 155 70 128 62 C134 58 138 52 138 45 C138 30 130 20 120 20 Z"
-              fill="url(#corsetGrad)"
-              stroke="#dfb15b"
-              stroke-width="1.5"
-              stroke-linecap="round"
-            />
+        <div class="grid grid-cols-3 sm:grid-cols-7 gap-2">
+          <button
+            v-for="t in ['XXS', 'XS', 'S', 'M', 'L', 'XL']"
+            :key="t"
+            type="button"
+            class="py-2 text-center font-bold rounded-lg border text-xs transition cursor-pointer"
+            :class="tallaSeleccionada === t
+              ? 'bg-amber-400 text-stone-950 border-amber-300 shadow-md font-black'
+              : 'bg-stone-900 text-stone-300 border-stone-800 hover:border-amber-500/40'"
+            @click="tallaSeleccionada = t"
+          >
+            {{ t }}
+          </button>
 
-            <!-- Bust Line -->
-            <line x1="68" y1="120" x2="172" y2="120" stroke="#f3e5ab" stroke-width="1.5" stroke-dasharray="3 2" />
-            <circle cx="120" cy="120" r="3" fill="#dfb15b" />
-            <text x="180" y="124" fill="#dfb15b" font-size="10" font-family="monospace">Busto {{ medidasLocales.busto }}cm</text>
-
-            <!-- Underbust Line -->
-            <line x1="74" y1="140" x2="166" y2="140" stroke="#c5a059" stroke-width="1" stroke-dasharray="2 2" />
-            <text x="175" y="144" fill="#a8a29e" font-size="9" font-family="monospace">Bajo Busto {{ bajoBusto }}cm</text>
-
-            <!-- Waist Line (Corset Reduction) -->
-            <line x1="92" y1="165" x2="148" y2="165" stroke="#ef4444" stroke-width="2" />
-            <circle cx="120" cy="165" r="3" fill="#ef4444" />
-            <text x="155" y="169" fill="#ef4444" font-size="10" font-weight="bold" font-family="monospace">Corsé {{ cinturaCorse }}cm</text>
-
-            <!-- High Hip Line -->
-            <line x1="84" y1="205" x2="156" y2="205" stroke="#c5a059" stroke-width="1" stroke-dasharray="2 2" />
-
-            <!-- Hip Line -->
-            <line x1="75" y1="240" x2="165" y2="240" stroke="#f3e5ab" stroke-width="1.5" stroke-dasharray="3 2" />
-            <circle cx="120" cy="240" r="3" fill="#dfb15b" />
-            <text x="175" y="244" fill="#dfb15b" font-size="10" font-family="monospace">Cadera {{ medidasLocales.cadera }}cm</text>
-
-            <!-- Corset Boning lines mockup -->
-            <line x1="110" y1="125" x2="106" y2="210" stroke="#c5a059" stroke-width="1" stroke-opacity="0.6" />
-            <line x1="130" y1="125" x2="134" y2="210" stroke="#c5a059" stroke-width="1" stroke-opacity="0.6" />
-            <line x1="120" y1="120" x2="120" y2="215" stroke="#dfb15b" stroke-width="1.5" stroke-opacity="0.8" />
-          </svg>
-
-          <!-- Corset Reduction Summary Widget -->
-          <div class="w-full mt-3 p-2.5 rounded-xl bg-stone-900 border border-stone-800 text-xs flex items-center justify-between font-mono">
-            <div>
-              <span class="text-stone-400 block text-[10px]">Reducción Cintura:</span>
-              <span class="text-amber-300 font-bold text-sm">-{{ reduccionCinturaCm }} cm ({{ reduccionPct }}%)</span>
-            </div>
-            <div class="text-right">
-              <span class="text-stone-400 block text-[10px]">Tolerancia Varillas:</span>
-              <span class="text-stone-200 font-semibold">12-16 aceros</span>
-            </div>
-          </div>
+          <button
+            type="button"
+            class="py-2 text-center font-bold rounded-lg border text-[11px] transition cursor-pointer"
+            :class="tallaSeleccionada.includes('Sin Talla')
+              ? 'bg-amber-400 text-stone-950 border-amber-300 font-black'
+              : 'bg-stone-900 text-stone-300 border-stone-800 hover:border-amber-500/40'"
+            @click="tallaSeleccionada = 'Sin Talla (Tote Bags)'"
+          >
+            👜 Sin Talla
+          </button>
         </div>
 
-        <!-- Form Inputs Grid -->
-        <div class="md:col-span-7 space-y-4">
-          <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-1">
-              <label class="text-[11px] font-mono text-stone-300 font-semibold">Contorno Busto (cm)</label>
-              <InputNumber v-model="medidasLocales.busto" :min="60" :max="160" suffix=" cm" class="w-full text-xs" />
-            </div>
-
-            <div class="space-y-1">
-              <label class="text-[11px] font-mono text-stone-300 font-semibold">Bajo Busto (cm)</label>
-              <InputNumber v-model="bajoBusto" :min="50" :max="140" suffix=" cm" class="w-full text-xs" />
-            </div>
-
-            <div class="space-y-1">
-              <label class="text-[11px] font-mono text-stone-300 font-semibold">Cintura Natural (cm)</label>
-              <InputNumber v-model="medidasLocales.cintura" :min="40" :max="150" suffix=" cm" class="w-full text-xs" />
-            </div>
-
-            <div class="space-y-1">
-              <label class="text-[11px] font-mono text-rose-300 font-semibold">Cintura Corsé (Reducción)</label>
-              <InputNumber v-model="cinturaCorse" :min="40" :max="140" suffix=" cm" class="w-full text-xs" />
-            </div>
-
-            <div class="space-y-1">
-              <label class="text-[11px] font-mono text-stone-300 font-semibold">Contorno Cadera (cm)</label>
-              <InputNumber v-model="medidasLocales.cadera" :min="60" :max="180" suffix=" cm" class="w-full text-xs" />
-            </div>
-
-            <div class="space-y-1">
-              <label class="text-[11px] font-mono text-stone-300 font-semibold">Alto Cadera (cm)</label>
-              <InputNumber v-model="altoCadera" :min="50" :max="150" suffix=" cm" class="w-full text-xs" />
-            </div>
-
-            <div class="space-y-1">
-              <label class="text-[11px] font-mono text-stone-300 font-semibold">Ancho Espalda (cm)</label>
-              <InputNumber v-model="medidasLocales.espalda" :min="25" :max="60" suffix=" cm" class="w-full text-xs" />
-            </div>
-
-            <div class="space-y-1">
-              <label class="text-[11px] font-mono text-stone-300 font-semibold">Talle Delantero (cm)</label>
-              <InputNumber v-model="medidasLocales.talle" :min="30" :max="65" suffix=" cm" class="w-full text-xs" />
-            </div>
-
-            <div class="space-y-1">
-              <label class="text-[11px] font-mono text-stone-300 font-semibold">Separación Busto (cm)</label>
-              <InputNumber v-model="separacionBusto" :min="12" :max="30" suffix=" cm" class="w-full text-xs" />
-            </div>
-
-            <div class="space-y-1">
-              <label class="text-[11px] font-mono text-stone-300 font-semibold">Altura Busto (cm)</label>
-              <InputNumber v-model="alturaBusto" :min="18" :max="40" suffix=" cm" class="w-full text-xs" />
-            </div>
-          </div>
-
-          <div class="space-y-1">
-            <label class="text-[11px] font-mono text-stone-300 font-semibold">Notas Anatómicas & Ajustes de Taller</label>
-            <Textarea
-              v-model="notasCalce"
-              rows="2"
-              placeholder="Ej: Asimetría leve de hombro derecho (0.5cm), preferencia de copa balconette armada, soporte lumbar reforzado..."
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <div>
+            <label class="block text-[10px] text-stone-400 uppercase font-bold mb-1">Categoría de Preferencia</label>
+            <Dropdown
+              v-model="categoriaPreferida"
+              :options="[
+                { label: 'Corsetería & Tops (Con Talla: XXS-XL)', value: 'Corsetería & Tops' },
+                { label: 'Faldas & Conjuntos (Con Talla: XXS-XL)', value: 'Faldas & Conjuntos' },
+                { label: 'Tote Bags de Lona (Sin Talla)', value: 'Tote Bags de Lona' },
+                { label: 'Accesorios & Joyería Textil (Sin Talla)', value: 'Accesorios & Merch' },
+              ]"
+              option-label="label"
+              option-value="value"
               class="w-full text-xs"
             />
           </div>
+
+          <div>
+            <label class="block text-[10px] text-stone-400 uppercase font-bold mb-1">Notas de Calce / Estilo</label>
+            <Textarea
+              v-model="notasCalce"
+              rows="1"
+              class="w-full text-xs"
+              placeholder="Ej: Calce ceñido, compradora de Tote Bags..."
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Sizing guide matrix -->
+      <div class="space-y-2 font-mono">
+        <div class="text-[11px] font-bold uppercase tracking-wider text-stone-300 flex items-center gap-2">
+          <i class="pi pi-table text-amber-400" />
+          Guía de Equivalencias Oficiales Atelier Arpía
+        </div>
+
+        <div class="rounded-xl border border-stone-800 overflow-hidden">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-stone-950 text-stone-400 uppercase text-[10px] border-b border-stone-800">
+                <th class="py-2 px-3">Talla</th>
+                <th class="py-2 px-3 text-center">Busto (cm)</th>
+                <th class="py-2 px-3 text-center">Cintura (cm)</th>
+                <th class="py-2 px-3 text-center">Cadera (cm)</th>
+                <th class="py-2 px-3">Detalle</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-800/60">
+              <tr
+                v-for="r in tablaTallasEstandar"
+                :key="r.talla"
+                class="hover:bg-stone-800/30 transition-colors"
+                :class="tallaSeleccionada === r.talla ? 'bg-amber-500/10 text-amber-300 font-bold' : 'text-stone-300'"
+              >
+                <td class="py-2 px-3">
+                  <span
+                    class="px-2 py-0.5 rounded font-mono font-bold"
+                    :class="tallaSeleccionada === r.talla ? 'bg-amber-400 text-stone-950' : 'bg-stone-800 text-stone-300'"
+                  >
+                    {{ r.talla }}
+                  </span>
+                </td>
+                <td class="py-2 px-3 text-center">{{ r.busto }}</td>
+                <td class="py-2 px-3 text-center">{{ r.cintura }}</td>
+                <td class="py-2 px-3 text-center">{{ r.cadera }}</td>
+                <td class="py-2 px-3 text-[11px] font-sans text-stone-400">{{ r.tipo }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
 
     <template #footer>
-      <div class="flex items-center justify-between w-full pt-3 border-t border-stone-800">
-        <span class="text-[11px] text-stone-400 font-mono">Arpía Atelier Haute Couture System</span>
-        <div class="flex items-center gap-2">
-          <Button
-            label="Cancelar"
-            icon="pi pi-times"
-            size="small"
-            severity="secondary"
-            outlined
-            class="text-xs"
-            @click="emit('update:visible', false)"
-          />
-          <Button
-            label="Guardar Medidas"
-            icon="pi pi-check"
-            size="small"
-            class="p-button-warning text-xs font-semibold"
-            @click="guardar"
-          />
-        </div>
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-stone-800">
+        <Button
+          label="Cerrar"
+          icon="pi pi-times"
+          size="small"
+          class="p-button-text p-button-secondary text-xs"
+          @click="emit('update:visible', false)"
+        />
+        <Button
+          label="Guardar Talla"
+          icon="pi pi-check"
+          size="small"
+          class="p-button-warning text-xs font-semibold px-4"
+          @click="guardar"
+        />
       </div>
     </template>
   </Dialog>

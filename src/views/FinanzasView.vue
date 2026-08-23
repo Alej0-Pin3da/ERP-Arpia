@@ -1,105 +1,259 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
+import Dropdown from 'primevue/dropdown'
+import Dialog from 'primevue/dialog'
 import Slider from 'primevue/slider'
-import { useAtelierStore } from '@/stores/atelier'
+import {
+  useAtelierStore,
+  type LiquidacionSocias,
+  type SociaAtelier,
+  type AnticipoSocia,
+} from '@/stores/atelier'
+import NuevaLiquidacionModal from '@/components/atelier/NuevaLiquidacionModal.vue'
+import DetalleLiquidacionModal from '@/components/atelier/DetalleLiquidacionModal.vue'
+import GestionSociasModal from '@/components/atelier/GestionSociasModal.vue'
+import NuevoAnticipoModal from '@/components/atelier/NuevoAnticipoModal.vue'
 import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
 
-const periodoActual = ref('2026-08')
-const valorVentaTotal = computed(() => {
-  return atelier.prendas.reduce((acc, p) => acc + (p.vendida && p.precio_venta_final ? p.precio_venta_final : 0), 0) + 12850000
-})
+// Subtabs
+type TabType = 'liquidaciones' | 'socias' | 'anticipos' | 'simulador'
+const activeTab = ref<TabType>('liquidaciones')
 
-const costoTotalInsumos = computed(() => {
-  return atelier.insumos.reduce((acc, i) => acc + (i.stock_actual * i.costo_unitario), 0) * 0.35 + 3420000
-})
+// Search and Filter states
+const searchLiquidaciones = ref('')
+const filterEstadoLiquidacion = ref('TODOS')
+const searchAnticipos = ref('')
 
-const gastosOperativos = ref(2100000)
-const fondoReservaPct = ref(15)
+// Modals state
+const showNuevaLiqModal = ref(false)
+const showDetalleLiqModal = ref(false)
+const showGestionSociaModal = ref(false)
+const showNuevoAnticipoModal = ref(false)
+
+const liquidacionSeleccionadaEditar = ref<LiquidacionSocias | null>(null)
+const liquidacionSeleccionadaDetalle = ref<LiquidacionSocias | null>(null)
+const sociaSeleccionadaEditar = ref<SociaAtelier | null>(null)
+const anticipoSeleccionadoEditar = ref<AnticipoSocia | null>(null)
+
+// Deletion confirmation modals
+const showDeleteLiqModal = ref(false)
+const liquidacionAEliminar = ref<LiquidacionSocias | null>(null)
+
+const showDeleteSociaModal = ref(false)
+const sociaAEliminar = ref<SociaAtelier | null>(null)
+
+const showDeleteAnticipoModal = ref(false)
+const anticipoAEliminar = ref<AnticipoSocia | null>(null)
 
 // Break-even simulator parameters
 const precioPromedioCorse = ref(450000)
 const costoInsumosPromedio = ref(130000)
 const horasManoObraPromedio = ref(6)
 const costoHoraTaller = ref(15000)
+const gastosOperativosSimulator = ref(2100000)
+const prendasMetaSimuladas = ref(15)
 
 const margenContribucionUnitario = computed(() => {
-  const costoTotalUnitario = costoInsumosPromedio.value + (horasManoObraPromedio.value * costoHoraTaller.value)
+  const costoTotalUnitario = costoInsumosPromedio.value + horasManoObraPromedio.value * costoHoraTaller.value
   return Math.max(1, precioPromedioCorse.value - costoTotalUnitario)
 })
 
 const puntoEquilibrioUnidades = computed(() => {
-  return Math.ceil(gastosOperativos.value / margenContribucionUnitario.value)
+  return Math.ceil(gastosOperativosSimulator.value / margenContribucionUnitario.value)
 })
 
-const prendasMetaSimuladas = ref(15)
 const utilidadSimulada = computed(() => {
   const ingresoSim = prendasMetaSimuladas.value * margenContribucionUnitario.value
-  return Math.max(0, ingresoSim - gastosOperativos.value)
+  return Math.max(0, ingresoSim - gastosOperativosSimulator.value)
 })
 
-const utilidadBruta = computed(() => valorVentaTotal.value - costoTotalInsumos.value)
-const utilidadNeta = computed(() => Math.max(0, utilidadBruta.value - gastosOperativos.value))
-const fondoReservaValor = computed(() => (utilidadNeta.value * fondoReservaPct.value) / 100)
-const utilidadRepartible = computed(() => utilidadNeta.value - fondoReservaValor.value)
-
-const socias = ref([
-  { id: 1, nombre: 'Valeria Arpía (Diseño & Dirección)', pct: 50, rol: 'Socia Fundadora' },
-  { id: 2, nombre: 'Camila Modista (Jefa de Taller & Corte)', pct: 30, rol: 'Socia Operativa' },
-  { id: 3, nombre: 'Elena Inversionista (Capital & Expansión)', pct: 20, rol: 'Socia Capitalista' },
-])
-
-const cuotasSocias = computed(() => {
-  return socias.value.map((s) => ({
-    ...s,
-    monto: (utilidadRepartible.value * s.pct) / 100,
-  }))
-})
-
-function liquidarPeriodo() {
-  showToast(
-    'success',
-    'Liquidación Generada',
-    `Se ha procesado la liquidación de ${formatCOP(utilidadRepartible.value)} entre las socias.`
-  )
+function formatCOP(val: number): string {
+  return `$${Math.round(val).toLocaleString('es-CO')}`
 }
 
-function exportarInforme() {
-  showToast(
-    'info',
-    'Informe Financiero Preparado',
-    `Generando balance oficial de Atelier Arpía para el periodo ${periodoActual.value}.`
-  )
-  if (typeof window !== 'undefined') {
-    window.print()
+// Filtered liquidaciones
+const liquidacionesFiltradas = computed(() => {
+  let list = [...atelier.liquidaciones]
+
+  if (searchLiquidaciones.value.trim()) {
+    const q = searchLiquidaciones.value.trim().toLowerCase()
+    list = list.filter(
+      (l) =>
+        l.codigo.toLowerCase().includes(q) ||
+        l.periodo.toLowerCase().includes(q) ||
+        (l.observaciones || '').toLowerCase().includes(q) ||
+        l.distribucion.some((d) => d.nombre_socia.toLowerCase().includes(q)),
+    )
+  }
+
+  if (filterEstadoLiquidacion.value !== 'TODOS') {
+    list = list.filter((l) => l.estado === filterEstadoLiquidacion.value)
+  }
+
+  return list
+})
+
+// Filtered anticipos
+const anticiposFiltrados = computed(() => {
+  let list = [...atelier.anticipos]
+
+  if (searchAnticipos.value.trim()) {
+    const q = searchAnticipos.value.trim().toLowerCase()
+    list = list.filter(
+      (a) =>
+        a.nombre_socia.toLowerCase().includes(q) ||
+        a.concepto.toLowerCase().includes(q) ||
+        (a.comprobante || '').toLowerCase().includes(q),
+    )
+  }
+
+  return list
+})
+
+// Total % of active socias
+const sumaPorcentajesSocias = computed(() => {
+  return atelier.socias.filter((s) => s.activo).reduce((acc, s) => acc + s.porcentaje, 0)
+})
+
+// Historical income per socia
+function getIngresoHistoricoSocia(sociaId: number): number {
+  return atelier.liquidaciones.reduce((acc, l) => {
+    const item = l.distribucion.find((d) => d.socia_id === sociaId)
+    return acc + (item ? item.monto_neto_pagar : 0)
+  }, 0)
+}
+
+function getAnticiposPendientesSocia(sociaId: number): number {
+  return atelier.anticipos
+    .filter((a) => a.socia_id === sociaId && a.estado === 'PENDIENTE_DESCUENTO')
+    .reduce((acc, a) => acc + a.monto, 0)
+}
+
+// Liquidaciones actions
+function abrirNuevaLiquidacion() {
+  liquidacionSeleccionadaEditar.value = null
+  showNuevaLiqModal.value = true
+}
+
+function abrirEditarLiquidacion(liq: LiquidacionSocias) {
+  liquidacionSeleccionadaEditar.value = liq
+  showNuevaLiqModal.value = true
+}
+
+function abrirDetalleLiquidacion(liq: LiquidacionSocias) {
+  liquidacionSeleccionadaDetalle.value = liq
+  showDetalleLiqModal.value = true
+}
+
+function solicitarEliminarLiquidacion(liq: LiquidacionSocias) {
+  liquidacionAEliminar.value = liq
+  showDeleteLiqModal.value = true
+}
+
+function confirmarEliminarLiquidacion() {
+  if (liquidacionAEliminar.value) {
+    const cod = liquidacionAEliminar.value.codigo
+    atelier.eliminarLiquidacion(liquidacionAEliminar.value.id)
+    showToast('info', 'Liquidación Eliminada', `La liquidación ${cod} ha sido eliminada del historial.`)
+    liquidacionAEliminar.value = null
+    showDeleteLiqModal.value = false
   }
 }
 
-function formatCOP(v: number): string {
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
+function cambiarEstadoLiq(liq: LiquidacionSocias, nuevoEstado: LiquidacionSocias['estado']) {
+  atelier.cambiarEstadoLiquidacion(liq.id, nuevoEstado)
+  showToast('success', 'Estado Actualizado', `Liquidación ${liq.codigo} marcada como ${nuevoEstado}.`)
+}
+
+// Socias actions
+function abrirNuevaSocia() {
+  sociaSeleccionadaEditar.value = null
+  showGestionSociaModal.value = true
+}
+
+function abrirEditarSocia(soc: SociaAtelier) {
+  sociaSeleccionadaEditar.value = soc
+  showGestionSociaModal.value = true
+}
+
+function solicitarEliminarSocia(soc: SociaAtelier) {
+  sociaAEliminar.value = soc
+  showDeleteSociaModal.value = true
+}
+
+function confirmarEliminarSocia() {
+  if (sociaAEliminar.value) {
+    const nom = sociaAEliminar.value.nombre
+    atelier.eliminarSocia(sociaAEliminar.value.id)
+    showToast('info', 'Socia Eliminada', `El registro de ${nom} ha sido removido.`)
+    sociaAEliminar.value = null
+    showDeleteSociaModal.value = false
+  }
+}
+
+// Anticipos actions
+function abrirNuevoAnticipo() {
+  anticipoSeleccionadoEditar.value = null
+  showNuevoAnticipoModal.value = true
+}
+
+function abrirEditarAnticipo(ant: AnticipoSocia) {
+  anticipoSeleccionadoEditar.value = ant
+  showNuevoAnticipoModal.value = true
+}
+
+function marcarAnticipoDescontado(ant: AnticipoSocia) {
+  atelier.cambiarEstadoAnticipo(ant.id, 'DESCONTADO')
+  showToast('success', 'Anticipo Actualizado', `Anticipo marcado como DESCONTADO.`)
+}
+
+function solicitarEliminarAnticipo(ant: AnticipoSocia) {
+  anticipoAEliminar.value = ant
+  showDeleteAnticipoModal.value = true
+}
+
+function confirmarEliminarAnticipo() {
+  if (anticipoAEliminar.value) {
+    atelier.eliminarAnticipo(anticipoAEliminar.value.id)
+    showToast('info', 'Anticipo Eliminado', `El anticipo ha sido eliminado.`)
+    anticipoAEliminar.value = null
+    showDeleteAnticipoModal.value = false
+  }
+}
+
+function imprimirBalance() {
+  showToast('info', 'Balance Preparado', 'Generando balance financiero oficial de Atelier Arpía.')
+  if (typeof window !== 'undefined') {
+    window.print()
+  }
 }
 </script>
 
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-800 pb-4">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-800 pb-4">
       <div>
-        <h1 class="text-2xl font-serif font-bold text-amber-300 tracking-wide">
-          Reparto de Utilidades & Liquidación de Socias
-        </h1>
-        <p class="text-xs text-stone-400 mt-1 font-mono">
-          Cálculo financiero transparente con deducción de insumos, fondo de reinversión textil y cuotas de socias.
+        <div class="flex items-center gap-2">
+          <h1 class="text-2xl font-serif font-bold text-amber-300 tracking-wide m-0">
+            Reparto de Socias & Finanzas Atelier
+          </h1>
+          <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold">
+            Fórmula 40 / 30 / 30
+          </span>
+        </div>
+        <p class="text-xs text-stone-400 mt-1 font-mono m-0">
+          Módulo integral para gestión de liquidaciones de utilidades, deducción de insumos, fondo de taller, anticipos y perfiles de socias.
         </p>
       </div>
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-stone-400">Periodo:</span>
-        <span class="px-3 py-1.5 rounded-lg bg-stone-900 border border-stone-700 text-amber-300 font-mono text-xs font-bold">
-          {{ periodoActual }}
-        </span>
+
+      <!-- Main Quick Actions -->
+      <div class="flex flex-wrap items-center gap-2">
         <Button
           label="Imprimir Balance"
           icon="pi pi-print"
@@ -107,97 +261,539 @@ function formatCOP(v: number): string {
           severity="secondary"
           outlined
           class="text-xs"
-          @click="exportarInforme"
+          @click="imprimirBalance"
         />
         <Button
-          label="Liquidar Utilidades"
-          icon="pi pi-check"
+          label="Nuevo Anticipo"
+          icon="pi pi-dollar"
           size="small"
-          class="p-button-warning text-xs font-semibold"
-          @click="liquidarPeriodo"
+          class="p-button-outlined p-button-warning text-xs font-semibold"
+          @click="abrirNuevoAnticipo"
+        />
+        <Button
+          label="Nueva Liquidación"
+          icon="pi pi-plus"
+          size="small"
+          class="p-button-warning text-xs font-semibold px-3"
+          @click="abrirNuevaLiquidacion"
         />
       </div>
     </div>
 
-    <!-- Financial KPI Summary -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-4">
-        <div class="text-xs font-mono text-stone-400">Ingresos Totales (Taller + Showroom)</div>
-        <div class="text-xl font-serif font-bold text-emerald-400 mt-1">{{ formatCOP(valorVentaTotal) }}</div>
-        <div class="text-[10px] text-stone-500 mt-1">Confecciones entregadas + Ventas stock</div>
+    <!-- Financial KPI Summary Cards (4 Columns) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-mono">
+      <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-3.5 flex flex-col justify-between">
+        <div>
+          <div class="text-[10px] text-stone-400 uppercase tracking-wider">Ventas Totales Facturadas</div>
+          <div class="text-lg font-serif font-bold text-emerald-400 mt-1">
+            {{ formatCOP(atelier.totalHistoricoFacturadoLiquidaciones) }}
+          </div>
+        </div>
+        <div class="text-[10px] text-stone-500 mt-2 border-t border-stone-800/80 pt-1.5 flex justify-between">
+          <span>Liquidaciones:</span>
+          <span class="text-stone-300 font-bold">{{ atelier.liquidaciones.length }} periodos</span>
+        </div>
       </div>
 
-      <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-4">
-        <div class="text-xs font-mono text-stone-400">Costos Insumos & Confección</div>
-        <div class="text-xl font-serif font-bold text-red-400 mt-1">{{ formatCOP(costoTotalInsumos) }}</div>
-        <div class="text-[10px] text-stone-500 mt-1">Consumo real según recetas BOM</div>
+      <div class="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3.5 flex flex-col justify-between">
+        <div>
+          <div class="text-[10px] text-amber-300/90 uppercase tracking-wider font-bold">🏛️ Fondo Taller (40%)</div>
+          <div class="text-lg font-serif font-bold text-amber-300 mt-1">
+            {{ formatCOP(atelier.totalHistoricoFondoReinversion) }}
+          </div>
+        </div>
+        <div class="text-[10px] text-amber-400/70 mt-2 border-t border-amber-500/20 pt-1.5 flex justify-between">
+          <span>Reserva Textil & Maquinaria</span>
+        </div>
       </div>
 
-      <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-4">
-        <div class="text-xs font-mono text-stone-400">Fondo Reinversión Atelier ({{ fondoReservaPct }}%)</div>
-        <div class="text-xl font-serif font-bold text-amber-300 mt-1">{{ formatCOP(fondoReservaValor) }}</div>
-        <div class="text-[10px] text-stone-500 mt-1">Reserva para maquinaria y compras mayoristas</div>
+      <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-3.5 flex flex-col justify-between">
+        <div>
+          <div class="text-[10px] text-stone-400 uppercase tracking-wider">🪡 Margara Restrepo (30%)</div>
+          <div class="text-lg font-serif font-bold text-stone-100 mt-1">
+            {{ formatCOP(atelier.totalHistoricoRepartidoMargara) }}
+          </div>
+        </div>
+        <div class="text-[10px] text-stone-500 mt-2 border-t border-stone-800/80 pt-1.5 flex justify-between">
+          <span>Confección & Taller</span>
+        </div>
       </div>
 
-      <div class="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4">
-        <div class="text-xs font-mono text-amber-300/80">Utilidad Neta Repartible</div>
-        <div class="text-2xl font-serif font-bold text-amber-300 mt-1">{{ formatCOP(utilidadRepartible) }}</div>
-        <div class="text-[10px] text-amber-400/60 mt-1">Disponible para división entre socias</div>
+      <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-3.5 flex flex-col justify-between">
+        <div>
+          <div class="text-[10px] text-stone-400 uppercase tracking-wider">🎨 Valeria Quintero (30%)</div>
+          <div class="text-lg font-serif font-bold text-stone-100 mt-1">
+            {{ formatCOP(atelier.totalHistoricoRepartidoValqui) }}
+          </div>
+        </div>
+        <div class="text-[10px] text-stone-500 mt-2 border-t border-stone-800/80 pt-1.5 flex justify-between">
+          <span>Diseño & Dirección</span>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-3.5 flex flex-col justify-between">
+        <div>
+          <div class="text-[10px] text-stone-400 uppercase tracking-wider">Anticipos Pendientes</div>
+          <div class="text-lg font-serif font-bold text-rose-400 mt-1">
+            {{ formatCOP(atelier.totalAnticiposPendientes) }}
+          </div>
+        </div>
+        <div class="text-[10px] text-stone-500 mt-2 border-t border-stone-800/80 pt-1.5 flex justify-between">
+          <span>Por descontar en cierre</span>
+        </div>
       </div>
     </div>
 
-    <!-- Socias Distribution Table -->
-    <div class="rounded-2xl border border-stone-800 bg-stone-900/40 backdrop-blur-sm overflow-hidden p-6 space-y-4">
-      <div class="flex items-center justify-between border-b border-stone-800/80 pb-3">
-        <h2 class="text-base font-serif font-semibold text-stone-100 flex items-center gap-2">
-          <i class="pi pi-users text-amber-400" />
-          Tabla de Distribución de Utilidades
-        </h2>
-        <div class="flex items-center gap-3 text-xs">
-          <span class="text-stone-400">Ajuste Gastos Operativos:</span>
-          <InputNumber
-            v-model="gastosOperativos"
-            mode="currency"
-            currency="COP"
-            locale="es-CO"
-            class="w-36 text-xs p-inputtext-sm"
+    <!-- Navigation Subtabs -->
+    <div class="flex items-center gap-2 border-b border-stone-800 overflow-x-auto pb-1 text-xs font-mono">
+      <button
+        class="px-4 py-2 rounded-t-lg transition-all flex items-center gap-2 font-bold cursor-pointer"
+        :class="activeTab === 'liquidaciones' ? 'bg-amber-500/10 text-amber-300 border-b-2 border-amber-400' : 'text-stone-400 hover:text-stone-200'"
+        @click="activeTab = 'liquidaciones'"
+      >
+        <i class="pi pi-list" />
+        Liquidaciones & Cierres ({{ atelier.liquidaciones.length }})
+      </button>
+
+      <button
+        class="px-4 py-2 rounded-t-lg transition-all flex items-center gap-2 font-bold cursor-pointer"
+        :class="activeTab === 'socias' ? 'bg-amber-500/10 text-amber-300 border-b-2 border-amber-400' : 'text-stone-400 hover:text-stone-200'"
+        @click="activeTab = 'socias'"
+      >
+        <i class="pi pi-users" />
+        Perfiles de Socias & Cuentas ({{ atelier.socias.length }})
+      </button>
+
+      <button
+        class="px-4 py-2 rounded-t-lg transition-all flex items-center gap-2 font-bold cursor-pointer"
+        :class="activeTab === 'anticipos' ? 'bg-amber-500/10 text-amber-300 border-b-2 border-amber-400' : 'text-stone-400 hover:text-stone-200'"
+        @click="activeTab = 'anticipos'"
+      >
+        <i class="pi pi-dollar" />
+        Anticipos & Retiros ({{ atelier.anticipos.length }})
+      </button>
+
+      <button
+        class="px-4 py-2 rounded-t-lg transition-all flex items-center gap-2 font-bold cursor-pointer"
+        :class="activeTab === 'simulador' ? 'bg-amber-500/10 text-amber-300 border-b-2 border-amber-400' : 'text-stone-400 hover:text-stone-200'"
+        @click="activeTab = 'simulador'"
+      >
+        <i class="pi pi-chart-line" />
+        Simulador Punto Equilibrio Textil
+      </button>
+    </div>
+
+    <!-- TAB 1: LIQUIDACIONES DE PERIODO (CRUD) -->
+    <div v-if="activeTab === 'liquidaciones'" class="space-y-4">
+      <!-- Search & Filters -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-stone-900/60 p-3.5 rounded-xl border border-stone-800 text-xs">
+        <div class="w-full sm:w-72 relative">
+          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 text-xs" />
+          <InputText
+            v-model="searchLiquidaciones"
+            placeholder="Buscar por código, periodo, socia..."
+            class="w-full pl-8 text-xs"
+          />
+        </div>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <span class="text-stone-400 text-xs font-mono">Estado:</span>
+          <Dropdown
+            v-model="filterEstadoLiquidacion"
+            :options="[
+              { label: 'Todos los Estados', value: 'TODOS' },
+              { label: 'Totalmente Pagadas', value: 'PAGADA' },
+              { label: 'Aprobadas', value: 'APROBADA' },
+              { label: 'En Borrador', value: 'BORRADOR' },
+            ]"
+            option-label="label"
+            option-value="value"
+            class="text-xs w-44"
+          />
+          <Button
+            label="Nueva Liquidación"
+            icon="pi pi-plus"
+            size="small"
+            class="p-button-warning text-xs font-semibold whitespace-nowrap"
+            @click="abrirNuevaLiquidacion"
           />
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+      <!-- Liquidaciones Table -->
+      <div class="rounded-2xl border border-stone-800 bg-stone-900/40 backdrop-blur-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead>
+              <tr class="bg-stone-950/90 border-b border-stone-800 text-[10px] font-mono uppercase text-stone-400">
+                <th class="py-3 px-4">Código & Periodo</th>
+                <th class="py-3 px-3 text-right">Ventas Brutas</th>
+                <th class="py-3 px-3 text-right">Costos / Gastos</th>
+                <th class="py-3 px-3 text-right">Utilidad Neta</th>
+                <th class="py-3 px-3 text-center">Fondo Taller (40%)</th>
+                <th class="py-3 px-3 text-center">Margara (30%)</th>
+                <th class="py-3 px-3 text-center">Valqui (30%)</th>
+                <th class="py-3 px-3 text-center">Estado</th>
+                <th class="py-3 px-4 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-800/60 font-mono">
+              <tr
+                v-for="l in liquidacionesFiltradas"
+                :key="l.id"
+                class="hover:bg-stone-800/30 transition-colors"
+              >
+                <td class="py-3.5 px-4">
+                  <div class="font-bold text-amber-300 font-serif text-sm">{{ l.codigo }}</div>
+                  <div class="text-stone-200 text-xs font-sans mt-0.5">{{ l.periodo }}</div>
+                  <div class="text-[10px] text-stone-500">Cierre: {{ l.fecha_cierre }}</div>
+                </td>
+
+                <td class="py-3.5 px-3 text-right font-bold text-stone-100">
+                  {{ formatCOP(l.total_ventas_brutas) }}
+                </td>
+
+                <td class="py-3.5 px-3 text-right text-stone-400 text-[11px]">
+                  <div>-{{ formatCOP(l.costo_taller_insumos) }} ins.</div>
+                  <div>-{{ formatCOP(l.gastos_operativos) }} gast.</div>
+                </td>
+
+                <td class="py-3.5 px-3 text-right font-bold text-emerald-400 text-sm">
+                  {{ formatCOP(l.utilidad_neta_total) }}
+                </td>
+
+                <td class="py-3.5 px-3 text-center">
+                  <span class="text-amber-300 font-bold text-xs">{{ formatCOP(l.fondo_reinversion_monto) }}</span>
+                </td>
+
+                <td class="py-3.5 px-3 text-center">
+                  <div class="text-stone-200 font-semibold text-xs">
+                    {{ formatCOP(l.distribucion.find((d) => d.socia_id === 2)?.monto_neto_pagar || 0) }}
+                  </div>
+                  <span
+                    class="text-[9px] px-1.5 py-0.2 rounded"
+                    :class="l.distribucion.find((d) => d.socia_id === 2)?.estado_pago === 'PAGADO' ? 'bg-emerald-950 text-emerald-400' : 'bg-stone-800 text-amber-400'"
+                  >
+                    {{ l.distribucion.find((d) => d.socia_id === 2)?.estado_pago || 'PENDIENTE' }}
+                  </span>
+                </td>
+
+                <td class="py-3.5 px-3 text-center">
+                  <div class="text-stone-200 font-semibold text-xs">
+                    {{ formatCOP(l.distribucion.find((d) => d.socia_id === 3)?.monto_neto_pagar || 0) }}
+                  </div>
+                  <span
+                    class="text-[9px] px-1.5 py-0.2 rounded"
+                    :class="l.distribucion.find((d) => d.socia_id === 3)?.estado_pago === 'PAGADO' ? 'bg-emerald-950 text-emerald-400' : 'bg-stone-800 text-amber-400'"
+                  >
+                    {{ l.distribucion.find((d) => d.socia_id === 3)?.estado_pago || 'PENDIENTE' }}
+                  </span>
+                </td>
+
+                <td class="py-3.5 px-3 text-center">
+                  <button
+                    class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider cursor-pointer hover:opacity-80 transition-opacity"
+                    :class="{
+                      'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30': l.estado === 'PAGADA',
+                      'bg-amber-500/20 text-amber-300 border border-amber-500/30': l.estado === 'APROBADA',
+                      'bg-stone-800 text-stone-400 border border-stone-700': l.estado === 'BORRADOR',
+                    }"
+                    :title="'Click para cambiar estado (actual: ' + l.estado + ')'"
+                    @click="cambiarEstadoLiq(l, l.estado === 'PAGADA' ? 'BORRADOR' : l.estado === 'BORRADOR' ? 'APROBADA' : 'PAGADA')"
+                  >
+                    {{ l.estado }}
+                  </button>
+                </td>
+
+                <td class="py-3.5 px-4 text-center">
+                  <div class="flex items-center justify-center gap-1.5">
+                    <Button
+                      icon="pi pi-eye"
+                      size="small"
+                      text
+                      rounded
+                      class="p-button-secondary text-amber-300 hover:bg-stone-800"
+                      title="Ver Acta Oficial & Transferencias"
+                      @click="abrirDetalleLiquidacion(l)"
+                    />
+                    <Button
+                      icon="pi pi-pencil"
+                      size="small"
+                      text
+                      rounded
+                      class="p-button-secondary text-stone-300 hover:bg-stone-800"
+                      title="Editar Liquidación"
+                      @click="abrirEditarLiquidacion(l)"
+                    />
+                    <Button
+                      icon="pi pi-trash"
+                      size="small"
+                      text
+                      rounded
+                      class="p-button-danger text-rose-400 hover:bg-rose-950/40"
+                      title="Eliminar Liquidación"
+                      @click="solicitarEliminarLiquidacion(l)"
+                    />
+                  </div>
+                </td>
+              </tr>
+
+              <tr v-if="liquidacionesFiltradas.length === 0">
+                <td colspan="9" class="py-8 text-center text-stone-500">
+                  <i class="pi pi-inbox text-2xl mb-2 block" />
+                  No se encontraron liquidaciones de socias con los filtros actuales.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: PERFILES DE SOCIAS & CUENTAS (CRUD) -->
+    <div v-if="activeTab === 'socias'" class="space-y-4">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-stone-900/60 p-3.5 rounded-xl border border-stone-800">
+        <div>
+          <div class="text-xs font-bold text-amber-300 uppercase font-mono">
+            Estructura de Socias & Porcentajes de Participación
+          </div>
+          <div class="text-[11px] text-stone-400 font-mono mt-0.5">
+            Suma total activa: <strong class="text-emerald-400">{{ sumaPorcentajesSocias }}%</strong>
+            (Regla estatutaria de Atelier Arpía: 40% Taller / 30% Confección / 30% Dirección)
+          </div>
+        </div>
+
+        <Button
+          label="Añadir Nueva Socia"
+          icon="pi pi-user-plus"
+          size="small"
+          class="p-button-warning text-xs font-semibold"
+          @click="abrirNuevaSocia"
+        />
+      </div>
+
+      <!-- Socias Cards Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div
-          v-for="s in cuotasSocias"
+          v-for="s in atelier.socias"
           :key="s.id"
-          class="rounded-xl border border-stone-800 bg-stone-950/70 p-4 relative overflow-hidden flex flex-col justify-between"
+          class="rounded-2xl border bg-stone-900/60 p-5 relative overflow-hidden flex flex-col justify-between transition-all"
+          :class="s.activo ? 'border-stone-800 hover:border-amber-500/40' : 'border-stone-800/40 opacity-60'"
         >
-          <div class="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none" />
           <div>
             <div class="flex items-center justify-between">
-              <span class="text-xs font-mono text-amber-400/90 font-bold">{{ s.pct }}% Participación</span>
-              <span class="text-[10px] px-2 py-0.5 rounded bg-stone-800 text-stone-300 font-mono">{{ s.rol }}</span>
+              <span class="px-2.5 py-1 rounded-full text-xs font-mono font-bold text-amber-300 bg-amber-500/20 border border-amber-500/30">
+                {{ s.porcentaje }}% Participación
+              </span>
+              <span
+                class="text-[10px] px-2 py-0.5 rounded font-mono font-bold"
+                :class="s.activo ? 'bg-emerald-950 text-emerald-400' : 'bg-stone-800 text-stone-400'"
+              >
+                {{ s.activo ? 'Activa' : 'Inactiva' }}
+              </span>
             </div>
-            <div class="font-serif font-bold text-stone-100 text-base mt-2">{{ s.nombre }}</div>
+
+            <div class="font-serif font-bold text-stone-100 text-base mt-3">{{ s.nombre }}</div>
+            <div class="text-xs text-stone-400 font-mono mt-0.5">{{ s.rol }}</div>
+
+            <div class="mt-4 pt-3 border-t border-stone-800/80 space-y-2 text-xs font-mono text-stone-300">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-stone-500">Banco / Plataforma:</span>
+                <span class="font-bold text-stone-200">{{ s.banco || 'N/A' }}</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-stone-500">N° Cuenta:</span>
+                <span class="text-stone-300">{{ s.numero_cuenta || 'N/A' }} ({{ s.tipo_cuenta || 'Ahorros' }})</span>
+              </div>
+              <div v-if="s.telefono" class="flex items-center justify-between text-[11px]">
+                <span class="text-stone-500">Teléfono:</span>
+                <span class="text-stone-300">{{ s.telefono }}</span>
+              </div>
+              <div v-if="s.email" class="flex items-center justify-between text-[11px]">
+                <span class="text-stone-500">Email:</span>
+                <span class="text-stone-300 truncate max-w-[150px]">{{ s.email }}</span>
+              </div>
+            </div>
+
+            <!-- Historical Financials -->
+            <div class="mt-4 p-3 rounded-xl bg-stone-950/80 border border-stone-800/80 font-mono space-y-1.5">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-stone-400">Total Liquidado Histórico:</span>
+                <span class="text-emerald-400 font-bold">{{ formatCOP(getIngresoHistoricoSocia(s.id)) }}</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-stone-400">Anticipos Pendientes:</span>
+                <span class="text-rose-400 font-bold">{{ formatCOP(getAnticiposPendientesSocia(s.id)) }}</span>
+              </div>
+            </div>
+
+            <p v-if="s.notas" class="text-[11px] text-stone-400 italic mt-3 line-clamp-2">
+              "{{ s.notas }}"
+            </p>
           </div>
 
-          <div class="mt-4 pt-3 border-t border-stone-800 flex items-end justify-between">
-            <span class="text-[11px] text-stone-400 font-mono">Cuota Neta:</span>
-            <span class="text-lg font-serif font-bold text-emerald-400">{{ formatCOP(s.monto) }}</span>
+          <div class="mt-5 pt-3 border-t border-stone-800 flex items-center justify-between">
+            <Button
+              :label="s.activo ? 'Desactivar' : 'Activar'"
+              size="small"
+              text
+              class="text-[11px] p-0 text-stone-400 hover:text-stone-200"
+              @click="atelier.toggleActivoSocia(s.id)"
+            />
+
+            <div class="flex items-center gap-1">
+              <Button
+                icon="pi pi-pencil"
+                size="small"
+                text
+                rounded
+                class="p-button-secondary text-amber-300 hover:bg-stone-800"
+                @click="abrirEditarSocia(s)"
+              />
+              <Button
+                v-if="!s.es_fondo_taller"
+                icon="pi pi-trash"
+                size="small"
+                text
+                rounded
+                class="p-button-danger text-rose-400 hover:bg-rose-950/40"
+                @click="solicitarEliminarSocia(s)"
+              />
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Interactive Break-Even Point Simulator (Simulador de Punto de Equilibrio) -->
-    <div class="rounded-2xl border border-amber-500/20 bg-stone-900/60 p-6 space-y-5">
+    <!-- TAB 3: ANTICIPOS & RETIROS DE SOCIAS (CRUD) -->
+    <div v-if="activeTab === 'anticipos'" class="space-y-4">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-stone-900/60 p-3.5 rounded-xl border border-stone-800 text-xs font-mono">
+        <div class="w-full sm:w-72 relative">
+          <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 text-xs" />
+          <InputText
+            v-model="searchAnticipos"
+            placeholder="Buscar por socia, concepto, recibo..."
+            class="w-full pl-8 text-xs font-sans"
+          />
+        </div>
+
+        <Button
+          label="Registrar Nuevo Anticipo"
+          icon="pi pi-plus"
+          size="small"
+          class="p-button-warning text-xs font-semibold whitespace-nowrap"
+          @click="abrirNuevoAnticipo"
+        />
+      </div>
+
+      <!-- Anticipos Table -->
+      <div class="rounded-2xl border border-stone-800 bg-stone-900/40 backdrop-blur-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse font-mono">
+            <thead>
+              <tr class="bg-stone-950/90 border-b border-stone-800 text-[10px] uppercase text-stone-400">
+                <th class="py-3 px-4">Fecha & Socia</th>
+                <th class="py-3 px-4">Concepto / Motivo</th>
+                <th class="py-3 px-3 text-right">Monto Anticipo</th>
+                <th class="py-3 px-3">Método & Comprobante</th>
+                <th class="py-3 px-3 text-center">Estado</th>
+                <th class="py-3 px-4 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-800/60">
+              <tr v-for="a in anticiposFiltrados" :key="a.id" class="hover:bg-stone-800/30">
+                <td class="py-3.5 px-4">
+                  <div class="font-serif font-bold text-stone-100 text-xs">{{ a.nombre_socia }}</div>
+                  <div class="text-[10px] text-stone-400">Fecha: {{ a.fecha }}</div>
+                </td>
+
+                <td class="py-3.5 px-4 font-sans text-stone-300">
+                  <div>{{ a.concepto }}</div>
+                  <div v-if="a.observaciones" class="text-[10px] text-stone-500 italic mt-0.5">
+                    {{ a.observaciones }}
+                  </div>
+                </td>
+
+                <td class="py-3.5 px-3 text-right font-bold text-rose-400 text-sm">
+                  {{ formatCOP(a.monto) }}
+                </td>
+
+                <td class="py-3.5 px-3 text-stone-300 text-[11px]">
+                  <div>{{ a.metodo_desembolso }}</div>
+                  <div v-if="a.comprobante" class="text-amber-400/90 font-mono text-[10px]">
+                    Ref: {{ a.comprobante }}
+                  </div>
+                </td>
+
+                <td class="py-3.5 px-3 text-center">
+                  <span
+                    class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                    :class="{
+                      'bg-amber-500/20 text-amber-300 border border-amber-500/30': a.estado === 'PENDIENTE_DESCUENTO',
+                      'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30': a.estado === 'DESCONTADO',
+                      'bg-rose-950 text-rose-400 border border-rose-800': a.estado === 'ANULADO',
+                    }"
+                  >
+                    {{ a.estado === 'PENDIENTE_DESCUENTO' ? '⏳ Pendiente Descuento' : (a.estado === 'DESCONTADO' ? '✅ Descontado' : 'Anulado') }}
+                  </span>
+                </td>
+
+                <td class="py-3.5 px-4 text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    <Button
+                      v-if="a.estado === 'PENDIENTE_DESCUENTO'"
+                      icon="pi pi-check"
+                      size="small"
+                      text
+                      rounded
+                      class="p-button-success text-emerald-400 hover:bg-emerald-950/40"
+                      title="Marcar como Descontado"
+                      @click="marcarAnticipoDescontado(a)"
+                    />
+                    <Button
+                      icon="pi pi-pencil"
+                      size="small"
+                      text
+                      rounded
+                      class="p-button-secondary text-stone-300 hover:bg-stone-800"
+                      title="Editar Anticipo"
+                      @click="abrirEditarAnticipo(a)"
+                    />
+                    <Button
+                      icon="pi pi-trash"
+                      size="small"
+                      text
+                      rounded
+                      class="p-button-danger text-rose-400 hover:bg-rose-950/40"
+                      title="Eliminar Anticipo"
+                      @click="solicitarEliminarAnticipo(a)"
+                    />
+                  </div>
+                </td>
+              </tr>
+
+              <tr v-if="anticiposFiltrados.length === 0">
+                <td colspan="6" class="py-8 text-center text-stone-500">
+                  <i class="pi pi-inbox text-2xl mb-2 block" />
+                  No hay registros de anticipos que coincidan.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: SIMULADOR DE PUNTO DE EQUILIBRIO TEXTIL -->
+    <div v-if="activeTab === 'simulador'" class="rounded-2xl border border-amber-500/20 bg-stone-900/60 p-6 space-y-5">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-800 pb-3">
         <div>
           <h2 class="text-base font-serif font-semibold text-stone-100 flex items-center gap-2 m-0">
             <i class="pi pi-chart-line text-amber-400" />
-            Simulador de Punto de Equilibrio Textil
+            Simulador de Rentabilidad & Punto de Equilibrio Textil
           </h2>
           <p class="text-xs text-stone-400 mt-0.5 m-0 font-mono">
-            Proyección de unidades mínimas para cubrir costos fijos y rentabilidad esperada del taller.
+            Proyección de unidades mínimas para cubrir costos fijos del taller y rentabilidad esperada por socias.
           </p>
         </div>
         <div class="px-3 py-1 rounded-lg bg-stone-950 border border-amber-500/30 text-amber-300 font-mono text-xs font-bold">
@@ -259,21 +855,153 @@ function formatCOP(v: number): string {
         </div>
         <Slider v-model="prendasMetaSimuladas" :min="1" :max="50" class="w-full" />
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 font-mono text-xs">
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2 font-mono text-xs">
           <div class="p-2.5 rounded-lg bg-stone-900/60 border border-stone-800">
             <span class="text-stone-400 block text-[10px]">Margen Unitario:</span>
             <span class="text-emerald-400 font-bold text-sm">{{ formatCOP(margenContribucionUnitario) }}</span>
           </div>
           <div class="p-2.5 rounded-lg bg-stone-900/60 border border-stone-800">
             <span class="text-stone-400 block text-[10px]">Costos Fijos Taller:</span>
-            <span class="text-stone-200 font-bold text-sm">{{ formatCOP(gastosOperativos) }}</span>
+            <span class="text-stone-200 font-bold text-sm">{{ formatCOP(gastosOperativosSimulator) }}</span>
           </div>
           <div class="p-2.5 rounded-lg bg-amber-950/40 border border-amber-500/30">
-            <span class="text-amber-300 block text-[10px]">Utilidad Neta Simulada:</span>
-            <span class="text-amber-300 font-bold text-sm">{{ formatCOP(utilidadSimulada) }}</span>
+            <span class="text-amber-300 block text-[10px]">Fondo Taller (40%):</span>
+            <span class="text-amber-300 font-bold text-sm">{{ formatCOP(Math.round(utilidadSimulada * 0.4)) }}</span>
+          </div>
+          <div class="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30">
+            <span class="text-emerald-300 block text-[10px]">Cuota Socias (Margara 30% / Valqui 30%):</span>
+            <span class="text-emerald-300 font-bold text-sm">{{ formatCOP(Math.round(utilidadSimulada * 0.3)) }} c/u</span>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Modals -->
+    <NuevaLiquidacionModal
+      v-model:visible="showNuevaLiqModal"
+      :liquidacion-editar="liquidacionSeleccionadaEditar"
+      @guardada="() => {}"
+    />
+
+    <DetalleLiquidacionModal
+      v-model:visible="showDetalleLiqModal"
+      :liquidacion="liquidacionSeleccionadaDetalle"
+      @editar="(l) => { showDetalleLiqModal = false; abrirEditarLiquidacion(l); }"
+    />
+
+    <GestionSociasModal
+      v-model:visible="showGestionSociaModal"
+      :socia-editar="sociaSeleccionadaEditar"
+      @guardada="() => {}"
+    />
+
+    <NuevoAnticipoModal
+      v-model:visible="showNuevoAnticipoModal"
+      :anticipo-editar="anticipoSeleccionadoEditar"
+      @guardado="() => {}"
+    />
+
+    <!-- Delete Liquidacion Dialog -->
+    <Dialog
+      v-model:visible="showDeleteLiqModal"
+      modal
+      header="⚠️ Confirmar Eliminación de Liquidación"
+      :style="{ width: '90vw', maxWidth: '420px' }"
+    >
+      <div class="space-y-3 pt-1 text-xs text-stone-200">
+        <p>
+          ¿Está seguro de que desea eliminar la liquidación
+          <strong class="text-amber-300">{{ liquidacionAEliminar?.codigo }}</strong> ({{ liquidacionAEliminar?.periodo }})?
+        </p>
+        <p class="text-stone-400 text-[11px]">
+          Esta acción no se puede deshacer.
+        </p>
+      </div>
+      <template #footer>
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-stone-800">
+          <Button
+            label="Cancelar"
+            icon="pi pi-times"
+            size="small"
+            class="p-button-text p-button-secondary text-xs"
+            @click="showDeleteLiqModal = false"
+          />
+          <Button
+            label="Eliminar"
+            icon="pi pi-trash"
+            size="small"
+            class="p-button-danger text-xs font-semibold"
+            @click="confirmarEliminarLiquidacion"
+          />
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- Delete Socia Dialog -->
+    <Dialog
+      v-model:visible="showDeleteSociaModal"
+      modal
+      header="⚠️ Confirmar Eliminación de Socia"
+      :style="{ width: '90vw', maxWidth: '420px' }"
+    >
+      <div class="space-y-3 pt-1 text-xs text-stone-200">
+        <p>
+          ¿Está seguro de eliminar el registro de
+          <strong class="text-amber-300">{{ sociaAEliminar?.nombre }}</strong>?
+        </p>
+      </div>
+      <template #footer>
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-stone-800">
+          <Button
+            label="Cancelar"
+            icon="pi pi-times"
+            size="small"
+            class="p-button-text p-button-secondary text-xs"
+            @click="showDeleteSociaModal = false"
+          />
+          <Button
+            label="Eliminar"
+            icon="pi pi-trash"
+            size="small"
+            class="p-button-danger text-xs font-semibold"
+            @click="confirmarEliminarSocia"
+          />
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- Delete Anticipo Dialog -->
+    <Dialog
+      v-model:visible="showDeleteAnticipoModal"
+      modal
+      header="⚠️ Confirmar Eliminación de Anticipo"
+      :style="{ width: '90vw', maxWidth: '420px' }"
+    >
+      <div class="space-y-3 pt-1 text-xs text-stone-200">
+        <p>
+          ¿Desea eliminar el anticipo de
+          <strong class="text-rose-400">{{ formatCOP(anticipoAEliminar?.monto || 0) }}</strong> para
+          <strong class="text-amber-300">{{ anticipoAEliminar?.nombre_socia }}</strong>?
+        </p>
+      </div>
+      <template #footer>
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-stone-800">
+          <Button
+            label="Cancelar"
+            icon="pi pi-times"
+            size="small"
+            class="p-button-text p-button-secondary text-xs"
+            @click="showDeleteAnticipoModal = false"
+          />
+          <Button
+            label="Eliminar"
+            icon="pi pi-trash"
+            size="small"
+            class="p-button-danger text-xs font-semibold"
+            @click="confirmarEliminarAnticipo"
+          />
+        </div>
+      </template>
+    </Dialog>
   </div>
 </template>
