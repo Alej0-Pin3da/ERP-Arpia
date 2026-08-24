@@ -155,6 +155,7 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
             raise EntityNotFoundError("Cliente", cliente_id)
 
     canal_venta = payload.get("canal_venta", "feria")
+    metodo_pago = payload.get("metodo_pago")
     descuento = Decimal(payload.get("descuento_porcentaje", "0"))
     descuento_factor = Decimal("1") - descuento / Decimal("100")
 
@@ -192,6 +193,7 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
     venta = Venta(
         cliente_id=cliente_id,
         canal_venta=canal_venta,
+        metodo_pago=metodo_pago,
         descuento_porcentaje=descuento,
         total_venta=total_venta,
         es_regalo=es_regalo,
@@ -272,6 +274,7 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
             raise EntityNotFoundError("Cliente", cliente_id)
 
     canal_venta = payload.get("canal_venta", "feria")
+    metodo_pago = payload.get("metodo_pago")
     descuento = Decimal(payload.get("descuento_porcentaje", "0"))
     descuento_factor = Decimal("1") - descuento / Decimal("100")
 
@@ -320,6 +323,7 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
 
     venta.cliente_id = cliente_id
     venta.canal_venta = canal_venta
+    venta.metodo_pago = metodo_pago
     venta.descuento_porcentaje = descuento
     venta.es_regalo = es_regalo
     venta.total_venta = total_venta

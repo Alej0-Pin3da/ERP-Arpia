@@ -77,7 +77,7 @@ def list_ventas(
     request: Request,
     limit: int = 50,
     offset: int = 0,
-    canal_venta: Literal["web", "whatsapp", "instagram", "feria"] | None = None,
+    canal_venta: Literal["web", "whatsapp", "instagram", "feria", "showroom_pereira"] | None = None,
     estado: Literal["draft", "confirmed", "cancelled", "reversed"] | None = None,
     producto_id: int | None = None,
     sort_by: str | None = None,
