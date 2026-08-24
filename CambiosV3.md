@@ -78,5 +78,29 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 
 ---
 
+### [2026-08-24] — V3.2.0: Indicador Visual de Modo API (MOCK vs Backend Real)
+
+#### 1. Nuevo Componente `src/components/ApiModeBadge.vue`
+- **Detección de modo (solo lectura de env):**
+  - `import.meta.env.VITE_API_BASE_URL` — si es `undefined`, vacío o empieza con `/api` => `MOCK`.
+  - Si contiene `http`, `:8000`, `:5433` o `backend` (case-insensitive) => `REAL`.
+  - DEV sin `VITE_API_BASE_URL` custom => `MOCK`.
+- **Estados visuales:**
+  - `MOCK`: icono `pi-database`, texto `MODO MOCK — Datos en memoria`, paleta amber/orange, tooltip `Los datos se pierden al reiniciar. Backend real inactivo.`
+  - `REAL`: icono `pi-server`, texto `BACKEND REAL — Postgres`, paleta emerald/green, tooltip `Conectado a FastAPI + Postgres`.
+- **API interna computada:** `mode`, `label`, `shortLabel`, `icon`, `tooltip`, `severity` (`warn` / `success`).
+- **Estética Noir/Gold:** `border-radius` pill, fondo translúcido, `backdrop-filter: blur`, `dot` pulsante con `box-shadow`, hover con elevación y halo, tipografía semibold 0.74rem, transición suave.
+- **Responsivo:** texto largo visible en desktop, colapsa a `MOCK`/`REAL` en `≤640px`; padding y gap reducidos en móvil.
+- **Accesibilidad:** `role="status"`, `aria-label`, `title` nativo, `data-severity` para tests.
+- **Sin mutación de lógica:** no modifica `src/api/client.ts` ni `handleMockApiRequest`; solo lee env.
+
+#### 2. Integración en Layout `src/layouts/AppLayout.vue`
+- Importa `ApiModeBadge` desde `@/components/ApiModeBadge.vue`.
+- Colocado en `.header-right` entre `system-status-chip` (Taller Pereira • Activo) y el `Tag` de rol, antes del bloque `app-layout__user`.
+- Mantiene grid responsivo existente; el chip del sistema sigue oculto en `≤992px`, el `ApiModeBadge` permanece visible con versión colapsada.
+- `npm run lint` y `npm run build` verificados sin regresiones (Vite 6.4.3, 366 módulos, esbuild bundle `dist/server.mjs`).
+
+---
+
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.

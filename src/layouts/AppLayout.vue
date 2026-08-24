@@ -14,6 +14,7 @@ import { useRoute, useRouter } from 'vue-router'
 import SidebarMenu from '@/components/layout/SidebarMenu.vue'
 import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
 import NotificacionesModal from '@/components/atelier/NotificacionesModal.vue'
+import ApiModeBadge from '@/components/ApiModeBadge.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAtelierStore } from '@/stores/atelier'
 import { roleLabel } from '@/utils/menu'
@@ -167,6 +168,9 @@ function closeSidebar(): void {
           <span class="pulse-indicator"></span>
           <span class="status-chip-text">Taller Pereira • Activo</span>
         </div>
+
+        <!-- API Mode Indicator (MOCK vs REAL backend) -->
+        <ApiModeBadge />
 
         <div class="app-layout__user">
           <Tag class="app-layout__role" severity="secondary">{{ rolLabel }}</Tag>
