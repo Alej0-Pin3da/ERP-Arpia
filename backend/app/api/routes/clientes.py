@@ -26,19 +26,25 @@ def list_clientes(
     limit: int = 50,
     offset: int = 0,
     q: str | None = None,
+    tipo: str | None = None,
+    ciudad: str | None = None,
     sort_by: str | None = None,
     order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
     _: Cliente = Depends(audited_user),
 ):
     stmt = select(Cliente).order_by(Cliente.id)
+    if tipo is not None:
+        stmt = stmt.where(Cliente.tipo == tipo)
+    if ciudad is not None:
+        stmt = stmt.where(Cliente.ciudad == ciudad)
     if q is not None:
+        like = f"%{q}%"
         stmt = stmt.where(
             or_(
-                Cliente.nombre.ilike(f"%{q}%"),
-                Cliente.documento_identidad.ilike(f"%{q}%"),
-                Cliente.email.ilike(f"%{q}%"),
-                Cliente.telefono.ilike(f"%{q}%"),
+                Cliente.nombre.ilike(like),
+                Cliente.ciudad.ilike(like),
+                Cliente.direccion.ilike(like),
             )
         )
     stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_CLIENTES)
