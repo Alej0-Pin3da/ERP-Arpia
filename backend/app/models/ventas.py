@@ -47,7 +47,7 @@ class Venta(Base):
             name="ck_ventas_estado",
         ),
         CheckConstraint(
-            "canal_venta IN ('web', 'whatsapp', 'instagram', 'feria')",
+            "canal_venta IN ('web', 'whatsapp', 'instagram', 'feria', 'showroom_pereira')",
             name="ck_ventas_canal_venta",
         ),
     )
@@ -60,8 +60,9 @@ class Venta(Base):
         ForeignKey("Clientes.id", ondelete="SET NULL"), nullable=True, index=True
     )
     canal_venta: Mapped[str] = mapped_column(
-        String(16), nullable=False, server_default="feria", default="feria", index=True
+        String(50), nullable=False, server_default="feria", default="feria", index=True
     )
+    metodo_pago: Mapped[str | None] = mapped_column(String(50), nullable=True)
     descuento_porcentaje: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
