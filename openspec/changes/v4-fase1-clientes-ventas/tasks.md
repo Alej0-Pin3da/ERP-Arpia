@@ -36,9 +36,9 @@ Chain strategy: stacked-to-main
 
 - [x] 2.1 RED: `backend/tests/test_pr1_db_foundation.py` — medidas non-dict 422, canal/metodo 422 (fails pre-2.2) — ✅ RED 14/15 failed, GREEN 15/15 after schemas
 - [x] 2.2 Modify `backend/app/schemas/cliente.py` + `venta.py` — +10 fields/validator, Literals (~45) → GREEN 2.1 — ✅ delivered in PR1 (DB foundation ships schemas base)
-- [ ] 2.3 Modify `backend/app/api/routes/clientes.py` — tipo/ciudad exact + q ILIKE(nombre|ciudad|direccion) (~30)
-- [ ] 2.4 Modify `backend/app/api/routes/ventas.py` — canal/metodo whitelist (~15)
-- [ ] 2.5 Modify `backend/app/seeder.py` — mirror 0010 seeds idempotent (~30)
+- [x] 2.3 Modify `backend/app/api/routes/clientes.py` — tipo/ciudad exact + q ILIKE(nombre|ciudad|direccion) (~30) — ✅ PR2 2026-08-23 (3 commits: clientes filters ILIKE)
+- [x] 2.4 Modify `backend/app/api/routes/ventas.py` — canal/metodo whitelist (~15) — ✅ PR2 2026-08-23 (canal 5 + metodo 4 + null, showroom_pereira Literal + inventory persist)
+- [x] 2.5 Modify `backend/app/seeder.py` — mirror 0010 seeds idempotent (~30) — ✅ PR2 2026-08-23 (ON CONFLICT DO NOTHING, 5+4 seeds)
 
 ## Phase 3: Integration — Frontend Adapter
 
