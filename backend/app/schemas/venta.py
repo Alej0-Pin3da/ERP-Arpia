@@ -14,7 +14,8 @@ class DetalleVentaCreate(BaseModel):
 
 class VentaCreate(BaseModel):
     cliente_id: int | None = None
-    canal_venta: Literal["web", "whatsapp", "instagram", "feria"]
+    canal_venta: Literal["web", "whatsapp", "instagram", "feria", "showroom_pereira"]
+    metodo_pago: Literal["efectivo", "transferencia", "tarjeta", "contraentrega"] | None = None
     descuento_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
     es_regalo: bool = False
     detalles: list[DetalleVentaCreate] = Field(min_length=1)
@@ -49,6 +50,7 @@ class VentaRead(BaseModel):
     fecha: datetime
     cliente_id: int | None
     canal_venta: str
+    metodo_pago: str | None = None
     descuento_porcentaje: Decimal
     estado: str
     total_venta: Decimal
