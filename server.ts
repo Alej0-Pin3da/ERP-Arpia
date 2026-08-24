@@ -8,7 +8,36 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
-const PORT = 3000
+const PORT = Number(process.env.PORT) || 3000
+
+// --- Mock / Proxy mode resolution ---
+// USE_MOCK=false forces real backend proxy.
+// API_PROXY_TARGET set also forces proxy (even if USE_MOCK not set).
+// VITE_API_BASE_URL external (http / :8000 / backend) also forces proxy.
+// Explicit USE_MOCK=true always enables mock and ignores proxy/external hints.
+const VITE_API_BASE_URL_ENV = (process.env.VITE_API_BASE_URL || '').trim()
+const API_PROXY_TARGET_RAW = (process.env.API_PROXY_TARGET || '').trim()
+const ENVIRONMENT_ENV = (process.env.ENVIRONMENT || process.env.NODE_ENV || 'development').trim()
+const isExternalApiBaseUrl = Boolean(
+  VITE_API_BASE_URL_ENV &&
+    (VITE_API_BASE_URL_ENV.includes('http') ||
+      VITE_API_BASE_URL_ENV.includes(':8000') ||
+      VITE_API_BASE_URL_ENV.includes('backend')),
+)
+const hasProxyTarget = Boolean(API_PROXY_TARGET_RAW)
+
+function resolveUseMock(): boolean {
+  if (process.env.USE_MOCK === 'false') return false
+  if (process.env.USE_MOCK === 'true') return true
+  if (hasProxyTarget) return false
+  if (isExternalApiBaseUrl) return false
+  // In production without explicit USE_MOCK but with proxy config, prefer proxy (already handled above)
+  void ENVIRONMENT_ENV
+  return true
+}
+
+const useMock = resolveUseMock()
+const proxyTarget = (API_PROXY_TARGET_RAW || 'http://localhost:8000').replace(/\/$/, '')
 
 app.use(cors())
 app.use(express.json())
@@ -1187,14 +1216,99 @@ apiRouter.delete('/usuarios/:id', (req, res) => {
   res.status(404).json({ detail: 'Usuario not found' })
 })
 
-// Mount API router
-app.use('/api/v1', apiRouter)
-app.use('/api', apiRouter)
+// --- API proxy (real backend) using native fetch (Node 20+) ---
+async function apiProxyMiddleware(
+  req: express.Request,
+  res: express.Response,
+): Promise<void> {
+  const targetUrl = `${proxyTarget}${req.originalUrl}`
+  try {
+    const headers: Record<string, string> = {}
+    for (const [k, v] of Object.entries(req.headers)) {
+      if (!v) continue
+      if (k.toLowerCase() === 'host' || k.toLowerCase() === 'connection') continue
+      if (Array.isArray(v)) headers[k] = v.join(', ')
+      else if (typeof v === 'string') headers[k] = v
+    }
+    // Let fetch set content-length / host correctly
+    delete headers['content-length']
+    delete headers['Content-Length']
 
-// Health Check
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() })
-})
+    const fetchOpts: RequestInit & { duplex?: string } = {
+      method: req.method,
+      headers,
+    }
+
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      const hasBody = req.body !== undefined && req.body !== null
+      const isJsonContent =
+        typeof req.headers['content-type'] === 'string' &&
+        String(req.headers['content-type']).includes('application/json')
+      if (hasBody) {
+        if (isJsonContent || (typeof req.body === 'object' && !(req.body instanceof Buffer))) {
+          // Express json parser already produced an object
+          const isEmptyObject =
+            typeof req.body === 'object' &&
+            !Array.isArray(req.body) &&
+            Object.keys(req.body as Record<string, unknown>).length === 0
+          if (!isEmptyObject) {
+            fetchOpts.body = JSON.stringify(req.body)
+            if (!headers['content-type'] && !headers['Content-Type']) {
+              ;(fetchOpts.headers as Record<string, string>)['content-type'] = 'application/json'
+            }
+          }
+        } else if (typeof req.body === 'string') {
+          fetchOpts.body = req.body
+        } else if (req.body instanceof Buffer) {
+          fetchOpts.body = req.body as unknown as BodyInit
+        } else {
+          fetchOpts.body = JSON.stringify(req.body)
+        }
+        // Required for Node fetch with streaming body
+        if (fetchOpts.body !== undefined) (fetchOpts as { duplex?: string }).duplex = 'half'
+      }
+    }
+
+    const proxyRes = await fetch(targetUrl, fetchOpts as RequestInit)
+
+    res.status(proxyRes.status)
+    proxyRes.headers.forEach((value, key) => {
+      const lower = key.toLowerCase()
+      if (['transfer-encoding', 'content-encoding', 'content-length', 'connection'].includes(lower))
+        return
+      res.setHeader(key, value)
+    })
+
+    const buf = Buffer.from(await proxyRes.arrayBuffer())
+    // Preserve empty 204
+    if (proxyRes.status === 204 || buf.length === 0) {
+      res.end()
+      return
+    }
+    res.send(buf)
+  } catch (err) {
+    console.error(`[proxy] failed ${req.method} ${req.originalUrl} -> ${targetUrl}:`, err)
+    res.status(502).json({
+      detail: 'Bad gateway: unable to reach backend',
+      target: proxyTarget,
+      error: String((err as Error)?.message || err),
+    })
+  }
+}
+
+// Conditional mount: mock in-memory vs proxy to real backend
+if (useMock) {
+  app.use('/api/v1', apiRouter)
+  app.use('/api', apiRouter)
+
+  // Health check in mock mode (local)
+  app.get('/api/health', (_req, res) => {
+    res.json({ status: 'ok', mode: 'mock', time: new Date().toISOString() })
+  })
+} else {
+  // Proxy all /api traffic to the real FastAPI backend
+  app.use('/api', apiProxyMiddleware)
+}
 
 // Vite & Static Asset Handling
 async function start() {
@@ -1217,7 +1331,13 @@ async function start() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`ERP Arpía server listening on http://0.0.0.0:${PORT}`)
+    if (useMock) {
+      console.log(`ERP Arpía server listening on http://0.0.0.0:${PORT} — Mock API enabled (in-memory DB)`)
+    } else {
+      console.log(
+        `ERP Arpía server listening on http://0.0.0.0:${PORT} — Mock API disabled — proxying /api to ${proxyTarget}`,
+      )
+    }
   })
 }
 
