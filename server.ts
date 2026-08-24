@@ -1296,6 +1296,15 @@ async function apiProxyMiddleware(
   }
 }
 
+// Live mode probe — always available, never proxied (source of truth for ApiModeBadge)
+app.get('/api/__mode', (_req, res) => {
+  res.json({
+    mode: useMock ? 'mock' : 'real',
+    proxyTarget: useMock ? null : proxyTarget,
+    time: new Date().toISOString(),
+  })
+})
+
 // Conditional mount: mock in-memory vs proxy to real backend
 if (useMock) {
   app.use('/api/v1', apiRouter)

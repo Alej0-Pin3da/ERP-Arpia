@@ -10,27 +10,41 @@
  * Detection is read-only: never mutates api client logic.
  */
 
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 
 type ApiMode = 'MOCK' | 'REAL'
 
 const rawBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined
 
-const mode = computed<ApiMode>(() => {
+function envMode(): ApiMode {
   const raw = (rawBaseUrl ?? '').trim()
-
-  // No env or relative /api path => mock in-memory server
   if (!raw || raw.startsWith('/api')) return 'MOCK'
-
   const lower = raw.toLowerCase()
   const isExternalHost =
-    lower.includes('http') ||
-    lower.includes(':8000') ||
-    lower.includes(':5433') ||
-    lower.includes('backend')
-
+    lower.includes('http') || lower.includes(':8000') || lower.includes(':5433') || lower.includes('backend')
   return isExternalHost ? 'REAL' : 'MOCK'
+}
+
+// Live probe — source of truth is server's /api/__mode (reflects USE_MOCK / proxy logic at runtime)
+const liveMode = ref<ApiMode | null>(null)
+const liveChecked = ref(false)
+
+onMounted(async () => {
+  try {
+    const res = await fetch('/api/__mode', { headers: { Accept: 'application/json' } })
+    if (res.ok) {
+      const data = (await res.json()) as { mode?: string }
+      if (data.mode === 'real') liveMode.value = 'REAL'
+      else if (data.mode === 'mock') liveMode.value = 'MOCK'
+    }
+  } catch {
+    // keep fallback
+  } finally {
+    liveChecked.value = true
+  }
 })
+
+const mode = computed<ApiMode>(() => liveMode.value ?? envMode())
 
 const label = computed(() =>
   mode.value === 'MOCK' ? 'MODO MOCK \u2014 Datos en memoria' : 'BACKEND REAL \u2014 Postgres',
