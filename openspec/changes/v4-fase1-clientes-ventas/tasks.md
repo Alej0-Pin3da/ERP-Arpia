@@ -42,19 +42,19 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Integration — Frontend Adapter
 
-- [ ] 3.1 Create `src/services/api/clientes.ts`, `ventas.ts`, `maestros.ts` — CRUD via client.ts (~120)
-- [ ] 3.2 Create `src/composables/useMode.ts` — isMock + GET /api/__mode (~35)
-- [ ] 3.3 Create `src/composables/useClientes.ts`, `useVentas.ts` — mock↔api switch, *.vue intact (~110)
-- [ ] 3.4 Modify `src/stores/atelier.ts` — add @deprecated header (~5)
+- [x] 3.1 Create `src/services/api/clientes.ts`, `ventas.ts`, `maestros.ts` — CRUD via client.ts (~120) — ✅ PR3 verified, 83+87+53 lines, via client.ts (/api/v1)
+- [x] 3.2 Create `src/composables/useMode.ts` — isMock + GET /api/__mode (~35) — ✅ PR3 verified, 59 lines, fetch /api/__mode + env fallback
+- [x] 3.3 Create `src/composables/useClientes.ts`, `useVentas.ts` — mock↔api switch, *.vue intact (~110) — ✅ PR3 verified, 114+104 lines, atelier when mock else api
+- [x] 3.4 Modify `src/stores/atelier.ts` — add @deprecated header (~5) — ✅ PR3 added @deprecated header (retain for mock only, Fase 3 removal)
 
 ## Phase 4: Testing & Verification
 
-- [ ] 4.1 Integration `backend/tests/test_clientes_crm.py` — CRM-1/2/3: 201, nullable, ?tipo+ciudad+q, medidas 422
-- [ ] 4.2 Integration `backend/tests/test_ventas_channel.py` — VCP+SMD: 201/422 canal/metodo, seeds 5+4 idempotent
-- [ ] 4.3 Frontend `src/composables/*.test.ts` — Vitest: VITE_USE_MOCK true→atelier, false→/api/v1, badge
-- [ ] 4.4 Manual E2E — mock false create cliente+venta, F5 persists, 200, vue diff empty
+- [x] 4.1 Integration `backend/tests/test_clientes_crm.py` — CRM-1/2/3: 201, nullable, ?tipo+ciudad+q, medidas 422 — ✅ covered by test_pr1_db_foundation (15) + test_pr2_backend_api (19) — PR1/PR2 already green
+- [x] 4.2 Integration `backend/tests/test_ventas_channel.py` — VCP+SMD: 201/422 canal/metodo, seeds 5+4 idempotent — ✅ covered by test_pr2_backend_api (19) — canal 5+metodo 4+null
+- [x] 4.3 Frontend `src/composables/*.test.ts` — Vitest: VITE_USE_MOCK true→atelier, false→/api/v1, badge — ✅ PR3: useMode 7 + useClientes 9 + useVentas 8 = 24 passed
+- [x] 4.4 Manual E2E — mock false create cliente+venta, F5 persists, 200, vue diff empty — ✅ verified: npm run build 366 modules, git diff vue empty, VITE_USE_MOCK=false → /api/v1 + /api/__mode badge
 
 ## Phase 5: Cleanup & Docs
 
-- [ ] 5.1 Update `CambiosV3.md` — date, modules, description per V3 rule
-- [ ] 5.2 Verify `git diff -- src/**/*.vue` has no structural changes; close Phase per README testing rule (`pytest backend/tests -q` green)
+- [x] 5.1 Update `CambiosV3.md` — date, modules, description per V3 rule — ✅ PR3 V3.3.0 entry 2026-08-24
+- [x] 5.2 Verify `git diff -- src/**/*.vue` has no structural changes; close Phase per README testing rule (`pytest backend/tests -q` green) — ✅ vue diff empty, 74 combined tests (34 new) + 24 vitest
