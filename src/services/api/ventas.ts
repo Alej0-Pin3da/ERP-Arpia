@@ -1,0 +1,87 @@
+/**
+ * Ventas API service — typed CRUD via shared axios client.
+ * Base path: /ventas (client baseURL is /api/v1).
+ * Mirrors backend schemas/venta.py (VentaCreate/Read).
+ */
+import { client } from '@/api/client'
+
+export type CanalVenta = 'web' | 'whatsapp' | 'instagram' | 'feria' | 'showroom_pereira'
+export type MetodoPago = 'efectivo' | 'transferencia' | 'tarjeta' | 'contraentrega'
+
+export interface DetalleVentaCreate {
+  producto_id: number
+  variante_id?: number | null
+  cantidad: number | string
+  precio_unitario: number | string
+}
+
+export interface VentaCreatePayload {
+  cliente_id?: number | null
+  canal_venta: CanalVenta
+  metodo_pago?: MetodoPago | null
+  descuento_porcentaje?: number | string
+  es_regalo?: boolean
+  detalles: DetalleVentaCreate[]
+}
+
+export interface DetalleVentaRead {
+  id: number
+  producto_id: number
+  variante_id: number | null
+  cantidad: string | number
+  precio_unitario_aplicado: string | number
+  costo_unitario_aplicado: string | number
+}
+
+export interface VentaRead {
+  id: number
+  fecha: string
+  cliente_id: number | null
+  canal_venta: string
+  metodo_pago: string | null
+  descuento_porcentaje: string | number
+  estado: string
+  total_venta: string | number
+  es_regalo: boolean
+  detalles: DetalleVentaRead[]
+}
+
+export interface Paginated<T> {
+  items: T[]
+  total: number
+}
+
+export interface ListVentasParams {
+  canal_venta?: CanalVenta
+  estado?: string
+  producto_id?: number
+  limit?: number
+  offset?: number
+  sort_by?: string
+  order?: 'asc' | 'desc'
+}
+
+export async function listVentas(params: ListVentasParams = {}): Promise<Paginated<VentaRead>> {
+  const { data } = await client.get<Paginated<VentaRead>>('/ventas', { params })
+  return data
+}
+
+export async function getVenta(id: number): Promise<VentaRead> {
+  const { data } = await client.get<VentaRead>(`/ventas/${id}`)
+  return data
+}
+
+export async function createVenta(payload: VentaCreatePayload): Promise<VentaRead> {
+  const { data } = await client.post<VentaRead>('/ventas', payload)
+  return data
+}
+
+export async function updateVenta(id: number, payload: VentaCreatePayload): Promise<VentaRead> {
+  const { data } = await client.put<VentaRead>(`/ventas/${id}`, payload)
+  return data
+}
+
+export async function anularVenta(id: number): Promise<VentaRead> {
+  const { data } = await client.delete<VentaRead>(`/ventas/${id}`)
+  return data
+}
