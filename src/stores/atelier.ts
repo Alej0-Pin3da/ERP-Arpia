@@ -1,3 +1,11 @@
+/**
+ * @deprecated Mock Pinia store — retained for VITE_USE_MOCK=true only.
+ * Real data now lives in Postgres via FastAPI /api/v1. Use
+ * src/services/api/* + src/composables/useClientes|useVentas when
+ * VITE_USE_MOCK=false. This store will be removed in Fase 3.
+ * @see src/composables/useMode.ts — isMock / GET /api/__mode badge
+ * @see src/services/api/clientes.ts, ventas.ts
+ */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
