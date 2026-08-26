@@ -192,5 +192,32 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 
 ---
 
+### [2026-08-25] — V3.5.0: Maestros — Tallas / Productos sin talla / Parámetros + APIs + Adapters Frontend (v4-fase3 PR2)
+
+#### 1. Backend — Base de datos (`backend/alembic/versions/0015_maestros_tallas.py`, `backend/app/models/maestros.py`)
+- **0015 `maestros_tallas`**: `maestros_tallas_estandar` (`talla` VARCHAR20 UNIQUE, `orden` INT UNIQUE, `busto/cintura/cadera/reduccion_corset` VARCHAR50, `descripcion` TEXT, `activo` bool, `ix_tallas_orden/activo`, seed 6 filas XXS(1)–XL(6) ON CONFLICT), `maestros_productos_sin_talla` (`nombre` UNIQUE, `categoria` VARCHAR100, `dimensiones` 100, `materiales` 200, `precio_sugerido` NUMERIC15,4 ≥0 CHECK, `ix_sintalla_categoria/activo`), `maestros_parametros_costeo` singleton id=1 (`costo_minuto_costura/hora_patronaje` ≥0, `margen_meta/iva/desperdicio` 0–100, `distribucion_reinversion/reparto_margara/valqui` 40/30/30 defaults, checks), guards `_has_table/_has_index`, downgrade DROP 3.
+- **Models (`maestros.py`, `models/__init__.py`)**: `TallaEstandar`, `ProductoSinTalla`, `ParametrosCosteo` (+ 5 PR1: `ProveedorMaestro`, `CategoriaColeccion`, `UbicacionTaller`, `CanalVentaMaestro`, `MetodoPagoMaestro`) con `UniqueConstraint`/`CheckConstraint`/`Index`/`Numeric15,4`/`TIMESTAMPTZ`; exports 8 modelos.
+
+#### 2. Backend — Schemas / Services / API (`backend/app/{schemas,services,api/routes}/maestros.py`)
+- **Schemas (`maestros.py`)**: `ProveedorCreate/Read` (EmailStr, `calificacion` 0–5 `Numeric3,1`, `tiempo_entrega_dias` ≥0), `CategoriaCreate/Read` (`tipo_talla` Literal 3, `margen_meta_pct` 0–100, `total_modelos` ≥0), `UbicacionCreate/Read` (`codigo` `UB-*` pattern, `tipo` Literal 4), `CanalCreate/Read` (`tipo` FISICO/DIGITAL/EVENTO, `comision_pct` 0–100, `costo_fijo` ≥0), `MetodoCreate/Read` (`tipo` 4, `comision_pct` 0–100), `TallaCreate/Read` (`talla` 20 UNIQUE, `orden` UNIQUE), `ProductoSinTallaCreate/Read` (`precio_sugerido` ≥0), `ParametrosRead/Update` (singleton, 422 si suma ≠100).
+- **Services (`maestros.py`)**: CRUD por dominio (`crear/actualizar/eliminar_*` + `_create/_update` helpers 409 `IntegrityError` →409), `get_or_create_parametros` auto-create id=1, `patch_parametros` `SELECT ... FOR UPDATE` serializa concurrentes + valida suma 100 →422.
+- **Routes (`maestros.py`)**: `prefix="/maestros"` 7× `GET Paginated` (`q/tipo/activo/sort_by/order`, `aplicar_orden/paginar`), `POST 201`, `GET/{id}`, `PATCH`, `DELETE 204`; singleton `GET /parametros-costeo` auto-create + `PATCH /parametros-costeo` FOR UPDATE, 409 dup / 422 enum; `router.py` registra `maestros.router` (`/api/v1`).
+- **Tests (`backend/tests/test_maestros_*.py`)**: `test_maestros_proveedores` 6 (201/409/422/q/categoria/ciudad/activo+patch+delete), `test_maestros_categorias_ubicaciones` 9 (201/409/422/tipo_talla/tipo UB-* +patch/delete), `test_maestros_ventas_extend` 6 (canales 5-enum/metodos 4-enum +400/30/30 +patch/delete), `test_maestros_tallas` 9 (seed XXS-XL sorted, dup talla/orden 409, sin-talla 201/409/422), `test_maestros_parametros` 7 (singleton GET auto-create, PATCH 40/30/30 200 else 422, POST/DELETE 405, concurrent FOR UPDATE) = 37 nuevos + 25 guards = 62 `✓`.
+
+#### 3. Frontend — Services + Composables (`src/services/api/maestros.ts`, `src/composables/useMaestros.ts`, `src/stores/atelier.ts`)
+- **`maestros.ts`** — 53→~320 líneas, 8 clientes `Paginated` via `@/api/client`: `listProveedores/Categorias/Ubicaciones/Canales/Metodos/Tallas/ProductosSinTalla` + `get/create/update/delete*` + `getParametros/updateParametros`; `tryFetch` fallback conserva estático para `listCanales/listMetodosPago` (Paginated wrap `CANALES_VENTA/METODOS_PAGO` cuando 404/red).
+- **`useMaestros.ts`** — `isMock` via `useMode` → `atelier` vs `api`, 7 grupos tab data sources + singleton; `toPaginated` mock filtra `q/tipo/tipo_talla/categoria`; CRUD mock manipula `atelier.proveedoresMaestros/categoriasColeccionMaestros/ubicacionesTallerMaestros/canalesVentaMaestros/metodosPagoMaestros/tallasEstandarMaestros/productosSinTallaMaestros/parametrosCosteo`, real delega a `maestros.ts`.
+- **`atelier.ts` (`@deprecated`)** — cabecera ya `@deprecated Mock Pinia — VITE_USE_MOCK=true only` (Fase5 removal), sin borrado.
+
+#### 4. Frontend — View (`src/views/MaestrosView.vue`) + Tests (Vitest jsdom)
+- **`MaestrosView.vue`** — ~40 líneas wiring mantiene UI 7 tabs intacta: `isMock?atelier:api`, `cargarDatosReales()` (Promise.all 8 GET `limit100` + `sort_by=orden` para tallas, asigna `*Api` refs), `computed` listas (`proveedoresList/canalesList/.../parametrosData`), `guardar*/eliminar*Wrapper` branch (`isMock?store:maestros.* + reload`), `guardarParametros` async con guard 100% + FOR UPDATE reflujo.
+- **`useMaestros.test.ts`** (12 tests): `isMock→atelier` vs `!isMock→api` para proveedores/categorias/ubicaciones/canales/metodos/tallas/sin-talla/parametros; `tryFetch` fallback, `create` mock incrementa total, `updateParametros` persiste, `remove` decrementa; `onMounted` warn benigno; `npm run test -- useMaestros` `✓` 12/12.
+
+#### 5. Contratos y verificación
+- `VITE_USE_MOCK=true` → Pinia mock; `false` → `GET /api/v1/maestros/*` Paginated + `GET /api/__mode`. `F5` persiste vía Postgres. Rollback: `VITE_USE_MOCK=true` o revert `0015_maestros_tallas.py` (`alembic downgrade -1`) + `schemas/services/routes maestros*` + `maestros.ts/useMaestros.ts/MaestrosView.vue`.
+- `pytest backend/tests -k maestros -q` 62 `✓`, `npm run test -- useMaestros` 12 `✓`, `npm run build` 367 módulos.
+
+---
+
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.

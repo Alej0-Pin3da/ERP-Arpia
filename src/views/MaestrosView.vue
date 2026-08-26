@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   useAtelierStore,
   type ProveedorMaestro,
@@ -11,8 +11,63 @@ import {
   type ProductoSinTallaMaestro,
   type ParametrosCosteoMaestro,
 } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
+import { useMaestros } from '@/composables/useMaestros'
 
 const store = useAtelierStore()
+const { isMock } = useMode()
+const maestros = useMaestros()
+
+// Real API state (F5 persists via backend)
+const proveedoresApi = ref<ProveedorMaestro[]>([])
+const canalesApi = ref<CanalVentaMaestro[]>([])
+const metodosApi = ref<MetodoPagoMaestro[]>([])
+const categoriasApi = ref<CategoriaColeccionMaestro[]>([])
+const ubicacionesApi = ref<UbicacionTallerMaestro[]>([])
+const tallasApi = ref<TallaEstandarMaestro[]>([])
+const sinTallaApi = ref<ProductoSinTallaMaestro[]>([])
+const parametrosApi = ref<ParametrosCosteoMaestro | null>(null)
+
+const proveedoresList = computed(() => (isMock.value ? proveedoresList : proveedoresApi.value))
+const canalesList = computed(() => (isMock.value ? canalesList : canalesApi.value))
+const metodosList = computed(() => (isMock.value ? metodosList : metodosApi.value))
+const categoriasList = computed(() => (isMock.value ? categoriasList : categoriasApi.value))
+const ubicacionesList = computed(() => (isMock.value ? ubicacionesList : ubicacionesApi.value))
+const tallasList = computed(() => (isMock.value ? tallasList : tallasApi.value))
+const sinTallaList = computed(() => (isMock.value ? sinTallaList : sinTallaApi.value))
+const parametrosData = computed(() => (isMock.value ? parametrosData : (parametrosApi.value ?? parametrosData)))
+
+async function cargarDatosReales() {
+  if (isMock.value) return
+  try {
+    const [prov, cat, ub, can, met, tal, sin, par] = await Promise.all([
+      maestros.listProveedores({ limit: 100 }),
+      maestros.listCategorias({ limit: 100 }),
+      maestros.listUbicaciones({ limit: 100 }),
+      maestros.listCanales({ limit: 100 }),
+      maestros.listMetodosPago({ limit: 100 }),
+      maestros.listTallas({ limit: 100, sort_by: 'orden' }),
+      maestros.listProductosSinTalla({ limit: 100 }),
+      maestros.getParametros(),
+    ])
+    proveedoresApi.value = (prov.items as unknown as ProveedorMaestro[]) ?? []
+    categoriasApi.value = (cat.items as unknown as CategoriaColeccionMaestro[]) ?? []
+    ubicacionesApi.value = (ub.items as unknown as UbicacionTallerMaestro[]) ?? []
+    canalesApi.value = (can.items as unknown as CanalVentaMaestro[]) ?? []
+    metodosApi.value = (met.items as unknown as MetodoPagoMaestro[]) ?? []
+    tallasApi.value = (tal.items as unknown as TallaEstandarMaestro[]) ?? []
+    sinTallaApi.value = (sin.items as unknown as ProductoSinTallaMaestro[]) ?? []
+    parametrosApi.value = par as unknown as ParametrosCosteoMaestro
+    // sync costeo form
+    if (par) Object.assign(parametrosForm.value, par)
+  } catch {
+    // keep fallback (atelier) on error
+  }
+}
+
+onMounted(() => {
+  void cargarDatosReales()
+})
 
 // Tab active
 type TabType = 'proveedores' | 'canales' | 'pagos' | 'categorias' | 'ubicaciones' | 'costeo' | 'tallas'
@@ -61,12 +116,15 @@ function abrirEditarProveedor(p: ProveedorMaestro) {
   modalProveedor.value = true
 }
 
-function guardarProveedor() {
+async function guardarProveedor() {
   if (!provForm.value.nombre) return
-  if (modoEdicionProveedor.value && provForm.value.id) {
-    store.actualizarProveedor(provForm.value.id, provForm.value)
+  if (isMock.value) {
+    if (modoEdicionProveedor.value && provForm.value.id) store.actualizarProveedor(provForm.value.id, provForm.value)
+    else store.crearProveedor(provForm.value)
   } else {
-    store.crearProveedor(provForm.value)
+    if (modoEdicionProveedor.value && provForm.value.id) await maestros.updateProveedor(provForm.value.id, provForm.value as Record<string, unknown>)
+    else await maestros.createProveedor(provForm.value as Record<string, unknown>)
+    await cargarDatosReales()
   }
   modalProveedor.value = false
 }
@@ -104,12 +162,15 @@ function abrirEditarCanal(c: CanalVentaMaestro) {
   modalCanal.value = true
 }
 
-function guardarCanal() {
+async function guardarCanal() {
   if (!canalForm.value.nombre) return
-  if (modoEdicionCanal.value && canalForm.value.id) {
-    store.actualizarCanalVenta(canalForm.value.id, canalForm.value)
+  if (isMock.value) {
+    if (modoEdicionCanal.value && canalForm.value.id) store.actualizarCanalVenta(canalForm.value.id, canalForm.value)
+    else store.crearCanalVenta(canalForm.value)
   } else {
-    store.crearCanalVenta(canalForm.value)
+    if (modoEdicionCanal.value && canalForm.value.id) await maestros.updateCanal(canalForm.value.id, canalForm.value as Record<string, unknown>)
+    else await maestros.createCanal(canalForm.value as Record<string, unknown>)
+    await cargarDatosReales()
   }
   modalCanal.value = false
 }
@@ -147,12 +208,15 @@ function abrirEditarPago(p: MetodoPagoMaestro) {
   modalPago.value = true
 }
 
-function guardarPago() {
+async function guardarPago() {
   if (!pagoForm.value.nombre) return
-  if (modoEdicionPago.value && pagoForm.value.id) {
-    store.actualizarMetodoPago(pagoForm.value.id, pagoForm.value)
+  if (isMock.value) {
+    if (modoEdicionPago.value && pagoForm.value.id) store.actualizarMetodoPago(pagoForm.value.id, pagoForm.value)
+    else store.crearMetodoPago(pagoForm.value)
   } else {
-    store.crearMetodoPago(pagoForm.value)
+    if (modoEdicionPago.value && pagoForm.value.id) await maestros.updateMetodo(pagoForm.value.id, pagoForm.value as Record<string, unknown>)
+    else await maestros.createMetodo(pagoForm.value as Record<string, unknown>)
+    await cargarDatosReales()
   }
   modalPago.value = false
 }
@@ -182,7 +246,7 @@ function abrirNuevaTalla() {
     cadera: '85 – 90 cm',
     reduccion_corset: '-5 cm a -7 cm',
     descripcion: 'Nueva talla estándar de confección',
-    orden: store.tallasEstandarMaestros.length + 1,
+    orden: tallasList.length + 1,
     activo: true,
   }
   modalTalla.value = true
@@ -194,12 +258,15 @@ function abrirEditarTalla(t: TallaEstandarMaestro) {
   modalTalla.value = true
 }
 
-function guardarTalla() {
+async function guardarTalla() {
   if (!tallaForm.value.talla) return
-  if (modoEdicionTalla.value && tallaForm.value.id) {
-    store.actualizarTallaEstandar(tallaForm.value.id, tallaForm.value)
+  if (isMock.value) {
+    if (modoEdicionTalla.value && tallaForm.value.id) store.actualizarTallaEstandar(tallaForm.value.id, tallaForm.value)
+    else store.crearTallaEstandar(tallaForm.value)
   } else {
-    store.crearTallaEstandar(tallaForm.value)
+    if (modoEdicionTalla.value && tallaForm.value.id) await maestros.updateTalla(tallaForm.value.id, tallaForm.value as Record<string, unknown>)
+    else await maestros.createTalla(tallaForm.value as Record<string, unknown>)
+    await cargarDatosReales()
   }
   modalTalla.value = false
 }
@@ -239,12 +306,15 @@ function abrirEditarSinTalla(p: ProductoSinTallaMaestro) {
   modalSinTalla.value = true
 }
 
-function guardarSinTalla() {
+async function guardarSinTalla() {
   if (!sinTallaForm.value.nombre) return
-  if (modoEdicionSinTalla.value && sinTallaForm.value.id) {
-    store.actualizarProductoSinTalla(sinTallaForm.value.id, sinTallaForm.value)
+  if (isMock.value) {
+    if (modoEdicionSinTalla.value && sinTallaForm.value.id) store.actualizarProductoSinTalla(sinTallaForm.value.id, sinTallaForm.value)
+    else store.crearProductoSinTalla(sinTallaForm.value)
   } else {
-    store.crearProductoSinTalla(sinTallaForm.value)
+    if (modoEdicionSinTalla.value && sinTallaForm.value.id) await maestros.updateProductoSinTalla(sinTallaForm.value.id, sinTallaForm.value as Record<string, unknown>)
+    else await maestros.createProductoSinTalla(sinTallaForm.value as Record<string, unknown>)
+    await cargarDatosReales()
   }
   modalSinTalla.value = false
 }
@@ -282,12 +352,15 @@ function abrirEditarCategoria(c: CategoriaColeccionMaestro) {
   modalCategoria.value = true
 }
 
-function guardarCategoria() {
+async function guardarCategoria() {
   if (!catForm.value.nombre) return
-  if (modoEdicionCategoria.value && catForm.value.id) {
-    store.actualizarCategoriaColeccion(catForm.value.id, catForm.value)
+  if (isMock.value) {
+    if (modoEdicionCategoria.value && catForm.value.id) store.actualizarCategoriaColeccion(catForm.value.id, catForm.value)
+    else store.crearCategoriaColeccion(catForm.value)
   } else {
-    store.crearCategoriaColeccion(catForm.value)
+    if (modoEdicionCategoria.value && catForm.value.id) await maestros.updateCategoria(catForm.value.id, catForm.value as Record<string, unknown>)
+    else await maestros.createCategoria(catForm.value as Record<string, unknown>)
+    await cargarDatosReales()
   }
   modalCategoria.value = false
 }
@@ -323,14 +396,46 @@ function abrirEditarUbicacion(u: UbicacionTallerMaestro) {
   modalUbicacion.value = true
 }
 
-function guardarUbicacion() {
+async function guardarUbicacion() {
   if (!ubForm.value.nombre) return
-  if (modoEdicionUbicacion.value && ubForm.value.id) {
-    store.actualizarUbicacionTaller(ubForm.value.id, ubForm.value)
+  if (isMock.value) {
+    if (modoEdicionUbicacion.value && ubForm.value.id) store.actualizarUbicacionTaller(ubForm.value.id, ubForm.value)
+    else store.crearUbicacionTaller(ubForm.value)
   } else {
-    store.crearUbicacionTaller(ubForm.value)
+    if (modoEdicionUbicacion.value && ubForm.value.id) await maestros.updateUbicacion(ubForm.value.id, ubForm.value as Record<string, unknown>)
+    else await maestros.createUbicacion(ubForm.value as Record<string, unknown>)
+    await cargarDatosReales()
   }
   modalUbicacion.value = false
+}
+
+async function eliminarProveedorWrapper(id: number) {
+  if (isMock.value) store.eliminarProveedor(id)
+  else { await maestros.removeProveedor(id); await cargarDatosReales() }
+}
+async function eliminarCanalWrapper(id: number) {
+  if (isMock.value) store.eliminarCanalVenta(id)
+  else { await maestros.removeCanal(id); await cargarDatosReales() }
+}
+async function eliminarMetodoWrapper(id: number) {
+  if (isMock.value) store.eliminarMetodoPago(id)
+  else { await maestros.removeMetodo(id); await cargarDatosReales() }
+}
+async function eliminarTallaWrapper(id: number) {
+  if (isMock.value) store.eliminarTallaEstandar(id)
+  else { await maestros.removeTalla(id); await cargarDatosReales() }
+}
+async function eliminarSinTallaWrapper(id: number) {
+  if (isMock.value) store.eliminarProductoSinTalla(id)
+  else { await maestros.removeProductoSinTalla(id); await cargarDatosReales() }
+}
+async function eliminarCategoriaWrapper(id: number) {
+  if (isMock.value) store.eliminarCategoriaColeccion(id)
+  else { await maestros.removeCategoria(id); await cargarDatosReales() }
+}
+async function eliminarUbicacionWrapper(id: number) {
+  if (isMock.value) store.eliminarUbicacionTaller(id)
+  else { await maestros.removeUbicacion(id); await cargarDatosReales() }
 }
 
 // ==========================================
@@ -348,20 +453,27 @@ const sumaDistribucion = computed(() => {
   )
 })
 
-function guardarParametros() {
+async function guardarParametros() {
   if (sumaDistribucion.value !== 100) {
     alert(`La suma del reparto de utilidades debe ser exactamente 100% (actualmente suma ${sumaDistribucion.value}%).`)
     return
   }
   guardandoParametros.value = true
-  store.actualizarParametrosCosteo(parametrosForm.value)
-  setTimeout(() => {
-    guardandoParametros.value = false
+  try {
+    if (isMock.value) store.actualizarParametrosCosteo(parametrosForm.value)
+    else {
+      const updated = await maestros.updateParametros(parametrosForm.value as unknown as Record<string, unknown>)
+      parametrosApi.value = updated as unknown as ParametrosCosteoMaestro
+      Object.assign(parametrosForm.value, updated)
+    }
     mensajeParametros.value = '✓ Parámetros maestros de costeo y márgenes guardados con éxito'
-    setTimeout(() => {
-      mensajeParametros.value = ''
-    }, 4000)
-  }, 300)
+    setTimeout(() => { mensajeParametros.value = '' }, 4000)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Error al guardar parámetros'
+    alert(msg)
+  } finally {
+    guardandoParametros.value = false
+  }
 }
 
 function restaurarParametrosDefecto() {
@@ -380,19 +492,19 @@ function restaurarParametrosDefecto() {
 // ==========================================
 // STATS & FILTROS
 // ==========================================
-const totalProveedores = computed(() => store.proveedoresMaestros.length)
-const totalCanales = computed(() => store.canalesVentaMaestros.length)
-const totalMetodos = computed(() => store.metodosPagoMaestros.length)
-const totalTallas = computed(() => store.tallasEstandarMaestros.length)
-const totalSinTalla = computed(() => store.productosSinTallaMaestros.length)
-const totalCategorias = computed(() => store.categoriasColeccionMaestros.length)
-const totalUbicaciones = computed(() => store.ubicacionesTallerMaestros.length)
+const totalProveedores = computed(() => proveedoresList.length)
+const totalCanales = computed(() => canalesList.length)
+const totalMetodos = computed(() => metodosList.length)
+const totalTallas = computed(() => tallasList.length)
+const totalSinTalla = computed(() => sinTallaList.length)
+const totalCategorias = computed(() => categoriasList.length)
+const totalUbicaciones = computed(() => ubicacionesList.length)
 
 // Filter for suppliers
 const filtroCategoriaProv = ref('TODOS')
 const proveedoresFiltrados = computed(() => {
-  if (filtroCategoriaProv.value === 'TODOS') return store.proveedoresMaestros
-  return store.proveedoresMaestros.filter((p) => p.categoria === filtroCategoriaProv.value)
+  if (filtroCategoriaProv.value === 'TODOS') return proveedoresList
+  return proveedoresList.filter((p) => p.categoria === filtroCategoriaProv.value)
 })
 
 // Format Currency
@@ -625,7 +737,7 @@ function formatoCOP(val: number) {
               </button>
               <button
                 :id="`btn-eliminar-prov-${prov.id}`"
-                @click="store.eliminarProveedor(prov.id)"
+                @click="eliminarProveedorWrapper(prov.id)"
                 class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
                 title="Eliminar Proveedor"
               >
@@ -656,7 +768,7 @@ function formatoCOP(val: number) {
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
-          v-for="canal in store.canalesVentaMaestros"
+          v-for="canal in canalesList"
           :key="canal.id"
           :id="`card-canal-${canal.id}`"
           class="bg-stone-900/60 border border-stone-800 rounded-xl p-4 flex flex-col justify-between hover:border-stone-700 transition-all"
@@ -711,7 +823,7 @@ function formatoCOP(val: number) {
             </button>
             <button
               :id="`btn-eliminar-canal-${canal.id}`"
-              @click="store.eliminarCanalVenta(canal.id)"
+              @click="eliminarCanalWrapper(canal.id)"
               class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
               title="Eliminar Canal"
             >
@@ -741,7 +853,7 @@ function formatoCOP(val: number) {
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
-          v-for="pago in store.metodosPagoMaestros"
+          v-for="pago in metodosList"
           :key="pago.id"
           :id="`card-pago-${pago.id}`"
           class="bg-stone-900/60 border border-stone-800 rounded-xl p-4 flex flex-col justify-between hover:border-stone-700 transition-all"
@@ -789,7 +901,7 @@ function formatoCOP(val: number) {
             </button>
             <button
               :id="`btn-eliminar-pago-${pago.id}`"
-              @click="store.eliminarMetodoPago(pago.id)"
+              @click="eliminarMetodoWrapper(pago.id)"
               class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
               title="Eliminar Método"
             >
@@ -837,7 +949,7 @@ function formatoCOP(val: number) {
               </thead>
               <tbody class="divide-y divide-stone-800/60 text-stone-200">
                 <tr
-                  v-for="t in store.tallasEstandarMaestros"
+                  v-for="t in tallasList"
                   :key="t.id"
                   class="hover:bg-stone-800/30 transition-colors"
                 >
@@ -861,7 +973,7 @@ function formatoCOP(val: number) {
                       </button>
                       <button
                         :id="`btn-eliminar-talla-${t.id}`"
-                        @click="store.eliminarTallaEstandar(t.id)"
+                        @click="eliminarTallaWrapper(t.id)"
                         class="text-[11px] text-stone-500 hover:text-rose-400 p-1"
                         title="Eliminar Talla"
                       >
@@ -899,7 +1011,7 @@ function formatoCOP(val: number) {
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div
-            v-for="p in store.productosSinTallaMaestros"
+            v-for="p in sinTallaList"
             :key="p.id"
             :id="`card-sintalla-${p.id}`"
             class="bg-stone-900/60 border border-stone-800 rounded-xl p-4 flex flex-col justify-between hover:border-stone-700 transition-all"
@@ -943,7 +1055,7 @@ function formatoCOP(val: number) {
               </button>
               <button
                 :id="`btn-eliminar-sintalla-${p.id}`"
-                @click="store.eliminarProductoSinTalla(p.id)"
+                @click="eliminarSinTallaWrapper(p.id)"
                 class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
                 title="Eliminar Producto Sin Talla"
               >
@@ -974,7 +1086,7 @@ function formatoCOP(val: number) {
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div
-          v-for="cat in store.categoriasColeccionMaestros"
+          v-for="cat in categoriasList"
           :key="cat.id"
           :id="`card-cat-${cat.id}`"
           class="bg-stone-900/60 border border-stone-800 rounded-xl p-4 flex flex-col justify-between hover:border-stone-700 transition-all"
@@ -1016,7 +1128,7 @@ function formatoCOP(val: number) {
               </button>
               <button
                 :id="`btn-eliminar-cat-${cat.id}`"
-                @click="store.eliminarCategoriaColeccion(cat.id)"
+                @click="eliminarCategoriaWrapper(cat.id)"
                 class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
                 title="Eliminar Categoría"
               >
@@ -1047,7 +1159,7 @@ function formatoCOP(val: number) {
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
-          v-for="ub in store.ubicacionesTallerMaestros"
+          v-for="ub in ubicacionesList"
           :key="ub.id"
           :id="`card-ub-${ub.id}`"
           class="bg-stone-900/60 border border-stone-800 rounded-xl p-4 flex flex-col justify-between hover:border-stone-700 transition-all"
@@ -1083,7 +1195,7 @@ function formatoCOP(val: number) {
               </button>
               <button
                 :id="`btn-eliminar-ub-${ub.id}`"
-                @click="store.eliminarUbicacionTaller(ub.id)"
+                @click="eliminarUbicacionWrapper(ub.id)"
                 class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
                 title="Eliminar Ubicación"
               >

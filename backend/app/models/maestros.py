@@ -149,3 +149,83 @@ class MetodoPagoMaestro(Base):
 
     def __repr__(self) -> str:
         return f"<MetodoPagoMaestro id={self.id} codigo={self.codigo!r}>"
+
+
+class TallaEstandar(Base):
+    """Maestros Tallas Estandar matrix — XXS-XL flat."""
+
+    __tablename__ = "maestros_tallas_estandar"
+    __table_args__ = (
+        UniqueConstraint("talla", name="uq_tallas_talla"),
+        UniqueConstraint("orden", name="uq_tallas_orden"),
+        Index("ix_tallas_orden", "orden"),
+        Index("ix_tallas_activo", "activo"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    talla: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    orden: Mapped[int] = mapped_column(unique=True, nullable=False)
+    busto: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    cintura: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    cadera: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    reduccion_corset: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    activo: Mapped[bool] = mapped_column(nullable=False, server_default=text("true"), default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<TallaEstandar id={self.id} talla={self.talla!r}>"
+
+
+class ProductoSinTalla(Base):
+    """Maestros productos sin talla / merch."""
+
+    __tablename__ = "maestros_productos_sin_talla"
+    __table_args__ = (
+        CheckConstraint("precio_sugerido >= 0", name="ck_sintalla_precio"),
+        UniqueConstraint("nombre", name="uq_sintalla_nombre"),
+        Index("ix_sintalla_categoria", "categoria"),
+        Index("ix_sintalla_activo", "activo"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    categoria: Mapped[str] = mapped_column(String(100), nullable=False)
+    dimensiones: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    materiales: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    precio_sugerido: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("0"), default=Decimal("0"))
+    activo: Mapped[bool] = mapped_column(nullable=False, server_default=text("true"), default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<ProductoSinTalla id={self.id} nombre={self.nombre!r}>"
+
+
+class ParametrosCosteo(Base):
+    """Singleton row id=1 — costeo global."""
+
+    __tablename__ = "maestros_parametros_costeo"
+    __table_args__ = (
+        CheckConstraint("costo_minuto_costura >= 0", name="ck_param_minuto"),
+        CheckConstraint("costo_hora_patronaje >= 0", name="ck_param_patronaje"),
+        CheckConstraint("margen_meta_global_pct >= 0 AND margen_meta_global_pct <= 100", name="ck_param_margen"),
+        CheckConstraint("desperdicio_textil_default_pct >= 0 AND desperdicio_textil_default_pct <= 100", name="ck_param_desperdicio"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    costo_minuto_costura: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("0"), default=Decimal("0"))
+    costo_hora_patronaje: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("0"), default=Decimal("0"))
+    margen_meta_global_pct: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("0"), default=Decimal("0"))
+    desperdicio_textil_default_pct: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("0"), default=Decimal("0"))
+    iva_regimen_pct: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("0"), default=Decimal("0"))
+    distribucion_reinversion_pct: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("40"), default=Decimal("40"))
+    reparto_margara_pct: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("30"), default=Decimal("30"))
+    reparto_valqui_pct: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("30"), default=Decimal("30"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<ParametrosCosteo id={self.id}>"

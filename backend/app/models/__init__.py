@@ -26,7 +26,10 @@ from app.models.maestros import (
     CanalVentaMaestro,
     CategoriaColeccion,
     MetodoPagoMaestro,
+    ParametrosCosteo,
+    ProductoSinTalla,
     ProveedorMaestro,
+    TallaEstandar,
     UbicacionTaller,
 )
 from app.models.ventas import DetalleVenta, Devolucion, DevolucionItem, Venta
@@ -63,4 +66,7 @@ __all__ = [
     "UbicacionTaller",
     "CanalVentaMaestro",
     "MetodoPagoMaestro",
+    "TallaEstandar",
+    "ProductoSinTalla",
+    "ParametrosCosteo",
 ]
