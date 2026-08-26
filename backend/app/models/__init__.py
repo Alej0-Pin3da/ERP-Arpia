@@ -22,6 +22,13 @@ from app.models.productos import (
 )
 from app.models.refresh_token import RefreshToken
 from app.models.usuarios import Usuario
+from app.models.maestros import (
+    CanalVentaMaestro,
+    CategoriaColeccion,
+    MetodoPagoMaestro,
+    ProveedorMaestro,
+    UbicacionTaller,
+)
 from app.models.ventas import DetalleVenta, Devolucion, DevolucionItem, Venta
 
 __all__ = [
@@ -51,4 +58,9 @@ __all__ = [
     "DistribucionEstado",
     "AnticipoEstado",
     "MigracionOmision",
+    "ProveedorMaestro",
+    "CategoriaColeccion",
+    "UbicacionTaller",
+    "CanalVentaMaestro",
+    "MetodoPagoMaestro",
 ]
