@@ -8,6 +8,8 @@ import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import { useAtelierStore, type LiquidacionSocias } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
+import { useMode } from '@/composables/useMode'
+import { useFinanzas } from '@/composables/useFinanzas'
 
 const props = defineProps<{
   visible: boolean
@@ -20,6 +22,8 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
+const finanzasApi = useFinanzas()
 
 const isEditing = computed(() => !!props.liquidacionEditar)
 
@@ -153,14 +157,56 @@ watch([totalVentas, costoInsumos, gastosOperativos], () => {
   recalcularDistribucion()
 })
 
-function guardar() {
+async function guardar() {
   if (!periodo.value.trim()) {
     showToast('warn', 'Campo requerido', 'Por favor indique el nombre o periodo de la liquidación.')
     return
   }
 
-  const payload: Partial<LiquidacionSocias> = {
-    codigo: codigo.value || `LIQ-${Date.now().toString().slice(-4)}`,
+  if (isMock.value) {
+    const payload: Partial<LiquidacionSocias> = {
+      codigo: codigo.value || `LIQ-${Date.now().toString().slice(-4)}`,
+      periodo: periodo.value.trim(),
+      fecha_cierre: fechaCierre.value,
+      total_ventas_brutas: totalVentas.value,
+      costo_taller_insumos: costoInsumos.value,
+      gastos_operativos: gastosOperativos.value,
+      utilidad_neta_total: utilidadNetaCalculada.value,
+      fondo_reinversion_monto: fondoReinversionCalculado.value,
+      utilidad_repartible: utilidadRepartibleSocias.value,
+      estado: estado.value,
+      distribucion: distribucionLocal.value.map((d) => ({
+        socia_id: d.socia_id,
+        nombre_socia: d.nombre_socia,
+        rol_socia: d.rol_socia,
+        porcentaje: d.porcentaje,
+        monto_bruto: d.monto_bruto,
+        deduccion_anticipos: d.deduccion_anticipos,
+        monto_neto_pagar: d.monto_neto_pagar,
+        estado_pago: d.estado_pago,
+        fecha_pago: d.estado_pago === 'PAGADO' ? (d.fecha_pago || new Date().toISOString().split('T')[0]) : undefined,
+        comprobante_transferencia: d.comprobante_transferencia,
+        banco_destino: d.banco_destino,
+      })),
+      observaciones: observaciones.value,
+    }
+    if (isEditing.value && props.liquidacionEditar) {
+      const act = atelier.actualizarLiquidacion(props.liquidacionEditar.id, payload)
+      if (act) {
+        showToast('success', 'Liquidación Actualizada', `La liquidación ${act.codigo} fue actualizada.`)
+        emit('guardada', act)
+      }
+    } else {
+      const nueva = atelier.crearLiquidacion(payload)
+      showToast('success', 'Liquidación Creada', `Liquidación ${nueva.codigo} registrada con ${formatCOP(nueva.utilidad_neta_total)} de utilidad.`)
+      emit('guardada', nueva)
+    }
+    emit('update:visible', false)
+    return
+  }
+
+  // Real API: server computes codigo + distribucion, only header totals sent
+  const apiPayload = {
     periodo: periodo.value.trim(),
     fecha_cierre: fechaCierre.value,
     total_ventas_brutas: totalVentas.value,
@@ -169,36 +215,23 @@ function guardar() {
     utilidad_neta_total: utilidadNetaCalculada.value,
     fondo_reinversion_monto: fondoReinversionCalculado.value,
     utilidad_repartible: utilidadRepartibleSocias.value,
-    estado: estado.value,
-    distribucion: distribucionLocal.value.map((d) => ({
-      socia_id: d.socia_id,
-      nombre_socia: d.nombre_socia,
-      rol_socia: d.rol_socia,
-      porcentaje: d.porcentaje,
-      monto_bruto: d.monto_bruto,
-      deduccion_anticipos: d.deduccion_anticipos,
-      monto_neto_pagar: d.monto_neto_pagar,
-      estado_pago: d.estado_pago,
-      fecha_pago: d.estado_pago === 'PAGADO' ? (d.fecha_pago || new Date().toISOString().split('T')[0]) : undefined,
-      comprobante_transferencia: d.comprobante_transferencia,
-      banco_destino: d.banco_destino,
-    })),
-    observaciones: observaciones.value,
+    observaciones: observaciones.value || null,
   }
-
-  if (isEditing.value && props.liquidacionEditar) {
-    const act = atelier.actualizarLiquidacion(props.liquidacionEditar.id, payload)
-    if (act) {
-      showToast('success', 'Liquidación Actualizada', `La liquidación ${act.codigo} fue actualizada.`)
-      emit('guardada', act)
+  try {
+    if (isEditing.value && props.liquidacionEditar) {
+      // Editing not supported via API (only state transition); keep local mock for edit
+      showToast('warn', 'Edición', 'La edición de liquidaciones existentes solo está disponible en modo MOCK. Use cambio de estado para transiciones.')
+      return
     }
-  } else {
-    const nueva = atelier.crearLiquidacion(payload)
-    showToast('success', 'Liquidación Creada', `Liquidación ${nueva.codigo} registrada con ${formatCOP(nueva.utilidad_neta_total)} de utilidad.`)
-    emit('guardada', nueva)
+    const creada = await finanzasApi.createLiquidacion(apiPayload)
+    const cod = (creada as unknown as Record<string, unknown>).codigo as string
+    showToast('success', 'Liquidación Creada', `Liquidación ${cod} registrada en BD.`)
+    emit('guardada', creada as unknown as LiquidacionSocias)
+    emit('update:visible', false)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al crear liquidación'
+    showToast('error', 'Error', String(msg))
   }
-
-  emit('update:visible', false)
 }
 </script>
 

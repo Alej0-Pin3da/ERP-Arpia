@@ -8,6 +8,8 @@ import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import { useAtelierStore, type AnticipoSocia } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
+import { useMode } from '@/composables/useMode'
+import { useFinanzas } from '@/composables/useFinanzas'
 
 const props = defineProps<{
   visible: boolean
@@ -20,6 +22,8 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
+const finanzasApi = useFinanzas()
 
 const isEditing = computed(() => !!props.anticipoEditar)
 
@@ -90,7 +94,7 @@ function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
 }
 
-function guardar() {
+async function guardar() {
   if (!concepto.value.trim()) {
     showToast('warn', 'Campo requerido', 'Por favor indique el concepto o justificación del anticipo.')
     return
@@ -101,33 +105,65 @@ function guardar() {
     return
   }
 
-  const soc = atelier.socias.find((s) => s.id === sociaId.value)
-
-  const payload: Partial<AnticipoSocia> = {
-    socia_id: sociaId.value,
-    nombre_socia: soc?.nombre || 'Socia Atelier',
-    fecha: fecha.value,
-    monto: Number(monto.value) || 0,
-    concepto: concepto.value.trim(),
-    metodo_desembolso: metodoDesembolso.value,
-    estado: estado.value,
-    comprobante: comprobante.value.trim(),
-    observaciones: observaciones.value.trim(),
-  }
-
-  if (isEditing.value && props.anticipoEditar) {
-    const act = atelier.actualizarAnticipo(props.anticipoEditar.id, payload)
-    if (act) {
-      showToast('success', 'Anticipo Actualizado', `Anticipo de ${formatCOP(act.monto)} para ${act.nombre_socia} actualizado.`)
-      emit('guardado', act)
+  if (isMock.value) {
+    const soc = atelier.socias.find((s) => s.id === sociaId.value)
+    const payload: Partial<AnticipoSocia> = {
+      socia_id: sociaId.value,
+      nombre_socia: soc?.nombre || 'Socia Atelier',
+      fecha: fecha.value,
+      monto: Number(monto.value) || 0,
+      concepto: concepto.value.trim(),
+      metodo_desembolso: metodoDesembolso.value,
+      estado: estado.value,
+      comprobante: comprobante.value.trim(),
+      observaciones: observaciones.value.trim(),
     }
-  } else {
-    const nuevo = atelier.crearAnticipo(payload)
-    showToast('success', 'Anticipo Registrado', `Se registró un anticipo de ${formatCOP(nuevo.monto)} para ${nuevo.nombre_socia}.`)
-    emit('guardado', nuevo)
+    if (isEditing.value && props.anticipoEditar) {
+      const act = atelier.actualizarAnticipo(props.anticipoEditar.id, payload)
+      if (act) {
+        showToast('success', 'Anticipo Actualizado', `Anticipo de ${formatCOP(act.monto)} para ${act.nombre_socia} actualizado.`)
+        emit('guardado', act)
+      }
+    } else {
+      const nuevo = atelier.crearAnticipo(payload)
+      showToast('success', 'Anticipo Registrado', `Se registró un anticipo de ${formatCOP(nuevo.monto)} para ${nuevo.nombre_socia}.`)
+      emit('guardado', nuevo)
+    }
+    emit('update:visible', false)
+    return
   }
 
-  emit('update:visible', false)
+  // Real API
+  const apiPayload = {
+    socia_id: sociaId.value,
+    monto: Number(monto.value) || 0,
+    fecha: fecha.value || null,
+    concepto: concepto.value.trim() || null,
+    metodo_desembolso: metodoDesembolso.value || null,
+    comprobante: comprobante.value.trim() || null,
+    observaciones: observaciones.value.trim() || null,
+  }
+  try {
+    if (isEditing.value && props.anticipoEditar) {
+      // Edit via PATCH estado if estado changed; monto/concepto not patchable via API in real mode
+      if (estado.value !== props.anticipoEditar.estado) {
+        const updated = await finanzasApi.transitionAnticipo(props.anticipoEditar.id, { estado: estado.value })
+        showToast('success', 'Anticipo Actualizado', `Anticipo ${estado.value}.`)
+        emit('guardado', updated as unknown as AnticipoSocia)
+      } else {
+        showToast('info', 'Sin cambios', 'No hay cambios de estado para guardar en modo REAL.')
+      }
+      emit('update:visible', false)
+      return
+    }
+    const creado = await finanzasApi.createAnticipo(apiPayload)
+    showToast('success', 'Anticipo Registrado', `Anticipo de ${formatCOP(Number((creado as unknown as Record<string, unknown>).monto ?? apiPayload.monto))} registrado en BD.`)
+    emit('guardado', creado as unknown as AnticipoSocia)
+    emit('update:visible', false)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al guardar anticipo'
+    showToast('error', 'Error', String(msg))
+  }
 }
 </script>
 

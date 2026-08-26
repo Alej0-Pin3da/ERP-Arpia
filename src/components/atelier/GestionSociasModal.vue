@@ -8,6 +8,8 @@ import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
 import { useAtelierStore, type SociaAtelier } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
+import { useMode } from '@/composables/useMode'
+import { useSocios } from '@/composables/useSocios'
 
 const props = defineProps<{
   visible: boolean
@@ -20,6 +22,8 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
+const sociosApi = useSocios()
 
 const isEditing = computed(() => !!props.sociaEditar)
 
@@ -82,40 +86,76 @@ watch(
   { immediate: true },
 )
 
-function guardar() {
+async function guardar() {
   if (!nombre.value.trim()) {
     showToast('warn', 'Campo requerido', 'Por favor ingrese el nombre de la socia.')
     return
   }
 
-  const payload: Partial<SociaAtelier> = {
+  // isMock ? atelier shape (porcentaje) : API shape (porcentaje_participacion + Literal tipo_cuenta)
+  const rawTipo = tipoCuenta.value.trim().toUpperCase()
+  const tipoCuentaLiteral = (['AHORROS', 'CORRIENTE', 'OTRA'] as const).includes(rawTipo as never) ? (rawTipo as 'AHORROS' | 'CORRIENTE' | 'OTRA') : null
+
+  if (isMock.value) {
+    const payload: Partial<SociaAtelier> = {
+      nombre: nombre.value.trim(),
+      rol: rol.value.trim() || 'Socia Colaboradora',
+      porcentaje: Number(porcentaje.value) || 0,
+      es_fondo_taller: esFondoTaller.value,
+      telefono: telefono.value.trim(),
+      email: email.value.trim(),
+      banco: banco.value.trim(),
+      tipo_cuenta: tipoCuenta.value.trim(),
+      numero_cuenta: numeroCuenta.value.trim(),
+      titular_cuenta: titularCuenta.value.trim() || nombre.value.trim(),
+      activo: activo.value,
+      notas: notas.value.trim(),
+    }
+    if (isEditing.value && props.sociaEditar) {
+      const act = atelier.actualizarSocia(props.sociaEditar.id, payload)
+      if (act) {
+        showToast('success', 'Socia Actualizada', `Perfil de ${act.nombre} actualizado correctamente.`)
+        emit('guardada', act)
+      }
+    } else {
+      const nueva = atelier.crearSocia(payload)
+      showToast('success', 'Socia Registrada', `${nueva.nombre} ha sido añadida con ${nueva.porcentaje}% de participación.`)
+      emit('guardada', nueva)
+    }
+    emit('update:visible', false)
+    return
+  }
+
+  // Real API
+  const apiPayload = {
     nombre: nombre.value.trim(),
-    rol: rol.value.trim() || 'Socia Colaboradora',
-    porcentaje: Number(porcentaje.value) || 0,
+    porcentaje_participacion: Number(porcentaje.value) || 0,
+    rol: rol.value.trim() || null,
     es_fondo_taller: esFondoTaller.value,
-    telefono: telefono.value.trim(),
-    email: email.value.trim(),
-    banco: banco.value.trim(),
-    tipo_cuenta: tipoCuenta.value.trim(),
-    numero_cuenta: numeroCuenta.value.trim(),
+    telefono: telefono.value.trim() || null,
+    email: email.value.trim() || null,
+    banco: banco.value.trim() || null,
+    tipo_cuenta: tipoCuentaLiteral,
+    numero_cuenta: numeroCuenta.value.trim() || null,
     titular_cuenta: titularCuenta.value.trim() || nombre.value.trim(),
     activo: activo.value,
-    notas: notas.value.trim(),
+    notas: notas.value.trim() || null,
   }
-
-  if (isEditing.value && props.sociaEditar) {
-    const act = atelier.actualizarSocia(props.sociaEditar.id, payload)
-    if (act) {
-      showToast('success', 'Socia Actualizada', `Perfil de ${act.nombre} actualizado correctamente.`)
-      emit('guardada', act)
+  try {
+    if (isEditing.value && props.sociaEditar) {
+      const updated = await sociosApi.update(props.sociaEditar.id, apiPayload)
+      showToast('success', 'Socia Actualizada', `Perfil de ${(updated as SociaAtelier).nombre ?? apiPayload.nombre} actualizado.`)
+      emit('guardada', updated as unknown as SociaAtelier)
+    } else {
+      const created = await sociosApi.create(apiPayload)
+      showToast('success', 'Socia Registrada', `${(created as SociaAtelier).nombre ?? apiPayload.nombre} registrada con ${apiPayload.porcentaje_participacion}%.`)
+      emit('guardada', created as unknown as SociaAtelier)
     }
-  } else {
-    const nueva = atelier.crearSocia(payload)
-    showToast('success', 'Socia Registrada', `${nueva.nombre} ha sido añadida con ${nueva.porcentaje}% de participación.`)
-    emit('guardada', nueva)
+    emit('update:visible', false)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al guardar socia'
+    showToast('error', 'Error', String(msg))
   }
-
-  emit('update:visible', false)
 }
 </script>
 

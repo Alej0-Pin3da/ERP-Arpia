@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
@@ -17,8 +17,121 @@ import DetalleLiquidacionModal from '@/components/atelier/DetalleLiquidacionModa
 import GestionSociasModal from '@/components/atelier/GestionSociasModal.vue'
 import NuevoAnticipoModal from '@/components/atelier/NuevoAnticipoModal.vue'
 import { showToast } from '@/utils/toast'
+import { useMode } from '@/composables/useMode'
+import { useSocios } from '@/composables/useSocios'
+import { useFinanzas } from '@/composables/useFinanzas'
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
+const sociosApi = useSocios()
+const finanzasApi = useFinanzas()
+
+// Real-mode state (populated via API when !isMock)
+const sociasReal = ref<SociaAtelier[]>([])
+const liquidacionesReal = ref<LiquidacionSocias[]>([])
+const anticiposReal = ref<AnticipoSocia[]>([])
+const cargandoReal = ref(false)
+
+function normalizeSocia(raw: Record<string, unknown>): SociaAtelier {
+  return {
+    id: raw.id as number,
+    nombre: raw.nombre as string,
+    rol: (raw.rol as string) ?? 'Socia Atelier',
+    porcentaje: Number(raw.porcentaje_participacion ?? raw.porcentaje ?? 0),
+    es_fondo_taller: Boolean(raw.es_fondo_taller),
+    telefono: raw.telefono as string | undefined,
+    email: raw.email as string | undefined,
+    banco: raw.banco as string | undefined,
+    tipo_cuenta: raw.tipo_cuenta as string | undefined,
+    numero_cuenta: raw.numero_cuenta as string | undefined,
+    titular_cuenta: raw.titular_cuenta as string | undefined,
+    activo: raw.activo !== false,
+    notas: raw.notas as string | undefined,
+  }
+}
+
+function normalizeLiquidacion(raw: Record<string, unknown>): LiquidacionSocias {
+  const dist = (raw.distribucion as unknown[] | undefined) ?? []
+  return {
+    id: raw.id as number,
+    codigo: raw.codigo as string,
+    periodo: raw.periodo as string,
+    fecha_cierre: raw.fecha_cierre as string,
+    total_ventas_brutas: Number(raw.total_ventas_brutas ?? 0),
+    costo_taller_insumos: Number(raw.costo_taller_insumos ?? 0),
+    gastos_operativos: Number(raw.gastos_operativos ?? 0),
+    utilidad_neta_total: Number(raw.utilidad_neta_total ?? 0),
+    fondo_reinversion_monto: Number(raw.fondo_reinversion_monto ?? 0),
+    utilidad_repartible: Number(raw.utilidad_repartible ?? 0),
+    estado: raw.estado as LiquidacionSocias['estado'],
+    distribucion: dist.map((d: unknown) => {
+      const dd = d as Record<string, unknown>
+      return {
+        socia_id: dd.socia_id as number,
+        nombre_socia: (dd.socia_nombre as string) ?? (dd.nombre_socia as string) ?? '',
+        rol_socia: (dd.rol_socia as string) ?? '',
+        porcentaje: Number(dd.porcentaje ?? 0),
+        monto_bruto: Number(dd.monto_bruto ?? 0),
+        deduccion_anticipos: Number(dd.deduccion_anticipos ?? 0),
+        monto_neto_pagar: Number((dd as Record<string, unknown>).monto_neto ?? dd.monto_neto_pagar ?? 0),
+        estado_pago: (dd.estado_pago as LiquidacionSocias['distribucion'][number]['estado_pago']) ?? 'PENDIENTE',
+        fecha_pago: dd.fecha_pago as string | undefined,
+        comprobante_transferencia: dd.comprobante_transferencia as string | undefined,
+        banco_destino: dd.banco_destino as string | undefined,
+      }
+    }),
+    observaciones: raw.observaciones as string | undefined,
+    created_at: (raw.created_at as string) ?? (raw.creado_en as string) ?? new Date().toISOString(),
+  }
+}
+
+function normalizeAnticipo(raw: Record<string, unknown>): AnticipoSocia {
+  return {
+    id: raw.id as number,
+    socia_id: raw.socia_id as number,
+    nombre_socia: (raw.socia_nombre as string) ?? (raw.nombre_socia as string) ?? '',
+    fecha: raw.fecha as string,
+    monto: Number(raw.monto ?? 0),
+    concepto: (raw.concepto as string) ?? 'Adelanto',
+    metodo_desembolso: (raw.metodo_desembolso as string) ?? 'Transferencia Bancaria',
+    estado: raw.estado as AnticipoSocia['estado'],
+    liquidacion_id: (raw.liquidacion_id as number | null) ?? null,
+    comprobante: raw.comprobante as string | undefined,
+    observaciones: raw.observaciones as string | undefined,
+  }
+}
+
+async function cargarDatosReales() {
+  if (isMock.value) return
+  cargandoReal.value = true
+  try {
+    const [socRes, liqRes, antRes] = await Promise.all([
+      sociosApi.list({ limit: 100, offset: 0 }),
+      finanzasApi.listLiquidaciones({ limit: 100, offset: 0 }),
+      finanzasApi.listAnticipos({ limit: 100, offset: 0 }),
+    ])
+    sociasReal.value = (socRes.items as unknown as Record<string, unknown>[]).map(normalizeSocia)
+    liquidacionesReal.value = (liqRes.items as unknown as Record<string, unknown>[]).map(normalizeLiquidacion)
+    anticiposReal.value = (antRes.items as unknown as Record<string, unknown>[]).map(normalizeAnticipo)
+  } catch {
+    // keep atelier fallback on error
+  } finally {
+    cargandoReal.value = false
+  }
+}
+
+onMounted(() => {
+  void cargarDatosReales()
+})
+
+watch(isMock, () => {
+  void cargarDatosReales()
+})
+
+// Unified lists — isMock ? atelier : real API
+const sociasList = computed<SociaAtelier[]>(() => (isMock.value ? (atelier.socias as unknown as SociaAtelier[]) : sociasReal.value))
+const liquidacionesList = computed<LiquidacionSocias[]>(() => (isMock.value ? (atelier.liquidaciones as unknown as LiquidacionSocias[]) : liquidacionesReal.value))
+const anticiposList = computed<AnticipoSocia[]>(() => (isMock.value ? (atelier.anticipos as unknown as AnticipoSocia[]) : anticiposReal.value))
 
 // Subtabs
 type TabType = 'liquidaciones' | 'socias' | 'anticipos' | 'simulador'
@@ -76,9 +189,9 @@ function formatCOP(val: number): string {
   return `$${Math.round(val).toLocaleString('es-CO')}`
 }
 
-// Filtered liquidaciones
+// Filtered liquidaciones (source switches via isMock)
 const liquidacionesFiltradas = computed(() => {
-  let list = [...atelier.liquidaciones]
+  let list = [...liquidacionesList.value]
 
   if (searchLiquidaciones.value.trim()) {
     const q = searchLiquidaciones.value.trim().toLowerCase()
@@ -98,9 +211,9 @@ const liquidacionesFiltradas = computed(() => {
   return list
 })
 
-// Filtered anticipos
+// Filtered anticipos (source switches via isMock)
 const anticiposFiltrados = computed(() => {
-  let list = [...atelier.anticipos]
+  let list = [...anticiposList.value]
 
   if (searchAnticipos.value.trim()) {
     const q = searchAnticipos.value.trim().toLowerCase()
@@ -115,21 +228,40 @@ const anticiposFiltrados = computed(() => {
   return list
 })
 
-// Total % of active socias
+// Total % of active socias (real or mock)
 const sumaPorcentajesSocias = computed(() => {
-  return atelier.socias.filter((s) => s.activo).reduce((acc, s) => acc + s.porcentaje, 0)
+  return sociasList.value.filter((s) => s.activo).reduce((acc, s) => acc + s.porcentaje, 0)
 })
 
-// Historical income per socia
+// KPI aggregates — mirror atelier getters but over the active data source
+const totalHistoricoFacturado = computed(() => liquidacionesList.value.reduce((a, l) => a + l.total_ventas_brutas, 0))
+const totalHistoricoFondo = computed(() => liquidacionesList.value.reduce((a, l) => a + l.fondo_reinversion_monto, 0))
+const totalRepartidoMargara = computed(() =>
+  liquidacionesList.value.reduce((a, l) => {
+    const item = l.distribucion.find((d) => d.socia_id === 2 || d.nombre_socia.toLowerCase().includes('marg'))
+    return a + (item ? item.monto_neto_pagar : 0)
+  }, 0),
+)
+const totalRepartidoValqui = computed(() =>
+  liquidacionesList.value.reduce((a, l) => {
+    const item = l.distribucion.find((d) => d.socia_id === 3 || d.nombre_socia.toLowerCase().includes('valq'))
+    return a + (item ? item.monto_neto_pagar : 0)
+  }, 0),
+)
+const totalAnticiposPendientes = computed(() =>
+  anticiposList.value.filter((a) => a.estado === 'PENDIENTE_DESCUENTO').reduce((a, x) => a + x.monto, 0),
+)
+
+// Historical income per socia (real or mock)
 function getIngresoHistoricoSocia(sociaId: number): number {
-  return atelier.liquidaciones.reduce((acc, l) => {
+  return liquidacionesList.value.reduce((acc, l) => {
     const item = l.distribucion.find((d) => d.socia_id === sociaId)
     return acc + (item ? item.monto_neto_pagar : 0)
   }, 0)
 }
 
 function getAnticiposPendientesSocia(sociaId: number): number {
-  return atelier.anticipos
+  return anticiposList.value
     .filter((a) => a.socia_id === sociaId && a.estado === 'PENDIENTE_DESCUENTO')
     .reduce((acc, a) => acc + a.monto, 0)
 }
@@ -155,19 +287,45 @@ function solicitarEliminarLiquidacion(liq: LiquidacionSocias) {
   showDeleteLiqModal.value = true
 }
 
-function confirmarEliminarLiquidacion() {
+async function confirmarEliminarLiquidacion() {
   if (liquidacionAEliminar.value) {
     const cod = liquidacionAEliminar.value.codigo
-    atelier.eliminarLiquidacion(liquidacionAEliminar.value.id)
+    const id = liquidacionAEliminar.value.id
+    if (isMock.value) {
+      atelier.eliminarLiquidacion(id)
+    } else {
+      try {
+        await finanzasApi.removeLiquidacion(id)
+        await cargarDatosReales()
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Error al eliminar liquidación'
+        showToast('error', 'Error', msg)
+        return
+      }
+    }
     showToast('info', 'Liquidación Eliminada', `La liquidación ${cod} ha sido eliminada del historial.`)
     liquidacionAEliminar.value = null
     showDeleteLiqModal.value = false
   }
 }
 
-function cambiarEstadoLiq(liq: LiquidacionSocias, nuevoEstado: LiquidacionSocias['estado']) {
-  atelier.cambiarEstadoLiquidacion(liq.id, nuevoEstado)
-  showToast('success', 'Estado Actualizado', `Liquidación ${liq.codigo} marcada como ${nuevoEstado}.`)
+async function cambiarEstadoLiq(liq: LiquidacionSocias, nuevoEstado: LiquidacionSocias['estado']) {
+  if (isMock.value) {
+    atelier.cambiarEstadoLiquidacion(liq.id, nuevoEstado)
+    showToast('success', 'Estado Actualizado', `Liquidación ${liq.codigo} marcada como ${nuevoEstado}.`)
+    return
+  }
+  try {
+    const updated = await finanzasApi.transitionLiquidacion(liq.id, { estado: nuevoEstado })
+    // patch local real list optimistically
+    const idx = liquidacionesReal.value.findIndex((l) => l.id === liq.id)
+    if (idx !== -1 && updated) liquidacionesReal.value[idx] = normalizeLiquidacion(updated as unknown as Record<string, unknown>)
+    else await cargarDatosReales()
+    showToast('success', 'Estado Actualizado', `Liquidación ${liq.codigo} marcada como ${nuevoEstado}.`)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Transición no permitida'
+    showToast('error', 'Error', msg)
+  }
 }
 
 // Socias actions
@@ -186,13 +344,40 @@ function solicitarEliminarSocia(soc: SociaAtelier) {
   showDeleteSociaModal.value = true
 }
 
-function confirmarEliminarSocia() {
+async function confirmarEliminarSocia() {
   if (sociaAEliminar.value) {
     const nom = sociaAEliminar.value.nombre
-    atelier.eliminarSocia(sociaAEliminar.value.id)
+    const id = sociaAEliminar.value.id
+    if (isMock.value) {
+      atelier.eliminarSocia(id)
+    } else {
+      try {
+        await sociosApi.remove(id)
+        await cargarDatosReales()
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Error al eliminar socia'
+        showToast('error', 'Error', msg)
+        return
+      }
+    }
     showToast('info', 'Socia Eliminada', `El registro de ${nom} ha sido removido.`)
     sociaAEliminar.value = null
     showDeleteSociaModal.value = false
+  }
+}
+
+async function toggleActivoSocia(s: SociaAtelier) {
+  if (isMock.value) {
+    atelier.toggleActivoSocia(s.id)
+    return
+  }
+  try {
+    await sociosApi.update(s.id, { activo: !s.activo })
+    await cargarDatosReales()
+    showToast('success', 'Socia Actualizada', `${s.nombre} ${!s.activo ? 'activada' : 'desactivada'}.`)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Error al actualizar socia'
+    showToast('error', 'Error', msg)
   }
 }
 
@@ -207,9 +392,24 @@ function abrirEditarAnticipo(ant: AnticipoSocia) {
   showNuevoAnticipoModal.value = true
 }
 
-function marcarAnticipoDescontado(ant: AnticipoSocia) {
-  atelier.cambiarEstadoAnticipo(ant.id, 'DESCONTADO')
-  showToast('success', 'Anticipo Actualizado', `Anticipo marcado como DESCONTADO.`)
+async function marcarAnticipoDescontado(ant: AnticipoSocia) {
+  if (isMock.value) {
+    atelier.cambiarEstadoAnticipo(ant.id, 'DESCONTADO')
+    showToast('success', 'Anticipo Actualizado', `Anticipo marcado como DESCONTADO.`)
+    return
+  }
+  try {
+    const updated = await finanzasApi.descontarAnticipo(ant.id, ant.liquidacion_id ?? 0)
+    // fallback: reload if liquidacion_id missing (endpoint needs liquidacion; try transition)
+    if (!updated && !ant.liquidacion_id) {
+      await finanzasApi.transitionAnticipo(ant.id, { estado: 'DESCONTADO' })
+    }
+    await cargarDatosReales()
+    showToast('success', 'Anticipo Actualizado', `Anticipo marcado como DESCONTADO.`)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Error al descontar anticipo'
+    showToast('error', 'Error', msg)
+  }
 }
 
 function solicitarEliminarAnticipo(ant: AnticipoSocia) {
@@ -217,9 +417,21 @@ function solicitarEliminarAnticipo(ant: AnticipoSocia) {
   showDeleteAnticipoModal.value = true
 }
 
-function confirmarEliminarAnticipo() {
+async function confirmarEliminarAnticipo() {
   if (anticipoAEliminar.value) {
-    atelier.eliminarAnticipo(anticipoAEliminar.value.id)
+    const id = anticipoAEliminar.value.id
+    if (isMock.value) {
+      atelier.eliminarAnticipo(id)
+    } else {
+      try {
+        await finanzasApi.removeAnticipo(id)
+        await cargarDatosReales()
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Error al eliminar anticipo'
+        showToast('error', 'Error', msg)
+        return
+      }
+    }
     showToast('info', 'Anticipo Eliminado', `El anticipo ha sido eliminado.`)
     anticipoAEliminar.value = null
     showDeleteAnticipoModal.value = false
@@ -286,12 +498,12 @@ function imprimirBalance() {
         <div>
           <div class="text-[10px] text-stone-400 uppercase tracking-wider">Ventas Totales Facturadas</div>
           <div class="text-lg font-serif font-bold text-emerald-400 mt-1">
-            {{ formatCOP(atelier.totalHistoricoFacturadoLiquidaciones) }}
+            {{ formatCOP(totalHistoricoFacturado) }}
           </div>
         </div>
         <div class="text-[10px] text-stone-500 mt-2 border-t border-stone-800/80 pt-1.5 flex justify-between">
           <span>Liquidaciones:</span>
-          <span class="text-stone-300 font-bold">{{ atelier.liquidaciones.length }} periodos</span>
+          <span class="text-stone-300 font-bold">{{ liquidacionesList.length }} periodos</span>
         </div>
       </div>
 
@@ -299,7 +511,7 @@ function imprimirBalance() {
         <div>
           <div class="text-[10px] text-amber-300/90 uppercase tracking-wider font-bold">🏛️ Fondo Taller (40%)</div>
           <div class="text-lg font-serif font-bold text-amber-300 mt-1">
-            {{ formatCOP(atelier.totalHistoricoFondoReinversion) }}
+            {{ formatCOP(totalHistoricoFondo) }}
           </div>
         </div>
         <div class="text-[10px] text-amber-400/70 mt-2 border-t border-amber-500/20 pt-1.5 flex justify-between">
@@ -311,7 +523,7 @@ function imprimirBalance() {
         <div>
           <div class="text-[10px] text-stone-400 uppercase tracking-wider">🪡 Margara Restrepo (30%)</div>
           <div class="text-lg font-serif font-bold text-stone-100 mt-1">
-            {{ formatCOP(atelier.totalHistoricoRepartidoMargara) }}
+            {{ formatCOP(totalRepartidoMargara) }}
           </div>
         </div>
         <div class="text-[10px] text-stone-500 mt-2 border-t border-stone-800/80 pt-1.5 flex justify-between">
@@ -323,7 +535,7 @@ function imprimirBalance() {
         <div>
           <div class="text-[10px] text-stone-400 uppercase tracking-wider">🎨 Valeria Quintero (30%)</div>
           <div class="text-lg font-serif font-bold text-stone-100 mt-1">
-            {{ formatCOP(atelier.totalHistoricoRepartidoValqui) }}
+            {{ formatCOP(totalRepartidoValqui) }}
           </div>
         </div>
         <div class="text-[10px] text-stone-500 mt-2 border-t border-stone-800/80 pt-1.5 flex justify-between">
@@ -335,7 +547,7 @@ function imprimirBalance() {
         <div>
           <div class="text-[10px] text-stone-400 uppercase tracking-wider">Anticipos Pendientes</div>
           <div class="text-lg font-serif font-bold text-rose-400 mt-1">
-            {{ formatCOP(atelier.totalAnticiposPendientes) }}
+            {{ formatCOP(totalAnticiposPendientes) }}
           </div>
         </div>
         <div class="text-[10px] text-stone-500 mt-2 border-t border-stone-800/80 pt-1.5 flex justify-between">
@@ -352,7 +564,7 @@ function imprimirBalance() {
         @click="activeTab = 'liquidaciones'"
       >
         <i class="pi pi-list" />
-        Liquidaciones & Cierres ({{ atelier.liquidaciones.length }})
+        Liquidaciones & Cierres ({{ liquidacionesList.length }})
       </button>
 
       <button
@@ -361,7 +573,7 @@ function imprimirBalance() {
         @click="activeTab = 'socias'"
       >
         <i class="pi pi-users" />
-        Perfiles de Socias & Cuentas ({{ atelier.socias.length }})
+        Perfiles de Socias & Cuentas ({{ sociasList.length }})
       </button>
 
       <button
@@ -370,7 +582,7 @@ function imprimirBalance() {
         @click="activeTab = 'anticipos'"
       >
         <i class="pi pi-dollar" />
-        Anticipos & Retiros ({{ atelier.anticipos.length }})
+        Anticipos & Retiros ({{ anticiposList.length }})
       </button>
 
       <button
@@ -575,7 +787,7 @@ function imprimirBalance() {
       <!-- Socias Cards Grid -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div
-          v-for="s in atelier.socias"
+          v-for="s in sociasList"
           :key="s.id"
           class="rounded-2xl border bg-stone-900/60 p-5 relative overflow-hidden flex flex-col justify-between transition-all"
           :class="s.activo ? 'border-stone-800 hover:border-amber-500/40' : 'border-stone-800/40 opacity-60'"
@@ -638,7 +850,7 @@ function imprimirBalance() {
               size="small"
               text
               class="text-[11px] p-0 text-stone-400 hover:text-stone-200"
-              @click="atelier.toggleActivoSocia(s.id)"
+              @click="toggleActivoSocia(s)"
             />
 
             <div class="flex items-center gap-1">
@@ -880,7 +1092,7 @@ function imprimirBalance() {
     <NuevaLiquidacionModal
       v-model:visible="showNuevaLiqModal"
       :liquidacion-editar="liquidacionSeleccionadaEditar"
-      @guardada="() => {}"
+      @guardada="() => { if (!isMock) void cargarDatosReales() }"
     />
 
     <DetalleLiquidacionModal
@@ -892,13 +1104,13 @@ function imprimirBalance() {
     <GestionSociasModal
       v-model:visible="showGestionSociaModal"
       :socia-editar="sociaSeleccionadaEditar"
-      @guardada="() => {}"
+      @guardada="() => { if (!isMock) void cargarDatosReales() }"
     />
 
     <NuevoAnticipoModal
       v-model:visible="showNuevoAnticipoModal"
       :anticipo-editar="anticipoSeleccionadoEditar"
-      @guardado="() => {}"
+      @guardado="() => { if (!isMock) void cargarDatosReales() }"
     />
 
     <!-- Delete Liquidacion Dialog -->
