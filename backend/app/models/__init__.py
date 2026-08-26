@@ -1,7 +1,16 @@
 from app.db.base import Base
 from app.models.audit import AuditLog
 from app.models.clientes import Cliente
-from app.models.finanzas import MovimientoFinanciero, SociosConfiguracion
+from app.models.finanzas import (
+    Anticipo,
+    AnticipoEstado,
+    DistribucionEstado,
+    Liquidacion,
+    LiquidacionDistribucion,
+    LiquidacionEstado,
+    MovimientoFinanciero,
+    SociosConfiguracion,
+)
 from app.models.insumos import CategoriaInsumo, CompraInsumo, Insumo
 from app.models.migracion import MigracionOmision
 from app.models.productos import (
@@ -35,5 +44,11 @@ __all__ = [
     "DevolucionItem",
     "SociosConfiguracion",
     "MovimientoFinanciero",
+    "Liquidacion",
+    "LiquidacionDistribucion",
+    "Anticipo",
+    "LiquidacionEstado",
+    "DistribucionEstado",
+    "AnticipoEstado",
     "MigracionOmision",
 ]
