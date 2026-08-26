@@ -6,9 +6,18 @@
 - GET/POST/PATCH/DELETE /finanzas/socios: SociosConfiguracion management with
   the global sum-to-100 invariant enforced in the service layer.
 
+v4 (PR2):
+- GET/POST/PATCH/DELETE /finanzas/socios: extended socia profile (SOC-1), sum-to-100
+  over activo incl fondo (SOC-2), composable filters (SOC-3).
+- POST /finanzas/liquidaciones/crear + GET /{id} + PATCH /{id}/estado + DELETE /{id}:
+  real liquidacion header+distribution (LIQ-1/2/3).
+- GET/POST /finanzas/anticipos + PATCH /{id}/descuento + PATCH /{id}/estado: anticipos
+  with atomic discount link (ANT-1/2/3).
+
 Mutations require admin|operador; lists are audited (admin|operador|consulta).
 """
 
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -19,11 +28,25 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.deps import get_current_user, get_db, require_roles
 from app.core.limiter import user_limiter
-from app.models.finanzas import DocumentState, MovimientoFinanciero, SociosConfiguracion
+from app.models.finanzas import (
+    Anticipo,
+    AnticipoEstado,
+    DocumentState,
+    Liquidacion,
+    MovimientoFinanciero,
+    SociosConfiguracion,
+)
 from app.models.usuarios import Usuario
 from app.schemas.common import Paginated
 from app.schemas.finanzas import (
+    AnticipoCreate,
+    AnticipoDescuentoUpdate,
+    AnticipoEstadoUpdate,
+    AnticipoRead,
     LiquidacionCreate,
+    LiquidacionEstadoUpdate,
+    LiquidacionRead,
+    LiquidacionSettlementCreate,
     MovimientoCreate,
     MovimientoRead,
     MovimientoStateTransition,
@@ -35,12 +58,22 @@ from app.schemas.finanzas import (
 from app.services.audit import audit_movimiento_create
 from app.services.finanzas import (
     actualizar_movimiento,
+    actualizar_socia_configuracion,
     actualizar_socio_configuracion,
+    crear_anticipo,
+    crear_liquidacion,
     crear_movimiento,
+    crear_socia_configuracion,
     crear_socio_configuracion,
+    descontar_anticipo,
+    eliminar_anticipo,
+    eliminar_liquidacion,
     eliminar_movimiento,
     eliminar_socio_configuracion,
+    listar_socias,
     settle_liquidacion,
+    transicionar_anticipo,
+    transicionar_liquidacion,
 )
 from app.services.paginacion import aplicar_orden, paginar
 
@@ -210,9 +243,9 @@ def transition_movimiento_state(
     status_code=status.HTTP_201_CREATED,
 )
 @_critical_limiter.limit("30/minute")
-def crear_liquidacion(
+def crear_liquidacion_settlement(
     request: Request,
-    payload: LiquidacionCreate,
+    payload: LiquidacionSettlementCreate,
     db: Session = Depends(get_db),
     _: Usuario = Depends(mutation_user),
 ):
@@ -222,7 +255,7 @@ def crear_liquidacion(
 
 
 # ---------------------------------------------------------------------------
-# SociosConfiguracion management (FIN-2)
+# SociosConfiguracion management (FIN-2 / v4 SOC-1/SOC-2/SOC-3)
 # ---------------------------------------------------------------------------
 
 
@@ -233,16 +266,30 @@ def list_socios(
     limit: int = 50,
     offset: int = 0,
     q: str | None = None,
+    activo: bool | None = None,
+    es_fondo_taller: bool | None = None,
+    rol: str | None = None,
     sort_by: str | None = None,
     order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
     _: Usuario = Depends(audited_user),
 ):
     """List partner participation rows ordered by id, paginated {items, total}
-    with an optional q search on nombre (API-1/API-3)."""
+    with composable filters activo/es_fondo_taller/rol/q (SOC-3)."""
     stmt = select(SociosConfiguracion)
-    if q is not None:
-        stmt = stmt.where(SociosConfiguracion.nombre.ilike(f"%{q}%"))
+    if activo is not None:
+        stmt = stmt.where(SociosConfiguracion.activo.is_(activo))
+    if es_fondo_taller is not None:
+        stmt = stmt.where(SociosConfiguracion.es_fondo_taller.is_(es_fondo_taller))
+    if rol is not None:
+        stmt = stmt.where(SociosConfiguracion.rol == rol)
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(
+            SociosConfiguracion.nombre.ilike(like)
+            | SociosConfiguracion.email.ilike(like)
+            | SociosConfiguracion.telefono.ilike(like)
+        )
     stmt = stmt.order_by(SociosConfiguracion.id)
     stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_SOCIOS)
     rows, total = paginar(db, stmt, limit, offset)
@@ -261,9 +308,13 @@ def create_socio(
     db: Session = Depends(get_db),
     _: Usuario = Depends(mutation_user),
 ):
-    """Create a partner row; the global sum of participations must land exactly
-    on 100 (else 422)."""
-    return crear_socio_configuracion(db, payload.nombre, payload.porcentaje_participacion)
+    """Create a socia with the extended profile (SOC-1). Sum-to-100 over active
+    rows incl fondo is checked in the service; building up to 100 is allowed,
+    exceeding it -> 422, second active fondo -> 422 (SOC-2)."""
+    data = payload.model_dump()
+    porcentaje = data.pop("porcentaje_participacion")
+    nombre = data.pop("nombre")
+    return crear_socia_configuracion(db, nombre=nombre, porcentaje=porcentaje, **data)
 
 
 @router.patch("/socios/{socio_id}", response_model=SocioConfiguracionRead)
@@ -275,9 +326,11 @@ def update_socio(
     db: Session = Depends(get_db),
     _: Usuario = Depends(mutation_user),
 ):
-    """Update a partner's share (interim rebalance below 100 allowed, never
-    above 100 -> 422)."""
-    return actualizar_socio_configuracion(db, socio_id, payload.porcentaje_participacion)
+    """Partial update of a socia profile (SOC-1). Only sent fields applied;
+    sum-to-100 over active rows incl fondo never exceeded -> 422 (SOC-2)."""
+    return actualizar_socia_configuracion(
+        db, socio_id, payload.model_dump(exclude_unset=True)
+    )
 
 
 @router.delete("/socios/{socio_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -290,3 +343,234 @@ def delete_socio(
 ):
     """Delete a partner row; blocked with 409 when the socio has payouts."""
     eliminar_socio_configuracion(db, socio_id)
+
+
+# ---------------------------------------------------------------------------
+# v4 — LIQ-1/2/3: real liquidaciones
+# ---------------------------------------------------------------------------
+
+
+def _liquidacion_response(db: Session, liq: Liquidacion) -> dict:
+    """Build the LiquidacionRead response including distribution rows and the
+    socia nombre (LIQ-1)."""
+    return {
+        "id": liq.id,
+        "codigo": liq.codigo,
+        "periodo": liq.periodo,
+        "fecha_cierre": liq.fecha_cierre,
+        "total_ventas_brutas": liq.total_ventas_brutas,
+        "costo_taller_insumos": liq.costo_taller_insumos,
+        "gastos_operativos": liq.gastos_operativos,
+        "utilidad_neta_total": liq.utilidad_neta_total,
+        "fondo_reinversion_monto": liq.fondo_reinversion_monto,
+        "utilidad_repartible": liq.utilidad_repartible,
+        "estado": liq.estado,
+        "observaciones": liq.observaciones,
+        "distribucion": [
+            {
+                "id": d.id,
+                "liquidacion_id": d.liquidacion_id,
+                "socia_id": d.socia_id,
+                "socia_nombre": d.socia.nombre if d.socia else None,
+                "porcentaje": d.porcentaje,
+                "monto_bruto": d.monto_bruto,
+                "deduccion_anticipos": d.deduccion_anticipos,
+                "monto_neto": d.monto_neto,
+                "estado_pago": d.estado_pago,
+            }
+            for d in liq.distribucion
+        ],
+    }
+
+
+@router.post(
+    "/liquidaciones/crear",
+    response_model=LiquidacionRead,
+    status_code=status.HTTP_201_CREATED,
+)
+@_critical_limiter.limit("30/minute")
+def crear_liquidacion_real(
+    request: Request,
+    payload: LiquidacionCreate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(mutation_user),
+):
+    """Create a real liquidacion header + distribution (LIQ-1). Codigo auto
+    LIQ-YYYY-NN; drift>5% persists with warning (LIQ-3)."""
+    liq, warnings = crear_liquidacion(db, payload.model_dump())
+    db.refresh(liq)
+    resp = _liquidacion_response(db, liq)
+    resp["warnings"] = warnings
+    return resp
+
+
+@router.get("/liquidaciones/{liquidacion_id}", response_model=LiquidacionRead)
+@user_limiter.limit("300/minute")
+def get_liquidacion(
+    request: Request,
+    liquidacion_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(audited_user),
+):
+    """Get one liquidacion with distribution (LIQ-1)."""
+    liq = db.get(Liquidacion, liquidacion_id)
+    if liq is None:
+        raise HTTPException(status_code=404, detail="Liquidación no encontrada")
+    resp = _liquidacion_response(db, liq)
+    resp["warnings"] = []
+    return resp
+
+
+@router.get("/liquidaciones", response_model=Paginated[LiquidacionRead])
+@user_limiter.limit("300/minute")
+def list_liquidaciones(
+    request: Request,
+    limit: int = 50,
+    offset: int = 0,
+    estado: Literal["BORRADOR", "APROBADA", "PAGADA"] | None = None,
+    periodo: str | None = None,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(audited_user),
+):
+    """Paginated list of real liquidaciones (LIQ-1)."""
+    stmt = select(Liquidacion).order_by(Liquidacion.id)
+    if estado is not None:
+        stmt = stmt.where(Liquidacion.estado == estado)
+    if periodo is not None:
+        stmt = stmt.where(Liquidacion.periodo == periodo)
+    rows, total = paginar(db, stmt, limit, offset)
+    items = [_liquidacion_response(db, liq) for liq in rows]
+    return Paginated[LiquidacionRead](items=items, total=total)
+
+
+@router.patch("/liquidaciones/{liquidacion_id}/estado", response_model=LiquidacionRead)
+@_critical_limiter.limit("30/minute")
+def patch_liquidacion_estado(
+    request: Request,
+    liquidacion_id: int,
+    payload: LiquidacionEstadoUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(mutation_user),
+):
+    """FSM BORRADOR -> APROBADA -> PAGADA; invalid/skip/revert -> 422 (LIQ-2)."""
+    liq = transicionar_liquidacion(db, liquidacion_id, payload.estado)
+    resp = _liquidacion_response(db, liq)
+    resp["warnings"] = []
+    return resp
+
+
+@router.delete("/liquidaciones/{liquidacion_id}", status_code=status.HTTP_204_NO_CONTENT)
+@_critical_limiter.limit("30/minute")
+def delete_liquidacion(
+    request: Request,
+    liquidacion_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(mutation_user),
+):
+    """Delete a BORRADOR liquidacion; children cascade, linked anticipos SET NULL
+    (LIQ-1/ANT-2)."""
+    eliminar_liquidacion(db, liquidacion_id)
+
+
+# ---------------------------------------------------------------------------
+# v4 — ANT-1/2/3: anticipos
+# ---------------------------------------------------------------------------
+
+
+def _anticipo_response(db: Session, a: Anticipo) -> dict:
+    return {
+        "id": a.id,
+        "socia_id": a.socia_id,
+        "socia_nombre": a.socia.nombre if a.socia else None,
+        "liquidacion_id": a.liquidacion_id,
+        "monto": a.monto,
+        "fecha": a.fecha,
+        "estado": a.estado,
+        "concepto": a.concepto,
+        "metodo_desembolso": a.metodo_desembolso,
+        "comprobante": a.comprobante,
+        "observaciones": a.observaciones,
+        "creado_en": a.creado_en,
+    }
+
+
+@router.get("/anticipos", response_model=Paginated[AnticipoRead])
+@user_limiter.limit("300/minute")
+def list_anticipos(
+    request: Request,
+    limit: int = 50,
+    offset: int = 0,
+    socia_id: int | None = None,
+    estado: Literal["PENDIENTE_DESCUENTO", "DESCONTADO", "ANULADO"] | None = None,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(audited_user),
+):
+    """Paginated list of anticipos, filter by socia_id/estado (ANT-3)."""
+    stmt = select(Anticipo).order_by(Anticipo.id)
+    if socia_id is not None:
+        stmt = stmt.where(Anticipo.socia_id == socia_id)
+    if estado is not None:
+        stmt = stmt.where(Anticipo.estado == estado)
+    rows, total = paginar(db, stmt, limit, offset)
+    items = [_anticipo_response(db, a) for a in rows]
+    return Paginated[AnticipoRead](items=items, total=total)
+
+
+@router.post(
+    "/anticipos",
+    response_model=AnticipoRead,
+    status_code=status.HTTP_201_CREATED,
+)
+@_critical_limiter.limit("30/minute")
+def create_anticipo(
+    request: Request,
+    payload: AnticipoCreate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(mutation_user),
+):
+    """Create an anticipo (ANT-1); nonexistent socia -> 404/422."""
+    data = payload.model_dump()
+    socia_id = data.pop("socia_id")
+    monto = data.pop("monto")
+    a = crear_anticipo(db, socia_id=socia_id, monto=monto, **data)
+    return _anticipo_response(db, a)
+
+
+@router.patch("/anticipos/{anticipo_id}/descuento", response_model=AnticipoRead)
+@_critical_limiter.limit("30/minute")
+def patch_anticipo_descuento(
+    request: Request,
+    anticipo_id: int,
+    payload: AnticipoDescuentoUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(mutation_user),
+):
+    """Atomically link an anticipo to a liquidacion + transition to DESCONTADO
+    (ANT-2). Double-discount -> 409; ANULADO -> 422 (ANT-3)."""
+    a = descontar_anticipo(db, anticipo_id, payload.liquidacion_id)
+    return _anticipo_response(db, a)
+
+
+@router.patch("/anticipos/{anticipo_id}/estado", response_model=AnticipoRead)
+@_critical_limiter.limit("30/minute")
+def patch_anticipo_estado(
+    request: Request,
+    anticipo_id: int,
+    payload: AnticipoEstadoUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(mutation_user),
+):
+    """FSM PENDIENTE_DESCUENTO -> DESCONTADO|ANULADO; terminal rejects (ANT-2)."""
+    a = transicionar_anticipo(db, anticipo_id, payload.estado)
+    return _anticipo_response(db, a)
+
+
+@router.delete("/anticipos/{anticipo_id}", status_code=status.HTTP_204_NO_CONTENT)
+@_critical_limiter.limit("30/minute")
+def delete_anticipo(
+    request: Request,
+    anticipo_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(mutation_user),
+):
+    eliminar_anticipo(db, anticipo_id)

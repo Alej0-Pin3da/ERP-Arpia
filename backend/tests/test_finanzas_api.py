@@ -362,7 +362,9 @@ def test_socio_crear_suma_exacta_100_201(client, admin_token):
 
 
 def test_socio_crear_suma_99_422(client, admin_token):
-    """Create leaving global sum at 99 -> 422, no row (boundary, FIN-2)."""
+    """Create leaving global sum at 99 -> 201 under v4 SOC-2 (building up to 100
+    row by row is allowed; only >100 is rejected). Legacy FIN-2 strict-100 no
+    longer applies after v4 rework (40+30+30 model)."""
     try:
         a_id = _crear_socio(client, admin_token, "100")
         _actualizar_socio(client, admin_token, a_id, "60")
@@ -371,7 +373,7 @@ def test_socio_crear_suma_99_422(client, admin_token):
             json={"nombre": f"Socio {_unique()}", "porcentaje_participacion": "39"},
             headers=_auth(admin_token),
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 201
     finally:
         _cleanup_all()
 
