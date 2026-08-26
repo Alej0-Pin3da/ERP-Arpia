@@ -8,6 +8,8 @@ import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import { useAtelierStore, type VentaAtelier } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
+import { useMode } from '@/composables/useMode'
+import { useVentas } from '@/composables/useVentas'
 
 const props = defineProps<{
   visible: boolean
@@ -20,6 +22,8 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
+const ventasApi = useVentas()
 
 const isEditing = computed(() => !!props.ventaEditar)
 
@@ -230,13 +234,12 @@ watch(
   { immediate: true },
 )
 
-function guardar() {
+async function guardar() {
   if (items.value.length === 0) {
     showToast('warn', 'Items requeridos', 'Debe agregar al menos una prenda o producto a la venta.')
     return
   }
 
-  // Validate garment names
   for (const it of items.value) {
     if (!it.nombre_prenda.trim()) {
       showToast('warn', 'Nombre de prenda requerido', 'Complete el nombre de todas las prendas.')
@@ -244,7 +247,6 @@ function guardar() {
     }
   }
 
-  // Determine client name
   let nombreClienteFinal = 'Cliente General'
   let cidFinal: number | null = null
 
@@ -258,53 +260,94 @@ function guardar() {
     nombreClienteFinal = clienteNombreManual.value.trim()
   }
 
-  const payload: Partial<VentaAtelier> = {
-    codigo: codigo.value || `VEN-ARP-${Date.now().toString().slice(-4)}`,
+  if (isMock.value) {
+    const payload: Partial<VentaAtelier> = {
+      codigo: codigo.value || `VEN-ARP-${Date.now().toString().slice(-4)}`,
+      cliente_id: cidFinal,
+      cliente_nombre: nombreClienteFinal,
+      fecha: fecha.value,
+      canal: canal.value,
+      metodo_pago: metodoPago.value,
+      estado: estado.value,
+      items: items.value.map((it, idx) => ({
+        id: idx + 1,
+        producto_id: it.producto_id || null,
+        nombre_prenda: it.nombre_prenda,
+        talla: it.talla,
+        color: it.color,
+        cantidad: it.cantidad,
+        precio_unitario: it.precio_unitario,
+        costo_unitario: it.costo_unitario,
+        subtotal: it.cantidad * it.precio_unitario,
+        costo_subtotal: it.cantidad * it.costo_unitario,
+      })),
+      subtotal: subtotalItems.value,
+      descuento_porcentaje: Number(descuentoPct.value) || 0,
+      descuento_valor: valorDescuento.value,
+      total_venta: totalVenta.value,
+      costo_total: costoTotalItems.value,
+      ganancia_neta: gananciaNeta.value,
+      margen_pct: margenPct.value,
+      reinversion_40: distribucion403030.value.reinversion40,
+      margarita_30: distribucion403030.value.margara30,
+      valqui_30: distribucion403030.value.valqui30,
+      observaciones: observaciones.value,
+      descontar_inventario: descontarInventario.value,
+    }
+    if (isEditing.value && props.ventaEditar) {
+      const act = atelier.actualizarVenta(props.ventaEditar.id, payload)
+      if (act) {
+        showToast('success', 'Venta Actualizada', `La venta ${act.codigo} ha sido actualizada con éxito.`)
+        emit('venta-guardada', act)
+      }
+    } else {
+      const nueva = atelier.crearVenta(payload)
+      showToast('success', 'Venta Registrada', `Venta ${nueva.codigo} guardada por ${formatCOP(nueva.total_venta)}.`)
+      emit('venta-guardada', nueva)
+    }
+    emit('update:visible', false)
+    return
+  }
+
+  // Real API — map to /ventas canonical enums (canal_venta, metodo_pago)
+  const canalMap: Record<string, string> = {
+    'Showroom Pereira': 'showroom_pereira',
+    'WhatsApp / DM': 'whatsapp',
+    'Feria / Evento NANA': 'feria',
+    'Feria Gótica': 'feria',
+    'Tienda Online / Instagram': 'web',
+    'Encargo Personalizado': 'web',
+  }
+  const pagoMap: Record<string, string> = {
+    'Transferencia Bancolombia': 'transferencia',
+    'Transferencia Nequi': 'transferencia',
+    'Transferencia Nequi / Daviplata': 'transferencia',
+    'Efectivo Showroom': 'efectivo',
+    'Datáfono / Tarjeta': 'tarjeta',
+    'Contraentrega': 'contraentrega',
+  }
+  const apiPayload = {
     cliente_id: cidFinal,
-    cliente_nombre: nombreClienteFinal,
-    fecha: fecha.value,
-    canal: canal.value,
-    metodo_pago: metodoPago.value,
-    estado: estado.value,
-    items: items.value.map((it, idx) => ({
-      id: idx + 1,
-      producto_id: it.producto_id || null,
-      nombre_prenda: it.nombre_prenda,
-      talla: it.talla,
-      color: it.color,
+    canal_venta: (canalMap[canal.value] ?? 'showroom_pereira') as never,
+    metodo_pago: (pagoMap[metodoPago.value] ?? 'transferencia') as never,
+    descuento_porcentaje: Number(descuentoPct.value) || 0,
+    es_regalo: false,
+    detalles: items.value.map((it) => ({
+      producto_id: it.producto_id ?? 1,
+      variante_id: null,
       cantidad: it.cantidad,
       precio_unitario: it.precio_unitario,
-      costo_unitario: it.costo_unitario,
-      subtotal: it.cantidad * it.precio_unitario,
-      costo_subtotal: it.cantidad * it.costo_unitario,
     })),
-    subtotal: subtotalItems.value,
-    descuento_porcentaje: Number(descuentoPct.value) || 0,
-    descuento_valor: valorDescuento.value,
-    total_venta: totalVenta.value,
-    costo_total: costoTotalItems.value,
-    ganancia_neta: gananciaNeta.value,
-    margen_pct: margenPct.value,
-    reinversion_40: distribucion403030.value.reinversion40,
-    margarita_30: distribucion403030.value.margara30,
-    valqui_30: distribucion403030.value.valqui30,
-    observaciones: observaciones.value,
-    descontar_inventario: descontarInventario.value,
   }
-
-  if (isEditing.value && props.ventaEditar) {
-    const act = atelier.actualizarVenta(props.ventaEditar.id, payload)
-    if (act) {
-      showToast('success', 'Venta Actualizada', `La venta ${act.codigo} ha sido actualizada con éxito.`)
-      emit('venta-guardada', act)
-    }
-  } else {
-    const nueva = atelier.crearVenta(payload)
-    showToast('success', 'Venta Registrada', `Venta ${nueva.codigo} guardada por ${formatCOP(nueva.total_venta)}.`)
-    emit('venta-guardada', nueva)
+  try {
+    const creada = await ventasApi.create(apiPayload as never)
+    showToast('success', 'Venta Registrada', `Venta ${(creada as unknown as Record<string, unknown>).codigo ?? 'creada'} guardada en BD.`)
+    emit('venta-guardada', creada as unknown as VentaAtelier)
+    emit('update:visible', false)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al guardar venta'
+    showToast('error', 'Error', String(msg))
   }
-
-  emit('update:visible', false)
 }
 </script>
 

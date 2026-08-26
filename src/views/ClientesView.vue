@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
@@ -7,8 +7,55 @@ import { useAtelierStore, type ClienteCRM } from '@/stores/atelier'
 import NuevoClienteModal from '@/components/atelier/NuevoClienteModal.vue'
 import FichaTallasClienteModal from '@/components/atelier/FichaTallasClienteModal.vue'
 import { showToast } from '@/utils/toast'
+import { useMode } from '@/composables/useMode'
+import { useClientes } from '@/composables/useClientes'
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
+const clientesApi = useClientes()
+
+const clientesReal = ref<ClienteCRM[]>([])
+const cargandoClientes = ref(false)
+
+function normalizeCliente(raw: Record<string, unknown>): ClienteCRM {
+  return {
+    id: raw.id as number,
+    nombre: raw.nombre as string,
+    tipo: (raw.tipo as string) ?? 'Clienta Habitual',
+    telefono: (raw.telefono as string) ?? '',
+    email: (raw.email as string) ?? '',
+    ciudad: raw.ciudad as string | undefined,
+    direccion: raw.direccion as string | undefined,
+    pedidos_count: Number(raw.pedidos_count ?? 0),
+    total_compras: Number(raw.total_compras ?? 0),
+    talla_habitual: (raw.talla_habitual as string) ?? 'M',
+    talla_superior: raw.talla_superior as string | undefined,
+    talla_inferior: raw.talla_inferior as string | undefined,
+    categoria_preferida: (raw.categoria_preferida as string) ?? 'Corsetería & Tops',
+    tipo_producto_frecuente: raw.tipo_producto_frecuente as ClienteCRM['tipo_producto_frecuente'],
+    notas: raw.notas as string | undefined,
+    medidas: raw.medidas as ClienteCRM['medidas'],
+  }
+}
+
+async function cargarClientesReales() {
+  if (isMock.value) return
+  cargandoClientes.value = true
+  try {
+    const res = await clientesApi.list({ limit: 100, offset: 0 })
+    clientesReal.value = (res.items as unknown as Record<string, unknown>[]).map(normalizeCliente)
+  } catch {
+    // keep fallback
+  } finally {
+    cargandoClientes.value = false
+  }
+}
+
+onMounted(() => void cargarClientesReales())
+watch(isMock, () => void cargarClientesReales())
+watch(showModal, (v) => { if (!v && !isMock.value) void cargarClientesReales() })
+
+const clientesList = computed<ClienteCRM[]>(() => (isMock.value ? (atelier.clientes as unknown as ClienteCRM[]) : clientesReal.value))
 const search = ref('')
 const filtroTalla = ref('TODAS')
 const filtroCategoria = ref('TODAS')
@@ -37,17 +84,17 @@ const categoriasFiltroOptions = [
   { label: 'Accesorios & Merch', value: 'Accesorios' },
 ]
 
-const totalClientas = computed(() => atelier.clientes.length)
+const totalClientas = computed(() => clientesList.value.length)
 
 const clientasConTalla = computed(() => {
-  return atelier.clientes.filter((c) => {
+  return clientesList.value.filter((c) => {
     const t = c.talla_habitual || ''
     return ['XXS', 'XS', 'S', 'M', 'L', 'XL'].some((size) => t.includes(size))
   }).length
 })
 
 const clientasSinTalla = computed(() => {
-  return atelier.clientes.filter((c) => {
+  return clientesList.value.filter((c) => {
     const t = c.talla_habitual || ''
     const cat = c.categoria_preferida || ''
     return t.includes('Sin Talla') || t.includes('Tote') || cat.includes('Tote Bags') || cat.includes('Accesorios')
@@ -55,11 +102,11 @@ const clientasSinTalla = computed(() => {
 })
 
 const totalFacturadoCRM = computed(() => {
-  return atelier.clientes.reduce((sum, c) => sum + (c.total_compras || 0), 0)
+  return clientesList.value.reduce((sum, c) => sum + (c.total_compras || 0), 0)
 })
 
 const clientesFiltrados = computed(() => {
-  return atelier.clientes.filter((c) => {
+  return clientesList.value.filter((c) => {
     const q = search.value.trim().toLowerCase()
     const matchesQuery =
       !q ||
@@ -109,16 +156,27 @@ function abrirFichaTalla(c: ClienteCRM) {
 }
 
 function abrirGuiaGeneral() {
-  clienteSeleccionado.value = atelier.clientes[0] || null
+  clienteSeleccionado.value = clientesList.value[0] || null
   showTallasModal.value = true
 }
 
-function eliminar(c: ClienteCRM) {
-  const idx = atelier.clientes.findIndex((x) => x.id === c.id)
-  if (idx !== -1) {
-    const eliminado = atelier.clientes[idx].nombre
-    atelier.clientes.splice(idx, 1)
-    showToast('info', 'Clienta eliminada', `${eliminado} ha sido removida del CRM.`)
+async function eliminar(c: ClienteCRM) {
+  if (isMock.value) {
+    const idx = atelier.clientes.findIndex((x) => x.id === c.id)
+    if (idx !== -1) {
+      const eliminado = atelier.clientes[idx].nombre
+      atelier.clientes.splice(idx, 1)
+      showToast('info', 'Clienta eliminada', `${eliminado} ha sido removida del CRM.`)
+    }
+    return
+  }
+  try {
+    await clientesApi.remove(c.id)
+    await cargarClientesReales()
+    showToast('info', 'Clienta eliminada', `${c.nombre} eliminada del CRM.`)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Error al eliminar clienta'
+    showToast('error', 'Error', String(msg))
   }
 }
 
@@ -269,7 +327,7 @@ function abrirWhatsApp(c: ClienteCRM) {
           : 'bg-stone-900 text-stone-400 border-stone-800 hover:text-stone-200'"
         @click="filtroTalla = 'TODAS'"
       >
-        Todas ({{ atelier.clientes.length }})
+        Todas ({{ clientesList.length }})
       </button>
 
       <button

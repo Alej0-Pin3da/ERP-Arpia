@@ -7,6 +7,8 @@ import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import { useAtelierStore, type ClienteCRM } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
+import { useMode } from '@/composables/useMode'
+import { useClientes } from '@/composables/useClientes'
 
 const props = defineProps<{
   visible: boolean
@@ -19,6 +21,8 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
+const clientesApi = useClientes()
 
 const nombre = ref('')
 const tipo = ref('Clienta Habitual')
@@ -98,7 +102,7 @@ function seleccionarTallaRapida(talla: string) {
   }
 }
 
-function guardar() {
+async function guardar() {
   if (!nombre.value.trim()) {
     showToast('warn', 'Nombre requerido', 'Ingresa el nombre de la clienta.')
     return
@@ -107,30 +111,59 @@ function guardar() {
   const esSinTalla = tallaHabitual.value.includes('Sin Talla') || categoriaPreferida.value.includes('Tote Bags')
   const tipoFrecuente = esSinTalla ? 'PRODUCTOS_SIN_TALLA' : 'PRENDAS_TALLAS'
 
-  const payload: Partial<ClienteCRM> = {
+  if (isMock.value) {
+    const payload: Partial<ClienteCRM> = {
+      nombre: nombre.value.trim(),
+      tipo: tipo.value,
+      telefono: telefono.value.trim(),
+      email: email.value.trim(),
+      ciudad: ciudad.value.trim(),
+      direccion: direccion.value.trim(),
+      talla_habitual: tallaHabitual.value,
+      talla_superior: tallaSuperior.value,
+      talla_inferior: tallaInferior.value,
+      categoria_preferida: categoriaPreferida.value,
+      tipo_producto_frecuente: tipoFrecuente,
+      notas: notas.value.trim(),
+    }
+    if (props.clienteEditar) {
+      atelier.actualizarCliente(props.clienteEditar.id, payload)
+      showToast('success', 'Clienta Actualizada', `${nombre.value} actualizada correctamente.`)
+    } else {
+      const c = atelier.crearCliente(payload)
+      showToast('success', 'Clienta Registrada', `${c.nombre} registrada en el CRM con talla ${tallaHabitual.value}.`)
+    }
+    emit('update:visible', false)
+    return
+  }
+
+  const apiPayload = {
     nombre: nombre.value.trim(),
     tipo: tipo.value,
-    telefono: telefono.value.trim(),
-    email: email.value.trim(),
-    ciudad: ciudad.value.trim(),
-    direccion: direccion.value.trim(),
-    talla_habitual: tallaHabitual.value,
-    talla_superior: tallaSuperior.value,
-    talla_inferior: tallaInferior.value,
-    categoria_preferida: categoriaPreferida.value,
+    telefono: telefono.value.trim() || null,
+    email: email.value.trim() || null,
+    ciudad: ciudad.value.trim() || null,
+    direccion: direccion.value.trim() || null,
+    talla_habitual: tallaHabitual.value || null,
+    talla_superior: tallaSuperior.value || null,
+    talla_inferior: tallaInferior.value || null,
+    categoria_preferida: categoriaPreferida.value || null,
     tipo_producto_frecuente: tipoFrecuente,
-    notas: notas.value.trim(),
+    notas: notas.value.trim() || null,
   }
-
-  if (props.clienteEditar) {
-    atelier.actualizarCliente(props.clienteEditar.id, payload)
-    showToast('success', 'Clienta Actualizada', `${nombre.value} actualizada correctamente.`)
-  } else {
-    const c = atelier.crearCliente(payload)
-    showToast('success', 'Clienta Registrada', `${c.nombre} registrada en el CRM con talla ${tallaHabitual.value}.`)
+  try {
+    if (props.clienteEditar) {
+      await clientesApi.update(props.clienteEditar.id, apiPayload)
+      showToast('success', 'Clienta Actualizada', `${nombre.value} actualizada.`)
+    } else {
+      await clientesApi.create(apiPayload)
+      showToast('success', 'Clienta Registrada', `${nombre.value} registrada en BD.`)
+    }
+    emit('update:visible', false)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al guardar clienta'
+    showToast('error', 'Error', String(msg))
   }
-
-  emit('update:visible', false)
 }
 </script>
 
