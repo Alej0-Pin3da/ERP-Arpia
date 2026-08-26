@@ -43,7 +43,7 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Integration (frontend adapter + vitest + docs)
 
-- [ ] 3.1 Create `src/services/api/socios.ts` `liquidaciones.ts` `anticipos.ts` via client (~2h) — Test: `npm run test -- services/api` — Harness: `curl real` — Rollback: delete 3 files
-- [ ] 3.2 Create `src/composables/useSocios.ts` `useFinanzas.ts` isMock via useMode (~1.5h) — Test: `npm run test -- useSocios` — Harness: `VITE_USE_MOCK true/false` — Rollback: delete 2 files
-- [ ] 3.3 Vitest `src/composables/useSocios.test.ts` `useFinanzas.test.ts` isMock->atelier vs api (~1.5h) — Test: `npm run test -- useSocios.test` — Harness: N/A jsdom — Rollback: delete tests
-- [ ] 3.4 Modify `src/stores/atelier.ts` @deprecated + `CambiosV3.md` (~0.5h) — Test: `pytest -q && npm run test -q` — Harness: `F5 persists` — Rollback: revert 2 files
+- [x] 3.1 Create `src/services/api/socios.ts` `liquidaciones.ts` `anticipos.ts` via client (~2h) — Test: `npm run test -- services/api` — Harness: `curl real` — Rollback: delete 3 files
+- [x] 3.2 Create `src/composables/useSocios.ts` `useFinanzas.ts` isMock via useMode (~1.5h) — Test: `npm run test -- useSocios` — Harness: `VITE_USE_MOCK true/false` — Rollback: delete 2 files
+- [x] 3.3 Vitest `src/composables/useSocios.test.ts` `useFinanzas.test.ts` isMock->atelier vs api (~1.5h) — Test: `npm run test -- useSocios.test` — Harness: N/A jsdom — Rollback: delete tests
+- [x] 3.4 Modify `src/stores/atelier.ts` @deprecated + `CambiosV3.md` (~0.5h) — Test: `pytest -q && npm run test -q` — Harness: `F5 persists` — Rollback: revert 2 files
