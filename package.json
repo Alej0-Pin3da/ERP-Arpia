@@ -10,10 +10,15 @@
   "scripts": {
     "dev": "tsx server.ts",
     "dev:real": "cross-env USE_MOCK=false tsx server.ts",
+    "dev:all": "pwsh -ExecutionPolicy Bypass -File scripts/start-all.ps1",
+    "dev:all:prod": "pwsh -ExecutionPolicy Bypass -File scripts/start-all.ps1 -Mode prod",
+    "dev:all:docker": "pwsh -ExecutionPolicy Bypass -File scripts/start-all.ps1 -UseDockerApi",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.mjs",
     "start": "node dist/server.mjs",
     "start:real": "cross-env USE_MOCK=false node dist/server.mjs",
     "start:mock": "cross-env USE_MOCK=true node dist/server.mjs",
+    "start:all": "pwsh -ExecutionPolicy Bypass -File scripts/start-all.ps1 -Mode prod",
+    "start:all:docker": "pwsh -ExecutionPolicy Bypass -File scripts/start-all.ps1 -Mode prod -UseDockerApi",
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint ."
