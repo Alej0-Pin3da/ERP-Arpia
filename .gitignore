@@ -31,3 +31,11 @@ backend/migrate/reports/
 .idea/prettier.xml
 .idea/vcs.xml
 .idea/inspectionProfiles/profiles_settings.xml
+
+# Logs efímeros de verify/build (no commitear)
+backend_tests*.txt
+build_output.txt
+frontend_tests.txt
+log.txt
+backend_tests_legacy.txt
+backend_tests_v4_output.txt
