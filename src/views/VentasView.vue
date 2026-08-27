@@ -73,7 +73,6 @@ async function cargarVentasReales() {
 
 onMounted(() => void cargarVentasReales())
 watch(isMock, () => void cargarVentasReales())
-watch(showNuevaVentaModal, (v) => { if (!v && !isMock.value) void cargarVentasReales() })
 
 const ventasList = computed<VentaAtelier[]>(() => (isMock.value ? (atelier.ventas as unknown as VentaAtelier[]) : ventasReal.value))
 void cargandoVentas
@@ -92,6 +91,8 @@ const showDeleteConfirmModal = ref(false)
 const ventaSeleccionadaEditar = ref<VentaAtelier | null>(null)
 const ventaSeleccionadaDetalle = ref<VentaAtelier | null>(null)
 const ventaAEliminar = ref<VentaAtelier | null>(null)
+
+watch(showNuevaVentaModal, (v) => { if (!v && !isMock.value) void cargarVentasReales() })
 
 const canalesFilterOptions = [
   { label: 'Todos los Canales', value: 'TODOS' },
