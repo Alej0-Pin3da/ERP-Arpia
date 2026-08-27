@@ -14,11 +14,10 @@ import { computed, ref, onMounted } from 'vue'
 
 type ApiMode = 'MOCK' | 'REAL'
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined
-
 function envMode(): ApiMode {
+  const rawBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined
   const raw = (rawBaseUrl ?? '').trim()
-  if (!raw || raw.startsWith('/api')) return 'MOCK'
+  if (!raw || raw.startsWith('/api')) return 'REAL' // V4 data-first default
   const lower = raw.toLowerCase()
   const isExternalHost =
     lower.includes('http') || lower.includes(':8000') || lower.includes(':5433') || lower.includes('backend')

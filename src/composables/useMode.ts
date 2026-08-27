@@ -25,7 +25,10 @@ function envMode(): ApiMode {
       return 'REAL'
     }
   }
-  return 'MOCK'
+  // V4 data-first default: REAL. Mock is opt-in via VITE_USE_MOCK=true or the
+  // live /api/__mode probe reporting 'mock'. This is what makes real Postgres
+  // data show even when VITE_USE_MOCK is unset (e.g. npm run dev:all).
+  return 'REAL'
 }
 
 export function useMode() {
