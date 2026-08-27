@@ -17,16 +17,9 @@ export interface AuthUser {
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref<AuthUser | null>(
-    readStoredUser() as AuthUser | null ?? {
-      id: 1,
-      nombre: 'Valeria Arpía',
-      email: 'admin@arpia.com.co',
-      rol: 'admin',
-    }
-  )
+  const user = ref<AuthUser | null>(readStoredUser() as AuthUser | null)
 
-  const token = ref<string | null>(readAccessToken() ?? 'dev-token-arpia')
+  const token = ref<string | null>(readAccessToken())
 
   const isAuthenticated = computed(() => Boolean(user.value))
   const role = computed<'admin' | 'operador' | 'consulta'>(() => user.value?.rol || 'operador')
@@ -34,15 +27,35 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(email: string, pass: string): Promise<void> {
     try {
       const res = await client.post('/auth/login', { email, password: pass })
-      if (res.data && res.data.user) {
-        user.value = res.data.user
-        token.value = res.data.access_token || 'session-token'
-        writeTokens(token.value, res.data.refresh_token)
-        writeStoredUser(res.data.user)
-        return
+      const data = res.data as Record<string, unknown>
+      const access = data.access_token as string | undefined
+      if (!access) {
+        throw new Error('Login response missing access_token')
       }
+      token.value = access
+      writeTokens(access, (data.refresh_token as string | undefined) ?? undefined)
+      // Poblar el user real desde /auth/me con el token recién obtenido.
+      try {
+        const me = await client.get('/auth/me')
+        const m = me.data as Record<string, unknown>
+        user.value = {
+          id: Number(m.id ?? 1),
+          nombre: String(m.nombre ?? 'Usuario'),
+          email: String(m.email ?? email),
+          rol: (m.rol as AuthUser['rol']) || (data.rol as AuthUser['rol']) || 'operador',
+        }
+      } catch {
+        // Si /auth/me falla, usar el rol del token de login.
+        user.value = {
+          id: 1,
+          nombre: 'Usuario',
+          email,
+          rol: (data.rol as AuthUser['rol']) || 'operador',
+        }
+      }
+      writeStoredUser(user.value)
     } catch {
-      // Fallback in-memory matching
+      // Fallback in-memory matching (modo MOCK)
       if (email.includes('admin') || pass === 'admin123') {
         user.value = { id: 1, nombre: 'Valeria Arpía', email, rol: 'admin' }
       } else if (email.includes('oper') || pass === 'oper123') {
