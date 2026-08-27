@@ -63,10 +63,27 @@ if (-not (Test-DockerDaemon)) {
   Write-Host "Docker daemon listo" -ForegroundColor Green
 }
 
-# Puerto backend: default 8080 (Docker). Si 8080 está ocupado, probar 8081, 8082...
-# (8000 lo usa Splunk, evitarlo siempre para la API.)
-$BackendPort = 8080
-while ((Get-Occupant $BackendPort) -and $BackendPort -lt 8090) { $BackendPort++ }
+# Puerto backend: si la API docker ya corre, usar su puerto host real (docker port).
+# Si no, default 8000 (o COMPOSE_API_PORT si se pasó). Evita matar splunkd.
+$BackendPort = 8000
+try {
+  $hostPort = (docker port arpia-api 2>$null | Select-String '0.0.0.0:(\d+)->8000' | Select-Object -First 1).Matches.Groups[1].Value
+  if ($hostPort) { $BackendPort = [int]$hostPort }
+} catch {}
+# Si 8000 default está ocupado por algo que no es Docker (splunkd), buscar puerto libre >=8080
+$portTakenByNonDocker = $false
+try {
+  $occ = Get-Occupant $BackendPort
+  if ($occ) {
+    $pn = (Get-Process -Id $occ -ErrorAction SilentlyContinue).ProcessName
+    if ($pn -and $pn -notin @('wslrelay','com.docker.backend','docker','python','uvicorn','node')) { $portTakenByNonDocker = $true }
+  }
+} catch { $portTakenByNonDocker = $false }
+if ($portTakenByNonDocker) {
+  Write-Warning "Puerto $BackendPort ocupado por no-backend. Buscando puerto libre desde 8080..."
+  $BackendPort = 8080
+  while ((Get-Occupant $BackendPort) -and $BackendPort -lt 8095) { $BackendPort++ }
+}
 Write-Host "Backend port: $BackendPort" -ForegroundColor DarkGray
 $env:API_PROXY_TARGET = "http://localhost:$BackendPort"
 
@@ -85,8 +102,14 @@ else { Write-Warning "DB no dio healthy. docker logs arpia-db:"; docker logs --t
 # 2) Backend
 if (-not $UseLocalApi) {
   Write-Step "2/3 — Backend FastAPI via Docker (arpia-api) en :$BackendPort"
-  $env:COMPOSE_API_PORT = "$BackendPort"
-  docker compose up -d api 2>&1 | Out-Host
+  $apiRunning = docker ps --filter "name=^/arpia-api$" --format "{{.Names}}" 2>$null
+  if ($apiRunning -eq 'arpia-api') {
+    Write-Host "arpia-api ya corre (puerto host $BackendPort) — no se recrea." -ForegroundColor Green
+    $env:API_PROXY_TARGET = "http://localhost:$BackendPort"
+  } else {
+    $env:COMPOSE_API_PORT = "$BackendPort"
+    docker compose up -d api 2>&1 | Out-Host
+  }
   $ok = Wait-Url "http://localhost:$BackendPort/docs" 60
   if (-not $ok) {
     Write-Warning "API no respondió en :$BackendPort. docker logs arpia-api:"
