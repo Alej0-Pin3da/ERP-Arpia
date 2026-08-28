@@ -39,6 +39,10 @@ class Insumo(Base):
     costo_promedio_actual: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
+    codigo: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    descripcion: Mapped[str | None] = mapped_column(String, nullable=True)
+    tipo: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    ubicacion: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     categoria: Mapped[CategoriaInsumo] = relationship(back_populates="insumos")
     compras: Mapped[list[CompraInsumo]] = relationship(back_populates="insumo", lazy="selectin")

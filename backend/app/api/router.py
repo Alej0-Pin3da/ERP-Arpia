@@ -14,6 +14,7 @@ from app.api.routes import (
     insumos,
     maestros,
     omisiones,
+    produccion,
     productos,
     tipos_productos,
     usuarios,
@@ -37,4 +38,15 @@ api_router.include_router(finanzas.router)
 api_router.include_router(analiticos.router)
 api_router.include_router(omisiones.router)
 api_router.include_router(maestros.router)
+api_router.include_router(produccion.router_prendas)
+api_router.include_router(produccion.router_pedidos)
 api_router.include_router(audit.router)
+
+
+@api_router.get("/__mode", tags=["mode"])
+def get_mode():
+    return {
+        "mode": "real",
+        "db_connected": True,
+        "version": "V4",
+    }

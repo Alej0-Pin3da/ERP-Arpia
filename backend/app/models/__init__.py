@@ -13,6 +13,13 @@ from app.models.finanzas import (
 )
 from app.models.insumos import CategoriaInsumo, CompraInsumo, Insumo
 from app.models.migracion import MigracionOmision
+from app.models.produccion import (
+    PedidoProduccion,
+    PedidoProduccionEstado,
+    PedidoProduccionPrioridad,
+    PrendaConfeccionada,
+    PrendaEstado,
+)
 from app.models.productos import (
     BomInsumo,
     BomProducto,
@@ -48,6 +55,11 @@ __all__ = [
     "VarianteProducto",
     "BomInsumo",
     "BomProducto",
+    "PedidoProduccion",
+    "PedidoProduccionEstado",
+    "PedidoProduccionPrioridad",
+    "PrendaConfeccionada",
+    "PrendaEstado",
     "Venta",
     "DetalleVenta",
     "Devolucion",

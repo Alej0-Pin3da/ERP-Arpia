@@ -18,8 +18,11 @@ audited_user = require_roles("admin", "operador", "consulta")
 # (inner join — categoria_id is NOT NULL).
 _SORTABLE_INSUMOS = {
     "id": Insumo.id,
+    "codigo": Insumo.codigo,
     "nombre": Insumo.nombre,
     "unidad_medida": Insumo.unidad_medida,
+    "tipo": Insumo.tipo,
+    "ubicacion": Insumo.ubicacion,
     "stock_actual": Insumo.stock_actual,
     "stock_minimo": Insumo.stock_minimo,
     "costo_promedio_actual": Insumo.costo_promedio_actual,
@@ -39,13 +42,12 @@ def list_insumos(
     offset: int = 0,
     q: str | None = None,
     categoria_id: int | None = None,
+    tipo: str | None = None,
     sort_by: str | None = None,
     order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
     _: Insumo = Depends(audited_user),
 ):
-    # Categoria joined once up-front so the categoria sort key works without
-    # adding joins later (categoria_id is NOT NULL, so the inner join is safe).
     stmt = (
         select(Insumo)
         .join(Insumo.categoria)
@@ -57,10 +59,15 @@ def list_insumos(
             or_(
                 Insumo.nombre.ilike(f"%{q}%"),
                 Insumo.unidad_medida.ilike(f"%{q}%"),
+                Insumo.codigo.ilike(f"%{q}%"),
+                Insumo.tipo.ilike(f"%{q}%"),
+                Insumo.ubicacion.ilike(f"%{q}%"),
             )
         )
     if categoria_id is not None:
         stmt = stmt.where(Insumo.categoria_id == categoria_id)
+    if tipo is not None:
+        stmt = stmt.where(Insumo.tipo.ilike(f"%{tipo}%"))
     stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_INSUMOS)
     rows, total = paginar(db, stmt, limit, offset)
     return Paginated[InsumoRead](items=[_to_read(i) for i in rows], total=total)
@@ -95,6 +102,7 @@ def create_insumo(
 
 
 @router.put("/{insumo_id}", response_model=InsumoRead)
+@router.patch("/{insumo_id}", response_model=InsumoRead)
 def update_insumo(
     insumo_id: int,
     payload: InsumoUpdate,
@@ -104,6 +112,8 @@ def update_insumo(
     insumo = db.get(Insumo, insumo_id)
     if insumo is None:
         raise HTTPException(status_code=404, detail="Insumo not found")
+    if payload.categoria_id is not None and db.get(CategoriaInsumo, payload.categoria_id) is None:
+        raise HTTPException(status_code=400, detail="Categoria does not exist")
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(insumo, field, value)
     db.commit()

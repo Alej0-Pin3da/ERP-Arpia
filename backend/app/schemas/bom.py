@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -8,6 +9,9 @@ class BomInsumoBase(BaseModel):
     variante_id: int | None = None
     cantidad_requerida: Decimal = Field(gt=0)
     porcentaje_desperdicio: Decimal = Field(default=Decimal("0"), ge=0, le=100)
+    fases: list[Any] | dict[str, Any] | None = None
+    tiempo_estimado_minutos: int | None = Field(default=None, ge=0)
+    markup_porcentual: Decimal | None = Field(default=None, ge=0)
 
 
 class BomInsumoCreate(BomInsumoBase):
@@ -19,6 +23,9 @@ class BomInsumoUpdate(BaseModel):
     variante_id: int | None = None
     cantidad_requerida: Decimal | None = Field(default=None, gt=0)
     porcentaje_desperdicio: Decimal | None = Field(default=None, ge=0, le=100)
+    fases: list[Any] | dict[str, Any] | None = None
+    tiempo_estimado_minutos: int | None = Field(default=None, ge=0)
+    markup_porcentual: Decimal | None = Field(default=None, ge=0)
 
 
 class BomInsumoRead(BomInsumoBase):
@@ -31,6 +38,9 @@ class BomInsumoRead(BomInsumoBase):
 class BomProductoBase(BaseModel):
     producto_incluido_id: int
     cantidad: Decimal = Field(gt=0)
+    fases: list[Any] | dict[str, Any] | None = None
+    tiempo_estimado_minutos: int | None = Field(default=None, ge=0)
+    markup_porcentual: Decimal | None = Field(default=None, ge=0)
 
 
 class BomProductoCreate(BomProductoBase):
@@ -40,6 +50,9 @@ class BomProductoCreate(BomProductoBase):
 class BomProductoUpdate(BaseModel):
     producto_incluido_id: int | None = None
     cantidad: Decimal | None = Field(default=None, gt=0)
+    fases: list[Any] | dict[str, Any] | None = None
+    tiempo_estimado_minutos: int | None = Field(default=None, ge=0)
+    markup_porcentual: Decimal | None = Field(default=None, ge=0)
 
 
 class BomProductoRead(BomProductoBase):

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -87,6 +88,9 @@ class BomInsumo(Base):
     porcentaje_desperdicio: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
+    fases: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
+    tiempo_estimado_minutos: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    markup_porcentual: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True)
 
     producto: Mapped[Producto] = relationship(back_populates="bom_insumos")
     insumo: Mapped[Insumo] = relationship(lazy="selectin")  # noqa: F821
@@ -110,6 +114,9 @@ class BomProducto(Base):
         ForeignKey("Productos.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     cantidad: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
+    fases: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
+    tiempo_estimado_minutos: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    markup_porcentual: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True)
 
     combo: Mapped[Producto] = relationship(foreign_keys=[combo_id], backref="combo_items")
     producto_incluido: Mapped[Producto] = relationship(foreign_keys=[producto_incluido_id])

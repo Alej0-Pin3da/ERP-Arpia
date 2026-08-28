@@ -7,6 +7,10 @@ class InsumoBase(BaseModel):
     categoria_id: int
     nombre: str = Field(min_length=1, max_length=255)
     unidad_medida: str = Field(min_length=1, max_length=50)
+    codigo: str | None = Field(default=None, max_length=50)
+    descripcion: str | None = None
+    tipo: str | None = Field(default=None, max_length=50)
+    ubicacion: str | None = Field(default=None, max_length=100)
 
 
 class InsumoCreate(InsumoBase):
@@ -19,6 +23,10 @@ class InsumoUpdate(BaseModel):
     categoria_id: int | None = None
     nombre: str | None = Field(default=None, min_length=1, max_length=255)
     unidad_medida: str | None = Field(default=None, min_length=1, max_length=50)
+    codigo: str | None = Field(default=None, max_length=50)
+    descripcion: str | None = None
+    tipo: str | None = Field(default=None, max_length=50)
+    ubicacion: str | None = Field(default=None, max_length=100)
     stock_actual: Decimal | None = Field(default=None, ge=0)
     stock_minimo: Decimal | None = Field(default=None, ge=0)
     costo_promedio_actual: Decimal | None = Field(default=None, ge=0)
