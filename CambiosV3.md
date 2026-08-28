@@ -362,5 +362,16 @@ Auditoría modo REAL detectó 3 clases sistémicas: (1) `NuevaVentaModal` enviab
 
 ---
 
+### [2026-08-27] — Fix: `NuevaVentaModal` clientes fantasma + 409 stock/estado/variante
+
+#### Causa
+(1) `clientesOptions` y `catalogoPrendasOptions` usaban siempre `atelier.clientes/prendasListas` (mock: Valentina, Camila, etc.) aunque en REAL la DB tiene `gaby, celes, Maira...` (14 filas) → dropdown mostraba clientas inexistentes y `cliente_id` fantasma daba `404` o `409` si se mandaba id inexistente. (2) `POST /ventas` daba `409 Conflict` por 3 motivos encadenados: `Insumos` sin stock (`Caja/Envio/Papel/Vela` y luego `Elastico 0.6`), `Venta` creada con `estado='confirmed'` (modelo) vs DB check `completada/anulada` → `IntegrityError`, y `producto 6` con variantes sin `variante_id` → `400` pero el fallback `producto_id ?? 1` ocultaba el error.
+
+#### Fix
+- **`src/components/atelier/NuevaVentaModal.vue`**: ahora carga `clientesReal` via `useClientes().list` y `productosReal` via `GET /productos` cuando `!isMock`; `clientesOptions/catalogoPrendasOptions` con `isMock ? atelier : real`; `seleccionarPrendaCatalogo` async fetchea `GET /productos/{id}/variantes` y setea `variante_id` + talla; `guardar` mapeo `canal/metodo` ya existente + `detalles[].variante_id` y `cidFinal` con fallback `null` si cliente fantasma; toast 409 ahora muestra `Stock insuficiente: <insumo>`.
+- **`backend/app/services/inventory.py`**: `registrar_venta` ahora `estado="completada"` explícito (antes default `confirmed` violaba `CHECK completada/anulada` → 409 genérico). Rebuild `api` + `UPDATE Insumos SET stock=100 WHERE stock<10` para demo. Verificado `POST /ventas` con `producto 6/variante 3` y `producto 13` → `201` con `VEN-0027`.
+
+---
+
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.

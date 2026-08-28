@@ -197,6 +197,7 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
         descuento_porcentaje=descuento,
         total_venta=total_venta,
         es_regalo=es_regalo,
+        estado="completada",
     )
     db.add(venta)
     for i, detalle in enumerate(detalles):

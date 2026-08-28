@@ -10,6 +10,8 @@ import { useAtelierStore, type VentaAtelier } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
 import { useMode } from '@/composables/useMode'
 import { useVentas } from '@/composables/useVentas'
+import { useClientes } from '@/composables/useClientes'
+import { client } from '@/api/client'
 import type { CanalVenta, MetodoPago, VentaCreatePayload } from '@/services/api/ventas'
 import { updateVenta } from '@/services/api/ventas'
 
@@ -26,6 +28,24 @@ const emit = defineEmits<{
 const atelier = useAtelierStore()
 const { isMock } = useMode()
 const ventasApi = useVentas()
+const clientesApi = useClientes()
+
+const clientesReal = ref<{ id: number; nombre: string; telefono?: string | null; ciudad?: string | null }[]>([])
+const productosReal = ref<{ id: number; nombre: string; precio_venta_sugerido?: number; precio_base?: number }[]>([])
+
+async function cargarOpcionesReales() {
+  if (isMock.value) return
+  try {
+    const [cliRes, prodRes] = await Promise.all([
+      clientesApi.list({ limit: 100, offset: 0 }),
+      client.get<{ items: { id: number; nombre: string; precio_venta_sugerido?: number }[] }>('/productos', { params: { limit: 100 } }),
+    ])
+    clientesReal.value = (cliRes.items as unknown as typeof clientesReal.value) ?? []
+    productosReal.value = (prodRes.data.items as unknown as typeof productosReal.value) ?? []
+  } catch {
+    // keep mock fallback silent — will show empty placeholder and fallback producto_id 1
+  }
+}
 
 const isEditing = computed(() => !!props.ventaEditar)
 
@@ -47,6 +67,7 @@ const descontarInventario = ref(true)
 interface LocalItem {
   id: number
   producto_id?: number | null
+  variante_id?: number | null
   nombre_prenda: string
   talla: string
   color: string
@@ -105,17 +126,25 @@ const estadosOptions = [
 const tallasOptions = ['XS', 'S', 'M', 'L', 'XL', 'A Medida', 'Única']
 
 const clientesOptions = computed(() => {
-  return atelier.clientes.map((c) => ({
-    label: `${c.nombre} (${c.telefono || c.ciudad || 'Cliente'})`,
+  const src = isMock.value ? atelier.clientes : clientesReal.value
+  return (src as { id: number; nombre: string; telefono?: string | null; ciudad?: string | null }[]).map((c) => ({
+    label: `${c.nombre} (${(c as unknown as { telefono?: string }).telefono || (c as unknown as { ciudad?: string }).ciudad || 'Cliente'})`,
     value: c.id,
   }))
 })
 
 const catalogoPrendasOptions = computed(() => {
-  return atelier.prendasListas.map((p) => ({
-    label: `${p.nombre} (PVP: $${p.precio_venta.toLocaleString('es-CO')} | Stock: ${p.disponible_total})`,
+  if (isMock.value) {
+    return atelier.prendasListas.map((p) => ({
+      label: `${p.nombre} (PVP: $${p.precio_venta.toLocaleString('es-CO')} | Stock: ${p.disponible_total})`,
+      value: p.id,
+      prenda: p,
+    }))
+  }
+  return productosReal.value.map((p) => ({
+    label: `${p.nombre} (ID: ${p.id})`,
     value: p.id,
-    prenda: p,
+    prenda: p as unknown as (typeof atelier.prendasListas)[number],
   }))
 })
 
@@ -165,6 +194,7 @@ function agregarItemVacio() {
   items.value.push({
     id: Date.now() + Math.random(),
     producto_id: null,
+    variante_id: null,
     nombre_prenda: '',
     talla: 'S',
     color: 'Negro Satín',
@@ -174,17 +204,37 @@ function agregarItemVacio() {
   })
 }
 
-function seleccionarPrendaCatalogo(it: LocalItem, prendaId: number | null) {
+async function seleccionarPrendaCatalogo(it: LocalItem, prendaId: number | null) {
   if (!prendaId) return
-  const p = atelier.prendasListas.find((x) => x.id === prendaId)
+  const src = isMock.value ? atelier.prendasListas : (productosReal.value as unknown as typeof atelier.prendasListas)
+  const p = (src as typeof atelier.prendasListas).find((x) => x.id === prendaId)
   if (p) {
     it.producto_id = p.id
     it.nombre_prenda = p.nombre
-    it.precio_unitario = p.precio_venta
-    it.costo_unitario = p.costo_unitario
-    if (p.variantes && p.variantes.length > 0) {
-      it.talla = p.variantes[0].talla
+    const precio = (p as unknown as { precio_venta?: number; precio_venta_sugerido?: number }).precio_venta ?? (p as unknown as { precio_venta_sugerido?: number }).precio_venta_sugerido ?? it.precio_unitario
+    it.precio_unitario = precio
+    it.costo_unitario = (p as unknown as { costo_unitario?: number }).costo_unitario ?? it.costo_unitario
+    if ((p as unknown as { variantes?: { talla: string }[] }).variantes?.[0]) {
+      it.talla = (p as unknown as { variantes: { talla: string }[] }).variantes[0].talla
     }
+    // In REAL mode, if product has variantes, fetch and pick first variant
+    if (!isMock.value) {
+      try {
+        const vare = await client.get<{ id: number; nombre_variante: string }[]>(`/productos/${prendaId}/variantes`)
+        if (vare.data.length > 0) {
+          it.variante_id = vare.data[0].id
+          // try to map talla from variante nombre (e.g. "S", "M - Rojo")
+          const rawTalla = vare.data[0].nombre_variante?.split(' - ')[0]?.trim()
+          if (rawTalla) it.talla = rawTalla
+        } else {
+          it.variante_id = null
+        }
+      } catch {
+        it.variante_id = null
+      }
+    }
+  } else {
+    it.producto_id = prendaId
   }
 }
 
@@ -213,6 +263,7 @@ function initForm() {
     items.value = v.items.map((it) => ({
       id: it.id,
       producto_id: it.producto_id,
+      variante_id: (it as unknown as { variante_id?: number }).variante_id ?? null,
       nombre_prenda: it.nombre_prenda,
       talla: it.talla,
       color: it.color,
@@ -239,6 +290,7 @@ function initForm() {
       {
         id: Date.now(),
         producto_id: null,
+        variante_id: null,
         nombre_prenda: 'Corset Estructurado "Garras"',
         talla: 'S',
         color: 'Negro Satín',
@@ -253,10 +305,16 @@ function initForm() {
 watch(
   () => props.visible,
   (val) => {
-    if (val) initForm()
+    if (val) {
+      initForm()
+      void cargarOpcionesReales()
+    }
   },
   { immediate: true },
 )
+watch(isMock, () => {
+  if (props.visible) void cargarOpcionesReales()
+})
 
 async function guardar() {
   if (items.value.length === 0) {
@@ -275,10 +333,14 @@ async function guardar() {
   let cidFinal: number | null = null
 
   if (modoCliente.value === 'existente' && clienteId.value) {
-    const c = atelier.clientes.find((x) => x.id === clienteId.value)
+    const srcCli = isMock.value ? atelier.clientes : (clientesReal.value as unknown as typeof atelier.clientes)
+    const c = (srcCli as typeof atelier.clientes).find((x) => x.id === clienteId.value)
     if (c) {
       nombreClienteFinal = c.nombre
       cidFinal = c.id
+    } else {
+      // clienteId viene de un cliente que ya no existe en la fuente activa — evita mandar id fantasma
+      cidFinal = null
     }
   } else if (clienteNombreManual.value.trim()) {
     nombreClienteFinal = clienteNombreManual.value.trim()
@@ -342,7 +404,7 @@ async function guardar() {
     es_regalo: false,
     detalles: items.value.map((it) => ({
       producto_id: it.producto_id ?? 1,
-      variante_id: null,
+      variante_id: it.variante_id ?? null,
       cantidad: it.cantidad,
       precio_unitario: it.precio_unitario,
     })),
@@ -359,7 +421,12 @@ async function guardar() {
     }
     emit('update:visible', false)
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al guardar venta'
+    const axiosDetail = (e as { response?: { data?: { detail?: string }; status?: number } })?.response?.data?.detail
+    const status = (e as { response?: { status?: number } })?.response?.status
+    let msg = axiosDetail ?? (e instanceof Error ? e.message : 'Error al guardar venta')
+    if (status === 409) {
+      msg = axiosDetail ? `Stock insuficiente: ${axiosDetail}` : 'Stock insuficiente para los insumos de esa prenda (409). Revisá el inventario o elegí otro producto con stock.'
+    }
     showToast('error', 'Error', String(msg))
   }
 }
