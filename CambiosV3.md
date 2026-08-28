@@ -330,5 +330,14 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 
 ---
 
+### [2026-08-27] — Backend: `Venta` ahora expone `margen_pct` y partición 40/30/30 nativa
+
+#### Fix
+- **`backend/app/models/ventas.py`**: añadidos `@property margen_pct` (`ganancia/total*100` con 1 decimal), `reinversion_40` (`ganancia*0.4`), `margarita_30` y `valqui_30` (`*0.3`) con `quantize Decimal("0.01")`.
+- **`backend/app/schemas/venta.py`**: `VentaRead` ahora incluye `margen_pct/reinversion_40/margarita_30/valqui_30` (`from_attributes` → lee properties sin query extra).
+- **`src/services/api/ventas.ts`**: `VentaRead` tipa los 4 campos nuevos. Verificado `GET /ventas` devuelve ej. `VEN-0001: margen_pct 56.1 / reinversion 66244.80 / margarita 49683.60` — `DetalleVentaModal` ya no depende solo del fallback frontend.
+
+---
+
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.

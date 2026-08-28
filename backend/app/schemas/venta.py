@@ -73,3 +73,7 @@ class VentaRead(BaseModel):
     subtotal: Decimal | None = None
     costo_total: Decimal | None = None
     ganancia_neta: Decimal | None = None
+    margen_pct: Decimal | None = None
+    reinversion_40: Decimal | None = None
+    margarita_30: Decimal | None = None
+    valqui_30: Decimal | None = None

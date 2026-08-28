@@ -53,6 +53,10 @@ export interface VentaRead {
   subtotal?: string | number | null
   costo_total?: string | number | null
   ganancia_neta?: string | number | null
+  margen_pct?: string | number | null
+  reinversion_40?: string | number | null
+  margarita_30?: string | number | null
+  valqui_30?: string | number | null
   es_regalo: boolean
   detalles: DetalleVentaRead[]
 }

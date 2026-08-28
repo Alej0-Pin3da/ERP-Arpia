@@ -122,6 +122,37 @@ class Venta(Base):
         except Exception:
             return Decimal("0")
 
+    @property
+    def margen_pct(self) -> Decimal:
+        try:
+            total = self.total_venta or Decimal("0")
+            if total == 0:
+                return Decimal("0")
+            return (self.ganancia_neta / total * Decimal("100")).quantize(Decimal("0.1"))
+        except Exception:
+            return Decimal("0")
+
+    @property
+    def reinversion_40(self) -> Decimal:
+        try:
+            return (self.ganancia_neta * Decimal("0.4")).quantize(Decimal("0.01"))
+        except Exception:
+            return Decimal("0")
+
+    @property
+    def margarita_30(self) -> Decimal:
+        try:
+            return (self.ganancia_neta * Decimal("0.3")).quantize(Decimal("0.01"))
+        except Exception:
+            return Decimal("0")
+
+    @property
+    def valqui_30(self) -> Decimal:
+        try:
+            return (self.ganancia_neta * Decimal("0.3")).quantize(Decimal("0.01"))
+        except Exception:
+            return Decimal("0")
+
     def __repr__(self) -> str:
         return f"<Venta id={self.id} estado={self.estado!r} total={self.total_venta}>"
 
