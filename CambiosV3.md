@@ -220,5 +220,83 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 
 ---
 
+### [2026-08-27] — V3.6.0: Insumos / Recetas / Prendas Confeccionadas / Pedidos de Producción (Fase 4)
+
+#### 1. Backend — Base de Datos (`backend/alembic/versions/0016_insumos_bom.py`, `0017_pedidos_produccion.py`, `0018_prendas_listas.py`)
+- **0016 `insumos_bom`**:
+  - `Insumos` +4 columnas: `codigo` (VARCHAR(50)), `descripcion` (TEXT), `tipo` (VARCHAR(50)), `ubicacion` (VARCHAR(100)) con índices `ix_insumos_codigo` y `ix_insumos_tipo`.
+  - `BOM_Insumos` y `BOM_Productos` +3 columnas: `fases` (JSONB), `tiempo_estimado_minutos` (INT), `markup_porcentual` (NUMERIC(15,4)).
+- **0017 `pedidos_produccion`**:
+  - Tabla `pedidos_produccion` (`producto_id` FK CASCADE, `variante_id` FK SET NULL, `cantidad`, `cantidad_producida`, `estado` CHECK/VARCHAR, `prioridad`, `fecha_pedido`, `fecha_entrega_estimada`, `observaciones`, `created_at`, `updated_at`, índices `ix_pedidos_estado_prioridad` y `ix_pedidos_producto_id`).
+- **0018 `prendas_listas`**:
+  - Tabla `prendas_confeccionadas` (`variante_id` FK CASCADE, `talla`, `estado` default 'disponible', `ubicacion`, `costo_real`, `precio_venta`, `fecha_confeccion`, `pedido_id` FK SET NULL, `created_at`, `updated_at`, índices `ix_prendas_variante_estado` y `ix_prendas_pedido_id`).
+
+#### 2. Backend — Modelos, Schemas y Rutas API
+- **Modelos (`backend/app/models/`)**:
+  - `Insumo` y `BomInsumo` / `BomProducto` extendidos con nuevos campos.
+  - Nuevo módulo `produccion.py` con `PrendaConfeccionada`, `PedidoProduccion`, `PrendaEstado`, `PedidoProduccionEstado`, `PedidoProduccionPrioridad`.
+  - Exportación centralizada en `models/__init__.py`.
+- **Schemas (`backend/app/schemas/`)**:
+  - `insumo.py`: `InsumoBase`, `InsumoCreate`, `InsumoUpdate`, `InsumoRead` ampliados con `codigo`, `descripcion`, `tipo`, `ubicacion`.
+  - `bom.py`: `BomInsumoBase`, `BomProductoBase`, `Update/Read` ampliados con `fases`, `tiempo_estimado_minutos`, `markup_porcentual`.
+  - `produccion.py`: Schemas tipados `PrendaConfeccionada*` y `PedidoProduccion*`.
+- **Rutas (`backend/app/api/routes/`)**:
+  - `insumos.py`: búsqueda extendida por `codigo`/`tipo`/`ubicacion`, filtro por `tipo`, endpoint `PATCH /{insumo_id}` y ordenamiento por nuevos campos.
+  - `produccion.py`: routers completos CRUD `/prendas-confeccionadas` y `/pedidos-produccion` con filtros, ordenamiento y paginación.
+  - Registro en `api/router.py`.
+
+#### 3. Frontend — Servicios API y Composables Adaptadores
+- **Servicios API (`src/services/api/`)**:
+  - `insumos.ts`: CRUD `/insumos` tipado.
+  - `prendas.ts`: CRUD `/prendas-confeccionadas` tipado.
+  - `pedidos-produccion.ts`: CRUD `/pedidos-produccion` tipado.
+- **Composables Adaptadores (`src/composables/`)**:
+  - `useInsumos.ts`: conmutador reactivo `isMock ? Pinia : API REST`.
+  - `usePrendas.ts`: conmutador reactivo `isMock ? Pinia : API REST`.
+  - `useProduccion.ts`: conmutador reactivo `isMock ? Pinia : API REST`.
+
+#### 4. Verificación y Suite de Pruebas
+- **Backend**: `pytest backend/tests/test_fase4_produccion.py` (5/5 PASS en insumos extendidos, BOM con fases/markup, pedidos de producción y prendas confeccionadas con validaciones de integridad).
+- **Frontend**: Vitest `npm run test -- --run` (9 archivos, 70/70 PASS).
+- **Compilación**: `npm run build` OK (Vite 378 módulos + bundle server.mjs sin errores).
+
+---
+
+### [2026-08-27] — V3.7.0: Switch Global a API Real, Probing de Modo & Wiring Final V4 (Fase 5)
+
+#### 1. Backend — Diagnóstico y Probing de Modo (`backend/app/api/router.py`)
+- Endpoint `GET /api/v1/__mode` expuesto para retorno dinámico del estado del servidor `{ mode: "real", db_connected: true, version: "V4" }`.
+
+#### 2. Frontend — Conexión de Vistas Restantes (`src/views/`)
+- **`InventarioView.vue`**: integrado con `useInsumos()` y `cargarInsumosReales()` en `onMounted` para poblar datos reales desde `/api/v1/insumos`.
+- **`PrendasListasView.vue`**: integrado con `usePrendas()` y `cargarPrendasReales()` en `onMounted` para poblar productos confeccionados desde `/api/v1/prendas-confeccionadas`.
+- **`ProduccionView.vue`**: integrado con `useProduccion()` y `cargarPedidosReales()` en `onMounted` para poblar órdenes de taller desde `/api/v1/pedidos-produccion`.
+- **Servicio `src/services/api/__mode.ts`**: cliente API tipado para consultar `GET /__mode`.
+
+#### 3. Deprecación y Cierre de Migración
+- `src/stores/atelier.ts`: marcado explícitamente como `@deprecated` retained for `VITE_USE_MOCK=true` (tests / offline mode).
+- `useMode.ts`: configurado para responder `REAL` por defecto cuando no se explicita `VITE_USE_MOCK=true`.
+
+#### 4. Verificación E2E y Suite de Pruebas
+- **Backend Tests**: 67/67 PASS en la suite completa V4.
+- **Frontend Tests**: 70/70 PASS en 9 suites de pruebas de Vitest.
+- **Build**: `npm run build` 378 módulos transformados + `dist/server.mjs` OK sin advertencias ni errores.
+
+---
+
+### [2026-08-27] — Bugfix: `cliente_nombre` mostraba 'Cliente' y `nombre_prenda` mostraba 'Producto N' en el frontend
+
+#### Causa
+1. **Backend (`ventas.py`):** Los endpoints `PATCH /{id}` (`es_regalo`) y `PATCH /{id}/state` usaban `db.refresh(venta)` luego del `commit()`. Con `expire_on_commit=True` (default de SQLAlchemy), el refresh solo recarga la fila principal pero no las relaciones lazy/selectin (`cliente`, `detalles → producto/variante`). Al serializar, los `@property` (`cliente_nombre`, `nombre_prenda`) no podían acceder a las relaciones expiradas y devolvían `None`.
+2. **Frontend (`VentasView.vue`):** El fallback `?? 'Cliente'` no era informativo para ventas sin `cliente_id` (ventas en feria sin cliente registrado).
+3. **Frontend (`ProduccionView.vue`):** El mapping de pedidos reales usaba `'Clienta General'` hardcodeado en vez de usar `nombre_variante` / `nombre_producto` reales de la API.
+
+#### Fix
+- **`backend/app/api/routes/ventas.py`**: Reemplazados los `db.refresh(venta)` por `venta = db.get(Venta, venta_id)` (re-query completo con selectin) en `update_venta_es_regalo` y `transition_venta_state`.
+- **`src/views/VentasView.vue`**: Fallback `cliente_nombre` cambiado a `'Sin cliente'` cuando `cliente_id` es null; `nombre_prenda` fallback ahora usa `nombre_variante` antes de generar `Producto #id`.
+- **`src/views/ProduccionView.vue`**: `cliente_nombre` en el mapping de pedidos reales usa `p.nombre_variante || p.nombre_producto || 'Taller Arpía'` en vez del texto hardcodeado.
+
+---
+
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.

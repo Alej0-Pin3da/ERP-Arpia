@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
 import { useAtelierStore, type InsumoAtelier } from '@/stores/atelier'
+import { useInsumos } from '@/composables/useInsumos'
 import NuevoInsumoModal from '@/components/atelier/NuevoInsumoModal.vue'
 import CompraInsumoModal from '@/components/atelier/CompraInsumoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
@@ -11,6 +12,7 @@ import OrdenCompraProveedorModal from '@/components/atelier/OrdenCompraProveedor
 import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
+const { isMock, list: listInsumosApi } = useInsumos()
 
 const search = ref('')
 const tipoFiltro = ref<'Todos' | 'Directo' | 'Indirecto'>('Todos')
@@ -22,22 +24,53 @@ const showCompraModal = ref(false)
 const showSugerirModal = ref(false)
 const showOrdenProveedorModal = ref(false)
 const insumoSeleccionado = ref<InsumoAtelier | null>(null)
+const insumosApi = ref<InsumoAtelier[]>([])
+
+async function cargarInsumosReales() {
+  if (isMock.value) return
+  try {
+    const res = await listInsumosApi({ limit: 100 })
+    insumosApi.value = res.items.map((i: any) => ({
+      id: i.id,
+      codigo: i.codigo || `INS-${i.id}`,
+      nombre: i.nombre,
+      descripcion: i.descripcion || '',
+      tipo: (i.tipo as any) || 'Directo',
+      categoria: i.nombre_categoria || 'General',
+      ubicacion: i.ubicacion || 'Bodega',
+      proveedor: 'Atelier',
+      stock_actual: Number(i.stock_actual) || 0,
+      stock_minimo: Number(i.stock_minimo) || 0,
+      unidad_medida: i.unidad_medida,
+      costo_unitario: Number(i.costo_promedio_actual) || 0,
+      valor_total: (Number(i.stock_actual) || 0) * (Number(i.costo_promedio_actual) || 0),
+    }))
+  } catch (e) {
+    console.error('Error cargando insumos reales:', e)
+  }
+}
+
+onMounted(() => {
+  cargarInsumosReales()
+})
+
+const insumosList = computed(() => (isMock.value ? atelier.insumos : insumosApi.value))
 
 const categoriasDisponibles = computed(() => {
-  const cats = new Set(atelier.insumos.map((i) => i.categoria))
+  const cats = new Set(insumosList.value.map((i) => i.categoria))
   return ['Todas', ...Array.from(cats)]
 })
 
 const insumosFiltrados = computed(() => {
-  return atelier.insumos.filter((item) => {
+  return insumosList.value.filter((item) => {
     // Search
     const q = search.value.trim().toLowerCase()
     const matchesSearch =
       !q ||
       item.nombre.toLowerCase().includes(q) ||
-      item.codigo.toLowerCase().includes(q) ||
-      item.proveedor.toLowerCase().includes(q) ||
-      item.ubicacion.toLowerCase().includes(q)
+      (item.codigo && item.codigo.toLowerCase().includes(q)) ||
+      (item.proveedor && item.proveedor.toLowerCase().includes(q)) ||
+      (item.ubicacion && item.ubicacion.toLowerCase().includes(q))
 
     // Tipo
     const matchesTipo = tipoFiltro.value === 'Todos' || item.tipo === tipoFiltro.value
@@ -52,8 +85,8 @@ const insumosFiltrados = computed(() => {
   })
 })
 
-const directosCount = computed(() => atelier.insumos.filter((i) => i.tipo === 'Directo').length)
-const indirectosCount = computed(() => atelier.insumos.filter((i) => i.tipo === 'Indirecto').length)
+const directosCount = computed(() => insumosList.value.filter((i) => i.tipo === 'Directo').length)
+const indirectosCount = computed(() => insumosList.value.filter((i) => i.tipo === 'Indirecto').length)
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`

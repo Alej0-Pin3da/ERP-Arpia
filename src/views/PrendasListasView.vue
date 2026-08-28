@@ -1,26 +1,66 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import { useAtelierStore, type PrendaConfeccionada, type PrendaVariante } from '@/stores/atelier'
+import { usePrendas } from '@/composables/usePrendas'
 import EtiquetaPrendaModal from '@/components/atelier/EtiquetaPrendaModal.vue'
 import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
+const { isMock, list: listPrendasApi } = usePrendas()
 const search = ref('')
 
 const showEtiquetaModal = ref(false)
 const selectedPrenda = ref<PrendaConfeccionada | null>(null)
 const selectedVariante = ref<PrendaVariante | null>(null)
+const prendasApi = ref<PrendaConfeccionada[]>([])
+
+async function cargarPrendasReales() {
+  if (isMock.value) return
+  try {
+    const res = await listPrendasApi({ limit: 100 })
+    // Map PrendaRead items to UI structure if needed
+    prendasApi.value = res.items.map((p: any) => ({
+      id: p.id,
+      codigo: `PRD-${p.id}`,
+      nombre: p.nombre_producto || `Prenda #${p.id}`,
+      categoria: 'Confección',
+      costo_base: Number(p.costo_real) || 0,
+      precio_venta: Number(p.precio_venta) || 0,
+      fisico_total: p.estado === 'disponible' ? 1 : 0,
+      disponible_total: p.estado === 'disponible' ? 1 : 0,
+      variantes: [
+        {
+          id: p.variante_id,
+          talla: p.talla || 'M',
+          color: 'Estándar',
+          sku: `VAR-${p.variante_id}`,
+          stock_fisico: p.estado === 'disponible' ? 1 : 0,
+          reservado: p.estado === 'reservada' ? 1 : 0,
+          disponible: p.estado === 'disponible' ? 1 : 0,
+        },
+      ],
+    }))
+  } catch (e) {
+    console.error('Error cargando prendas reales:', e)
+  }
+}
+
+onMounted(() => {
+  cargarPrendasReales()
+})
+
+const prendasList = computed(() => (isMock.value ? atelier.prendasListas : prendasApi.value))
 
 const prendasFiltradas = computed(() => {
-  return atelier.prendasListas.filter((p) => {
+  return prendasList.value.filter((p) => {
     const q = search.value.trim().toLowerCase()
     return (
       !q ||
       p.nombre.toLowerCase().includes(q) ||
-      p.codigo.toLowerCase().includes(q) ||
-      p.categoria.toLowerCase().includes(q)
+      (p.codigo && p.codigo.toLowerCase().includes(q)) ||
+      (p.categoria && p.categoria.toLowerCase().includes(q))
     )
   })
 })

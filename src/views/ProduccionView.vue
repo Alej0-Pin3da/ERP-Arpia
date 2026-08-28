@@ -1,21 +1,53 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import { useAtelierStore, type PedidoProduccion, type EstadoPedido } from '@/stores/atelier'
+import { useProduccion } from '@/composables/useProduccion'
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import DetallePedidoTallerModal from '@/components/atelier/DetallePedidoTallerModal.vue'
 import { showToast } from '@/utils/toast'
 
 const router = useRouter()
 const atelier = useAtelierStore()
+const { isMock, list: listPedidosApi } = useProduccion()
 
 const search = ref('')
 const viewMode = ref<'kanban' | 'tabla'>('kanban')
 const showNuevoPedidoModal = ref(false)
 const showDetallePedidoModal = ref(false)
 const pedidoSeleccionado = ref<PedidoProduccion | null>(null)
+const pedidosApi = ref<PedidoProduccion[]>([])
+
+async function cargarPedidosReales() {
+  if (isMock.value) return
+  try {
+    const res = await listPedidosApi({ limit: 100 })
+    pedidosApi.value = res.items.map((p: any) => ({
+      id: p.id,
+      codigo: `ORD-${p.id}`,
+      cliente_id: 0,
+      cliente_nombre: p.nombre_variante || p.nombre_producto || 'Taller Arpía',
+      prenda_nombre: p.nombre_producto || `Producto #${p.producto_id}`,
+      estado: p.estado === 'pendiente' ? 'CORTE' : p.estado === 'en_produccion' ? 'COSTURA' : p.estado === 'completado' ? 'LISTO' : 'COTIZADO',
+      precio_venta: 0,
+      costo_produccion: 0,
+      utilidad_neta: 0,
+      margen_pct: 0,
+      fecha: p.fecha_pedido || new Date().toISOString().split('T')[0],
+      observaciones: p.observaciones || undefined,
+    }))
+  } catch (e) {
+    console.error('Error cargando pedidos reales:', e)
+  }
+}
+
+onMounted(() => {
+  cargarPedidosReales()
+})
+
+const pedidosList = computed(() => (isMock.value ? atelier.pedidos : pedidosApi.value))
 
 function abrirFichaTaller(p: PedidoProduccion) {
   pedidoSeleccionado.value = p
@@ -38,13 +70,13 @@ function formatCOP(val: number) {
 }
 
 const pedidosFiltrados = computed(() => {
-  return atelier.pedidos.filter((p) => {
+  return pedidosList.value.filter((p) => {
     const q = search.value.trim().toLowerCase()
     return (
       !q ||
-      p.codigo.toLowerCase().includes(q) ||
-      p.cliente_nombre.toLowerCase().includes(q) ||
-      p.prenda_nombre.toLowerCase().includes(q)
+      (p.codigo && p.codigo.toLowerCase().includes(q)) ||
+      (p.cliente_nombre && p.cliente_nombre.toLowerCase().includes(q)) ||
+      (p.prenda_nombre && p.prenda_nombre.toLowerCase().includes(q))
     )
   })
 })

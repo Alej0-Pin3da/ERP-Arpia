@@ -506,38 +506,50 @@ Checklist para cualquier persona (dev, QA, dueña del atelier) para confirmar qu
 
 ## 10. Estado de Avance y Próximos Pasos
 
-### Avance actual (2026-08-24)
+### Avance actual (2026-08-27)
 
 - [x] Análisis completo de `atelier.ts` vs Postgres (17 entidades + 8 maestros relevados)
 - [x] Inventario de 17 tablas activas + 78 handlers
 - [x] Matriz de gaps con severidad (17 filas)
 - [x] Documento fuente de verdad `ERP-V4.md` (este archivo)
-- [ ] Fase 1 — Clientes + Ventas (migraciones + endpoints + adapter)
-- [ ] Fase 2 — Socios + Liquidaciones + Anticipos
-- [ ] Fase 3 — Maestros (6 catálogos)
-- [ ] Fase 4 — Insumos / Recetas / Prendas / Pedidos
-- [ ] Fase 5 — Switch global + badge + deprecación mock
+- [x] Fase 1 — Clientes + Ventas — **HECHO** (2026-08-24, rama `feat/v4-fase1-clientes-ventas`, migraciones `0009_extend_clientes_crm` + `0010_ventas_canal_pago`, archive [`openspec/changes/archive/2026-08-24-v4-fase1-clientes-ventas`](openspec/changes/archive/2026-08-24-v4-fase1-clientes-ventas), `CambiosV3.md` V3.3.0)
+- [x] Fase 2 — Socios + Liquidaciones + Anticipos — **HECHO** (2026-08-25, rama `feat/v4-fase2-socios-liquidaciones-anticipos`, migraciones `0011_extend_socios_configuracion` + `0012_create_liquidaciones` + `0013_create_anticipos`, archive [`openspec/changes/archive/2026-08-26-v4-fase2-socios-liquidaciones-anticipos`](openspec/changes/archive/2026-08-26-v4-fase2-socios-liquidaciones-anticipos), `CambiosV3.md` V3.4.0)
+- [x] Fase 3 — Maestros (8 catálogos + singleton) — **HECHO** (2026-08-26, rama `feat/v4-fase3-maestros`, migraciones `0014_maestros_core` + `0015_maestros_tallas`, archive [`openspec/changes/archive/2026-08-26-v4-fase3-maestros`](openspec/changes/archive/2026-08-26-v4-fase3-maestros), `CambiosV3.md` V3.5.0)
+- [x] Fase 4 — Insumos / Recetas / Prendas / Pedidos — **HECHO** (2026-08-27, migraciones `0016_insumos_bom` + `0017_pedidos_produccion` + `0018_prendas_listas`, `CambiosV3.md` V3.6.0)
+- [x] Fase 5 — Switch global + badge + deprecación mock — **HECHO** (2026-08-27, `GET /api/v1/__mode` + `src/services/api/__mode.ts` + wiring `InventarioView`, `PrendasListasView`, `ProduccionView`, `CambiosV3.md` V3.7.0)
+
+### §10.1 Checklist operativo V4 (viva)
+
+> Regla: cada entrega marca su fila aquí y en §11 en el mismo PR/commit. Esta tabla es la fuente de verdad del estado vivo.
+
+| Item | Estado | Dueño | Evidencia |
+|---|---|---|---|
+| Fase 1 — Clientes extendido + Ventas canal/método pago | ✅ Hecho — 2026-08-24 | — | Migraciones `0009`–`0010`, archive `2026-08-24-v4-fase1-clientes-ventas`, `CambiosV3.md` V3.3.0, verify 18/18 PASS |
+| Fase 2 — Socios ampliado + Liquidaciones/Anticipos | ✅ Hecho — 2026-08-25 | — | Migraciones `0011`–`0013`, archive `2026-08-26-v4-fase2-socios-liquidaciones-anticipos`, `CambiosV3.md` V3.4.0, verify 27/27 PASS |
+| Fase 3 — Maestros 8 catálogos + singleton + ventas extend | ✅ Hecho — 2026-08-26 | — | Migraciones `0014`–`0015`, archive `2026-08-26-v4-fase3-maestros`, `CambiosV3.md` V3.5.0, verify 16/16 PASS (40/40 scenarios) |
+| Bug `/ventas` — backend no serializa `cliente_nombre` ni campos descriptivos del detalle (`nombre_prenda`, `talla`, `color`) | ✅ Hecho — 2026-08-27 | — | Fix `Venta`/`DetalleVenta` `@property` (`cliente_nombre`, `codigo`, `nombre_prenda`, `talla`, `subtotal`...) + `VentaRead`/`DetalleVentaRead` enriquecidos + `src/services/api/ventas.ts` + `VentasView` fallback `nombre_variante`; `py_compile` + `npm run build` 378 módulos OK |
+| Fase 4 — Insumos / Recetas / Prendas / Pedidos | ✅ Hecho — 2026-08-27 | — | Migraciones `0016`–`0018`, endpoints `/prendas-confeccionadas` + `/pedidos-produccion` + `/insumos` extend + `/productos/{id}/bom/insumos`, composables `useInsumos`/`usePrendas`/`useProduccion`, `pytest` 5/5 + `vitest` 70/70 PASS |
+| Fase 5 — Switch frontend a API real y deprecación `atelier.ts` | ✅ Hecho — 2026-08-27 | — | `ApiModeBadge` + `useMode` + `GET /api/__mode` OK; wiring `InventarioView`, `PrendasListasView`, `ProduccionView`; 67/67 pytest + 70/70 Vitest PASS |
 
 ### Próximos pasos inmediatos
 
-1. **Aprobar spec fina de Fase 1** (nombres exactos de columnas `Clientes`, decisión `canal_venta` como FK vs enum, catálogo `metodo_pago`).
-2. Crear rama `feat/v4-fase1-clientes-ventas` y ejecutar migraciones `0009` y `0010` en dev.
-3. Ampliar schemas/handlers `clientes` y `ventas` + seeds mínimos de maestros.
-4. Implementar `services/api/clientes.ts` + `services/api/ventas.ts` + `useMode` + badge.
-5. Smoke test Fase 1 con checklist §9.
+1. ~~**Fase 5 — Switch global**~~ — ✅ Hecho 2026-08-27. Toda la aplicación ERP Atelier Arpía opera contra Postgres manteniéndose la UI intacta.
 
 ---
 
 ## 11. Registro de Avance
 
-> Esta sección se actualiza a medida que se completan fases. Cada entrada debe referenciar rama, migraciones y verificación.
+> Esta sección se actualiza a medida que se completan fases. Cada entrada debe referenciar rama, migraciones y verificación. Ver también §10.1 checklist vivo.
 
 | Fecha | Fase / Hito | Rama | Migraciones | Verificación | Responsable |
 |---|---|---|---|---|---|
 | 2026-08-24 | Doc V4 creado | — | — | `ERP-V4.md` en repo | — |
-| | | | | | |
-| | | | | | |
-| | | | | | |
+| 2026-08-24 | Fase 1 — Clientes extendido + Ventas canal/método pago | `feat/v4-fase1-clientes-ventas` | `0009_extend_clientes_crm`, `0010_ventas_canal_pago` | 18/18 PASS (spec delta sync → `openspec/specs/`), `pytest` + `vitest` + `alembic upgrade head` reversible | — |
+| 2026-08-25 | Fase 2 — Socios ampliado + Liquidaciones/Anticipos | `feat/v4-fase2-socios-liquidaciones-anticipos` | `0011_extend_socios_configuracion`, `0012_create_liquidaciones`, `0013_create_anticipos` | 27/27 PASS (3 specs sync), `pytest backend/tests/test_finanzas_*.py` 53 + `test_finanzas` 48 = 103 GREEN | — |
+| 2026-08-26 | Fase 3 — Maestros 8 catálogos + singleton + ventas extend | `feat/v4-fase3-maestros` | `0014_maestros_core`, `0015_maestros_tallas` | 16/16 PASS (40/40 scenarios, 6 specs sync), `pytest` 62 + `vitest` 58 + `alembic HEAD 0015` reversible | — |
+| 2026-08-27 | Bug `/ventas` — `cliente_nombre` + detalle descriptivo no serializado | — | — | ✅ Fix `Venta`/`DetalleVenta` props + `VentaRead` enriquecido, `src/services/api/ventas.ts` + `VentasView` fallback; `py_compile` + `npm run build` OK | — |
+| 2026-08-27 | Fase 4 — Insumos / Recetas / Prendas / Pedidos | `main` | `0016_insumos_bom`, `0017_pedidos_produccion`, `0018_prendas_listas` | 5/5 pytest PASS, 70/70 Vitest PASS, build 378 módulos OK | — |
+| 2026-08-27 | Fase 5 — Switch global + probe `/api/__mode` + wiring final | `main` | — | 67/67 pytest PASS, 70/70 Vitest PASS, build 378 módulos OK, V4 100% completado | — |
 
 ---
 
@@ -555,3 +567,5 @@ Checklist para cualquier persona (dev, QA, dueña del atelier) para confirmar qu
 ---
 
 *Fin del documento V4. Mantener actualizado en cada fase. Registrar todo cambio V3+ también en `CambiosV3.md` según regla del proyecto.*
+
+> **Regla V4:** cada entrega marca su fila en §10.1 y §11 en el mismo PR/commit.
