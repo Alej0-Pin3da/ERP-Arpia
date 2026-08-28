@@ -319,5 +319,16 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 
 ---
 
+### [2026-08-27] — Bugfix: `DetalleVentaModal` mostraba $0 en Fondo/Margara/Valqui y 0% margen
+
+#### Causa
+`src/views/VentasView.vue:normalizeVenta` mapeaba `reinversion_40/margarita_30/valqui_30/margen_pct` como `Number(raw.* ?? 0)` — el backend `/ventas` ahora devuelve `costo_total/ganancia_neta` pero no las particiones 40/30/30 ni `margen_pct`. En modo REAL quedaban en `0`, por eso el modal mostraba `Costo $21.561 / Ganancia $68.439 (0%) / Fondo $0`.
+
+#### Fix
+- **`src/views/VentasView.vue`**: `normalizeVenta` ahora deriva `ganancia_neta = total - costo` si falta, `margen_pct = ganancia/total*100` con fallback, y `reinversion_40/margarita_30/valqui_30` desde `ganancia_neta * 0.4/0.3` si el payload no los trae (soporta alias `margara_30`).
+- **`src/components/atelier/DetalleVentaModal.vue`**: añadidos `computed` `margenPct/reinversion40/margarita30/valqui30` con fallback a `ganancia_neta * 40/30%` para que el comprobante nunca quede en $0 aunque el objeto venga sin particiones. Template usa esos computeds.
+
+---
+
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.

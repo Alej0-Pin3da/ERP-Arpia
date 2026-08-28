@@ -43,16 +43,26 @@ function normalizeVenta(raw: Record<string, unknown>): VentaAtelier {
         costo_subtotal: Number(d.costo_subtotal ?? 0),
       }
     }),
-    subtotal: Number(raw.subtotal ?? raw.total_venta ?? 0),
+    subtotal: Number(raw.subtotal ?? (Number(raw.total_venta ?? 0) + Number(raw.descuento_valor ?? 0)) ?? 0),
     descuento_porcentaje: Number(raw.descuento_porcentaje ?? 0),
     descuento_valor: Number(raw.descuento_valor ?? 0),
     total_venta: Number(raw.total_venta ?? 0),
     costo_total: Number(raw.costo_total ?? 0),
-    ganancia_neta: Number(raw.ganancia_neta ?? 0),
-    margen_pct: Number(raw.margen_pct ?? 0),
-    reinversion_40: Number(raw.reinversion_40 ?? 0),
-    margarita_30: Number(raw.margarita_30 ?? 0),
-    valqui_30: Number(raw.valqui_30 ?? 0),
+    ganancia_neta: Number(raw.ganancia_neta ?? (Number(raw.total_venta ?? 0) - Number(raw.costo_total ?? 0))),
+    margen_pct: Number(
+      raw.margen_pct ??
+        (Number(raw.total_venta ?? 0) > 0
+          ? Number(((Number(raw.ganancia_neta ?? Number(raw.total_venta ?? 0) - Number(raw.costo_total ?? 0)) / Number(raw.total_venta ?? 0)) * 100).toFixed(1))
+          : 0),
+    ),
+    reinversion_40: Number(
+      raw.reinversion_40 ??
+        Math.round(Number(raw.ganancia_neta ?? Number(raw.total_venta ?? 0) - Number(raw.costo_total ?? 0)) * 0.4),
+    ),
+    margarita_30: Number(
+      raw.margarita_30 ?? raw.margara_30 ?? Math.round(Number(raw.ganancia_neta ?? Number(raw.total_venta ?? 0) - Number(raw.costo_total ?? 0)) * 0.3),
+    ),
+    valqui_30: Number(raw.valqui_30 ?? Math.round(Number(raw.ganancia_neta ?? Number(raw.total_venta ?? 0) - Number(raw.costo_total ?? 0)) * 0.3)),
     observaciones: raw.observaciones as string | undefined,
     descontar_inventario: raw.descontar_inventario as boolean | undefined,
   }

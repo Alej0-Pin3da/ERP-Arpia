@@ -21,6 +21,16 @@ const clienteVinculado = computed(() => {
   return atelier.clientes.find((c) => c.id === props.venta?.cliente_id) || null
 })
 
+const margenPct = computed(() => {
+  if (!props.venta) return 0
+  if (props.venta.margen_pct && props.venta.margen_pct !== 0) return props.venta.margen_pct
+  if (props.venta.total_venta > 0) return Number(((props.venta.ganancia_neta / props.venta.total_venta) * 100).toFixed(1))
+  return 0
+})
+const reinversion40 = computed(() => props.venta?.reinversion_40 || Math.round((props.venta?.ganancia_neta ?? 0) * 0.4))
+const margarita30 = computed(() => props.venta?.margarita_30 || Math.round((props.venta?.ganancia_neta ?? 0) * 0.3))
+const valqui30 = computed(() => props.venta?.valqui_30 || Math.round((props.venta?.ganancia_neta ?? 0) * 0.3))
+
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
 }
@@ -196,21 +206,21 @@ function compartirWhatsApp() {
 
           <div class="flex justify-between text-emerald-400 font-bold">
             <span>Ganancia Neta Atelier:</span>
-            <span>{{ formatCOP(venta.ganancia_neta) }} ({{ venta.margen_pct }}%)</span>
+            <span>{{ formatCOP(venta.ganancia_neta) }} ({{ margenPct }}%)</span>
           </div>
 
           <div class="mt-3 pt-2 border-t border-stone-800/80 space-y-1.5 text-[11px]">
             <div class="flex justify-between text-amber-300 font-semibold">
               <span>🏛️ Fondo Reinversión Atelier (40%):</span>
-              <span>{{ formatCOP(venta.reinversion_40) }}</span>
+              <span>{{ formatCOP(reinversion40) }}</span>
             </div>
             <div class="flex justify-between text-stone-300">
               <span>🪡 Margara Confección (30%):</span>
-              <span>{{ formatCOP(venta.margarita_30) }}</span>
+              <span>{{ formatCOP(margarita30) }}</span>
             </div>
             <div class="flex justify-between text-stone-300">
               <span>🎨 Valqui Diseño (30%):</span>
-              <span>{{ formatCOP(venta.valqui_30) }}</span>
+              <span>{{ formatCOP(valqui30) }}</span>
             </div>
           </div>
         </div>
