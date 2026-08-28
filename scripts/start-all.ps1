@@ -14,9 +14,12 @@
   Usa backend local .venv en vez de Docker. Requiere DATABASE_URL apuntando a localhost:5433.
 .PARAMETER SkipBuild
   En Mode prod, salta el vite build.
+.PARAMETER RebuildApi
+  Fuerza docker compose build del api (default true, cached ~2s si no hay cambios). Usa -RebuildApi:$false para skip ultra-rápido.
 .EXAMPLE
-  npm run dev:all            # Docker DB+API en 8080, vite en 5173
-  npm run start:all          # Docker DB+API en 8080, Node en 3000
+  npm run dev:all            # Docker DB+API en 8080, vite en 5173 (con --build cached)
+  npm run start:all          # Docker DB+API en 8080, Node en 3000 (con --build cached)
+  pwsh -File scripts/start-all.ps1 -RebuildApi:$false  # skip build, solo up
   pwsh -File scripts/start-all.ps1 -UseLocalApi
 #>
 
@@ -24,7 +27,8 @@ param(
   [ValidateSet('dev','prod')]
   [string]$Mode = 'dev',
   [switch]$UseLocalApi,
-  [switch]$SkipBuild
+  [switch]$SkipBuild,
+  [bool]$RebuildApi = $true
 )
 
 $ErrorActionPreference = 'Stop'
@@ -101,14 +105,19 @@ else { Write-Warning "DB no dio healthy. docker logs arpia-db:"; docker logs --t
 
 # 2) Backend
 if (-not $UseLocalApi) {
-  Write-Step "2/3 — Backend FastAPI via Docker (arpia-api) en :$BackendPort"
+  Write-Step "2/3 — Backend FastAPI via Docker (arpia-api) en :$BackendPort (RebuildApi=$RebuildApi)"
   $apiRunning = docker ps --filter "name=^/arpia-api$" --format "{{.Names}}" 2>$null
-  if ($apiRunning -eq 'arpia-api') {
-    Write-Host "arpia-api ya corre (puerto host $BackendPort) — no se recrea." -ForegroundColor Green
+  if ($apiRunning -eq 'arpia-api' -and -not $RebuildApi) {
+    Write-Host "arpia-api ya corre (puerto host $BackendPort) — no se recrea (usa -RebuildApi para forzar build)." -ForegroundColor Green
     $env:API_PROXY_TARGET = "http://localhost:$BackendPort"
   } else {
     $env:COMPOSE_API_PORT = "$BackendPort"
-    docker compose up -d api 2>&1 | Out-Host
+    if ($RebuildApi) {
+      Write-Host "Construyendo imagen api (cached, ~2s si no hay cambios)..." -ForegroundColor Yellow
+      docker compose up -d --build api 2>&1 | Out-Host
+    } else {
+      docker compose up -d api 2>&1 | Out-Host
+    }
   }
   $ok = Wait-Url "http://localhost:$BackendPort/docs" 60
   if (-not $ok) {
