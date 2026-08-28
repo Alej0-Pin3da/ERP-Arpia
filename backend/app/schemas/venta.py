@@ -41,6 +41,13 @@ class DetalleVentaRead(BaseModel):
     cantidad: Decimal
     precio_unitario_aplicado: Decimal
     costo_unitario_aplicado: Decimal
+    # Enriched descriptive fields (derived from relationships / computed)
+    nombre_prenda: str | None = None
+    talla: str | None = None
+    nombre_variante: str | None = None
+    color: str | None = None
+    subtotal: Decimal | None = None
+    costo_subtotal: Decimal | None = None
 
 
 class VentaRead(BaseModel):
@@ -60,3 +67,9 @@ class VentaRead(BaseModel):
     reversed_motivo: str | None = None
     reversed_by: int | None = None
     reversed_at: datetime | None = None
+    # Enriched fields (derived via model @property, no extra query if selectin)
+    cliente_nombre: str | None = None
+    codigo: str | None = None
+    subtotal: Decimal | None = None
+    costo_total: Decimal | None = None
+    ganancia_neta: Decimal | None = None

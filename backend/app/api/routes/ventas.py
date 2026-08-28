@@ -117,7 +117,7 @@ def update_venta_es_regalo(
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     venta.es_regalo = payload.es_regalo
     db.commit()
-    db.refresh(venta)
+    venta = db.get(Venta, venta_id)
     return venta
 
 
@@ -222,5 +222,5 @@ def transition_venta_state(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
     db.commit()
-    db.refresh(venta)
+    venta = db.get(Venta, venta_id)
     return venta

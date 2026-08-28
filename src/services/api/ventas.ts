@@ -31,17 +31,28 @@ export interface DetalleVentaRead {
   cantidad: string | number
   precio_unitario_aplicado: string | number
   costo_unitario_aplicado: string | number
+  nombre_prenda?: string | null
+  talla?: string | null
+  nombre_variante?: string | null
+  color?: string | null
+  subtotal?: string | number | null
+  costo_subtotal?: string | number | null
 }
 
 export interface VentaRead {
   id: number
   fecha: string
   cliente_id: number | null
+  cliente_nombre?: string | null
+  codigo?: string | null
   canal_venta: string
   metodo_pago: string | null
   descuento_porcentaje: string | number
   estado: string
   total_venta: string | number
+  subtotal?: string | number | null
+  costo_total?: string | number | null
+  ganancia_neta?: string | number | null
   es_regalo: boolean
   detalles: DetalleVentaRead[]
 }

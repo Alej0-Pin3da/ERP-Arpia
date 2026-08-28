@@ -86,6 +86,42 @@ class Venta(Base):
     detalles: Mapped[list[DetalleVenta]] = relationship(back_populates="venta", lazy="selectin")
     reversed_by_user: Mapped[Usuario | None] = relationship(lazy="selectin")  # noqa: F821
 
+    @property
+    def cliente_nombre(self) -> str | None:
+        return self.cliente.nombre if self.cliente is not None else None
+
+    @property
+    def codigo(self) -> str | None:
+        return f"VEN-{self.id:04d}" if self.id is not None else None
+
+    @property
+    def subtotal(self) -> Decimal:
+        """Suma bruta de detalles antes de descuento."""
+        total = Decimal("0")
+        for d in self.detalles or []:
+            try:
+                total += (d.cantidad or Decimal("0")) * (d.precio_unitario_aplicado or Decimal("0"))
+            except Exception:
+                continue
+        return total
+
+    @property
+    def costo_total(self) -> Decimal:
+        total = Decimal("0")
+        for d in self.detalles or []:
+            try:
+                total += (d.cantidad or Decimal("0")) * (d.costo_unitario_aplicado or Decimal("0"))
+            except Exception:
+                continue
+        return total
+
+    @property
+    def ganancia_neta(self) -> Decimal:
+        try:
+            return (self.total_venta or Decimal("0")) - self.costo_total
+        except Exception:
+            return Decimal("0")
+
     def __repr__(self) -> str:
         return f"<Venta id={self.id} estado={self.estado!r} total={self.total_venta}>"
 
@@ -138,6 +174,38 @@ class DetalleVenta(Base):
     venta: Mapped[Venta] = relationship(back_populates="detalles")
     producto: Mapped[Producto] = relationship(lazy="selectin")
     variante: Mapped[VarianteProducto | None] = relationship(lazy="selectin")
+
+    @property
+    def nombre_prenda(self) -> str | None:
+        return self.producto.nombre if self.producto is not None else None
+
+    @property
+    def talla(self) -> str | None:
+        # VarianteProducto only has nombre_variante (e.g. "M", "S - Rojo")
+        return self.variante.nombre_variante if self.variante is not None else None
+
+    @property
+    def nombre_variante(self) -> str | None:
+        return self.variante.nombre_variante if self.variante is not None else None
+
+    @property
+    def color(self) -> str | None:
+        # No separate color column; keep None so frontend falls back to '—'
+        return None
+
+    @property
+    def subtotal(self) -> Decimal:
+        try:
+            return (self.cantidad or Decimal("0")) * (self.precio_unitario_aplicado or Decimal("0"))
+        except Exception:
+            return Decimal("0")
+
+    @property
+    def costo_subtotal(self) -> Decimal:
+        try:
+            return (self.cantidad or Decimal("0")) * (self.costo_unitario_aplicado or Decimal("0"))
+        except Exception:
+            return Decimal("0")
 
     def __repr__(self) -> str:
         return f"<DetalleVenta id={self.id} venta_id={self.venta_id}>"
