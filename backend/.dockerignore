@@ -6,6 +6,5 @@ venv/
 .env
 .pytest_cache/
 tests/
-alembic.ini
 *.db
 .git/

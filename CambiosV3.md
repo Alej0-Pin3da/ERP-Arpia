@@ -308,5 +308,16 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 
 ---
 
+### [2026-08-27] — Fix: migraciones 0016-0018 no corrían en Docker (alembic.ini ignorado)
+
+#### Causa
+`backend/.dockerignore` ignoraba `alembic.ini`, la imagen `erp-arpia-api` se buildeaba sin él y `alembic upgrade head` dentro del contenedor fallaba con `No config file 'alembic.ini' found`. La DB quedó en `0015_maestros_tallas` y los nuevos modelos (`Insumo.codigo/tipo`, `BOM.fases`, `pedidos_produccion`, `prendas_confeccionadas`) tiraban `UndefinedColumn` al listar `GET /ventas` (selectin de `BOM_Insumos.fases`).
+
+#### Fix
+- **`backend/.dockerignore`**: removido `alembic.ini` de la lista de ignorados — ahora `COPY . .` lo incluye y `docker compose up --build` puede migrar.
+- **Migración manual**: `docker cp backend/alembic.ini arpia-api:/app/alembic.ini && alembic upgrade head` → DB ahora en `0018_prendas_listas`. Verificado `GET /ventas` ya devuelve `cliente_nombre`, `codigo`, `subtotal/costo_total/ganancia_neta`, `nombre_prenda`, etc.
+
+---
+
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.
