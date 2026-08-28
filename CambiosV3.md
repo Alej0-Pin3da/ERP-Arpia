@@ -298,5 +298,15 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 
 ---
 
+### [2026-08-27] — Fix: `start-all` rebuild automático de imagen API (--build cached)
+
+#### Causa
+`scripts/start-all.ps1` hacía `docker compose up -d api` sin `--build` y si `arpia-api` ya corría, ni siquiera hacía `up` ("no se recrea"). Tras commitear el fix de enriquecimiento de ventas (`cliente_nombre`, `codigo`, etc.) la API seguía corriendo con la imagen vieja, devolviendo el shape viejo sin campos enriquecidos.
+
+#### Fix
+- **`scripts/start-all.ps1`**: nuevo param `[bool]$RebuildApi = $true` (default `true`). Con `RebuildApi=true` hace `docker compose up -d --build api` (BuildKit cached — ~2s si `backend/` no cambió, rebuild real si cambió). Con `-RebuildApi:$false` preserva el path ultra-rápido `up -d` sin build para iteraciones solo-frontend. Actualizado help text y log `RebuildApi=$RebuildApi`. Uso: `npm run start:all` (con build) vs `pwsh -File scripts/start-all.ps1 -RebuildApi:$false` (skip).
+
+---
+
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.
