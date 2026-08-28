@@ -54,8 +54,8 @@ function normalizeLiquidacion(raw: Record<string, unknown>): LiquidacionSocias {
   const dist = (raw.distribucion as unknown[] | undefined) ?? []
   return {
     id: raw.id as number,
-    codigo: raw.codigo as string,
-    periodo: raw.periodo as string,
+    codigo: (raw.codigo as string) ?? '',
+    periodo: (raw.periodo as string) ?? '',
     fecha_cierre: raw.fecha_cierre as string,
     total_ventas_brutas: Number(raw.total_ventas_brutas ?? 0),
     costo_taller_insumos: Number(raw.costo_taller_insumos ?? 0),
@@ -197,10 +197,10 @@ const liquidacionesFiltradas = computed(() => {
     const q = searchLiquidaciones.value.trim().toLowerCase()
     list = list.filter(
       (l) =>
-        l.codigo.toLowerCase().includes(q) ||
-        l.periodo.toLowerCase().includes(q) ||
-        (l.observaciones || '').toLowerCase().includes(q) ||
-        l.distribucion.some((d) => d.nombre_socia.toLowerCase().includes(q)),
+        (l.codigo ?? '').toLowerCase().includes(q) ||
+        (l.periodo ?? '').toLowerCase().includes(q) ||
+        (l.observaciones ?? '').toLowerCase().includes(q) ||
+        (l.distribucion ?? []).some((d) => (d.nombre_socia ?? '').toLowerCase().includes(q)),
     )
   }
 

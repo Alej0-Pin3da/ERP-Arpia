@@ -20,7 +20,7 @@ const cargandoClientes = ref(false)
 function normalizeCliente(raw: Record<string, unknown>): ClienteCRM {
   return {
     id: raw.id as number,
-    nombre: raw.nombre as string,
+    nombre: ((raw.nombre as string) ?? '').trim() || 'Sin nombre',
     tipo: (raw.tipo as string) ?? 'Clienta Habitual',
     telefono: (raw.telefono as string) ?? '',
     email: (raw.email as string) ?? '',
@@ -110,12 +110,12 @@ const clientesFiltrados = computed(() => {
     const q = search.value.trim().toLowerCase()
     const matchesQuery =
       !q ||
-      c.nombre.toLowerCase().includes(q) ||
-      (c.telefono && c.telefono.toLowerCase().includes(q)) ||
-      (c.email && c.email.toLowerCase().includes(q)) ||
-      (c.ciudad && c.ciudad.toLowerCase().includes(q)) ||
-      (c.talla_habitual && c.talla_habitual.toLowerCase().includes(q)) ||
-      (c.notas && c.notas.toLowerCase().includes(q))
+      (c.nombre ?? '').toLowerCase().includes(q) ||
+      (c.telefono ?? '').toLowerCase().includes(q) ||
+      (c.email ?? '').toLowerCase().includes(q) ||
+      (c.ciudad ?? '').toLowerCase().includes(q) ||
+      (c.talla_habitual ?? '').toLowerCase().includes(q) ||
+      (c.notas ?? '').toLowerCase().includes(q)
 
     const matchesTalla =
       filtroTalla.value === 'TODAS' ||
@@ -135,9 +135,11 @@ function formatCOP(val: number) {
 }
 
 function getInitials(nombre: string) {
-  const parts = nombre.split(' ').filter(Boolean)
+  const safe = (nombre ?? '').trim()
+  if (!safe) return '??'
+  const parts = safe.split(' ').filter(Boolean)
   if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-  return nombre.slice(0, 2).toUpperCase()
+  return safe.slice(0, 2).toUpperCase()
 }
 
 function abrirNuevo() {

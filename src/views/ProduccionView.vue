@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -12,6 +12,7 @@ import { showToast } from '@/utils/toast'
 const router = useRouter()
 const atelier = useAtelierStore()
 const { isMock, list: listPedidosApi } = useProduccion()
+const produccionService = useProduccion()
 
 const search = ref('')
 const viewMode = ref<'kanban' | 'tabla'>('kanban')
@@ -46,6 +47,8 @@ async function cargarPedidosReales() {
 onMounted(() => {
   cargarPedidosReales()
 })
+
+watch(isMock, () => void cargarPedidosReales())
 
 const pedidosList = computed(() => (isMock.value ? atelier.pedidos : pedidosApi.value))
 
@@ -85,21 +88,43 @@ function getPedidosPorEstado(est: EstadoPedido) {
   return pedidosFiltrados.value.filter((p) => p.estado === est)
 }
 
-function avanzarEstado(pedido: PedidoProduccion) {
+async function avanzarEstado(pedido: PedidoProduccion) {
   const currentIndex = estados.indexOf(pedido.estado)
   if (currentIndex < estados.length - 1) {
     const nextState = estados[currentIndex + 1]
-    atelier.cambiarEstadoPedido(pedido.id, nextState)
-    showToast('success', 'Etapa Actualizada', `Orden ${pedido.codigo} avanzada a ${nextState}.`)
+    if (isMock.value) {
+      atelier.cambiarEstadoPedido(pedido.id, nextState)
+      showToast('success', 'Etapa Actualizada', `Orden ${pedido.codigo} avanzada a ${nextState}.`)
+      return
+    }
+    try {
+      await produccionService.update(pedido.id, { estado: nextState } as unknown as Record<string, unknown> as never)
+      await cargarPedidosReales()
+      showToast('success', 'Etapa Actualizada', `Orden ${pedido.codigo} avanzada a ${nextState}.`)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error al avanzar estado'
+      showToast('error', 'Error', String(msg))
+    }
   }
 }
 
-function retrocederEstado(pedido: PedidoProduccion) {
+async function retrocederEstado(pedido: PedidoProduccion) {
   const currentIndex = estados.indexOf(pedido.estado)
   if (currentIndex > 0) {
     const prevState = estados[currentIndex - 1]
-    atelier.cambiarEstadoPedido(pedido.id, prevState)
-    showToast('info', 'Etapa Actualizada', `Orden ${pedido.codigo} movida a ${prevState}.`)
+    if (isMock.value) {
+      atelier.cambiarEstadoPedido(pedido.id, prevState)
+      showToast('info', 'Etapa Actualizada', `Orden ${pedido.codigo} movida a ${prevState}.`)
+      return
+    }
+    try {
+      await produccionService.update(pedido.id, { estado: prevState } as unknown as Record<string, unknown> as never)
+      await cargarPedidosReales()
+      showToast('info', 'Etapa Actualizada', `Orden ${pedido.codigo} movida a ${prevState}.`)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error al retroceder estado'
+      showToast('error', 'Error', String(msg))
+    }
   }
 }
 

@@ -10,6 +10,8 @@ import { useAtelierStore, type VentaAtelier } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
 import { useMode } from '@/composables/useMode'
 import { useVentas } from '@/composables/useVentas'
+import type { CanalVenta, MetodoPago, VentaCreatePayload } from '@/services/api/ventas'
+import { updateVenta } from '@/services/api/ventas'
 
 const props = defineProps<{
   visible: boolean
@@ -71,6 +73,28 @@ const metodosPagoOptions = [
   { label: 'Datáfono / Tarjeta', value: 'Datáfono / Tarjeta' },
   { label: 'Contraentrega', value: 'Contraentrega' },
 ]
+
+// Mappers from UI display values to backend Literal enums — keep UI labels intact, only translate payload
+const canalToApi: Record<string, CanalVenta> = {
+  'Showroom Pereira': 'showroom_pereira',
+  'WhatsApp / DM': 'whatsapp',
+  'Feria / Evento NANA': 'feria',
+  'Feria Gótica': 'feria',
+  'Tienda Online / Instagram': 'web',
+  'Encargo Personalizado': 'web',
+}
+
+const metodoToApi: Record<string, MetodoPago> = {
+  'Transferencia Bancolombia': 'transferencia',
+  'Transferencia Nequi': 'transferencia',
+  'Transferencia Nequi / Daviplata': 'transferencia',
+  Transferencia: 'transferencia',
+  'Efectivo Showroom': 'efectivo',
+  Efectivo: 'efectivo',
+  'Datáfono / Tarjeta': 'tarjeta',
+  Tarjeta: 'tarjeta',
+  Contraentrega: 'contraentrega',
+}
 
 const estadosOptions = [
   { label: 'Completada / Entregada', value: 'COMPLETADA' },
@@ -309,27 +333,11 @@ async function guardar() {
     return
   }
 
-  // Real API — map to /ventas canonical enums (canal_venta, metodo_pago)
-  const canalMap: Record<string, string> = {
-    'Showroom Pereira': 'showroom_pereira',
-    'WhatsApp / DM': 'whatsapp',
-    'Feria / Evento NANA': 'feria',
-    'Feria Gótica': 'feria',
-    'Tienda Online / Instagram': 'web',
-    'Encargo Personalizado': 'web',
-  }
-  const pagoMap: Record<string, string> = {
-    'Transferencia Bancolombia': 'transferencia',
-    'Transferencia Nequi': 'transferencia',
-    'Transferencia Nequi / Daviplata': 'transferencia',
-    'Efectivo Showroom': 'efectivo',
-    'Datáfono / Tarjeta': 'tarjeta',
-    'Contraentrega': 'contraentrega',
-  }
-  const apiPayload = {
+  // Real API — map UI values to backend Literals via typed mappers (fallback feria/efectivo per spec)
+  const apiPayload: VentaCreatePayload = {
     cliente_id: cidFinal,
-    canal_venta: (canalMap[canal.value] ?? 'showroom_pereira') as never,
-    metodo_pago: (pagoMap[metodoPago.value] ?? 'transferencia') as never,
+    canal_venta: canalToApi[canal.value] ?? 'feria',
+    metodo_pago: metodoToApi[metodoPago.value] ?? 'efectivo',
     descuento_porcentaje: Number(descuentoPct.value) || 0,
     es_regalo: false,
     detalles: items.value.map((it) => ({
@@ -340,9 +348,15 @@ async function guardar() {
     })),
   }
   try {
-    const creada = await ventasApi.create(apiPayload as never)
-    showToast('success', 'Venta Registrada', `Venta ${(creada as unknown as Record<string, unknown>).codigo ?? 'creada'} guardada en BD.`)
-    emit('venta-guardada', creada as unknown as VentaAtelier)
+    if (isEditing.value && props.ventaEditar) {
+      const actualizada = await updateVenta(props.ventaEditar.id, apiPayload)
+      showToast('success', 'Venta Actualizada', `Venta ${(actualizada as unknown as Record<string, unknown>).codigo ?? props.ventaEditar.codigo} actualizada en BD.`)
+      emit('venta-guardada', actualizada as unknown as VentaAtelier)
+    } else {
+      const creada = await ventasApi.create(apiPayload)
+      showToast('success', 'Venta Registrada', `Venta ${(creada as unknown as Record<string, unknown>).codigo ?? 'creada'} guardada en BD.`)
+      emit('venta-guardada', creada as unknown as VentaAtelier)
+    }
     emit('update:visible', false)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al guardar venta'

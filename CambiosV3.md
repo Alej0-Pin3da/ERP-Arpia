@@ -349,5 +349,18 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 
 ---
 
+### [2026-08-27] — Fix: auditoría REAL — 422 ventas + null-guards + wiring Inventario/Prendas/Producción
+
+#### Causa
+Auditoría modo REAL detectó 3 clases sistémicas: (1) `NuevaVentaModal` enviaba `canal: "Showroom Pereira"` y `metodo: "Transferencia Bancolombia"` pero `schemas/venta.py` espera `Literal["showroom_pereira"]` y `["transferencia"]` → `422 Unprocessable Entity` en CREATE; (2) `ClientesView`/`FinanzasView` hacían `c.nombre.toLowerCase()` y `raw.nombre as string` sin `?? ''` → crash si DB legacy trae `null`; (3) `Inventario`/`Prendas`/`Producción` solo tenían `onMounted` sin `watch(isMock)` y acciones solo tocaban `atelier` (mock) → en REAL no persistían.
+
+#### Fix
+- **`src/components/atelier/NuevaVentaModal.vue`**: mappers tipados `canalToApi`/`metodoToApi` con fallback `feria`/`efectivo`, payload `VentaCreatePayload` usa `canalToApi[canal.value]` y `metodoToApi[metodoPago.value]`; soporta `create` y `update` (usa `updateVenta` si `isEditing`).
+- **`src/views/ClientesView.vue`**: `normalizeCliente` `((raw.nombre as string) ?? '').trim() || 'Sin nombre'`, filtros con `(c.nombre ?? '').toLowerCase()` y `?? ''` en telefono/email/ciudad, `getInitials` safe `??`.
+- **`src/views/FinanzasView.vue`**: `normalizeLiquidacion` `codigo ?? ''`, filtros ` (l.codigo ?? '').toLowerCase()`, distribucion `?? []` safe.
+- **`src/views/InventarioView.vue`/`PrendasListasView.vue`/`ProduccionView.vue`**: `watch(isMock, cargarReales)` + branch `if(isMock) atelier else api.* + reload + toast` para eliminar/ajustar/avanzarEstado. `npm run build` 384 módulos OK.
+
+---
+
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.

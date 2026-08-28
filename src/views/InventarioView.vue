@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
@@ -13,6 +13,7 @@ import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
 const { isMock, list: listInsumosApi } = useInsumos()
+const insumosService = useInsumos()
 
 const search = ref('')
 const tipoFiltro = ref<'Todos' | 'Directo' | 'Indirecto'>('Todos')
@@ -53,6 +54,8 @@ async function cargarInsumosReales() {
 onMounted(() => {
   cargarInsumosReales()
 })
+
+watch(isMock, () => void cargarInsumosReales())
 
 const insumosList = computed(() => (isMock.value ? atelier.insumos : insumosApi.value))
 
@@ -97,15 +100,38 @@ function abrirCompra(item: InsumoAtelier) {
   showCompraModal.value = true
 }
 
-function ajustar(item: InsumoAtelier, delta: number) {
-  atelier.ajustarStockInsumo(item.id, delta)
+async function ajustar(item: InsumoAtelier, delta: number) {
+  if (isMock.value) {
+    atelier.ajustarStockInsumo(item.id, delta)
+    return
+  }
+  try {
+    const nuevoStock = Math.max(0, (item.stock_actual ?? 0) + delta)
+    await insumosService.update(item.id, { stock_actual: nuevoStock })
+    await cargarInsumosReales()
+    showToast('success', 'Stock actualizado', `${item.nombre} ajustado en ${delta > 0 ? '+' : ''}${delta}.`)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Error al ajustar stock'
+    showToast('error', 'Error', String(msg))
+  }
 }
 
-function eliminar(item: InsumoAtelier) {
-  const idx = atelier.insumos.findIndex((i) => i.id === item.id)
-  if (idx !== -1) {
-    atelier.insumos.splice(idx, 1)
+async function eliminar(item: InsumoAtelier) {
+  if (isMock.value) {
+    const idx = atelier.insumos.findIndex((i) => i.id === item.id)
+    if (idx !== -1) {
+      atelier.insumos.splice(idx, 1)
+      showToast('info', 'Insumo eliminado', `${item.nombre} ha sido removido del catálogo.`)
+    }
+    return
+  }
+  try {
+    await insumosService.remove(item.id)
+    await cargarInsumosReales()
     showToast('info', 'Insumo eliminado', `${item.nombre} ha sido removido del catálogo.`)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Error al eliminar insumo'
+    showToast('error', 'Error', String(msg))
   }
 }
 </script>
