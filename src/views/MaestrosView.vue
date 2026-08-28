@@ -28,14 +28,14 @@ const tallasApi = ref<TallaEstandarMaestro[]>([])
 const sinTallaApi = ref<ProductoSinTallaMaestro[]>([])
 const parametrosApi = ref<ParametrosCosteoMaestro | null>(null)
 
-const proveedoresList = computed(() => (isMock.value ? proveedoresList : proveedoresApi.value))
-const canalesList = computed(() => (isMock.value ? canalesList : canalesApi.value))
-const metodosList = computed(() => (isMock.value ? metodosList : metodosApi.value))
-const categoriasList = computed(() => (isMock.value ? categoriasList : categoriasApi.value))
-const ubicacionesList = computed(() => (isMock.value ? ubicacionesList : ubicacionesApi.value))
-const tallasList = computed(() => (isMock.value ? tallasList : tallasApi.value))
-const sinTallaList = computed(() => (isMock.value ? sinTallaList : sinTallaApi.value))
-const parametrosData = computed(() => (isMock.value ? parametrosData : (parametrosApi.value ?? parametrosData)))
+const proveedoresList = computed(() => (isMock.value ? store.proveedoresMaestros : proveedoresApi.value))
+const canalesList = computed(() => (isMock.value ? store.canalesVentaMaestros : canalesApi.value))
+const metodosList = computed(() => (isMock.value ? store.metodosPagoMaestros : metodosApi.value))
+const categoriasList = computed(() => (isMock.value ? store.categoriasColeccionMaestros : categoriasApi.value))
+const ubicacionesList = computed(() => (isMock.value ? store.ubicacionesTallerMaestros : ubicacionesApi.value))
+const tallasList = computed(() => (isMock.value ? store.tallasEstandarMaestros : tallasApi.value))
+const sinTallaList = computed(() => (isMock.value ? store.productosSinTallaMaestros : sinTallaApi.value))
+const parametrosData = computed(() => (isMock.value ? store.parametrosCosteo : (parametrosApi.value ?? store.parametrosCosteo)))
 
 async function cargarDatosReales() {
   if (isMock.value) return
@@ -246,7 +246,7 @@ function abrirNuevaTalla() {
     cadera: '85 – 90 cm',
     reduccion_corset: '-5 cm a -7 cm',
     descripcion: 'Nueva talla estándar de confección',
-    orden: tallasList.length + 1,
+    orden: tallasList.value.length + 1,
     activo: true,
   }
   modalTalla.value = true
@@ -492,19 +492,19 @@ function restaurarParametrosDefecto() {
 // ==========================================
 // STATS & FILTROS
 // ==========================================
-const totalProveedores = computed(() => proveedoresList.length)
-const totalCanales = computed(() => canalesList.length)
-const totalMetodos = computed(() => metodosList.length)
-const totalTallas = computed(() => tallasList.length)
-const totalSinTalla = computed(() => sinTallaList.length)
-const totalCategorias = computed(() => categoriasList.length)
-const totalUbicaciones = computed(() => ubicacionesList.length)
+const totalProveedores = computed(() => proveedoresList.value.length)
+const totalCanales = computed(() => canalesList.value.length)
+const totalMetodos = computed(() => metodosList.value.length)
+const totalTallas = computed(() => tallasList.value.length)
+const totalSinTalla = computed(() => sinTallaList.value.length)
+const totalCategorias = computed(() => categoriasList.value.length)
+const totalUbicaciones = computed(() => ubicacionesList.value.length)
 
 // Filter for suppliers
 const filtroCategoriaProv = ref('TODOS')
 const proveedoresFiltrados = computed(() => {
-  if (filtroCategoriaProv.value === 'TODOS') return proveedoresList
-  return proveedoresList.filter((p) => p.categoria === filtroCategoriaProv.value)
+  if (filtroCategoriaProv.value === 'TODOS') return proveedoresList.value
+  return proveedoresList.value.filter((p) => p.categoria === filtroCategoriaProv.value)
 })
 
 // Format Currency

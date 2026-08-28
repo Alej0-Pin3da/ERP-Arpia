@@ -339,5 +339,15 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 
 ---
 
+### [2026-08-27] — Fix: `MaestrosView` crash `Cannot read properties of undefined (reading 'id')`
+
+#### Causa
+`src/views/MaestrosView.vue:31-38` tenía 8 `computed` auto-referenciales `isMock ? proveedoresList : proveedoresApi` (y lo mismo para canales/metodos/categorias/ubicaciones/tallas/sinTalla/parametros) — nunca apuntaban a `store.proveedoresMaestros` etc. Además `totalProveedores`, `proveedoresFiltrados` y `abrirNuevaTalla` usaban `proveedoresList` sin `.value`, devolviendo el objeto `Ref` en vez del array. El bug venía desde `d530955` (Fase 3 PR2) pero quedó dormido hasta que `start-all --build` activó modo REAL y `onMounted cargarDatosReales` forzó el render en `/maestros`.
+
+#### Fix
+- **`src/views/MaestrosView.vue`**: 8 computeds ahora `isMock ? store.*Maestros/store.parametrosCosteo : *Api.value`; `total*` y `proveedoresFiltrados` usan `.value`; `abrirNuevaTalla orden: tallasList.value.length`. Build `vite 6.4` 2.79s OK.
+
+---
+
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.
