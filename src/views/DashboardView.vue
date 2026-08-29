@@ -7,6 +7,7 @@ import { useMode } from '@/composables/useMode'
 import { useInsumos } from '@/composables/useInsumos'
 import { useProduccion } from '@/composables/useProduccion'
 import { useVentas } from '@/composables/useVentas'
+import * as analiticosApi from '@/services/api/analiticos'
 import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
@@ -19,11 +20,13 @@ const { pedidos: pedidosReal } = useProduccion()
 const { ventas: ventasReal } = useVentas()
 
 const insumosCriticosReal = computed(() => (insumosReal.value as any[]).filter((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
-const insumosCriticosDisplay = computed(() => isMock.value ? insumosCriticosDisplay : insumosCriticosReal.value)
-const pedidosDisplay = computed(() => isMock.value ? pedidosDisplay : (pedidosReal.value as any[]))
+const insumosCriticosDisplay = computed(() => isMock.value ? atelier.insumosCriticos : insumosCriticosReal.value)
+const pedidosDisplay = computed(() => isMock.value ? atelier.pedidos : (pedidosReal.value as any[]))
 const ventasDisplay = computed(() => isMock.value ? atelier.ventas : (ventasReal.value as any[]))
 
-onMounted(() => { if (!isMock.value) { /* composables auto-fetch via watch(isMock) */ } })
+const ventasMensuales = ref<any[]>([])
+const rentabilidadReal = computed(()=> isMock.value ? atelier.rentabilidadPromedio : 0)
+
 
 const showIaModal = ref(false)
 const showNuevoPedidoModal = ref(false)
