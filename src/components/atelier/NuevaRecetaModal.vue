@@ -52,6 +52,7 @@ function guardar() {
     return
   }
 
+  if (!isMock.value) { showToast('info','Modo REAL','Usá POST /productos y /bom para crear recetas.'); return }
   const r = atelier.crearReceta({
     codigo: codigo.value.trim() || `REC-ARP-0${atelier.recetas.length + 1}`,
     nombre: nombre.value.trim(),

@@ -85,6 +85,7 @@ function guardarPedido() {
   }
 
   const prenda = nombrePrendaManual.value.trim() || 'Prenda a Medida Atelier'
+  if (!isMock.value) { showToast('info','Modo REAL','Usá POST /pedidos-produccion'); return }
   const p = atelier.crearPedido({
     cliente_id: clienteId || 1,
     cliente_nombre: clienteNombre,

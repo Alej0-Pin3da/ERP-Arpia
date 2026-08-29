@@ -127,9 +127,11 @@ async function guardar() {
       notas: notas.value.trim(),
     }
     if (props.clienteEditar) {
+      if (!isMock.value) { showToast('info','Modo REAL','Usá PATCH /clientes/:id'); return }
       atelier.actualizarCliente(props.clienteEditar.id, payload)
       showToast('success', 'Clienta Actualizada', `${nombre.value} actualizada correctamente.`)
     } else {
+      if (!isMock.value) { showToast('info','Modo REAL','Usá POST /clientes'); return }
       const c = atelier.crearCliente(payload)
       showToast('success', 'Clienta Registrada', `${c.nombre} registrada en el CRM con talla ${tallaHabitual.value}.`)
     }
