@@ -14,6 +14,7 @@ from app.core.idempotency import create_idempotency_middleware
 from app.core.limiter import limiter
 from app.core.logging_config import setup_logging
 from app.core.logging_middleware import RequestContextMiddleware
+from app.core.metrics import MetricsMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.db.session import engine
 from app.models import Base  # noqa: F401  # ensure all models are registered
@@ -61,6 +62,7 @@ if settings.ENVIRONMENT in ("production", "staging"):
     ]
 
 app.add_middleware(CORSMiddleware, **cors_kwargs)
+app.add_middleware(MetricsMiddleware)
 app.add_middleware(RequestContextMiddleware)
 
 # Idempotency middleware for critical endpoints

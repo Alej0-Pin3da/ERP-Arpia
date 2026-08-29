@@ -373,5 +373,25 @@ Auditoría modo REAL detectó 3 clases sistémicas: (1) `NuevaVentaModal` enviab
 
 ---
 
+### [2026-08-27] — SDD testing-frontend-vitest — 70 specs Vitest (composables) verificados
+
+#### Contexto
+Sprint 3 de `MEJORAS_PRIORITARIAS_ERP_ARPIA.md`: frontend con 0 specs. Se creó change `testing-frontend-vitest` (engram/auto/single-pr) para cerrar el gap.
+
+#### Estado
+- **Aplicado y verificado:** 9 suites / 70 tests PASS (`npm test` 4.7s, jsdom) — `useClientes` (9), `useVentas` (8), `useInsumos`, `useMaestros` (157 líneas), `useMode`, `usePrendas`, `useProduccion`, `useSocios` (10), `useFinanzas` (12). Fixtures + mocks de `src/services/api/*` + `vitest.config` ya en `vite.config.ts` + `tests/setup.ts` (ResizeObserver/matchMedia polyfills).
+- **Pendiente opcional (fuera de este corte):** specs de Views (VentasView/Inventario/Finanzas/Login) — no bloquea el cierre del gap core.
+
+---
+
+### [2026-08-27] — SDD metrics-observability — Métricas por endpoint + alertas stock + Prometheus
+
+#### Implementado
+- **`backend/app/core/metrics.py`**: `MetricsMiddleware` (BaseHTTPMiddleware) registra `count/errors/avg_ms/p95_ms` por path normalizado (`/\\d+` → `/:id`), header `X-Response-Time-Ms`.
+- **`backend/app/api/routes/observability.py`**: `GET /api/v1/observability/summary` (JSON snapshot), `GET /api/v1/observability/metrics` (Prometheus text `http_requests_total`/`http_errors_total`/`http_latency_avg_ms`), `GET /api/v1/observability/alerts` (stock <10).
+- **`backend/app/api/router.py` + `backend/app/main.py`**: router `observability` + `MetricsMiddleware` wireado (antes de `RequestContextMiddleware`). `PYTHONPATH=backend python -c "from app.main import app"` OK, `npm test 70/70`, `vite build 2.84s`.
+
+---
+
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.

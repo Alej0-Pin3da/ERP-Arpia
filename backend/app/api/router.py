@@ -4,6 +4,7 @@ from app.api.routes import (
     analiticos,
     audit,
     auth,
+    observability,
     bom,
     categorias_insumos,
     clientes,
@@ -41,6 +42,7 @@ api_router.include_router(maestros.router)
 api_router.include_router(produccion.router_prendas)
 api_router.include_router(produccion.router_pedidos)
 api_router.include_router(audit.router)
+api_router.include_router(observability.router)
 
 
 @api_router.get("/__mode", tags=["mode"])
