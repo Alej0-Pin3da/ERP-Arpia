@@ -106,6 +106,7 @@ Cada `atelier.crear*/actualizar*` debe branch `isMock ? atelier : api`. Priorida
 
 | Fecha | Hito | Evidencia |
 | 2026-08-27 | Modales NuevaReceta/NuevoPedido/OrdenCompra/NuevoCliente branch isMock | guard isMock + toast modo REAL |
+| 2026-08-27 | Dashboard purga final template isMock | rentabilidad/pipeline/distribución → isMock ? atelier : 0 (commit 5ac52a1) |
 | 2026-08-27 | Dashboard analiticos service creado + fix recursive | src/services/api/analiticos.ts + build OK |
 |---|---|---|
 | 2026-08-27 | ERP-V5.md creado + auditoría inicial 121 usos | Este archivo |

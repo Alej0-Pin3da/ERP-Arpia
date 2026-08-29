@@ -1,0 +1,13 @@
+{
+  "topic": "sdd/purge-frontend-mock",
+  "title": "V5 purge frontend mock - estado 2026-08-27",
+  "date": "2026-08-28T23:57:06.052282",
+  "commits": [
+    "fee2aee",
+    "e96ac4c",
+    "3b6ee98",
+    "5ac52a1"
+  ],
+  "remaining": "Analisis recetas table + modales POST real + vistas secundarias",
+  "erp_v5": "ERP-V5.md actualizado"
+}
