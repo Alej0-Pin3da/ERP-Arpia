@@ -13,6 +13,7 @@ import {
 } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
 import { useMaestros } from '@/composables/useMaestros'
+import { showToast } from '@/utils/toast'
 
 const store = useAtelierStore()
 const { isMock } = useMode()
@@ -36,6 +37,85 @@ const ubicacionesList = computed(() => (isMock.value ? store.ubicacionesTallerMa
 const tallasList = computed(() => (isMock.value ? store.tallasEstandarMaestros : tallasApi.value))
 const sinTallaList = computed(() => (isMock.value ? store.productosSinTallaMaestros : sinTallaApi.value))
 const parametrosData = computed(() => (isMock.value ? store.parametrosCosteo : (parametrosApi.value ?? store.parametrosCosteo)))
+
+function sanitizeProveedorPayload(form: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  const nombre = String(form.nombre ?? '').trim()
+  if (nombre) out.nombre = nombre
+  const categoria = String(form.categoria ?? '').trim()
+  if (categoria) out.categoria = categoria
+  const ciudad = String(form.ciudad ?? '').trim()
+  out.ciudad = ciudad || null
+  const emailRaw = String(form.email ?? '').trim()
+  out.email = emailRaw || null
+  const telRaw = String(form.telefono ?? '').trim()
+  out.telefono = telRaw || null
+  const cal = form.calificacion
+  if (cal !== '' && cal !== null && cal !== undefined) {
+    const n = Number(cal)
+    if (!Number.isNaN(n)) out.calificacion = Math.max(0, Math.min(5, n))
+  }
+  const tiempo = form.tiempo_entrega_dias
+  if (tiempo !== '' && tiempo !== null && tiempo !== undefined) {
+    const n = Number(tiempo)
+    if (!Number.isNaN(n)) out.tiempo_entrega_dias = Math.max(0, Math.round(n))
+  }
+  out.activo = form.activo !== false
+  const notas = String(form.notas ?? '').trim()
+  out.notas = notas || null
+  return out
+}
+
+function sanitizeCanalPayload(form: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  const nombre = String(form.nombre ?? '').trim()
+  if (nombre) out.nombre = nombre
+  let codigo = String((form as any).codigo ?? '').trim()
+  if (!codigo && nombre) codigo = nombre.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '').slice(0,50) || 'CANAL'
+  if (codigo) out.codigo = codigo
+  const tipoRaw = String(form.tipo ?? '').trim().toUpperCase()
+  if (['FISICO','DIGITAL','EVENTO'].includes(tipoRaw)) out.tipo = tipoRaw
+  else out.tipo = 'DIGITAL'
+  const com = form.comision_pct
+  if (com !== '' && com !== null && com !== undefined) {
+    const n = Number(com)
+    if (!Number.isNaN(n)) out.comision_pct = Math.max(0, Math.min(100, n))
+  }
+  const costo = (form as any).costo_fijo_mensual
+  if (costo !== '' && costo !== null && costo !== undefined) {
+    const n = Number(costo)
+    if (!Number.isNaN(n)) out.costo_fijo_mensual = Math.max(0, n)
+  }
+  out.activo = (form as any).activo !== false
+  const desc = String((form as any).descripcion ?? '').trim()
+  out.descripcion = desc || null
+  return out
+}
+
+function sanitizeMetodoPayload(form: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  const nombre = String(form.nombre ?? '').trim()
+  if (nombre) out.nombre = nombre
+  let codigo = String((form as any).codigo ?? '').trim()
+  if (!codigo && nombre) codigo = nombre.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '').slice(0,50) || 'METODO'
+  if (codigo) out.codigo = codigo
+  const tipoRaw = String(form.tipo ?? '').trim().toUpperCase()
+  if (['TRANSFERENCIA','BILLETERA_DIGITAL','EFECTIVO','PASARELA_DATAFONO'].includes(tipoRaw)) out.tipo = tipoRaw
+  else out.tipo = 'TRANSFERENCIA'
+  const com = form.comision_pct
+  if (com !== '' && com !== null && com !== undefined) {
+    const n = Number(com)
+    if (!Number.isNaN(n)) out.comision_pct = Math.max(0, Math.min(100, n))
+  }
+  const tiempo = String(form.tiempo_acreditacion ?? '').trim()
+  out.tiempo_acreditacion = tiempo || null
+  out.activo = (form as any).activo !== false
+  const datos = String((form as any).datos_cuenta ?? '').trim()
+  out.datos_cuenta = datos || null
+  const desc = String((form as any).descripcion ?? '').trim()
+  out.descripcion = desc || null
+  return out
+}
 
 async function cargarDatosReales() {
   if (isMock.value) return
@@ -117,16 +197,28 @@ function abrirEditarProveedor(p: ProveedorMaestro) {
 }
 
 async function guardarProveedor() {
-  if (!provForm.value.nombre) return
+  if (!provForm.value.nombre) {
+    showToast('warn', 'Campo requerido', 'Ingresá el nombre del proveedor.')
+    return
+  }
   if (isMock.value) {
     if (modoEdicionProveedor.value && provForm.value.id) store.actualizarProveedor(provForm.value.id, provForm.value)
     else store.crearProveedor(provForm.value)
-  } else {
-    if (modoEdicionProveedor.value && provForm.value.id) await maestros.updateProveedor(provForm.value.id, provForm.value as Record<string, unknown>)
-    else await maestros.createProveedor(provForm.value as Record<string, unknown>)
-    await cargarDatosReales()
+    modalProveedor.value = false
+    return
   }
-  modalProveedor.value = false
+  const payload = sanitizeProveedorPayload(provForm.value as unknown as Record<string, unknown>)
+  try {
+    if (modoEdicionProveedor.value && provForm.value.id) await maestros.updateProveedor(provForm.value.id, payload)
+    else await maestros.createProveedor(payload)
+    await cargarDatosReales()
+    showToast('success', 'Proveedor guardado', `${provForm.value.nombre} guardado correctamente.`)
+    modalProveedor.value = false
+  } catch (e: unknown) {
+    const msg = (e as any)?.response?.data?.detail ?? (e as Error)?.message ?? 'Error al guardar proveedor'
+    const detail = Array.isArray(msg) ? msg.map((d: any) => d.msg || JSON.stringify(d)).join(', ') : String(msg)
+    showToast('error', 'Error 422', detail)
+  }
 }
 
 // ==========================================
@@ -163,16 +255,28 @@ function abrirEditarCanal(c: CanalVentaMaestro) {
 }
 
 async function guardarCanal() {
-  if (!canalForm.value.nombre) return
+  if (!canalForm.value.nombre) {
+    showToast('warn', 'Campo requerido', 'Ingresá el nombre del canal.')
+    return
+  }
   if (isMock.value) {
     if (modoEdicionCanal.value && canalForm.value.id) store.actualizarCanalVenta(canalForm.value.id, canalForm.value)
     else store.crearCanalVenta(canalForm.value)
-  } else {
-    if (modoEdicionCanal.value && canalForm.value.id) await maestros.updateCanal(canalForm.value.id, canalForm.value as Record<string, unknown>)
-    else await maestros.createCanal(canalForm.value as Record<string, unknown>)
-    await cargarDatosReales()
+    modalCanal.value = false
+    return
   }
-  modalCanal.value = false
+  const payload = sanitizeCanalPayload(canalForm.value as unknown as Record<string, unknown>)
+  try {
+    if (modoEdicionCanal.value && canalForm.value.id) await maestros.updateCanal(canalForm.value.id, payload)
+    else await maestros.createCanal(payload)
+    await cargarDatosReales()
+    showToast('success', 'Canal guardado', `${canalForm.value.nombre} guardado correctamente.`)
+    modalCanal.value = false
+  } catch (e: unknown) {
+    const msg = (e as any)?.response?.data?.detail ?? (e as Error)?.message ?? 'Error al guardar canal'
+    const detail = Array.isArray(msg) ? msg.map((d: any) => d.msg || JSON.stringify(d)).join(', ') : String(msg)
+    showToast('error', 'Error 422', detail)
+  }
 }
 
 // ==========================================
@@ -209,16 +313,28 @@ function abrirEditarPago(p: MetodoPagoMaestro) {
 }
 
 async function guardarPago() {
-  if (!pagoForm.value.nombre) return
+  if (!pagoForm.value.nombre) {
+    showToast('warn', 'Campo requerido', 'Ingresá el nombre del método de pago.')
+    return
+  }
   if (isMock.value) {
     if (modoEdicionPago.value && pagoForm.value.id) store.actualizarMetodoPago(pagoForm.value.id, pagoForm.value)
     else store.crearMetodoPago(pagoForm.value)
-  } else {
-    if (modoEdicionPago.value && pagoForm.value.id) await maestros.updateMetodo(pagoForm.value.id, pagoForm.value as Record<string, unknown>)
-    else await maestros.createMetodo(pagoForm.value as Record<string, unknown>)
-    await cargarDatosReales()
+    modalPago.value = false
+    return
   }
-  modalPago.value = false
+  const payload = sanitizeMetodoPayload(pagoForm.value as unknown as Record<string, unknown>)
+  try {
+    if (modoEdicionPago.value && pagoForm.value.id) await maestros.updateMetodo(pagoForm.value.id, payload)
+    else await maestros.createMetodo(payload)
+    await cargarDatosReales()
+    showToast('success', 'Método guardado', `${pagoForm.value.nombre} guardado correctamente.`)
+    modalPago.value = false
+  } catch (e: unknown) {
+    const msg = (e as any)?.response?.data?.detail ?? (e as Error)?.message ?? 'Error al guardar método de pago'
+    const detail = Array.isArray(msg) ? msg.map((d: any) => d.msg || JSON.stringify(d)).join(', ') : String(msg)
+    showToast('error', 'Error 422', detail)
+  }
 }
 
 // ==========================================

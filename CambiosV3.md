@@ -491,6 +491,23 @@ Revisión total detectó 6 gaps post-purga: `DevolucionesView`/`OmisionesView` 1
 - **DashboardView.vue**: eliminado `<div>` duplicado tras `v-else`, queda un único `v-if` empty-state + `v-else` grid. `AnalisisView` re-añadido empty-state `Sin recetas...` que se había perdido tras el fix de lint.
 - Verificado `npm run build` 168 módulos OK + `MaestrosView` ya no `replace` null.
 
+
+---
+
+### [2026-08-29] — Fix: 422 Maestros `proveedores/canal/metodo` — `codigo` missing + `email` empty string + unhandled promise
+
+#### Causa
+`MaestrosView.vue` `guardarProveedor/Canal/Pago` hacía `await maestros.createX(provForm.value as Record)` directo con todo el form del store. 3 causas encadenadas de `422 Unprocessable Entity`:
+- **Proveedores:** `email: ''` (empty string) fallaba `EmailStr` (debe ser `null` o email válido), `telefono/ciudad` con `''` y `calificacion/tiempo_entrega_dias` como string; `contacto`/`condicion_pago` extra no mapeados.
+- **Canales/Métodos:** `codigo` es requerido (`Field(max_length=50)`) pero `canalForm`/`pagoForm` no tenían `codigo` — se enviaba sin él → `422 missing codigo`. `tipo` debe ser `FISICO|DIGITAL|EVENTO` y `TRANSFERENCIA|BILLETERA_DIGITAL|EFECTIVO|PASARELA_DATAFONO` pero el form podía mandar lowercase.
+- **Unhandled:** sin `try/catch`, el `422` quedaba como `Uncaught (in promise) AxiosError` y `Vue warn: Unhandled error during execution of native event handler` en vez de toast.
+
+#### Fix
+- **MaestrosView.vue** import `showToast` + 3 helpers `sanitizeProveedorPayload / sanitizeCanalPayload / sanitizeMetodoPayload`:
+  - `email/telefono/ciudad/notas/descripcion` `''` → `null`, `calificacion` clamp 0-5, `tiempo_entrega_dias` int >=0, `codigo` auto-generado de `nombre` (`toUpperCase().replace(/\s+/g,'_').replace(/[^A-Z0-9_]/g,'').slice(0,50)`), `tipo` upper + whitelist, `comision_pct` clamp 0-100, `costo_fijo` >=0.
+  - `guardarProveedor/Canal/Pago` ahora: `if (!nombre) toast warn`, `if(isMock) store... return`, `payload = sanitize...`, `try { await create/update + cargarDatosReales + toast success } catch { detail = response.data.detail (array→join) → toast error 422 }` — ya no `Uncaught`.
+- Verificado `npm run build` 168 módulos OK, `POST /maestros/proveedores` con `email: null` y `codigo` auto ya no `422`.
+
 ---
 
 ### Instrucción de Mantenimiento Continuo
