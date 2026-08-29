@@ -1,13 +1,19 @@
 {
   "topic": "sdd/purge-frontend-mock",
-  "title": "V5 purge frontend mock - estado 2026-08-27",
-  "date": "2026-08-28T23:57:06.052282",
+  "title": "V5 purge frontend mock - estado 2026-08-29 (COMPLETADO)",
+  "date": "2026-08-29T11:20:00",
   "commits": [
-    "fee2aee",
-    "e96ac4c",
-    "3b6ee98",
-    "5ac52a1"
+    "176f946",
+    "10fac5e",
+    "d43c590"
   ],
-  "remaining": "Analisis recetas table + modales POST real + vistas secundarias",
-  "erp_v5": "ERP-V5.md actualizado"
+  "tags": [
+    "v5.0",
+    "v5.1",
+    "v5.2"
+  ],
+  "status": "DONE",
+  "resumen": "Purga frontend mock completa: 17 vistas + AppLayout + 13 modales branch isMock total. Fix crashes AppLayout/Dashboard/Analisis (useInsumos sin insumos ref) + ClientesView TDZ + MaestrosView replace null + Dashboard duplicate grid + 422 maestros (codigo auto, email null, sanitize, toast). Wire Devoluciones/Omisiones/Optimizador/Productos/Cotizador/Analisis + SugerirOrden POST /compras-insumos + servicios productos/compras-insumos/devoluciones/omisiones. Build 168 OK + 70/70 Vitest.",
+  "remaining": "Solo pendientes no críticos: (1) wire edición real en /productos (create/update/delete POST/PUT/DELETE /productos + FichaTecnicaModal editar) — usuario dijo 'continuamos después'; (2) migrar PrimeVue Dropdown -> Select (deprecado v4, warning no-crash); (3) migrar 29 any del bridge mock<->real (lint warnings, no rompen build); (4) favicon.ico 404 cosmético",
+  "erp_v5": "ERP-V5.md actualizado (roadmap V5.1-V5.4 tildado) + CambiosV3.md con entradas 2026-08-29"
 }

@@ -1,0 +1,14 @@
+{
+  "topic": "sdd/productos-edit-real",
+  "title": "V5.3 pendiente - Edición real de modelos en /productos (POST/PUT/DELETE /productos)",
+  "date": "2026-08-29T11:20:00",
+  "status": "PENDING",
+  "descripcion": "El usuario pidió poder editar los modelos en /productos en modo REAL. Hoy la vista hace GET /productos (v5.1) y muestra productos reales mapeados a fichas, pero crear/eliminar siguen tirando a atelier.recetas (memoria) con guard if(!isMock) return + toast 'Usá POST /productos'. No persiste en Postgres.",
+  "plan": [
+    "src/services/api/productos.ts: agregar createProducto(POST /productos con tipo_producto_id, nombre, requiere_fabricacion, precio_venta_sugerido, costos_operativos_fijos), updateProducto(PUT /productos/{id}), deleteProducto(DELETE /productos/{id})",
+    "ProductosView.vue: boton lapiz Editar por tarjeta + NuevaRecetaModal soporte isEditing (en REAL POST/PUT, en MOCK store.crearReceta/actualizarReceta) + eliminarReceta branch REAL DELETE + cargarProductosReales()",
+    "FichaTecnicaModal.vue: boton Editar adentro que abre NuevaRecetaModal en modo edicion",
+    "Verificar: crear/editar/eliminar en VITE_USE_MOCK=false persiste en GET /productos F5 + build + lint"
+  ],
+  "dependencias": "Ninguna — código listo para retomar. CambiosV3.md + ERP-V5.md ya documentan V5.1/V5.2."
+}
