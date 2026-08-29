@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useMode } from '@/composables/useMode'
+import * as omisionesApi from '@/services/api/omisiones'
 
+const { isMock } = useMode()
 const omisiones = ref([
   {
     id: 1,
@@ -17,6 +20,24 @@ const omisiones = ref([
     impacto: 'Descuento $40.000 COP',
   },
 ])
+
+const omisionesReal = ref<any[]>([])
+async function cargarOmisionesReales() {
+  if (isMock.value) return
+  try {
+    const r = await omisionesApi.listOmisiones({ limit: 100 })
+    omisionesReal.value = (r as any).items ?? []
+  } catch { omisionesReal.value = [] }
+}
+onMounted(() => { void cargarOmisionesReales() })
+watch(isMock, () => { void cargarOmisionesReales() })
+const omisionesDisplay = computed(() => isMock.value ? omisiones.value : (omisionesReal.value.length ? omisionesReal.value.map((o: any) => ({
+  id: o.id,
+  fecha: o.creado_en || '',
+  usuario: o.hoja || 'Sistema',
+  evento: o.mensaje || o.fase || 'Omisión',
+  impacto: o.nivel || '',
+})) : []))
 </script>
 
 <template>
@@ -41,7 +62,14 @@ const omisiones = ref([
           </tr>
         </thead>
         <tbody class="divide-y divide-stone-800/60 font-mono">
-          <tr v-for="o in omisiones" :key="o.id">
+          <tr v-if="!omisionesDisplay.length">
+                <td colspan="4" class="py-8 text-center text-stone-500">
+                  <i class="pi pi-inbox text-2xl mb-2 block" />
+                  Sin omisiones registradas en modo {{ isMock ? 'MOCK' : 'REAL' }}.
+                  <span v-if="!isMock" class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/omisiones</code>.</span>
+                </td>
+              </tr>
+          <tr v-for="o in omisionesDisplay" :key="o.id">
             <td class="py-3 px-3 text-stone-400">{{ o.fecha }}</td>
             <td class="py-3 px-3 text-amber-300 font-bold">{{ o.usuario }}</td>
             <td class="py-3 px-3 text-stone-300">{{ o.evento }}</td>

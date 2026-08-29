@@ -53,7 +53,6 @@ async function cargarClientesReales() {
 
 onMounted(() => void cargarClientesReales())
 watch(isMock, () => void cargarClientesReales())
-watch(showModal, (v) => { if (!v && !isMock.value) void cargarClientesReales() })
 
 const clientesList = computed<ClienteCRM[]>(() => (isMock.value ? (atelier.clientes as unknown as ClienteCRM[]) : clientesReal.value))
 const search = ref('')
@@ -64,6 +63,8 @@ const showModal = ref(false)
 const showTallasModal = ref(false)
 const clienteEditar = ref<ClienteCRM | null>(null)
 const clienteSeleccionado = ref<ClienteCRM | null>(null)
+
+watch(showModal, (v) => { if (!v && !isMock.value) void cargarClientesReales() })
 
 const tallasFiltroOptions = [
   { label: 'Todas las Tallas', value: 'TODAS' },

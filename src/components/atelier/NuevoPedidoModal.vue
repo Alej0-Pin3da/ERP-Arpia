@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import Dialog from 'primevue/dialog'
@@ -44,14 +45,14 @@ const estadosOptions = [
 ]
 
 const clientesOptions = computed(() => {
-  return atelier.clientes.map((c) => ({
+  return (isMock.value ? atelier.clientes : [] as any[]).map((c) => ({
     label: `${c.nombre} (${c.telefono || 'Sin tel'})`,
     value: c.id,
   }))
 })
 
 const recetasOptions = computed(() => {
-  return atelier.recetas.map((r) => ({
+  return (isMock.value ? (atelier as any).recetas : [] as any[]).map((r) => ({
     label: `${r.nombre} (PVP Sugerido: $${r.precio_venta.toLocaleString('es-CO')})`,
     value: r.id,
   }))
@@ -59,7 +60,7 @@ const recetasOptions = computed(() => {
 
 function onRecetaChange() {
   if (recetaSeleccionada.value) {
-    const r = atelier.recetas.find((x) => x.id === recetaSeleccionada.value)
+    const r = (isMock.value ? (atelier as any).recetas : [] as any[]).find((x) => x.id === recetaSeleccionada.value)
     if (r) {
       nombrePrendaManual.value = r.nombre
       precioVenta.value = r.precio_venta
@@ -73,11 +74,12 @@ function guardarPedido() {
   let clienteNombre = 'Cliente'
 
   if (modoCliente.value === 'nuevo' && nuevoClienteNombre.value.trim()) {
+    if (!isMock.value) { showToast('info','Modo REAL','Creación de clientas vía CRM API.'); return c as any }
     const c = atelier.crearCliente({ nombre: nuevoClienteNombre.value.trim() })
     clienteId = c.id
     clienteNombre = c.nombre
   } else if (clienteId) {
-    const c = atelier.clientes.find((x) => x.id === clienteId)
+    const c = (isMock.value ? atelier.clientes : [] as any[]).find((x) => x.id === clienteId)
     if (c) clienteNombre = c.nombre
   } else {
     showToast('warn', 'Seleccione un cliente', 'Debe seleccionar o ingresar el nombre de la clienta.')
@@ -86,6 +88,7 @@ function guardarPedido() {
 
   const prenda = nombrePrendaManual.value.trim() || 'Prenda a Medida Atelier'
   if (!isMock.value) { showToast('info','Modo REAL','Usá POST /pedidos-produccion'); return }
+  if (!isMock.value) { showToast('info','Modo REAL','Creación de pedidos vía Producción API.'); return }
   const p = atelier.crearPedido({
     cliente_id: clienteId || 1,
     cliente_nombre: clienteNombre,

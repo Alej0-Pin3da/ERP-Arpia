@@ -56,7 +56,7 @@ const esSinTalla = computed(() => {
 
 function guardar() {
   if (props.cliente) {
-    atelier.actualizarCliente(props.cliente.id, {
+    if (isMock.value) atelier.actualizarCliente(props.cliente.id, {
       talla_habitual: tallaSeleccionada.value,
       talla_superior: tallaSuperior.value,
       talla_inferior: tallaInferior.value,
@@ -64,6 +64,7 @@ function guardar() {
       tipo_producto_frecuente: esSinTalla.value ? 'PRODUCTOS_SIN_TALLA' : 'PRENDAS_TALLAS',
       notas: notasCalce.value.trim(),
     })
+    else showToast('info','Modo REAL','Actualice medidas vía Gestión de Clientas API.')
     showToast('success', 'Ficha de Talla Actualizada', `Talla guardada como ${tallaSeleccionada.value} para ${props.cliente.nombre}.`)
     emit('guardar', { busto: '-', cintura: '-', cadera: '-', espalda: '-', talle: '-', largo: '-' })
   }

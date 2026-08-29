@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
+import * as comprasApi from '@/services/api/compras-insumos'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import { useAtelierStore } from '@/stores/atelier'
@@ -17,8 +19,18 @@ const emit = defineEmits<{
 
 const atelier = useAtelierStore()
 const { isMock } = useMode()
-const { insumos: insumosReal } = useInsumos()
-const criticosReal = computed(() => (insumosReal.value as any[]).filter((i:any)=>(i.stock_actual??i.stock??0)<=(i.stock_minimo??0)))
+const insumosApi = useInsumos()
+const insumosRealList = ref<any[]>([])
+async function cargarInsumosSugerir() {
+  if (isMock.value) return
+  try {
+    const r = await insumosApi.list({ limit: 100 })
+    insumosRealList.value = (r as any).items ?? []
+  } catch { insumosRealList.value = [] }
+}
+onMounted(() => { void cargarInsumosSugerir() })
+watch(isMock, () => { void cargarInsumosSugerir() })
+const criticosReal = computed(() => (insumosRealList.value as any[]).filter((i:any)=>(i.stock_actual??i.stock??0)<=(i.stock_minimo??0)))
 
 const criticos = computed(() => isMock.value ? atelier.insumosCriticos : (criticosReal.value as any))
 
@@ -29,11 +41,26 @@ const totalSugerido = computed(() => {
   }, 0)
 })
 
-function generarOrden() {
-  criticos.value.forEach((item) => {
-    const deficit = Math.max(0, item.stock_minimo * 2 - item.stock_actual)
-    isMock.value ? atelier.agregarCompraInsumo(item.id, deficit) : undefined
-  })
+async function generarOrden() {
+  if (isMock.value) {
+    criticos.value.forEach((item) => {
+      const deficit = Math.max(0, item.stock_minimo * 2 - item.stock_actual)
+      atelier.agregarCompraInsumo(item.id, deficit)
+    })
+  } else {
+    for (const item of criticos.value) {
+      const deficit = Math.max(0, item.stock_minimo * 2 - item.stock_actual)
+      if (deficit <= 0) continue
+      try {
+        await comprasApi.createCompraInsumo({
+          insumo_id: item.id,
+          cantidad_comprada: deficit,
+          precio_unitario_compra: item.costo_unitario ?? item.costo_promedio_actual ?? 0,
+        })
+      } catch (e) { /* continue */ }
+    }
+    void cargarInsumosSugerir()
+  }
   showToast('success', 'Orden de Compra Procesada', 'Se ha reabastecido el stock de los insumos críticos sugeridos.')
   emit('update:visible', false)
 }

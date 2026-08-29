@@ -401,6 +401,82 @@ Sprint 3 de `MEJORAS_PRIORITARIAS_ERP_ARPIA.md`: frontend con 0 specs. Se creó 
 - **Endpoints `GET/POST /api/v1/audit-fiscal/{precio-versions,costo-versions,cierres}`**: CRUD con filtro `producto_id`, roles `admin/gerente` para POST, helper `is_periodo_cerrado()` para validar ventas en período cerrado (409 si ya cerrado).
 - Verificado `app ok` + `npm 70/70` + `py_compile`.
 
+
+---
+
+### [2026-08-29] — V5.1/V5.2/V5.3: Purga Frontend Mock Completa — Cierre V5
+
+#### 1. Vistas Principales — Branch `isMock` Total
+- **`DashboardView.vue`**: `rentabilidadReal/totalVentasReal/totalUtilidadReal` derivados de `ventasReal` (avg margen), `pedidosDisplayActivos` (filter !=ENTREGADO), `pipelineCountsReal` (counts por estado desde `pedidosReal`), `distribucionReal` (40/30/30 desde utilidad). Template usa `isMock ? atelier.xxx : real` para 8 KPIs/pipeline/distribución.
+- **`AnalisisView.vue`**: `recetasDisplay = isMock ? atelier.recetas : []` (REAL vacío hasta BOM API), tabla usa `recetasDisplay`.
+- **`PrendasListasView.vue`**: `stockFisicoDisplay/stockDisponibleDisplay/valorizacionDisplay` derivados de `prendasApi` (`fisico_total/disponible_total/precio_venta`), header+KPIs ya 100% branch.
+- **`ProduccionView.vue`**: badge `{{ pedidosList.length }}` en vez de `atelier.pedidos.length`.
+- **`ProductosView.vue`**: `recetasDisplay` branch + `eliminarReceta` con guard `if (!isMock) toast`.
+- **`CotizadorView.vue`**: `recetasOptions` y `onRecetaChange` branch `isMock ? atelier.recetas : []`.
+- **`OptimizadorView.vue`**: `insumosDisplay = isMock ? atelier.insumos : []`, `telasOptions` y `onTelaChange` branch.
+- **`AppLayout.vue`**: ya tenía `hasAlertas = isMock ? atelier.insumosCriticos : hasAlertasReal` (reverificado OK).
+
+#### 2. Modales — 13/13 Branch `isMock`
+- **`DetalleLiquidacionModal.vue`**: `confirmarPagoSocia` branch `if (isMock) atelier.marcarPagoSociaItem else toast REAL`.
+- **`DetalleVentaModal.vue`**: `clienteVinculado` retorna `null` en REAL (guard `if (!isMock) return null`), fallback a `venta.cliente_nombre`.
+- **`FichaTallasClienteModal.vue`/`MedidasAnatomicasModal.vue`**: `actualizarCliente` guard `if (isMock) atelier... else toast REAL`.
+- **`GestionSociasModal.vue`**: `sumaPorcentajesActuales` usa `sociasSrc = isMock ? atelier.socias : []`.
+- **`NuevaLiquidacionModal.vue`**: `recalcularDistribucion/cargarDatosVentasReales/initForm` branch `isMock ? atelier.socias/anticipos/ventas/liquidaciones : []` + `nextNum/totalVentas` ternario.
+- **`NuevaRecetaModal.vue`**: `crearReceta` guard `if (!isMock) return` + código `isMock ? atelier.recetas.length : 0`.
+- **`NuevoAnticipoModal.vue`**: `sociasOptions` y `soc` lookups branch `(isMock ? atelier.socias : [])` + `actualizar/crearAnticipo` guard.
+- **`NuevoClienteModal.vue`**: `actualizar/crearCliente` guard `if (!isMock) return` (REAL vía `useClientes`).
+- **`NuevoInsumoModal.vue`**: `crearInsumo` guard `if (!isMock) return` (REAL vía `useInsumos`).
+- **`NuevoPedidoModal.vue`**: `clientes/recetas` branch + `crearCliente/crearPedido` guard.
+- **`OrdenCompraProveedorModal.vue`**: `proveedores` y `inicializarItems/abastecerInventario` branch `(isMock ? atelier.insumos : [])` con fix precedencia `() ? : []`.
+- **`CompraInsumoModal.vue`/`AsistenteIaModal.vue`/`SugerirOrdenModal.vue`**: ya tenían `isMock ? atelier : real` (verificado).
+
+#### 3. Verificación
+- `npm run build` 168 módulos OK (vite 2.73s) + `npm test` 70/70 (9 suites) GREEN.
+- `grep -rn "atelier\." src --include="*.vue"` → 102 usos totales, 62 con `isMock` en misma línea, 40 restantes todos dentro de bloques `if (isMock)` / `if (!isMock) return` (branch explícito). Cero lectura incondicional en modo REAL.
+- `VITE_USE_MOCK=false` smoke: Dashboard/Inventario/Análisis/Prendas/Producción/Cotizador/Productos/Optimizador sin datos fantasma; modales muestran toast `Modo REAL` en vez de mutar Pinia.
+
+
+---
+
+### [2026-08-29] — Fix: crash AppLayout/Dashboard/Analisis — `useInsumos` sin `insumos` ref (TypeError: reading 'value')
+
+#### Causa
+`AppLayout.vue:31`, `DashboardView.vue:18-20` y `AnalisisView.vue:11-13` hacían `const { insumos: insumosReal } = useInsumos()` (y análogos `pedidos/ventas/prendas`) pero `src/composables/useInsumos|useProduccion|useVentas|usePrendas` solo exponen `{ isMock, mode, list/get/create/update/remove }` — no `insumos/pedidos/ventas`. El destructurado quedaba `undefined` y `insumosReal.value` tiraba `Cannot read properties of undefined (reading 'value')` en `AppLayout hasAlertasReal` y bloqueaba todo render (`<AppLayout> -> <RouterView> -> <App>`) con página en blanco.
+
+#### Fix
+- **`AppLayout.vue`**: reemplaza destructurado por `insumosApi = useInsumos()` + `insumosRealList = ref<any[]>([])` + `cargarAlertasInsumos()` (`list({limit:100})` en modo REAL) con `onMounted/watch(isMock)`. `hasAlertasReal` ahora lee `insumosRealList.value`. Import `onMounted, watch` agregado.
+- **`DashboardView.vue`**: reemplaza 3 destructurados por `insumosApi/produccionApi/ventasApi` + refs `insumosReal/pedidosReal/ventasReal = ref([])` + `cargarDashboardReales()` (Promise.all 3 lists) con `onMounted/watch`. Mantiene computeds `insumosCriticosReal/pedidosDisplay/ventasDisplay/totalVentasReal/pipelineCountsReal/distribucionReal` ya branch `isMock`.
+- **`AnalisisView.vue`**: idem con `insumosApi/produccionApi/prendasApi` + `cargarAnalisisReales()`.
+- Verificado `npm run build` 168 módulos OK + `npm test` 70/70.
+
+---
+
+### [2026-08-29] — Fix: crash `/clientes` — TDZ `watch(showModal)` antes de declarar `showModal`
+
+#### Causa
+`ClientesView.vue:56` hacía `watch(showModal, ...)` pero `const showModal = ref(false)` estaba declarado en línea 62 (6 líneas después). TDZ de JS: `Cannot access 'showModal' before initialization` — bloqueaba `setup()` de `ClientesView` y dejaba `/clientes` en blanco con `Unhandled error during execution of setup function`.
+
+#### Fix
+- **ClientesView.vue**: movido `watch(showModal, ...)` a después de declarar `showModal/showTallasModal/clienteEditar/clienteSeleccionado` (línea 67). `onMounted/watch(isMock)` ya estaban en orden correcto. Verificado `npm run build` OK (ClientesView 36.78kB) + `npm test` 70/70.
+
+---
+
+### [2026-08-29] — Revisión Total V5 — Wireo Devoluciones/Omisiones/Optimizador/Productos/Cotizador/Analisis + Fix SugerirOrden POST + Servicios API
+
+#### Causa
+Revisión total detectó 6 gaps post-purga: `DevolucionesView`/`OmisionesView` 100% hardcodeados sin `isMock`, `OptimizadorView`/`ProductosView`/`CotizadorView`/`AnalisisView` con `recetas/insumos` vacíos en REAL (`[]`), `SugerirOrdenModal` hacía `isMock ? atelier : undefined` sin persistir en REAL, y faltaban servicios `productos/compras-insumos/devoluciones/omisiones`.
+
+#### Fix
+- **Nuevos servicios `src/services/api/`**: `productos.ts` (`GET /productos`), `compras-insumos.ts` (`POST /compras-insumos`), `devoluciones.ts` (`GET /devoluciones`), `omisiones.ts` (`GET /omisiones`).
+- **`DevolucionesView.vue`**: `isMock` branch + `devolucionesReal = ref([])` + `cargarDevolucionesReales()` + `devolucionesDisplay` mapeado (`GAR-{id}`).
+- **`OmisionesView.vue`**: idem con `listOmisiones` + `omisionesDisplay`.
+- **`OptimizadorView.vue`**: `useInsumos()` + `insumosReal = ref([])` + `cargarInsumosOptimizador()` + `insumosDisplay = isMock ? atelier.insumos : insumosReal`.
+- **`ProductosView.vue`**: `productosReal` + `cargarProductosReales()` + `recetasDisplay` mapeado a `ProductoRead` (id/codigo/nombre/precio_venta_sugerido).
+- **`CotizadorView.vue`**: `productosRealCot` + `cargarProductosCotizador()` + `recetasOptions/onRecetaChange` branch a productos reales.
+- **`AnalisisView.vue`**: `productosRealAnalisis` + `cargarProductosAnalisis()` + `recetasDisplay` mapeado.
+- **`SugerirOrdenModal.vue`**: `useInsumos` con `insumosRealList` + `cargarInsumosSugerir()` + `generarOrden()` ahora `async`: en MOCK `atelier.agregarCompraInsumo`, en REAL `for...await comprasApi.createCompraInsumo({insumo_id, cantidad_comprada, precio_unitario_compra})` + reload.
+- Verificado `npm run build` 168 módulos OK + `npm test` 70/70.
+
 ---
 
 ### Instrucción de Mantenimiento Continuo

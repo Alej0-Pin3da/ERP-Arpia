@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useAtelierStore } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
 import { useInsumos } from '@/composables/useInsumos'
@@ -8,13 +9,48 @@ import { usePrendas } from '@/composables/usePrendas'
 
 const atelier = useAtelierStore()
 const { isMock } = useMode()
-const { insumos: insumosReal } = useInsumos()
-const { pedidos: pedidosReal } = useProduccion()
-const { prendas: prendasReal } = usePrendas()
+const insumosApi = useInsumos()
+const produccionApi = useProduccion()
+const prendasApi = usePrendas()
+const insumosReal = ref<any[]>([])
+const pedidosReal = ref<any[]>([])
+const prendasReal = ref<any[]>([])
+async function cargarAnalisisReales() {
+  if (isMock.value) return
+  try {
+    const [ir, pr, prr] = await Promise.all([
+      insumosApi.list({ limit: 100 }),
+      produccionApi.list({ limit: 100 }),
+      prendasApi.list({ limit: 100 }),
+    ])
+    insumosReal.value = (ir as any).items ?? []
+    pedidosReal.value = (pr as any).items ?? []
+    prendasReal.value = (prr as any).items ?? []
+  } catch {}
+}
+onMounted(() => { void cargarAnalisisReales(); void cargarProductosAnalisis() })
+watch(isMock, () => { void cargarAnalisisReales(); void cargarProductosAnalisis() })
 
 const pedidosSrc = computed(() => isMock.value ? atelier.pedidos : (pedidosReal.value as any[]))
 const prendasSrc = computed(() => isMock.value ? (atelier as any).prendas ?? [] : (prendasReal.value as any[]))
 const insumosAlertasReal = computed(() => (insumosReal.value as any[]).filter((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)).length)
+const productosRealAnalisis = ref<any[]>([])
+async function cargarProductosAnalisis() {
+  if (isMock.value) return
+  try {
+    const { listProductos } = await import('@/services/api/productos')
+    const r = await listProductos({ limit: 100 })
+    productosRealAnalisis.value = (r.items as any) ?? []
+  } catch { productosRealAnalisis.value = [] }
+}
+// append to existing cargarAnalisisReales
+const recetasDisplay = computed(() => isMock.value ? (atelier as any).recetas : productosRealAnalisis.value.map((p: any) => ({
+  id: p.id,
+  nombre: p.nombre,
+  costo_estimado_materiales: 0,
+  tiempo_estimado_confeccion_horas: 1,
+  precio_venta_sugerido: p.precio_venta_sugerido ?? 0,
+})))
 
 const metricas = computed(() => {
   const pedidosCompletados = pedidosSrc.value.filter((p: any) => p.estado === 'entregado').length
@@ -84,7 +120,7 @@ function formatCOP(v: number): string {
             </tr>
           </thead>
           <tbody class="divide-y divide-stone-800/60 font-mono">
-            <tr v-for="r in atelier.recetas" :key="r.id" class="hover:bg-stone-900/50">
+            <tr v-for="r in recetasDisplay" :key="r.id" class="hover:bg-stone-900/50">
               <td class="py-3 px-3 font-serif text-sm font-semibold text-stone-200">{{ r.nombre }}</td>
               <td class="py-3 px-3 text-stone-300">{{ formatCOP(r.costo_estimado_materiales) }}</td>
               <td class="py-3 px-3 text-stone-400">{{ r.tiempo_estimado_confeccion_horas }}h</td>

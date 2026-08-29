@@ -53,8 +53,9 @@ function guardar() {
   }
 
   if (!isMock.value) { showToast('info','Modo REAL','Usá POST /productos y /bom para crear recetas.'); return }
+  if (!isMock.value) { showToast('info','Modo REAL','La creación de recetas en modo REAL usa el catálogo de productos.'); return }
   const r = atelier.crearReceta({
-    codigo: codigo.value.trim() || `REC-ARP-0${atelier.recetas.length + 1}`,
+    codigo: codigo.value.trim() || `REC-ARP-0${(isMock.value ? atelier.recetas.length : 0) + 1}`,
     nombre: nombre.value.trim(),
     categoria: categoria.value,
     linea: linea.value,

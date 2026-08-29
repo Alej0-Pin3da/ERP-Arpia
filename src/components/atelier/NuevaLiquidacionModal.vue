@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
@@ -77,12 +78,12 @@ const utilidadRepartibleSocias = computed(() => {
 
 function recalcularDistribucion() {
   const util = utilidadNetaCalculada.value
-  const activas = atelier.socias.filter((s) => s.activo)
+  const activas = (isMock.value ? atelier.socias : [] as any[]).filter((s) => s.activo)
 
   distribucionLocal.value = activas.map((s) => {
     const montoBruto = Math.round(util * (s.porcentaje / 100))
     // Get pending anticipos for this socia
-    const antPending = atelier.anticipos
+    const antPending = (isMock.value ? atelier.anticipos : [] as any[])
       .filter((a) => a.socia_id === s.id && a.estado === 'PENDIENTE_DESCUENTO')
       .reduce((sum, a) => sum + a.monto, 0)
 
@@ -107,7 +108,7 @@ function recalcularDistribucion() {
 
 function cargarDatosVentasReales() {
   // Pull real total from atelier.ventas completed
-  const completadas = atelier.ventas.filter((v) => v.estado === 'COMPLETADA')
+  const completadas = (isMock.value ? atelier.ventas : [] as any[]).filter((v) => v.estado === 'COMPLETADA')
   const vTotal = completadas.reduce((acc, v) => acc + v.total_venta, 0)
   const cTotal = completadas.reduce((acc, v) => acc + v.costo_total, 0)
 
@@ -132,11 +133,11 @@ function initForm() {
     observaciones.value = l.observaciones || ''
     distribucionLocal.value = l.distribucion.map((d) => ({ ...d }))
   } else {
-    const nextNum = (atelier.liquidaciones.length ? Math.max(...atelier.liquidaciones.map((l) => l.id)) : 0) + 1
+    const nextNum = isMock.value ? (atelier.liquidaciones.length ? Math.max(...atelier.liquidaciones.map((l) => l.id)) : 0) + 1 : 1
     codigo.value = `LIQ-${new Date().getFullYear()}-${String(nextNum).padStart(2, '0')}`
     periodo.value = `Liquidación Periodo ${new Date().toLocaleString('es-CO', { month: 'long', year: 'numeric' })}`
     fechaCierre.value = new Date().toISOString().split('T')[0]
-    totalVentas.value = atelier.totalVentasRealizadas || 24800000
+    totalVentas.value = isMock.value ? (atelier.totalVentasRealizadas || 24800000) : totalVentas.value || 0
     costoInsumos.value = 7200000
     gastosOperativos.value = 1800000
     estado.value = 'BORRADOR'

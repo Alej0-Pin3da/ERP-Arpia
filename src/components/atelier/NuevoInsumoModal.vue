@@ -60,6 +60,7 @@ function guardar() {
     return
   }
 
+  if (!isMock.value) { showToast('info','Modo REAL','Creación de insumos vía Inventario API.'); return }
   const item = atelier.crearInsumo({
     codigo: codigo.value.trim() || `TEL-AUTO-${Date.now().toString().slice(-4)}`,
     nombre: nombre.value.trim(),

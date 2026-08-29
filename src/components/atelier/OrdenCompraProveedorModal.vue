@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import Dialog from 'primevue/dialog'
@@ -21,7 +22,7 @@ const { isMock } = useMode()
 
 const proveedorSeleccionado = ref<string>('Todos los Proveedores')
 const proveedores = computed(() => {
-  const set = new Set(atelier.insumos.map((i) => i.proveedor).filter(Boolean))
+  const set = new Set((isMock.value ? atelier.insumos : [] as any[]).map((i) => i.proveedor).filter(Boolean))
   return ['Todos los Proveedores', ...Array.from(set)]
 })
 
@@ -40,7 +41,7 @@ interface ItemCompra {
 const itemsPedido = ref<ItemCompra[]>([])
 
 function inicializarItems() {
-  itemsPedido.value = atelier.insumos
+  itemsPedido.value = (isMock.value ? atelier.insumos : [] as any[])
     .filter((i) => i.stock_actual <= i.stock_minimo * 1.5)
     .map((i) => ({
       id: i.id,
@@ -81,7 +82,7 @@ function formatCOP(val: number) {
 
 function abastecerInventario() {
   itemsFiltrados.value.forEach((item) => {
-    const insumo = atelier.insumos.find((i) => i.id === item.id)
+    const insumo = (isMock.value ? atelier.insumos : [] as any[]).find((i) => i.id === item.id)
     if (insumo) {
       insumo.stock_actual += item.cantidad_pedir
       insumo.valor_total = insumo.stock_actual * insumo.costo_unitario

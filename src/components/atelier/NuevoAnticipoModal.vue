@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
@@ -38,7 +39,7 @@ const comprobante = ref('')
 const observaciones = ref('')
 
 const sociasOptions = computed(() => {
-  return atelier.socias.map((s) => ({
+  return (isMock.value ? atelier.socias : [] as any[]).map((s) => ({
     label: `${s.nombre} (${s.rol})`,
     value: s.id,
   }))
@@ -70,7 +71,7 @@ function initForm() {
     observaciones.value = a.observaciones || ''
   } else {
     // Default to first non-fondo socia
-    const soc = atelier.socias.find((s) => !s.es_fondo_taller)
+    const soc = (isMock.value ? atelier.socias : [] as any[]).find((s) => !s.es_fondo_taller)
     sociaId.value = soc ? soc.id : 2
     fecha.value = new Date().toISOString().split('T')[0]
     monto.value = 350000
@@ -106,7 +107,7 @@ async function guardar() {
   }
 
   if (isMock.value) {
-    const soc = atelier.socias.find((s) => s.id === sociaId.value)
+    const soc = (isMock.value ? atelier.socias : [] as any[]).find((s) => s.id === sociaId.value)
     const payload: Partial<AnticipoSocia> = {
       socia_id: sociaId.value,
       nombre_socia: soc?.nombre || 'Socia Atelier',
@@ -119,12 +120,14 @@ async function guardar() {
       observaciones: observaciones.value.trim(),
     }
     if (isEditing.value && props.anticipoEditar) {
+      if (!isMock.value) { showToast('info','Modo REAL','Use Finanzas API'); return }
       const act = atelier.actualizarAnticipo(props.anticipoEditar.id, payload)
       if (act) {
         showToast('success', 'Anticipo Actualizado', `Anticipo de ${formatCOP(act.monto)} para ${act.nombre_socia} actualizado.`)
         emit('guardado', act)
       }
     } else {
+      if (!isMock.value) { showToast('info','Modo REAL','Use Finanzas API'); return }
       const nuevo = atelier.crearAnticipo(payload)
       showToast('success', 'Anticipo Registrado', `Se registró un anticipo de ${formatCOP(nuevo.monto)} para ${nuevo.nombre_socia}.`)
       emit('guardado', nuevo)

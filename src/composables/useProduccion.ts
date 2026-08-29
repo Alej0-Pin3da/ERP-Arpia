@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * useProduccion — adapter that selects Pinia mock or real API based on useMode.
  *

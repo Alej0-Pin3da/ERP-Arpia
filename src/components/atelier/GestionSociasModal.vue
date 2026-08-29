@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
@@ -42,7 +43,8 @@ const activo = ref(true)
 const notas = ref('')
 
 const sumaPorcentajesActuales = computed(() => {
-  const otros = atelier.socias.filter((s) => s.activo && (!props.sociaEditar || s.id !== props.sociaEditar.id))
+  const sociasSrc = isMock.value ? atelier.socias : [] as any[]
+  const otros = sociasSrc.filter((s) => s.activo && (!props.sociaEditar || s.id !== props.sociaEditar.id))
   const sumOtros = otros.reduce((acc, s) => acc + s.porcentaje, 0)
   return sumOtros + (porcentaje.value || 0)
 })

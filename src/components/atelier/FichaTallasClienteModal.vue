@@ -87,7 +87,8 @@ function guardarFicha() {
       tipo_producto_frecuente: esClientaSinTalla.value ? 'PRODUCTOS_SIN_TALLA' : 'PRENDAS_TALLAS',
       notas: notasCalce.value.trim(),
     }
-    atelier.actualizarCliente(props.cliente.id, updated)
+    if (isMock.value) atelier.actualizarCliente(props.cliente.id, updated)
+    else showToast('info','Modo REAL','Actualice la talla vía Gestión de Clientas API.')
     showToast('success', 'Ficha de Talla Actualizada', `Talla guardada como ${tallaSeleccionada.value} para ${props.cliente.nombre}.`)
     emit('guardar', updated)
   }

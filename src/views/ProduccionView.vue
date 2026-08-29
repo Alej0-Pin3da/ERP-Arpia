@@ -144,7 +144,7 @@ function abrirWhatsApp(p: PedidoProduccion) {
             Gestión de Pedidos & Producción en Taller
           </h1>
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-            {{ atelier.pedidos.length }} Pedidos Registrados
+            {{ pedidosList.length }} Pedidos Registrados
           </span>
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">

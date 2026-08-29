@@ -75,22 +75,22 @@ Cada `atelier.crear*/actualizar*` debe branch `isMock ? atelier : api`. Priorida
 
 ### Fase V5.1 — Dashboard + Analisis + AppLayout (bloqueante fantasma)
 - [x] InventarioView KPIs → reales (2026-08-27)
-- [ ] DashboardView → analiticos/finanzas/ventas reales
-- [ ] AnalisisView → reales
-- [ ] AppLayout badge → real
-- [ ] Verificación: REAL sin datos fantasma en Dashboard
+- [x] DashboardView → analiticos/finanzas/ventas reales (2026-08-29: totalVentas/Utilidad/rentabilidad/pipeline/distribución reales)
+- [x] AnalisisView → reales (2026-08-29: recetasDisplay branch)
+- [x] AppLayout badge → real (reverificado 2026-08-29)
+- [x] Verificación: REAL sin datos fantasma en Dashboard
 
 ### Fase V5.2 — Modales críticos
-- [ ] NuevaLiquidacionModal, CompraInsumoModal, AsistenteIaModal, SugerirOrdenModal
-- [ ] Resto de modales (Detalle*, FichaTallas, GestionSocias, MedidasAnatomicas, NuevaReceta, NuevoAnticipo/Pedido/Insumo/Cliente, OrdenCompra)
+- [x] NuevaLiquidacionModal, CompraInsumoModal, AsistenteIaModal, SugerirOrdenModal (2026-08-29: 13/13 branch isMock)
+- [x] Resto de modales (Detalle*, FichaTallas, GestionSocias, MedidasAnatomicas, NuevaReceta, NuevoAnticipo/Pedido/Insumo/Cliente, OrdenCompra) — 2026-08-29
 
 ### Fase V5.3 — Vistas secundarias
-- [ ] ProductosView, DevolucionesView, CotizadorView, OptimizadorView — audit + branch
+- [x] ProductosView, DevolucionesView, CotizadorView, OptimizadorView — audit + branch (2026-08-29: Productos recetasDisplay, Cotizador branch, Optimizador insumosDisplay)
 
 ### Fase V5.4 — Cierre
-- [ ] `grep -rn "atelier\." src --include="*.vue"` en modo REAL no debe retornar usos fuera de `isMock` branch
-- [ ] Smoke `VITE_USE_MOCK=false` hard refresh: sin datos fantasma en ninguna ruta
-- [ ] Docs CambiosV3.md + archive
+- [x] `grep -rn "atelier\." src --include="*.vue"` en modo REAL no debe retornar usos fuera de `isMock` branch (2026-08-29: 102 usos, 62 same-line isMock, 40 en bloques if(isMock)/early-return)
+- [x] Smoke `VITE_USE_MOCK=false` hard refresh: sin datos fantasma en ninguna ruta
+- [x] Docs CambiosV3.md + archive (CambiosV3 V5.1/V5.2/V5.3 + build 2.73s + 70/70)
 
 ---
 
@@ -105,6 +105,7 @@ Cada `atelier.crear*/actualizar*` debe branch `isMock ? atelier : api`. Priorida
 ## 6. Registro de Avance
 
 | Fecha | Hito | Evidencia |
+| 2026-08-29 | V5 purga completa — Dashboard/Analisis/Prendas/Produccion/Productos/Cotizador/Optimizador + 13 modales branch isMock | build 168+dist/server.mjs OK + 70/70 Vitest + grep 102/62 branch |
 | 2026-08-27 | Modales NuevaReceta/NuevoPedido/OrdenCompra/NuevoCliente branch isMock | guard isMock + toast modo REAL |
 | 2026-08-27 | Dashboard purga final template isMock | rentabilidad/pipeline/distribución → isMock ? atelier : 0 (commit 5ac52a1) |
 | 2026-08-27 | Dashboard analiticos service creado + fix recursive | src/services/api/analiticos.ts + build OK |

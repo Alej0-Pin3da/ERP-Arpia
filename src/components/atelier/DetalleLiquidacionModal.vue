@@ -37,11 +37,16 @@ function abrirRegistroPago(item: LiquidacionSociaItem) {
 function confirmarPagoSocia() {
   if (!props.liquidacion || !sociaPagoSeleccionada.value) return
 
-  atelier.marcarPagoSociaItem(
-    props.liquidacion.id,
-    sociaPagoSeleccionada.value.socia_id,
-    comprobanteInput.value.trim()
-  )
+  if (isMock.value) {
+    if (isMock.value) atelier.marcarPagoSociaItem(
+
+      props.liquidacion.id,
+      sociaPagoSeleccionada.value.socia_id,
+      comprobanteInput.value.trim()
+    )
+  } else {
+    showToast('info','Modo REAL','El registro de pago en modo REAL se gestiona vía Financiamiento API.')
+  }
 
   showToast(
     'success',

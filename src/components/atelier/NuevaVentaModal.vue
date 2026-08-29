@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
@@ -135,7 +136,7 @@ const clientesOptions = computed(() => {
 
 const catalogoPrendasOptions = computed(() => {
   if (isMock.value) {
-    return atelier.prendasListas.map((p) => ({
+    return (isMock.value ? atelier.prendasListas : [] as any[]).map((p) => ({
       label: `${p.nombre} (PVP: $${p.precio_venta.toLocaleString('es-CO')} | Stock: ${p.disponible_total})`,
       value: p.id,
       prenda: p,
@@ -273,6 +274,7 @@ function initForm() {
     }))
   } else {
     // New sale default
+    if (!isMock.value) return // real uses server id
     const nextNum = (atelier.ventas.length ? Math.max(...atelier.ventas.map((v) => v.id)) : 0) + 1
     codigo.value = `VEN-ARP-${String(nextNum).padStart(3, '0')}`
     fecha.value = new Date().toISOString().split('T')[0]

@@ -128,10 +128,12 @@ async function guardar() {
     }
     if (props.clienteEditar) {
       if (!isMock.value) { showToast('info','Modo REAL','Usá PATCH /clientes/:id'); return }
+      if (!isMock.value) { showToast('info','Modo REAL','Use Clientes API'); return }
       atelier.actualizarCliente(props.clienteEditar.id, payload)
       showToast('success', 'Clienta Actualizada', `${nombre.value} actualizada correctamente.`)
     } else {
       if (!isMock.value) { showToast('info','Modo REAL','Usá POST /clientes'); return }
+      if (!isMock.value) { showToast('info','Modo REAL','Use Clientes API'); return }
       const c = atelier.crearCliente(payload)
       showToast('success', 'Clienta Registrada', `${c.nombre} registrada en el CRM con talla ${tallaHabitual.value}.`)
     }

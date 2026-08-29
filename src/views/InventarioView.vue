@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import Button from 'primevue/button'

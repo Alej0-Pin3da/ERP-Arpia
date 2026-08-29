@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import * as productosApi from '@/services/api/productos'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -13,6 +14,16 @@ import { showToast } from '@/utils/toast'
 const router = useRouter()
 const atelier = useAtelierStore()
 const { isMock } = useMode()
+const productosRealCot = ref<any[]>([])
+async function cargarProductosCotizador() {
+  if (isMock.value) return
+  try {
+    const r = await productosApi.listProductos({ limit: 100 })
+    productosRealCot.value = (r.items as any) ?? []
+  } catch { productosRealCot.value = [] }
+}
+onMounted(() => { void cargarProductosCotizador() })
+watch(isMock, () => { void cargarProductosCotizador() })
 
 const recetaSeleccionada = ref<number | null>(null)
 const nombrePrenda = ref('Bustier Estructurado en Tul y Satén')
@@ -38,7 +49,7 @@ const margenPct = ref<number>(60)
 const recetasOptions = computed(() => {
   return [
     { label: '-- Cargar desde Receta BOM --', value: null },
-    ...atelier.recetas.map((r) => ({
+    ...(isMock.value ? atelier.recetas : productosRealCot.value).map((r) => ({
       label: `${r.nombre} (${r.codigo})`,
       value: r.id,
     })),
@@ -47,7 +58,7 @@ const recetasOptions = computed(() => {
 
 function onRecetaChange() {
   if (recetaSeleccionada.value) {
-    const r = atelier.recetas.find((x) => x.id === recetaSeleccionada.value)
+    const r = (isMock.value ? atelier.recetas : productosRealCot.value).find((x) => x.id === recetaSeleccionada.value)
     if (r) {
       nombrePrenda.value = r.nombre
       tiempoConfeccionMin.value = r.tiempo_confeccion_min

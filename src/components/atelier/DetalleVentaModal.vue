@@ -20,6 +20,8 @@ const { isMock } = useMode()
 
 const clienteVinculado = computed(() => {
   if (!props.venta?.cliente_id) return null
+  if (!isMock.value) return null
+  if (!isMock.value) return null
   return atelier.clientes.find((c) => c.id === props.venta?.cliente_id) || null
 })
 

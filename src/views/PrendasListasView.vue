@@ -55,6 +55,9 @@ onMounted(() => {
 watch(isMock, () => void cargarPrendasReales())
 
 const prendasList = computed(() => (isMock.value ? atelier.prendasListas : prendasApi.value))
+const stockFisicoDisplay = computed(() => isMock.value ? (atelier as any).prendasStockFisico : prendasApi.value.reduce((acc: number, p: any) => acc + (p.fisico_total ?? 1), 0) || prendasApi.value.length)
+const stockDisponibleDisplay = computed(() => isMock.value ? (atelier as any).prendasStockDisponible : prendasApi.value.reduce((acc: number, p: any) => acc + (p.disponible_total ?? (p.estado === 'disponible' ? 1 : 0)), 0))
+const valorizacionDisplay = computed(() => isMock.value ? (atelier as any).valorizacionPVP : prendasApi.value.reduce((acc: number, p: any) => acc + Number(p.precio_venta ?? 0), 0))
 
 const prendasFiltradas = computed(() => {
   return prendasList.value.filter((p) => {
@@ -111,7 +114,7 @@ function ingresarPrendaModal() {
             Inventario de Productos Confeccionados
           </h1>
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-            {{ atelier.prendasStockFisico }} Prendas en Stock
+            {{ stockFisicoDisplay }} Prendas en Stock
           </span>
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">
@@ -135,7 +138,7 @@ function ingresarPrendaModal() {
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Prendas Físicas en Perchero</div>
         <div class="text-2xl font-extrabold text-stone-100 mt-2 font-mono">
-          {{ atelier.prendasStockFisico }} unidades
+          {{ stockFisicoDisplay }} unidades
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Existencia real en taller</div>
       </div>
@@ -143,7 +146,7 @@ function ingresarPrendaModal() {
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Stock Disponible para Venta</div>
         <div class="text-2xl font-extrabold text-emerald-400 mt-2 font-mono">
-          {{ atelier.prendasStockDisponible }} unidades
+          {{ stockDisponibleDisplay }} unidades
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Listos para despacho inmediato</div>
       </div>
@@ -151,7 +154,7 @@ function ingresarPrendaModal() {
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Prendas Reservadas en Pedidos</div>
         <div class="text-2xl font-extrabold text-amber-400 mt-2 font-mono">
-          {{ atelier.prendasStockFisico - atelier.prendasStockDisponible }} unidades
+          {{ stockFisicoDisplay - stockDisponibleDisplay }} unidades
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Con abono o reserva previa</div>
       </div>
@@ -159,7 +162,7 @@ function ingresarPrendaModal() {
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Valorización a PVP</div>
         <div class="text-2xl font-extrabold text-amber-300 mt-2 font-mono">
-          {{ formatCOP(atelier.valorizacionPVP) }}
+          {{ formatCOP(valorizacionDisplay) }}
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Total mercancía a precio venta</div>
       </div>

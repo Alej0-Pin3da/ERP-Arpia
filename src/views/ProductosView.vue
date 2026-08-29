@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import * as productosApi from '@/services/api/productos'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import { useAtelierStore, type RecetaBOM } from '@/stores/atelier'
@@ -31,8 +32,37 @@ const categorias = [
   'Alta Costura',
 ]
 
+const productosReal = ref<any[]>([])
+async function cargarProductosReales() {
+  if (isMock.value) return
+  try {
+    const r = await productosApi.listProductos({ limit: 100 })
+    productosReal.value = (r.items as any) ?? []
+  } catch { productosReal.value = [] }
+}
+onMounted(() => { void cargarProductosReales() })
+watch(isMock, () => { void cargarProductosReales() })
+const recetasDisplay = computed(() => isMock.value ? (atelier as any).recetas : productosReal.value.map((p: any) => ({
+  id: p.id,
+  codigo: `PRD-${p.id}`,
+  nombre: p.nombre,
+  linea: p.tipo_producto_id ? `Tipo ${p.tipo_producto_id}` : 'General',
+  descripcion: p.nombre,
+  categoria: 'General',
+  items: [],
+  tiempo_confeccion_min: 60,
+  costo_insumos: 0,
+  mano_obra: 0,
+  cif_energia: p.costos_operativos_fijos ?? 0,
+  costo_total_unitario: p.costos_operativos_fijos ?? 0,
+  precio_venta: p.precio_venta_sugerido ?? 0,
+  precio_venta_sugerido: p.precio_venta_sugerido ?? 0,
+  costo_estimado_materiales: 0,
+  tiempo_estimado_confeccion_horas: 1,
+  markup_pct: 0,
+})))
 const recetasFiltradas = computed(() => {
-  return atelier.recetas.filter((r) => {
+  return recetasDisplay.value.filter((r) => {
     const q = search.value.trim().toLowerCase()
     const matchesSearch =
       !q ||
@@ -58,6 +88,7 @@ function abrirFicha(r: RecetaBOM) {
 }
 
 function eliminarReceta(r: RecetaBOM) {
+  if (!isMock.value) { showToast('info','Modo REAL','La gestión de recetas BOM en modo REAL usa el catálogo de productos.'); return }
   const idx = atelier.recetas.findIndex((x) => x.id === r.id)
   if (idx !== -1) {
     atelier.recetas.splice(idx, 1)
@@ -76,7 +107,7 @@ function eliminarReceta(r: RecetaBOM) {
             Recetas de Productos & Fichas Técnicas (BOM)
           </h1>
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-            {{ atelier.recetas.length }} Modelos
+            {{ recetasDisplay.length }} Modelos
           </span>
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">
@@ -92,7 +123,7 @@ function eliminarReceta(r: RecetaBOM) {
           severity="secondary"
           outlined
           class="text-xs font-semibold"
-          @click="abrirFicha(atelier.recetas[0])"
+          @click="abrirFicha(recetasDisplay[0])"
         />
         <Button
           label="Generar con IA"
@@ -141,8 +172,13 @@ function eliminarReceta(r: RecetaBOM) {
       </div>
     </div>
 
+    <div v-if="!recetasFiltradas.length" class="text-center py-12 bg-stone-900/40 border border-stone-800 rounded-2xl">
+      <i class="pi pi-inbox text-3xl text-stone-500 mb-3 block" />
+      <p class="text-sm font-bold text-stone-300">Sin modelos registrados en modo {{ isMock ? 'MOCK' : 'REAL' }}</p>
+      <p v-if="!isMock" class="text-xs text-stone-400 mt-1">Los datos vienen de <code>GET /api/v1/productos</code>. Creá un producto desde el backend o volvé a <code>VITE_USE_MOCK=true</code>.</p>
+    </div>
     <!-- Recipe Cards Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
       <div
         v-for="r in recetasFiltradas"
         :key="r.id"

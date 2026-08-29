@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useMode } from '@/composables/useMode'
+import * as devolucionesApi from '@/services/api/devoluciones'
 
+const { isMock } = useMode()
 const devoluciones = ref([
+
   {
     id: 1,
     codigo: 'GAR-001',
@@ -13,6 +17,26 @@ const devoluciones = ref([
     fecha: '2026-08-19',
   },
 ])
+const devolucionesReal = ref<any[]>([])
+async function cargarDevolucionesReales() {
+  if (isMock.value) return
+  try {
+    const r = await devolucionesApi.listDevoluciones({ limit: 100 })
+    devolucionesReal.value = (r as any).items ?? []
+  } catch { devolucionesReal.value = [] }
+}
+onMounted(() => { void cargarDevolucionesReales() })
+watch(isMock, () => { void cargarDevolucionesReales() })
+const devolucionesDisplay = computed(() => isMock.value ? devoluciones.value : (devolucionesReal.value.length ? devolucionesReal.value.map((d: any, idx: number) => ({
+  id: d.id,
+  codigo: `GAR-${d.id}`,
+  prenda: `Venta #${d.venta_id}`,
+  cliente: `Cliente ${d.venta_id}`,
+  motivo: d.motivo || 'Ajuste Atelier',
+  tipo: d.tipo || 'Garantía',
+  estado: d.estado || 'Registrada',
+  fecha: d.creado_en || '',
+})) : []))
 </script>
 
 <template>
@@ -38,7 +62,14 @@ const devoluciones = ref([
           </tr>
         </thead>
         <tbody class="divide-y divide-stone-800/60 font-mono">
-          <tr v-for="d in devoluciones" :key="d.id">
+          <tr v-if="!devolucionesDisplay.length">
+                <td colspan="5" class="py-8 text-center text-stone-500">
+                  <i class="pi pi-inbox text-2xl mb-2 block" />
+                  Sin garantías registradas en modo {{ isMock ? 'MOCK' : 'REAL' }}.
+                  <span v-if="!isMock" class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/devoluciones</code>.</span>
+                </td>
+              </tr>
+          <tr v-for="d in devolucionesDisplay" :key="d.id">
             <td class="py-3 px-3 text-amber-400 font-bold">{{ d.codigo }}</td>
             <td class="py-3 px-3 font-serif font-semibold text-stone-200">{{ d.prenda }}</td>
             <td class="py-3 px-3 text-stone-300">{{ d.cliente }}</td>

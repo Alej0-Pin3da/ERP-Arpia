@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useInsumos } from '@/composables/useInsumos'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
@@ -17,6 +18,17 @@ interface PrendaTendido {
 
 const atelier = useAtelierStore()
 const { isMock } = useMode()
+const insumosApi = useInsumos()
+const insumosReal = ref<any[]>([])
+async function cargarInsumosOptimizador() {
+  if (isMock.value) return
+  try {
+    const r = await insumosApi.list({ limit: 100 })
+    insumosReal.value = (r as any).items ?? []
+  } catch { insumosReal.value = [] }
+}
+onMounted(() => { void cargarInsumosOptimizador() })
+watch(isMock, () => { void cargarInsumosOptimizador() })
 
 const telaSeleccionadaId = ref<number | null>(8) // Default Lino Vértigo
 const anchoTela = ref<number>(1.5)
@@ -31,10 +43,11 @@ const prendas = ref<PrendaTendido[]>([
 const optimizando = ref(false)
 const optimizado = ref(false)
 
+const insumosDisplay = computed(() => isMock.value ? atelier.insumos : insumosReal.value as any[])
 const telasOptions = computed(() => {
   return [
     { label: '-- Seleccionar tela del inventario --', value: null },
-    ...atelier.insumos
+    ...insumosDisplay.value
       .filter((i) => i.unidad_medida === 'm')
       .map((i) => ({
         label: `${i.nombre} (${i.stock_actual} m disponibles)`,
@@ -45,7 +58,7 @@ const telasOptions = computed(() => {
 
 function onTelaChange() {
   if (telaSeleccionadaId.value) {
-    const item = atelier.insumos.find((i) => i.id === telaSeleccionadaId.value)
+    const item = insumosDisplay.value.find((i: any) => i.id === telaSeleccionadaId.value)
     if (item) {
       largoTotalDisponible.value = item.stock_actual
     }

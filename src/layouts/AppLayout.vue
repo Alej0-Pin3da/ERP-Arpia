@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
 /**
  * Persistent Enterprise Atelier Layout.
@@ -8,7 +9,7 @@
  * - Atelier status chip ("Taller Activo • Pereira, Colombia")
  * - Role-aware access and top-bar actions
  */
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import SidebarMenu from '@/components/layout/SidebarMenu.vue'
@@ -27,8 +28,18 @@ import Tag from 'primevue/tag'
 const auth = useAuthStore()
 const atelier = useAtelierStore()
 const { isMock } = useMode()
-const { insumos: insumosReal } = useInsumos()
-const hasAlertasReal = computed(() => (insumosReal.value as any[]).some((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
+const insumosApi = useInsumos()
+const insumosRealList = ref<any[]>([])
+async function cargarAlertasInsumos() {
+  if (isMock.value) return
+  try {
+    const r = await insumosApi.list({ limit: 100 })
+    insumosRealList.value = (r as any).items ?? []
+  } catch { insumosRealList.value = [] }
+}
+onMounted(() => { void cargarAlertasInsumos() })
+watch(isMock, () => { void cargarAlertasInsumos() })
+const hasAlertasReal = computed(() => (insumosRealList.value as any[]).some((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
 const hasAlertas = computed(() => isMock.value ? !!atelier.insumosCriticos.length : hasAlertasReal.value)
 const router = useRouter()
 const route = useRoute()
