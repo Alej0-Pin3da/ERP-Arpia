@@ -4,6 +4,7 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import { useAtelierStore, type LiquidacionSocias, type LiquidacionSociaItem } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps<{
@@ -17,6 +18,7 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
 
 const modalPagoVisible = ref(false)
 const sociaPagoSeleccionada = ref<LiquidacionSociaItem | null>(null)

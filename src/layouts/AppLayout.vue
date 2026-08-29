@@ -17,6 +17,8 @@ import NotificacionesModal from '@/components/atelier/NotificacionesModal.vue'
 import ApiModeBadge from '@/components/ApiModeBadge.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAtelierStore } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
+import { useInsumos } from '@/composables/useInsumos'
 import { roleLabel } from '@/utils/menu'
 import arpiaBrandLogo from '@/assets/arpia-05-1-100x100.png'
 import Button from 'primevue/button'
@@ -24,6 +26,10 @@ import Tag from 'primevue/tag'
 
 const auth = useAuthStore()
 const atelier = useAtelierStore()
+const { isMock } = useMode()
+const { insumos: insumosReal } = useInsumos()
+const hasAlertasReal = computed(() => (insumosReal.value as any[]).some((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
+const hasAlertas = computed(() => isMock.value ? !!atelier.insumosCriticos.length : hasAlertasReal.value)
 const router = useRouter()
 const route = useRoute()
 const sidebarOpen = ref(false)
@@ -158,7 +164,7 @@ function closeSidebar(): void {
         >
           <i class="pi pi-bell text-sm" />
           <span
-            v-if="atelier.insumosCriticos.length"
+            v-if="hasAlertas"
             class="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-stone-950"
           />
         </button>

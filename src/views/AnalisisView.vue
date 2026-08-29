@@ -1,14 +1,26 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useAtelierStore } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
+import { useInsumos } from '@/composables/useInsumos'
+import { useProduccion } from '@/composables/useProduccion'
+import { usePrendas } from '@/composables/usePrendas'
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
+const { insumos: insumosReal } = useInsumos()
+const { pedidos: pedidosReal } = useProduccion()
+const { prendas: prendasReal } = usePrendas()
+
+const pedidosSrc = computed(() => isMock.value ? atelier.pedidos : (pedidosReal.value as any[]))
+const prendasSrc = computed(() => isMock.value ? (atelier as any).prendas ?? [] : (prendasReal.value as any[]))
+const insumosAlertasReal = computed(() => (insumosReal.value as any[]).filter((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)).length)
 
 const metricas = computed(() => {
-  const pedidosCompletados = atelier.pedidos.filter((p) => p.estado === 'entregado').length
-  const pedidosEnProceso = atelier.pedidos.filter((p) => ['corte', 'confeccion', 'prueba'].includes(p.estado)).length
-  const stockPrendas = atelier.prendas.filter((p) => !p.vendida).length
-  const insumosAlertas = atelier.insumosCriticos.length
+  const pedidosCompletados = pedidosSrc.value.filter((p: any) => p.estado === 'entregado').length
+  const pedidosEnProceso = pedidosSrc.value.filter((p: any) => ['corte', 'confeccion', 'prueba'].includes(p.estado)).length
+  const stockPrendas = prendasSrc.value.filter((p: any) => !p.vendida).length
+  const insumosAlertas = isMock.value ? atelier.insumosCriticos.length : insumosAlertasReal.value
 
   return {
     pedidosCompletados,

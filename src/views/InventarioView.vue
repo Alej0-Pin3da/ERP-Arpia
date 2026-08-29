@@ -90,6 +90,8 @@ const insumosFiltrados = computed(() => {
 
 const directosCount = computed(() => insumosList.value.filter((i) => i.tipo === 'Directo').length)
 const indirectosCount = computed(() => insumosList.value.filter((i) => i.tipo === 'Indirecto').length)
+const insumosCriticosCount = computed(() => insumosList.value.filter((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)).length)
+const valorTotalInventarioReal = computed(() => insumosList.value.reduce((acc: number, i: any) => acc + ((i.stock_actual ?? i.stock ?? 0) * (i.costo_promedio ?? i.costo ?? 0)), 0))
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
@@ -146,7 +148,7 @@ async function eliminar(item: InsumoAtelier) {
             Inventario de Materiales e Insumos
           </h1>
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-            {{ atelier.insumos.length }} Insumos Totales
+            {{ insumosList.length }} Insumos Totales
           </span>
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">
@@ -165,7 +167,7 @@ async function eliminar(item: InsumoAtelier) {
           @click="showOrdenProveedorModal = true"
         />
         <Button
-          :label="`Sugerir Orden (${atelier.insumosCriticos.length})`"
+          :label="`Sugerir Orden (${insumosCriticosCount})`"
           icon="pi pi-shopping-cart"
           size="small"
           severity="secondary"
@@ -189,7 +191,7 @@ async function eliminar(item: InsumoAtelier) {
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Valor Total Inventario</div>
         <div class="text-2xl font-extrabold text-stone-100 mt-2 font-mono">
-          {{ formatCOP(atelier.valorTotalInventario) }}
+          {{ formatCOP(isMock ? atelier.valorTotalInventario : valorTotalInventarioReal) }}
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Costo promedio ponderado</div>
       </div>
@@ -216,7 +218,7 @@ async function eliminar(item: InsumoAtelier) {
       <div class="bg-stone-900/80 border border-red-500/30 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-red-400 font-bold uppercase tracking-wider">Insumos en Alerta</div>
         <div class="text-2xl font-extrabold text-red-400 mt-2 font-mono">
-          {{ atelier.insumosCriticos.length }} items bajos
+          {{ insumosCriticosCount }} items bajos
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Requieren reposición urgente</div>
       </div>
@@ -281,8 +283,8 @@ async function eliminar(item: InsumoAtelier) {
             @click="soloBajoStock = !soloBajoStock"
           >
             <span>⚠️ Solo Bajo Stock</span>
-            <span v-if="atelier.insumosCriticos.length" class="px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[10px] font-bold">
-              {{ atelier.insumosCriticos.length }}
+            <span v-if="insumosCriticosCount" class="px-1.5 py-0.2 rounded-full bg-red-500 text-white text-[10px] font-bold">
+              {{ insumosCriticosCount }}
             </span>
           </button>
         </div>

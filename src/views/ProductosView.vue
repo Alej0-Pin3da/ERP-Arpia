@@ -3,12 +3,14 @@ import { ref, computed } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import { useAtelierStore, type RecetaBOM } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
 import FichaTecnicaModal from '@/components/atelier/FichaTecnicaModal.vue'
 import NuevaRecetaModal from '@/components/atelier/NuevaRecetaModal.vue'
 import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
 import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
 
 const search = ref('')
 const selectedCategory = ref('Todos los Modelos')

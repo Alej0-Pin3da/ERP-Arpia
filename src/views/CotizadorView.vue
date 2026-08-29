@@ -7,10 +7,12 @@ import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Slider from 'primevue/slider'
 import { useAtelierStore } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 
 const router = useRouter()
 const atelier = useAtelierStore()
+const { isMock } = useMode()
 
 const recetaSeleccionada = ref<number | null>(null)
 const nombrePrenda = ref('Bustier Estructurado en Tul y Satén')

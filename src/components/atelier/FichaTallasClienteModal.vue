@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import { type ClienteCRM, useAtelierStore } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps<{
@@ -18,6 +19,7 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
 
 const tallaSeleccionada = ref('S')
 const tallaSuperior = ref('S')

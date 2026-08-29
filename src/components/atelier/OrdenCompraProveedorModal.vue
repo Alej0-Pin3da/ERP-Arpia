@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import { useAtelierStore } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps<{
@@ -16,6 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
 
 const proveedorSeleccionado = ref<string>('Todos los Proveedores')
 const proveedores = computed(() => {

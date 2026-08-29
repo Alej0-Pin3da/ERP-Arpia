@@ -7,6 +7,7 @@ import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import { useAtelierStore, type RecetaBOM } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 
 defineProps<{
@@ -19,6 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
 
 const codigo = ref('')
 const nombre = ref('')

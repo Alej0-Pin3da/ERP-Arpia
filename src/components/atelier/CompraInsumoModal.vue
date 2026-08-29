@@ -4,6 +4,7 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import { useAtelierStore, type InsumoAtelier } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps<{
@@ -16,6 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
 const cantidad = ref(10)
 const costoUnitario = ref(0)
 
@@ -32,7 +34,8 @@ watch(
 
 function registrar() {
   if (!props.insumo) return
-  atelier.agregarCompraInsumo(props.insumo.id, cantidad.value, costoUnitario.value)
+  if (isMock.value) atelier.agregarCompraInsumo(props.insumo.id, cantidad.value, costoUnitario.value)
+  else showToast('info','Modo REAL','Usá el flujo real de compras-insumos.')
   showToast('success', 'Compra registrada', `Se sumaron ${cantidad.value} ${props.insumo.unidad_medida} a ${props.insumo.nombre}.`)
   emit('update:visible', false)
 }

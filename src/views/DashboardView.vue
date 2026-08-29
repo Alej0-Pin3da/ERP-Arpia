@@ -1,14 +1,29 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import { useAtelierStore } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
+import { useInsumos } from '@/composables/useInsumos'
+import { useProduccion } from '@/composables/useProduccion'
+import { useVentas } from '@/composables/useVentas'
 import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
 
 const router = useRouter()
 const atelier = useAtelierStore()
+const { isMock } = useMode()
+const { insumos: insumosReal } = useInsumos()
+const { pedidos: pedidosReal } = useProduccion()
+const { ventas: ventasReal } = useVentas()
+
+const insumosCriticosReal = computed(() => (insumosReal.value as any[]).filter((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
+const insumosCriticosDisplay = computed(() => isMock.value ? insumosCriticosDisplay : insumosCriticosReal.value)
+const pedidosDisplay = computed(() => isMock.value ? pedidosDisplay : (pedidosReal.value as any[]))
+const ventasDisplay = computed(() => isMock.value ? atelier.ventas : (ventasReal.value as any[]))
+
+onMounted(() => { if (!isMock.value) { /* composables auto-fetch via watch(isMock) */ } })
 
 const showIaModal = ref(false)
 const showNuevoPedidoModal = ref(false)
@@ -114,12 +129,12 @@ function getEstadoBadgeClass(estado: string) {
             <i class="pi pi-clock text-amber-400" />
           </div>
           <div class="text-2xl sm:text-3xl font-extrabold text-stone-100 mt-2 font-mono">
-            {{ atelier.pedidosActivos }}
+            {{ pedidosDisplayActivos }}
           </div>
         </div>
         <div class="text-xs text-stone-400 mt-3 pt-2 border-t border-stone-800/80 flex items-center justify-between">
           <span>En confección:</span>
-          <span class="text-amber-300 font-semibold">{{ atelier.pedidosActivos }} prenda(s) en taller</span>
+          <span class="text-amber-300 font-semibold">{{ pedidosDisplayActivos }} prenda(s) en taller</span>
         </div>
       </div>
 
@@ -136,7 +151,7 @@ function getEstadoBadgeClass(estado: string) {
         </div>
         <div class="text-xs text-stone-400 mt-3 pt-2 border-t border-stone-800/80 flex items-center justify-between">
           <span>Total órdenes:</span>
-          <span class="text-stone-200 font-semibold">{{ atelier.pedidos.length }} pedidos registrados</span>
+          <span class="text-stone-200 font-semibold">{{ pedidosDisplay.length }} pedidos registrados</span>
         </div>
       </div>
 
@@ -148,7 +163,7 @@ function getEstadoBadgeClass(estado: string) {
             <i class="pi pi-exclamation-circle text-red-400" />
           </div>
           <div class="text-2xl sm:text-3xl font-extrabold text-red-400 mt-2 font-mono">
-            {{ atelier.insumosCriticos.length }}
+            {{ insumosCriticosDisplay.length }}
           </div>
         </div>
         <div class="text-xs text-stone-400 mt-3 pt-2 border-t border-stone-800/80">
@@ -287,7 +302,7 @@ function getEstadoBadgeClass(estado: string) {
             <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400 m-0 flex items-center gap-2">
               <i class="pi pi-list" /> Seguimiento de Producción & Rentabilidad
             </h3>
-            <span class="text-xs text-stone-400">{{ atelier.pedidos.length }} órdenes</span>
+            <span class="text-xs text-stone-400">{{ pedidosDisplay.length }} órdenes</span>
           </div>
 
           <div class="overflow-x-auto">
@@ -303,7 +318,7 @@ function getEstadoBadgeClass(estado: string) {
                 </tr>
               </thead>
               <tbody class="divide-y divide-stone-800/50 text-stone-200">
-                <tr v-for="p in atelier.pedidos.slice(0, 6)" :key="p.id" class="hover:bg-stone-800/30">
+                <tr v-for="p in pedidosDisplay.slice(0, 6)" :key="p.id" class="hover:bg-stone-800/30">
                   <td class="py-2.5 px-3">
                     <div class="font-mono font-bold text-amber-300">{{ p.codigo }}</div>
                     <div class="text-[11px] text-stone-400 truncate max-w-[130px]">{{ p.cliente_nombre }}</div>
@@ -343,11 +358,11 @@ function getEstadoBadgeClass(estado: string) {
         <div class="bg-stone-900/80 border border-red-500/30 rounded-2xl p-4 shadow-lg space-y-3">
           <div class="flex items-center justify-between">
             <h4 class="text-xs font-bold uppercase tracking-wider text-red-400 m-0 flex items-center gap-2">
-              <i class="pi pi-exclamation-triangle" /> Stock Bajo Crítico ({{ atelier.insumosCriticos.length }} alertas)
+              <i class="pi pi-exclamation-triangle" /> Stock Bajo Crítico ({{ insumosCriticosDisplay.length }} alertas)
             </h4>
           </div>
 
-          <div v-for="it in atelier.insumosCriticos" :key="it.id" class="bg-stone-950/70 border border-stone-800 rounded-xl p-3 space-y-2">
+          <div v-for="it in insumosCriticosDisplay" :key="it.id" class="bg-stone-950/70 border border-stone-800 rounded-xl p-3 space-y-2">
             <div class="flex justify-between items-start">
               <div>
                 <div class="font-bold text-stone-200 text-xs">{{ it.nombre }}</div>

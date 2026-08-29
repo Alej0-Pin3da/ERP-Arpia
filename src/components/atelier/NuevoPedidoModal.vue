@@ -7,6 +7,7 @@ import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import { useAtelierStore, type PedidoProduccion } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 
 defineProps<{
@@ -19,6 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
 
 const clienteSeleccionado = ref<number | null>(null)
 const nuevoClienteNombre = ref('')

@@ -5,6 +5,7 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import { useAtelierStore } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 
 interface PrendaTendido {
@@ -15,6 +16,7 @@ interface PrendaTendido {
 }
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
 
 const telaSeleccionadaId = ref<number | null>(8) // Default Lino Vértigo
 const anchoTela = ref<number>(1.5)

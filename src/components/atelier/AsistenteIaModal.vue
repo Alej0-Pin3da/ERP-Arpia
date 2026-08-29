@@ -4,6 +4,7 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Textarea from 'primevue/textarea'
 import { useAtelierStore, type RecetaBOM } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 
 defineProps<{
@@ -16,6 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
 const prompt = ref('')
 const loading = ref(false)
 const respuesta = ref<string | null>(null)
@@ -66,14 +68,14 @@ async function consultarIA() {
     } else if (q.includes('retazo') || q.includes('desperdicio') || q.includes('lino') || q.includes('corte')) {
       respuesta.value = `✂️ **Estrategia de Optimización Textil de Atelier Arpía**:\n\n1. **Tendido Intercalado**: Al cortar piezas simétricas de bustiers y corsetería, invierte el patrón 180° sobre el orillo para ahorrar entre un 7% y 11% de tela por metro.\n2. **Subproductos Inmediatos**: Los retazos menores a 20x30 cm son ideales para confeccionar *Scrunchies de satén*, *Máscaras de descanso para ojos* o *Mini portacuchillas para máquinas de coser*.\n3. **Cuidado de Hilo**: Cortar al sesgo a 45° solo en piezas que requieran elasticidad natural (copas y sesgos); en cuerpos estructurados, mantén el hilo recto para evitar deformaciones.`
     } else {
-      respuesta.value = `🧵 **Recomendación AtelierPro**: Basado en el balance actual de pedidos y el stock de insumos críticos (${atelier.insumosCriticos.map(i => i.nombre).join(', ')}), te sugiero programar lotes de corte agrupados por color de hilo para optimizar los tiempos de enhebrado en las máquinas Singer y fileteadoras.`
+      respuesta.value = `🧵 **Recomendación AtelierPro**: Basado en el balance actual de pedidos y el stock de insumos críticos (${(isMock.value ? atelier.insumosCriticos : []).map(i => i.nombre).join(', ')}), te sugiero programar lotes de corte agrupados por color de hilo para optimizar los tiempos de enhebrado en las máquinas Singer y fileteadoras.`
     }
   }, 1000)
 }
 
 function aplicarReceta() {
   if (recetaSugerida.value) {
-    atelier.crearReceta(recetaSugerida.value)
+    if (isMock.value) atelier.crearReceta(recetaSugerida.value)
     showToast('success', 'Receta generada', 'Se ha guardado la nueva receta en el catálogo de fichas BOM.')
     emit('receta-generada', recetaSugerida.value)
     emit('update:visible', false)

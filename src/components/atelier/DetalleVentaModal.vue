@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import { type VentaAtelier, useAtelierStore } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
 
 const props = defineProps<{
   visible: boolean
@@ -15,6 +16,7 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
 
 const clienteVinculado = computed(() => {
   if (!props.venta?.cliente_id) return null

@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import { useAtelierStore } from '@/stores/atelier'
+import { useMode } from '@/composables/useMode'
+import { useInsumos } from '@/composables/useInsumos'
 import { showToast } from '@/utils/toast'
 
 defineProps<{
@@ -14,8 +16,11 @@ const emit = defineEmits<{
 }>()
 
 const atelier = useAtelierStore()
+const { isMock } = useMode()
+const { insumos: insumosReal } = useInsumos()
+const criticosReal = computed(() => (insumosReal.value as any[]).filter((i:any)=>(i.stock_actual??i.stock??0)<=(i.stock_minimo??0)))
 
-const criticos = computed(() => atelier.insumosCriticos)
+const criticos = computed(() => isMock.value ? atelier.insumosCriticos : (criticosReal.value as any))
 
 const totalSugerido = computed(() => {
   return criticos.value.reduce((sum, item) => {
@@ -27,7 +32,7 @@ const totalSugerido = computed(() => {
 function generarOrden() {
   criticos.value.forEach((item) => {
     const deficit = Math.max(0, item.stock_minimo * 2 - item.stock_actual)
-    atelier.agregarCompraInsumo(item.id, deficit)
+    isMock.value ? atelier.agregarCompraInsumo(item.id, deficit) : undefined
   })
   showToast('success', 'Orden de Compra Procesada', 'Se ha reabastecido el stock de los insumos críticos sugeridos.')
   emit('update:visible', false)
