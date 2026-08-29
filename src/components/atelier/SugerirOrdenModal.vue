@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { computed, ref, onMounted, watch } from 'vue'
 import * as comprasApi from '@/services/api/compras-insumos'
 import Dialog from 'primevue/dialog'

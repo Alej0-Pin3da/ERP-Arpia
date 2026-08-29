@@ -67,6 +67,7 @@ const estados: EstadoPedido[] = [
   'LISTO',
   'ENTREGADO',
 ]
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
@@ -87,6 +88,7 @@ const pedidosFiltrados = computed(() => {
 function getPedidosPorEstado(est: EstadoPedido) {
   return pedidosFiltrados.value.filter((p) => p.estado === est)
 }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 async function avanzarEstado(pedido: PedidoProduccion) {
   const currentIndex = estados.indexOf(pedido.estado)

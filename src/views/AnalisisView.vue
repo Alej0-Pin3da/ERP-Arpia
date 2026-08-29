@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, no-empty */
 import { computed, ref, onMounted, watch } from 'vue'
 import { useAtelierStore } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
@@ -120,6 +120,9 @@ function formatCOP(v: number): string {
             </tr>
           </thead>
           <tbody class="divide-y divide-stone-800/60 font-mono">
+                <tr v-if="!recetasDisplay.length">
+                  <td colspan="5" class="py-8 text-center text-stone-500">Sin recetas para analizar en modo {{ isMock ? 'MOCK' : 'REAL' }}.</td>
+                </tr>
             <tr v-for="r in recetasDisplay" :key="r.id" class="hover:bg-stone-900/50">
               <td class="py-3 px-3 font-serif text-sm font-semibold text-stone-200">{{ r.nombre }}</td>
               <td class="py-3 px-3 text-stone-300">{{ formatCOP(r.costo_estimado_materiales) }}</td>

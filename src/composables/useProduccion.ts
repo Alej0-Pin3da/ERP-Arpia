@@ -67,6 +67,7 @@ export function useProduccion(): UseProduccionReturn {
         codigo: `ORD-${nextId}`,
         cliente_id: 1,
         cliente_nombre: 'Clienta General',
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
         prenda_nombre: `Producto ${payload.producto_id}`,
         estado: (payload.estado as any) || 'COTIZADO',
         precio_venta: 100000,
@@ -87,6 +88,7 @@ export function useProduccion(): UseProduccionReturn {
       const idx = atelier.pedidos.findIndex((p) => p.id === id)
       if (idx === -1) return null
       const existing = atelier.pedidos[idx]
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updated: PedidoProduccion = {
         ...existing,
         estado: (payload.estado as any) || existing.estado,

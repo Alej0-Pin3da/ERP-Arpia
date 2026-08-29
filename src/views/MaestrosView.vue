@@ -719,7 +719,7 @@ function formatoCOP(val: number) {
           <div class="mt-4 pt-3 border-t border-stone-800 flex items-center justify-between">
             <a
               v-if="prov.telefono"
-              :href="`https://wa.me/${prov.telefono.replace(/[^0-9]/g, '')}`"
+              :href="`https://wa.me/${(prov.telefono ?? '').replace(/[^0-9]/g, '')}`"
               target="_blank"
               class="text-xs text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1"
             >
@@ -861,7 +861,7 @@ function formatoCOP(val: number) {
           <div>
             <div class="flex items-center justify-between">
               <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-stone-800 text-amber-300 border border-stone-700/60">
-                {{ pago.tipo.replace('_', ' ') }}
+                {{ (pago.tipo ?? '').replace('_', ' ') }}
               </span>
               <span
                 class="text-[10px] font-mono px-2 py-0.5 rounded"
@@ -1183,7 +1183,7 @@ function formatoCOP(val: number) {
           </div>
 
           <div class="mt-4 pt-3 border-t border-stone-800 flex items-center justify-between text-xs font-mono">
-            <span class="text-stone-500 text-[11px]">{{ ub.tipo.replace('_', ' ') }}</span>
+            <span class="text-stone-500 text-[11px]">{{ (ub.tipo ?? '').replace('_', ' ') }}</span>
 
             <div class="flex items-center gap-2">
               <button

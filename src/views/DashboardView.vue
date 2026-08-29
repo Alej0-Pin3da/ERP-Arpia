@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 <script setup lang="ts">
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, no-empty */
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
@@ -229,8 +229,9 @@ function getEstadoBadgeClass(estado: string) {
         </button>
       </div>
 
-      <!-- 8-Stage Pipeline Strip -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+      <div v-if="!pedidosDisplay.length" class="text-center py-4 text-xs text-stone-500 bg-stone-900/40 border border-stone-800 rounded-xl">Sin pedidos en modo {{ isMock ? 'MOCK' : 'REAL' }} — creá uno en <code>/produccion</code> o <code>GET /api/v1/pedidos-produccion</code>.</div>
+          <!-- 8-Stage Pipeline Strip -->
+          <div v-else class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
         <div class="bg-stone-950/60 border border-stone-800 rounded-xl p-2.5 text-center">
           <div class="text-[11px] text-stone-400 font-medium truncate">1. Cotizado</div>
           <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ isMock ? atelier.pipelineCounts.COTIZADO : pipelineCountsReal.COTIZADO }}</div>

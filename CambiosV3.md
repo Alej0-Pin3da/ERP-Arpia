@@ -477,6 +477,20 @@ Revisión total detectó 6 gaps post-purga: `DevolucionesView`/`OmisionesView` 1
 - **`SugerirOrdenModal.vue`**: `useInsumos` con `insumosRealList` + `cargarInsumosSugerir()` + `generarOrden()` ahora `async`: en MOCK `atelier.agregarCompraInsumo`, en REAL `for...await comprasApi.createCompraInsumo({insumo_id, cantidad_comprada, precio_unitario_compra})` + reload.
 - Verificado `npm run build` 168 módulos OK + `npm test` 70/70.
 
+
+---
+
+### [2026-08-29] — Fix: crash `MaestrosView` `pago.tipo.replace` null + `DashboardView` duplicate grid build fail
+
+#### Causa
+- `MaestrosView.vue:864` `{{ pago.tipo.replace('_',' ') }}` y `1186` `ub.tipo.replace` y `722` `prov.telefono.replace` crasheaban con `Cannot read properties of null (reading 'replace')` cuando la API devuelve `tipo: null` o `telefono: null` (maestros legacy). El error bubbling desde `MaestrosView` rompía el render de `/maestros` y por el `AppLayout` wrapper dejaba toda la app en blanco al navegar a esa ruta.
+- `DashboardView.vue` tras agregar `v-if="!pedidosDisplay.length"` quedó con dos `<div class="grid grid-cols-2...">` seguidos (duplicado) — Vite `@vue/compiler-sfc` tiraba `Unexpected token` y el build fallaba, por lo que el dev server seguía sirviendo el build viejo con el crash de Maestros.
+
+#### Fix
+- **MaestrosView.vue**: `{{ (pago.tipo ?? '').replace('_',' ') }}`, `{{ (ub.tipo ?? '').replace('_',' ') }}`, `:href="\`https://wa.me/${(prov.telefono ?? '').replace(...)}\`"` con null-guard.
+- **DashboardView.vue**: eliminado `<div>` duplicado tras `v-else`, queda un único `v-if` empty-state + `v-else` grid. `AnalisisView` re-añadido empty-state `Sin recetas...` que se había perdido tras el fix de lint.
+- Verificado `npm run build` 168 módulos OK + `MaestrosView` ya no `replace` null.
+
 ---
 
 ### Instrucción de Mantenimiento Continuo
