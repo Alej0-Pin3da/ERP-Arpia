@@ -18,7 +18,7 @@ V4 migró TODO el modelo a Postgres y wireó 8 vistas a API real (Clientes, Vent
 | # | Archivo | Estado | Usos `atelier` | Severidad | Acción V5 |
 |---|---|---|---|---|---|
 | 1 | `InventarioView.vue` | 🟡 Parcial | 7 → 1 tras fix 2026-08-27 | 🔴 Alta | ✅ Parcial fix: `insumosCriticosCount` + `valorTotalReal` derivados de `insumosList`. Queda `ajustar/eliminar` branch OK. |
-| 2 | `DashboardView.vue` | 🟡 Parcial | ~22 → ~15 | 🟠 Alto | Alertas+pedidos → reales; queda rentabilidad/distribución/pipeline (analiticos)  a `/analiticos/*` + `/finanzas/*` |
+| 2 | `DashboardView.vue` | 🟢 Purga template | ~22 → 4 (solo branch isMock) | ~22 → ~15 | 🟠 Alto | Alertas+pedidos → reales; queda rentabilidad/distribución/pipeline (analiticos)  a `/analiticos/*` + `/finanzas/*` |
 | 3 | `AnalisisView.vue` | 🔴 Mock | 5 | 🔴 Crítico | Migrar a analíticos + productos |
 | 4 | `AppLayout.vue` | 🔴 Mock | 1 | 🟠 Alto | Badge `insumosCriticos` → real |
 | 5 | `VentasView.vue` | 🟢 OK | 1 (branch) | 🟢 | OK — `isMock ? atelier : real` |
