@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     analiticos,
     audit,
+    audit_fiscal,
     auth,
     observability,
     bom,
@@ -43,6 +44,7 @@ api_router.include_router(produccion.router_prendas)
 api_router.include_router(produccion.router_pedidos)
 api_router.include_router(audit.router)
 api_router.include_router(observability.router)
+api_router.include_router(audit_fiscal.router)
 
 
 @api_router.get("/__mode", tags=["mode"])

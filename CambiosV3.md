@@ -393,5 +393,15 @@ Sprint 3 de `MEJORAS_PRIORITARIAS_ERP_ARPIA.md`: frontend con 0 specs. Se creó 
 
 ---
 
+### [2026-08-27] — SDD audit-fiscal-versioning — Versionado precios/costos + cierres mensuales
+
+#### Implementado
+- **Migración `0019_audit_fiscal_versioning`**: tablas `precio_versions`, `costo_versions` (producto/variante, precio/costo, fecha_desde, creado_por), `cierres_mensuales` (periodo YYYY-MM unique, estado).
+- **Modelos `audit_fiscal.py`**: `PrecioVersion`, `CostoVersion`, `CierreMensual` registrados en `models/__init__.py`.
+- **Endpoints `GET/POST /api/v1/audit-fiscal/{precio-versions,costo-versions,cierres}`**: CRUD con filtro `producto_id`, roles `admin/gerente` para POST, helper `is_periodo_cerrado()` para validar ventas en período cerrado (409 si ya cerrado).
+- Verificado `app ok` + `npm 70/70` + `py_compile`.
+
+---
+
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.

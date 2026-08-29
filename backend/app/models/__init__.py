@@ -39,6 +39,7 @@ from app.models.maestros import (
     TallaEstandar,
     UbicacionTaller,
 )
+from app.models.audit_fiscal import CierreMensual, CostoVersion, PrecioVersion
 from app.models.ventas import DetalleVenta, Devolucion, DevolucionItem, Venta
 
 __all__ = [
@@ -81,4 +82,7 @@ __all__ = [
     "TallaEstandar",
     "ProductoSinTalla",
     "ParametrosCosteo",
+    "PrecioVersion",
+    "CostoVersion",
+    "CierreMensual",
 ]
