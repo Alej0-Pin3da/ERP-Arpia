@@ -20,6 +20,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAtelierStore } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
 import { useInsumos } from '@/composables/useInsumos'
+import { installMockGuard } from '@/utils/mockGuard'
 import { roleLabel } from '@/utils/menu'
 import arpiaBrandLogo from '@/assets/arpia-05-1-100x100.png'
 import Button from 'primevue/button'
@@ -37,7 +38,7 @@ async function cargarAlertasInsumos() {
     insumosRealList.value = (r as any).items ?? []
   } catch { insumosRealList.value = [] }
 }
-onMounted(() => { void cargarAlertasInsumos() })
+onMounted(() => { void cargarAlertasInsumos(); installMockGuard() })
 watch(isMock, () => { void cargarAlertasInsumos() })
 const hasAlertasReal = computed(() => (insumosRealList.value as any[]).some((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
 const hasAlertas = computed(() => isMock.value ? !!atelier.insumosCriticos.length : hasAlertasReal.value)

@@ -542,3 +542,26 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 #### 5. Verificación
 - `npm run build` 168 módulos OK (vite 2.85s) + `npm test` 70/70 (9 suites) GREEN.
 - Modo REAL: crear/editar/eliminar persiste en `GET /productos` y sobrevive `F5` (Postgres); MOCK mantiene `atelier.recetas` en memoria. `VITE_USE_MOCK=false` hard refresh sin datos fantasma en `/productos`.
+
+---
+
+### [2026-08-30] — Hardening REAL fail-loud: mockGuard + DataSourceBadge + check:mock-leak
+
+#### 1. Nuevo `src/utils/mockGuard.ts` — fail-loud en REAL
+- **Problema:** en `VITE_USE_MOCK=false`, un `atelier.*` olvidado sin branch `isMock` renderizaba fantasma silencioso y no se distinguía de Postgres.
+- **Solución:** `installMockGuard()` instala `Object.defineProperty` sobre 18 props críticas (`recetas/clientes/ventas/insumos/prendasListas/pedidos/socias/liquidaciones/anticipos/proveedoresMaestros/.../parametrosCosteo/insumosCriticos`) que en `!isMock.value` hace `console.error [REAL LEAK]` + `console.trace()` + `showToast('error','Mock leak detectado')` y deduplica 10s. Instalado en `AppLayout.vue onMounted` (tras `createPinia`) + `watch(isMock)` reset.
+
+#### 2. Nuevo `src/components/DataSourceBadge.vue`
+- Badge `MOCK — atelier.recetas (memoria)` (amber) vs `REAL — GET /api/v1/productos (Postgres)` (emerald) con dot + `count` + `title` tooltip. Props `isMock/source/count/endpoint`.
+
+#### 3. `src/views/ProductosView.vue` — procedencia visible
+- Import `DataSourceBadge` junto al contador `{{ recetasDisplay.length }} Modelos`. Muestra `atelier.recetas (memoria)` en MOCK y `GET /api/v1/productos (Postgres)` en REAL con count live.
+
+#### 4. `src/layouts/AppLayout.vue`
+- Import `installMockGuard` y `onMounted(() => { void cargarAlertasInsumos(); installMockGuard() })`.
+
+#### 5. `scripts/check-mock-leak.mjs` + `package.json check:mock-leak`
+- Guard CI advisory: escanea `src/**/*.vue` y falla solo si un archivo toca `atelier.` sin importar `isMock` (vía `useMode` o wrappers `useInsumos/usePrendas`). Los 394 usos actuales ya están brancheados, por lo que hoy pasa `PASSED`. El source of truth runtime es `mockGuard`. Uso: `npm run check:mock-leak`.
+
+#### 6. Verificación
+- `npm run build` 168 módulos OK + `npm test` 70/70 + `node scripts/check-mock-leak.mjs` PASSED.

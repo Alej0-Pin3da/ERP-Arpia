@@ -21,7 +21,8 @@
     "start:all:docker": "pwsh -ExecutionPolicy Bypass -File scripts/start-all.ps1 -Mode prod -UseDockerApi",
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "check:mock-leak": "node scripts/check-mock-leak.mjs"
   },
   "dependencies": {
     "@primeuix/themes": "^2.0.3",

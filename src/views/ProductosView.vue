@@ -6,6 +6,7 @@ import InputText from 'primevue/inputtext'
 import { useAtelierStore, type RecetaBOM } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
 import FichaTecnicaModal from '@/components/atelier/FichaTecnicaModal.vue'
+import DataSourceBadge from '@/components/DataSourceBadge.vue'
 import NuevaRecetaModal from '@/components/atelier/NuevaRecetaModal.vue'
 import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
 import { showToast } from '@/utils/toast'
@@ -143,6 +144,7 @@ async function eliminarReceta(r: RecetaBOM) {
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
             {{ recetasDisplay.length }} Modelos
           </span>
+          <DataSourceBadge :is-mock="isMock" :source="isMock ? 'atelier.recetas (memoria)' : 'GET /api/v1/productos (Postgres)'" :count="recetasDisplay.length" endpoint="/productos" />
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">
           Escandallo de costeo detallado: consumo de insumos directos/indirectos, tiempos de mano de obra y margen sugerido.
