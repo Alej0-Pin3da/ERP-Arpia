@@ -512,3 +512,33 @@ Revisión total detectó 6 gaps post-purga: `DevolucionesView`/`OmisionesView` 1
 
 ### Instrucción de Mantenimiento Continuo
 A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente o funcionalidad agregada en el proyecto será documentada en este archivo `CambiosV3.md` con su respectiva fecha, archivo modificado y resumen operativo.
+
+---
+
+### [2026-08-30] — Feat: edición real de modelos en /productos (POST/PUT/DELETE /productos)
+
+#### 1. Servicios API (`src/services/api/productos.ts`)
+- **Interfaces extendidas:** `ProductoRead` ahora tipa `tipo_producto_id/ precio_venta_sugerido/ costos_operativos_fijos` como requeridos (alineado a `schemas/producto.py`). Nuevas interfaces `ProductoCreate/ProductoUpdate/TipoProductoRead`.
+- **Nuevas funciones:** `createProducto(POST /productos)`, `updateProducto(PUT /productos/{id})`, `deleteProducto(DELETE /productos/{id})`, `listTiposProducto(GET /tipos-producto)` con paginación.
+
+#### 2. Vista `src/views/ProductosView.vue`
+- **Estado edición:** nuevo `recetaEditar: Ref<RecetaBOM|null>` + helpers `abrirNueva()`, `abrirEditar(r)`, `handleFichaEditar(r)`, `handleRecetaGuardada()` (reload en REAL).
+- **Branch REAL completo:** `eliminarReceta` ahora `async` con `if(!isMock) await deleteProducto + cargarProductosReales + toast` y manejo 409/422; en MOCK mantiene `atelier.recetas.splice`.
+- **Grid:** footer con botón lápiz `pi-pencil` (editar) + `pi-trash` (eliminar) en flex `gap-1` con hover `bg-stone-800`.
+- **Mapping REAL:** `recetasDisplay` preserva `tipo_producto_id: p.tipo_producto_id` para que el modal pueda pre-seleccionar tipo en edición.
+- **Modales:** `FichaTecnicaModal @editar` → `handleFichaEditar`; `NuevaRecetaModal :receta="recetaEditar"` + `@receta-creada/@receta-actualizada` → `handleRecetaGuardada` + `@update:visible` reset `recetaEditar=null`.
+
+#### 3. Modal `src/components/atelier/NuevaRecetaModal.vue` — Soporte crear/editar en ambos modos
+- **Props:** `receta?: RecetaBOM|null` + `isEditing = computed(!!props.receta)`; título dinámico `Crear` vs `Editar`.
+- **Prefill:** `watch(visible)` y `watch(receta)` populando `codigo/nombre/categoria/linea/descripcion/tiempos/costos/precio/recomendaciones` + `tipoProductoId` si viene en el mapeo.
+- **Tipos REAL:** `cargarTipos()` vía `listTiposProducto({limit:50})` → `tiposOptions {label,value}` + auto-select primer tipo si `tipoProductoId` null. Nuevo `Dropdown` de Tipo de Producto visible solo en `!isMock`.
+- **Guardar MOCK:** si `isEditing && receta` → `findIndex + splice` update in-place con `costo_total_unitario = suma + toast 'Receta actualizada'`; sino `atelier.crearReceta` como antes.
+- **Guardar REAL:** `saving` ref con `:loading`; resolve `tid` (fallback fetch 1 tipo o `1`), `costosFijos = costoInsumos+manoObra+cifEnergia`; si edita `PUT /productos/{id}` con `{nombre, tipo_producto_id, precio_venta_sugerido, costos_operativos_fijos, requiere_fabricacion:true}` sino `POST /productos`; mapeo de respuesta a `RecetaBOM` emit `receta-actualizada/creada`; `try/catch` con `detail` array→join y `toast error`.
+- **UX:** `codigo` disabled en REAL con hint `Auto: PRD-{id}`, `*` en nombre y tipo requerido.
+
+#### 4. Modal `src/components/atelier/FichaTecnicaModal.vue`
+- **Emit:** nuevo `emit('editar', receta)` + `Tag` header intacto + botón `Editar` (`pi-pencil`, `severity warning outlined`) junto a `Imprimir` en el subheader; abre edición sin cerrar datos.
+
+#### 5. Verificación
+- `npm run build` 168 módulos OK (vite 2.85s) + `npm test` 70/70 (9 suites) GREEN.
+- Modo REAL: crear/editar/eliminar persiste en `GET /productos` y sobrevive `F5` (Postgres); MOCK mantiene `atelier.recetas` en memoria. `VITE_USE_MOCK=false` hard refresh sin datos fantasma en `/productos`.

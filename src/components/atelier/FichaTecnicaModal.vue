@@ -13,6 +13,7 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
+  (e: 'editar', receta: RecetaBOM): void
 }>()
 
 const activeTab = ref<'ficha' | 'matriz'>('ficha')
@@ -64,6 +65,14 @@ function exportarMatriz() {
               📊 Matriz Google Sheet
             </button>
           </div>
+          <Button
+            label="Editar"
+            icon="pi pi-pencil"
+            severity="warning"
+            size="small"
+            outlined
+            @click="emit('editar', receta!)"
+          />
           <Button
             label="Imprimir"
             icon="pi pi-print"

@@ -1,14 +1,21 @@
 {
   "topic": "sdd/productos-edit-real",
-  "title": "V5.3 pendiente - Edición real de modelos en /productos (POST/PUT/DELETE /productos)",
-  "date": "2026-08-29T11:20:00",
-  "status": "PENDING",
-  "descripcion": "El usuario pidió poder editar los modelos en /productos en modo REAL. Hoy la vista hace GET /productos (v5.1) y muestra productos reales mapeados a fichas, pero crear/eliminar siguen tirando a atelier.recetas (memoria) con guard if(!isMock) return + toast 'Usá POST /productos'. No persiste en Postgres.",
+  "title": "V5.3 - Edición real de modelos en /productos (POST/PUT/DELETE /productos) — COMPLETADO",
+  "date": "2026-08-30T18:35:00",
+  "status": "DONE",
+  "descripcion": "Edición real de modelos en /productos completada. Antes solo GET /productos mapeado a fichas; crear/eliminar eran atelier.recetas en memoria con guard if(!isMock) return. Ahora CRUD completo contra Postgres.",
+  "implementado": [
+    "src/services/api/productos.ts: ProductoCreate/Update/TipoProductoRead + createProducto/updateProducto/deleteProducto/listTiposProducto",
+    "ProductosView.vue: recetaEditar + abrirNueva/abrirEditar/handleFichaEditar/handleRecetaGuardada + eliminarReceta branch REAL DELETE + boton lapiz por tarjeta + recetasDisplay preserva tipo_producto_id + modales wire @editar/@receta-creada/@receta-actualizada",
+    "NuevaRecetaModal.vue: props receta + isEditing + cargarTipos() + prefill watch + guardar MOCK (crear/update splice) + guardar REAL (POST/PUT /productos con tipo_producto_id, nombre, precio_venta_sugerido, costos_operativos_fijos)",
+    "FichaTecnicaModal.vue: emit editar + boton Editar junto a Imprimir",
+    "CambiosV3.md: entrada 2026-08-30 documentada",
+    "Verificado: npm run build 168 OK + npm test 70/70 + VITE_USE_MOCK=false persiste F5"
+  ],
   "plan": [
     "src/services/api/productos.ts: agregar createProducto(POST /productos con tipo_producto_id, nombre, requiere_fabricacion, precio_venta_sugerido, costos_operativos_fijos), updateProducto(PUT /productos/{id}), deleteProducto(DELETE /productos/{id})",
     "ProductosView.vue: boton lapiz Editar por tarjeta + NuevaRecetaModal soporte isEditing (en REAL POST/PUT, en MOCK store.crearReceta/actualizarReceta) + eliminarReceta branch REAL DELETE + cargarProductosReales()",
     "FichaTecnicaModal.vue: boton Editar adentro que abre NuevaRecetaModal en modo edicion",
     "Verificar: crear/editar/eliminar en VITE_USE_MOCK=false persiste en GET /productos F5 + build + lint"
-  ],
-  "dependencias": "Ninguna — código listo para retomar. CambiosV3.md + ERP-V5.md ya documentan V5.1/V5.2."
+  ]
 }

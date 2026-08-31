@@ -20,6 +20,7 @@ const showFichaModal = ref(false)
 const showNuevaModal = ref(false)
 const showIaModal = ref(false)
 const recetaSeleccionada = ref<RecetaBOM | null>(null)
+const recetaEditar = ref<RecetaBOM | null>(null)
 
 const categorias = [
   'Todos los Modelos',
@@ -46,6 +47,7 @@ const recetasDisplay = computed(() => isMock.value ? (atelier as any).recetas : 
   id: p.id,
   codigo: `PRD-${p.id}`,
   nombre: p.nombre,
+  tipo_producto_id: p.tipo_producto_id,
   linea: p.tipo_producto_id ? `Tipo ${p.tipo_producto_id}` : 'General',
   descripcion: p.nombre,
   categoria: 'General',
@@ -87,8 +89,40 @@ function abrirFicha(r: RecetaBOM) {
   showFichaModal.value = true
 }
 
-function eliminarReceta(r: RecetaBOM) {
-  if (!isMock.value) { showToast('info','Modo REAL','La gestión de recetas BOM en modo REAL usa el catálogo de productos.'); return }
+function abrirEditar(r: RecetaBOM) {
+  recetaEditar.value = r
+  showNuevaModal.value = true
+}
+
+function abrirNueva() {
+  recetaEditar.value = null
+  showNuevaModal.value = true
+}
+
+function handleFichaEditar(r: RecetaBOM) {
+  showFichaModal.value = false
+  recetaEditar.value = r
+  showNuevaModal.value = true
+}
+
+async function handleRecetaGuardada() {
+  if (!isMock.value) await cargarProductosReales()
+  recetaEditar.value = null
+}
+
+async function eliminarReceta(r: RecetaBOM) {
+  if (!isMock.value) {
+    try {
+      await productosApi.deleteProducto(r.id)
+      showToast('success','Producto eliminado', `${r.nombre} eliminado correctamente.`)
+      await cargarProductosReales()
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail
+      const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ') : (detail ?? e?.message ?? 'Error al eliminar')
+      showToast('error','Error al eliminar', String(msg))
+    }
+    return
+  }
   const idx = atelier.recetas.findIndex((x) => x.id === r.id)
   if (idx !== -1) {
     atelier.recetas.splice(idx, 1)
@@ -139,7 +173,7 @@ function eliminarReceta(r: RecetaBOM) {
           severity="secondary"
           outlined
           class="text-xs font-semibold"
-          @click="showNuevaModal = true"
+          @click="abrirNueva"
         />
       </div>
     </div>
@@ -242,21 +276,31 @@ function eliminarReceta(r: RecetaBOM) {
             class="text-amber-400 p-0 font-bold text-xs hover:underline"
             @click="abrirFicha(r)"
           />
-          <button
-            type="button"
-            class="text-stone-500 hover:text-red-400 p-1 transition"
-            title="Eliminar Receta"
-            @click="eliminarReceta(r)"
-          >
-            <i class="pi pi-trash text-xs" />
-          </button>
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              class="text-stone-500 hover:text-amber-400 p-1.5 transition rounded hover:bg-stone-800"
+              title="Editar Receta"
+              @click="abrirEditar(r)"
+            >
+              <i class="pi pi-pencil text-xs" />
+            </button>
+            <button
+              type="button"
+              class="text-stone-500 hover:text-red-400 p-1.5 transition rounded hover:bg-stone-800"
+              title="Eliminar Receta"
+              @click="eliminarReceta(r)"
+            >
+              <i class="pi pi-trash text-xs" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Modals -->
-    <FichaTecnicaModal v-model:visible="showFichaModal" :receta="recetaSeleccionada" />
-    <NuevaRecetaModal v-model:visible="showNuevaModal" />
+    <FichaTecnicaModal v-model:visible="showFichaModal" :receta="recetaSeleccionada" @editar="handleFichaEditar" />
+    <NuevaRecetaModal v-model:visible="showNuevaModal" :receta="recetaEditar" @receta-creada="handleRecetaGuardada" @receta-actualizada="handleRecetaGuardada" @update:visible="(v:boolean) => { if(!v) recetaEditar = null }" />
     <AsistenteIaModal v-model:visible="showIaModal" />
   </div>
 </template>
