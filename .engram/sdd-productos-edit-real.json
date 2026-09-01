@@ -1,21 +1,19 @@
 {
   "topic": "sdd/productos-edit-real",
-  "title": "V5.3 - Edición real de modelos en /productos (POST/PUT/DELETE /productos) — COMPLETADO",
-  "date": "2026-08-30T18:35:00",
+  "title": "V5.3+ — Productos cabecera + BOM completo — CERRADO 2026-08-31",
+  "date": "2026-08-31T21:00:00",
   "status": "DONE",
-  "descripcion": "Edición real de modelos en /productos completada. Antes solo GET /productos mapeado a fichas; crear/eliminar eran atelier.recetas en memoria con guard if(!isMock) return. Ahora CRUD completo contra Postgres.",
+  "descripcion": "Producto cabecera (6 campos) + BOM insumos por producto + Ficha unificada + hardening REAL. Todo persiste en Postgres y se recalcula live.",
   "implementado": [
-    "src/services/api/productos.ts: ProductoCreate/Update/TipoProductoRead + createProducto/updateProducto/deleteProducto/listTiposProducto",
-    "ProductosView.vue: recetaEditar + abrirNueva/abrirEditar/handleFichaEditar/handleRecetaGuardada + eliminarReceta branch REAL DELETE + boton lapiz por tarjeta + recetasDisplay preserva tipo_producto_id + modales wire @editar/@receta-creada/@receta-actualizada",
-    "NuevaRecetaModal.vue: props receta + isEditing + cargarTipos() + prefill watch + guardar MOCK (crear/update splice) + guardar REAL (POST/PUT /productos con tipo_producto_id, nombre, precio_venta_sugerido, costos_operativos_fijos)",
-    "FichaTecnicaModal.vue: emit editar + boton Editar junto a Imprimir",
-    "CambiosV3.md: entrada 2026-08-30 documentada",
-    "Verificado: npm run build 168 OK + npm test 70/70 + VITE_USE_MOCK=false persiste F5"
+    "Migration 0020_productos_cabecera: 11 cols (codigo, categoria, linea, descripcion, tiempo_confeccion_min, costo_insumos, mano_obra, cif_energia, markup_pct -1000..1000, recomendaciones_taller, fases) + fixes 0019 FK case",
+    "productos.ts + schemas/producto.py + models/productos.py extended",
+    "NuevaRecetaModal: 5-col grid fix + CIF input + total bar + prefill fix + payload completo con markupCalc",
+    "ProductosView: DataSourceBadge + lápiz abre Ficha directa en edición, recetasDisplay mapea todos los campos sin hardcodear",
+    "FichaTecnicaModal: unificada editable (header + BOM), costoTotalCalculado = BOM sum + mano + cif, markupCalculado, agregar/editar (cantidad/desperdicio PUT) / borrar BOM, precio_venta_sugerido fetch fresco",
+    "bom.ts: list/create/update/delete/getCosto",
+    "mockGuard + DataSourceBadge + check:mock-leak + Dockerfile non-blocking + start-all auto-migrate",
+    "AUDIT-ERP-GAPS-2026-08-30.md"
   ],
-  "plan": [
-    "src/services/api/productos.ts: agregar createProducto(POST /productos con tipo_producto_id, nombre, requiere_fabricacion, precio_venta_sugerido, costos_operativos_fijos), updateProducto(PUT /productos/{id}), deleteProducto(DELETE /productos/{id})",
-    "ProductosView.vue: boton lapiz Editar por tarjeta + NuevaRecetaModal soporte isEditing (en REAL POST/PUT, en MOCK store.crearReceta/actualizarReceta) + eliminarReceta branch REAL DELETE + cargarProductosReales()",
-    "FichaTecnicaModal.vue: boton Editar adentro que abre NuevaRecetaModal en modo edicion",
-    "Verificar: crear/editar/eliminar en VITE_USE_MOCK=false persiste en GET /productos F5 + build + lint"
-  ]
+  "verificado": "npm run build 168 OK + npm test 70/70 + py_compile OK; pendiente DB at 0020 (docker compose build --no-cache api + up -d api + alembic upgrade head)",
+  "commits": ["c7089d2", "8ac719c", "e1ab3d3", "2da98f2", "779fa10", "535cc51", "857b1d5", "f657d4f", "47b1f42", "baf1a1e", "2f3118d"]
 }

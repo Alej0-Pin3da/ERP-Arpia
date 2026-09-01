@@ -1,0 +1,40 @@
+{
+  "topic": "erp/state",
+  "date": "2026-08-31T21:00:00",
+  "branch": "main",
+  "head": "2f3118d",
+  "status": "PAUSED_FOR_TODAY",
+  "ultimo_commit": "2f3118d feat(bom): inline edit cantidad and desperdicio per BOM row",
+  "commits_hoy": [
+    "c7089d2 feat(productos): persist cabecera fields — migration 0020 + wiring",
+    "8ac719c fix(migration): correct FK case Productos/Variantes_Producto",
+    "e1ab3d3 fix(docker): make alembic non-blocking so api always starts",
+    "2da98f2 fix(migration): correct FK case for 0019",
+    "779fa10 fix(ficha): ensure precio_venta_sugerido loads from fresh DB fetch",
+    "535cc51 fix(modal): prevent cost inputs overlap — responsive grid",
+    "857b1d5 fix(productos): show CIF + total cost in edit modal and fix prefill",
+    "f657d4f fix(productos): allow negative markup (loss)",
+    "47b1f42 feat(productos): unify modals — single editable Ficha Tecnica",
+    "baf1a1e fix(ficha): restore Categoria and Linea as Dropdown selects",
+    "2f3118d feat(bom): inline edit cantidad and desperdicio per BOM row"
+  ],
+  "estado_v5": "DONE + hardening + cabecera + BOM",
+  "hardening": {
+    "mockGuard": "src/utils/mockGuard.ts — fail-loud en REAL, toast + console.error si atelier.* es tocado sin branch",
+    "dataSourceBadge": "src/components/DataSourceBadge.vue — MOCK/REAL provenance por vista",
+    "checkMockLeak": "scripts/check-mock-leak.mjs + npm run check:mock-leak"
+  },
+  "productos": {
+    "migration": "0020_productos_cabecera — 11 cols nullable en Productos (codigo, categoria, linea, descripcion, tiempo_confeccion_min, costo_insumos, mano_obra, cif_energia, markup_pct, recomendaciones_taller, fases) + checks -1000..1000 para markup",
+    "api": "POST/PUT/DELETE /productos + GET /productos/{id}/bom/insumos + GET /costo ya wireados",
+    "ui": "ProductosView lápiz abre Ficha directa en edición, NuevaRecetaModal solo para crear, Ficha unificada editable (código/categoría/línea/tiempo/mano/cif/precio/recomendaciones + BOM tabla con agregar/editar cantidad+desperdicio/borrar + costo total auto-calculado)"
+  },
+  "bom": {
+    "service": "src/services/api/bom.ts — list/create/update/delete + getCosto",
+    "ficha": "FichaTecnicaModal wireada a BOM real en REAL mode, costoTotalCalculado = BOM sum + mano + cif, markupCalculado live"
+  },
+  "audit": "AUDIT-ERP-GAPS-2026-08-30.md — gap audit completo de 7 dominios, solo Productos necesitaba migración (11 gaps), resto OK",
+  "docker": "backend/Dockerfile CMD ahora alembic upgrade head || echo; uvicorn — no bloquea arranque; start-all.ps1 corre alembic upgrade head tras /docs",
+  "pendiente_usuario": "Probar en REAL con npm run start:all (docker compose build --no-cache api si hace falta) — crear/editar con los 6 campos + BOM cantidad/desperdicio; F5 persiste; precio 6000 con markup -458 ya permitido",
+  "proximo_paso": "Continuar con siguiente gap del audit si el usuario quiere, o cerrar V5. El mock sigue presente pero con guard fail-loud; purga total queda para después (opción B por fases)"
+}
