@@ -35,7 +35,7 @@ class ProductoBase(BaseModel):
     costo_insumos: Decimal | None = Field(default=None, ge=0)
     mano_obra: Decimal | None = Field(default=None, ge=0)
     cif_energia: Decimal | None = Field(default=None, ge=0)
-    markup_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    markup_pct: Decimal | None = Field(default=None, ge=-1000, le=1000)
     recomendaciones_taller: str | None = None
     fases: list | dict | None = None
 
@@ -58,7 +58,7 @@ class ProductoUpdate(BaseModel):
     costo_insumos: Decimal | None = Field(default=None, ge=0)
     mano_obra: Decimal | None = Field(default=None, ge=0)
     cif_energia: Decimal | None = Field(default=None, ge=0)
-    markup_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    markup_pct: Decimal | None = Field(default=None, ge=-1000, le=1000)
     recomendaciones_taller: str | None = None
     fases: list | dict | None = None
 

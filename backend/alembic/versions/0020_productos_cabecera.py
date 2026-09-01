@@ -55,8 +55,13 @@ def upgrade() -> None:
         op.create_check_constraint("ck_productos_cif_energia", tbl, "cif_energia IS NULL OR cif_energia >= 0")
     except Exception:
         pass
+    # Drop old 0-100 constraint if it exists from a previous 0020 attempt, then create with -1000..1000
     try:
-        op.create_check_constraint("ck_productos_markup_pct", tbl, "markup_pct IS NULL OR (markup_pct >= 0 AND markup_pct <= 100)")
+        op.drop_constraint("ck_productos_markup_pct", tbl, type_="check")
+    except Exception:
+        pass
+    try:
+        op.create_check_constraint("ck_productos_markup_pct", tbl, "markup_pct IS NULL OR (markup_pct >= -1000 AND markup_pct <= 1000)")
     except Exception:
         pass
 
