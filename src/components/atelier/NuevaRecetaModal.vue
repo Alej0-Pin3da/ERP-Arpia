@@ -307,7 +307,7 @@ async function guardar() {
         <Textarea v-model="descripcion" rows="2" placeholder="Detalles de patronaje, copas, varillado y materiales." class="w-full" />
       </div>
 
-      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Tiempo (min)</label>
           <InputNumber v-model="tiempoConfeccion" :min="1" class="w-full font-mono" />
