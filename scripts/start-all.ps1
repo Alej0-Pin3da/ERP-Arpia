@@ -120,6 +120,11 @@ if (-not $UseLocalApi) {
     }
   }
   $ok = Wait-Url "http://localhost:$BackendPort/docs" 60
+  if ($ok) {
+    Write-Host "Corriendo migraciones (alembic upgrade head)..." -ForegroundColor Yellow
+    try { docker compose exec -T api alembic upgrade head 2>&1 | Out-Host } catch { Write-Warning "alembic upgrade head falló (puede que ya esté al día): $_" }
+    try { $head = docker compose exec -T api alembic current 2>$null; Write-Host "DB head: $head" -ForegroundColor DarkGray } catch {}
+  }
   if (-not $ok) {
     Write-Warning "API no respondió en :$BackendPort. docker logs arpia-api:"
     docker logs --tail 60 arpia-api 2>&1 | Out-Host
