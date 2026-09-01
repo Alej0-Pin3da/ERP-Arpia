@@ -80,9 +80,16 @@ async function cargarBom() {
   }
 }
 
-function enterEdit() {
+async function enterEdit() {
   if (!props.receta) return
-  const r = props.receta as unknown as Record<string, unknown>
+  let r = props.receta as unknown as Record<string, unknown>
+  // In REAL, fetch fresh product to ensure precio_venta_sugerido and all cabecera fields are up-to-date (DB is source of truth)
+  if (!isMock.value && recetaId.value) {
+    try {
+      const fresh = await productosApi.getProducto(recetaId.value)
+      r = { ...r, ...fresh } as unknown as Record<string, unknown>
+    } catch { /* fallback to prop */ }
+  }
   editNombre.value = (r.nombre as string) ?? ''
   editCodigo.value = (r.codigo as string) ?? ''
   editCategoria.value = (r.categoria as string) ?? 'General'
@@ -91,7 +98,9 @@ function enterEdit() {
   editTiempo.value = Number(r.tiempo_confeccion_min ?? 60)
   editMano.value = Number(r.mano_obra ?? 0)
   editCif.value = Number(r.cif_energia ?? 0)
-  editPrecio.value = Number((r.precio_venta ?? r.precio_venta_sugerido ?? 0) as number)
+  // precio_venta_sugerido is the DB column, precio_venta is the mapped alias — try both, and handle string Decimal
+  const precioRaw = (r.precio_venta_sugerido ?? r.precio_venta ?? 0) as unknown
+  editPrecio.value = Number(precioRaw ?? 0)
   editRecomendaciones.value = (r.recomendaciones_taller as string) ?? ''
   isEditing.value = true
 }
