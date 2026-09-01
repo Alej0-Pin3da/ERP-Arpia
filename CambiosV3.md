@@ -614,3 +614,25 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 
 #### 3. Verificación
 - `npm run build` 168 OK + `npm test` 70/70. En REAL: crear producto → abrir Ficha → agregar 2-3 insumos → costo total se actualiza vía `GET /costo` y `F5` persiste BOM (Postgres). En MOCK sigue items mock sin API.
+
+---
+
+### [2026-08-31] — Unificación modales: Ficha Técnica editable única (precio + cabecera + BOM)
+
+#### 1. `src/components/atelier/FichaTecnicaModal.vue` — edición inline unificada
+- **Props:** `startEditing?: boolean` + emits `guardado`
+- **State edición:** `isEditing/saving/editNombre/editCodigo/editCategoria/editLinea/editDescripcion/editTiempo/editMano/editCif/editPrecio/editRecomendaciones`
+- **Funciones:** `enterEdit()` (prefill desde `receta`), `cancelEdit()`, `guardarEdicion()` (PUT `/productos/{id}` con cabecera + `costos_operativos_fijos = BOM sum + mano + cif` + `precio_venta_sugerido`, toast, emit `guardado`, reload BOM)
+- **Template:** header `Editar/Guardar/Cancelar` (warning/success), metadata strip editable (código/categoría/línea/tiempo inputs cuando `isEditing`), descripción/nombre editables, costeo con `Mano/CIF/Precio` inputs cuando edita y `costoTotalCalculado/markupCalculado` live, recomendaciones textarea.
+- **BOM:** mantiene `Agregar insumo` (Dropdown + cantidad + desperdicio) y `DELETE` por renglón, costo total recalculado live.
+
+#### 2. `src/views/ProductosView.vue` — flujo unificado
+- Nuevo `fichaStartEditing` ref
+- `abrirFicha(r)` → `fichaStartEditing=false` + `showFichaModal=true` (solo ver)
+- `abrirEditar(r)` (lápiz) → `fichaStartEditing=true` + `showFichaModal=true` (directo a edición, ya no abre `NuevaRecetaModal`)
+- `handleFichaGuardada()` → `cargarProductosReales()` + reset `fichaStartEditing`
+- `NuevaRecetaModal` queda solo para `+ Nueva Receta` (creación)
+- Template: `<FichaTecnicaModal :start-editing="fichaStartEditing" @guardado="handleFichaGuardada" />`
+
+#### 3. Verificación
+- `npm run build` 168 OK. En REAL: lápiz → Ficha abre ya en edición con todos los campos (código, categoría, tiempo, CIF, precio) editables + BOM, un solo Guardar persiste cabecera + precio en `PUT /productos` y refresca la grilla. Creación sigue vía `+ Nueva Receta`.

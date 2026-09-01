@@ -10,19 +10,34 @@ import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 import * as bomApi from '@/services/api/bom'
 import * as insumosApi from '@/services/api/insumos'
+import * as productosApi from '@/services/api/productos'
 
 const props = defineProps<{
   visible: boolean
   receta: RecetaBOM | null
+  startEditing?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
   (e: 'editar', receta: RecetaBOM): void
+  (e: 'guardado', receta: RecetaBOM): void
 }>()
 
 const { isMock } = useMode()
 const activeTab = ref<'ficha' | 'matriz'>('ficha')
+const isEditing = ref(false)
+const saving = ref(false)
+const editNombre = ref('')
+const editCodigo = ref('')
+const editCategoria = ref('')
+const editLinea = ref('')
+const editDescripcion = ref('')
+const editTiempo = ref(60)
+const editMano = ref(0)
+const editCif = ref(0)
+const editPrecio = ref(0)
+const editRecomendaciones = ref('')
 
 // REAL BOM state
 const bomReal = ref<bomApi.BomInsumoRead[]>([])
@@ -62,17 +77,80 @@ async function cargarBom() {
   }
 }
 
+function enterEdit() {
+  if (!props.receta) return
+  const r = props.receta as unknown as Record<string, unknown>
+  editNombre.value = (r.nombre as string) ?? ''
+  editCodigo.value = (r.codigo as string) ?? ''
+  editCategoria.value = (r.categoria as string) ?? 'General'
+  editLinea.value = (r.linea as string) ?? 'General'
+  editDescripcion.value = (r.descripcion as string) ?? ''
+  editTiempo.value = Number(r.tiempo_confeccion_min ?? 60)
+  editMano.value = Number(r.mano_obra ?? 0)
+  editCif.value = Number(r.cif_energia ?? 0)
+  editPrecio.value = Number((r.precio_venta ?? r.precio_venta_sugerido ?? 0) as number)
+  editRecomendaciones.value = (r.recomendaciones_taller as string) ?? ''
+  isEditing.value = true
+}
+
+function cancelEdit() {
+  isEditing.value = false
+}
+
+async function guardarEdicion() {
+  if (!props.receta || !recetaId.value) return
+  if (!editNombre.value.trim()) {
+    showToast('warn', 'Nombre requerido', 'Ingresá el nombre del modelo.')
+    return
+  }
+  saving.value = true
+  try {
+    const costosFijos = Number(editMano.value ?? 0) + Number(editCif.value ?? 0) + Number(totalInsumosReal.value ?? 0)
+    const payload = {
+      nombre: editNombre.value.trim(),
+      codigo: editCodigo.value.trim() || null,
+      categoria: editCategoria.value || null,
+      linea: editLinea.value || null,
+      descripcion: editDescripcion.value.trim() || null,
+      tiempo_confeccion_min: Number(editTiempo.value ?? 0),
+      mano_obra: Number(editMano.value ?? 0),
+      cif_energia: Number(editCif.value ?? 0),
+      precio_venta_sugerido: Number(editPrecio.value ?? 0),
+      costos_operativos_fijos: costosFijos,
+      recomendaciones_taller: editRecomendaciones.value.trim() || null,
+    }
+    const updated = await productosApi.updateProducto(recetaId.value, payload as unknown as Record<string, unknown>)
+    showToast('success', 'Ficha actualizada', `${updated.nombre} guardado.`)
+    isEditing.value = false
+    const mapped = { ...props.receta, ...payload, id: updated.id, codigo: (updated as unknown as Record<string,unknown>).codigo ?? editCodigo.value, precio_venta: editPrecio.value } as unknown as RecetaBOM
+    emit('guardado', mapped)
+    await cargarBom()
+  } catch (e: unknown) {
+    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+    const msg = Array.isArray(detail) ? (detail as { msg?: string }[]).map((d) => d.msg ?? JSON.stringify(d)).join('; ') : (detail as string ?? (e as Error)?.message ?? 'Error al guardar')
+    showToast('error', 'Error al guardar', String(msg))
+  } finally {
+    saving.value = false
+  }
+}
+
 watch(() => props.visible, (v) => {
   if (v) {
     void cargarInsumosOptions()
     void cargarBom()
+    if (props.startEditing) {
+      setTimeout(() => enterEdit(), 50)
+    } else {
+      isEditing.value = false
+    }
+  } else {
+    isEditing.value = false
   }
 })
 watch(() => props.receta?.id, () => {
   if (props.visible) void cargarBom()
 })
 
-// For REAL, map bomReal to display items with insumo names
 const insumosMap = computed(() => {
   const m = new Map<number, { nombre: string; costo: number; unidad: string }>()
   insumosOptions.value.forEach((o) => m.set(o.value, { nombre: o.label, costo: o.costo, unidad: o.unidad }))
@@ -104,8 +182,6 @@ const displayItems = computed(() => {
 
 const totalInsumosReal = computed(() => {
   if (costoReal.value) {
-    // costoReal.total includes fijos + BOM, but we want only insumos part for breakdown
-    // Use sum of displayItems for insumos, or if no BOM, fallback to costoReal minus fijos
     const sumBOM = displayItems.value.reduce((acc: number, it: unknown) => acc + Number((it as { subtotal: number }).subtotal ?? 0), 0)
     if (sumBOM > 0) return sumBOM
     return Number(costoReal.value.total ?? 0) - Number(props.receta?.cif_energia ?? 0) - Number(props.receta?.mano_obra ?? 0)
@@ -116,9 +192,8 @@ const totalInsumosReal = computed(() => {
 const costoTotalCalculado = computed(() => {
   if (isMock.value || !props.receta) return props.receta?.costo_total_unitario ?? 0
   const insumos = Number(totalInsumosReal.value ?? 0) || Number(props.receta.costo_insumos ?? 0)
-  const mano = Number(props.receta.mano_obra ?? 0)
-  const cif = Number(props.receta.cif_energia ?? 0)
-  // If BOM has items, use BOM total + mano + cif, else use stored costo_insumos + mano + cif
+  const mano = Number(isEditing.value ? editMano.value : props.receta.mano_obra ?? 0)
+  const cif = Number(isEditing.value ? editCif.value : props.receta.cif_energia ?? 0)
   const base = insumos > 0 ? insumos : Number(props.receta.costo_insumos ?? 0)
   return base + mano + cif
 })
@@ -126,7 +201,7 @@ const costoTotalCalculado = computed(() => {
 const markupCalculado = computed(() => {
   if (!props.receta) return 0
   const total = Number(costoTotalCalculado.value ?? 0)
-  const precio = Number(props.receta.precio_venta ?? 0)
+  const precio = Number(isEditing.value ? editPrecio.value : props.receta.precio_venta ?? 0)
   if (!precio) return 0
   return Math.round(((precio - total) / precio) * 100)
 })
@@ -189,14 +264,13 @@ function exportarMatriz() {
     :visible="visible"
     modal
     :style="{ width: '92vw', maxWidth: '980px' }"
-    :header="receta ? `${receta.nombre} (${receta.codigo})` : 'Ficha Técnica'"
+    :header="receta ? `${isEditing ? editNombre || receta.nombre : receta.nombre} (${isEditing ? editCodigo || receta.codigo : receta.codigo})` : 'Ficha Técnica'"
     @update:visible="(v) => emit('update:visible', v)"
   >
     <div v-if="receta" class="space-y-5 pt-1">
-      <!-- Subheader -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-800 pb-3">
         <div class="flex items-center gap-2">
-          <Tag severity="warning" class="font-bold tracking-wider text-xs uppercase">{{ receta.linea }}</Tag>
+          <Tag severity="warning" class="font-bold tracking-wider text-xs uppercase">{{ isEditing ? editLinea || receta.linea : receta.linea }}</Tag>
           <span class="text-xs text-stone-400 font-medium">Ficha Técnica Oficial de Taller • Arpía Atelier</span>
           <span v-if="!isMock" class="px-2 py-0.5 rounded-full text-[10px] font-bold border" :class="loadingBom ? 'bg-amber-950/40 text-amber-300 border-amber-500/30' : 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'">{{ loadingBom ? 'Cargando BOM...' : `BOM: ${bomReal.length} renglones` }}</span>
         </div>
@@ -205,25 +279,37 @@ function exportarMatriz() {
             <button type="button" class="px-3 py-1.5 rounded-md text-xs font-semibold transition" :class="activeTab === 'ficha' ? 'bg-amber-500 text-stone-950 shadow' : 'text-stone-400 hover:text-stone-200'" @click="activeTab = 'ficha'">📋 Ficha Técnica</button>
             <button type="button" class="px-3 py-1.5 rounded-md text-xs font-semibold transition" :class="activeTab === 'matriz' ? 'bg-amber-500 text-stone-950 shadow' : 'text-stone-400 hover:text-stone-200'" @click="activeTab = 'matriz'">📊 Matriz Google Sheet</button>
           </div>
-          <Button label="Editar" icon="pi pi-pencil" severity="warning" size="small" outlined @click="emit('editar', receta!)" />
+          <Button v-if="!isEditing" label="Editar" icon="pi pi-pencil" severity="warning" size="small" outlined @click="enterEdit()" />
+          <Button v-if="isEditing" label="Guardar" icon="pi pi-check" severity="success" size="small" :loading="saving" @click="guardarEdicion()" />
+          <Button v-if="isEditing" label="Cancelar" icon="pi pi-times" severity="secondary" size="small" outlined @click="cancelEdit()" />
           <Button label="Imprimir" icon="pi pi-print" severity="secondary" size="small" outlined @click="imprimir" />
         </div>
       </div>
 
-      <!-- TAB 1 -->
       <div v-if="activeTab === 'ficha'" class="space-y-5 animate-fade-in">
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 text-center">
+        <div v-if="!isEditing" class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 text-center">
           <div><div class="text-[11px] uppercase font-bold text-stone-400">Código Referencia</div><div class="text-sm font-mono font-bold text-amber-400 mt-0.5">{{ receta.codigo }}</div></div>
           <div><div class="text-[11px] uppercase font-bold text-stone-400">Línea / Categoría</div><div class="text-sm font-semibold text-stone-200 mt-0.5">{{ receta.categoria }}</div></div>
           <div><div class="text-[11px] uppercase font-bold text-stone-400">Tiempo Estimado</div><div class="text-sm font-semibold text-stone-200 mt-0.5">{{ receta.tiempo_confeccion_min }} min</div></div>
           <div><div class="text-[11px] uppercase font-bold text-stone-400">Costo Unitario</div><div class="text-sm font-bold text-emerald-400 mt-0.5">{{ formatCOP(costoTotalCalculado) }}</div></div>
         </div>
-
-        <div class="bg-stone-900/40 border border-stone-800/80 rounded-xl p-3 text-xs text-stone-300 leading-relaxed">
-          <strong class="text-amber-300">Descripción del Modelo:</strong> {{ receta.descripcion }}
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-stone-900/90 border border-amber-500/30 rounded-xl p-3.5">
+          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Código</label><input v-model="editCodigo" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-amber-400" placeholder="PRD-..." /></div>
+          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Categoría</label><input v-model="editCategoria" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm text-stone-200" /></div>
+          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Línea</label><input v-model="editLinea" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm text-stone-200" /></div>
+          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Tiempo (min)</label><input v-model.number="editTiempo" type="number" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-stone-200" /></div>
         </div>
 
-        <!-- Add BOM form (REAL only) -->
+        <div v-if="!isEditing" class="bg-stone-900/40 border border-stone-800/80 rounded-xl p-3 text-xs text-stone-300 leading-relaxed">
+          <strong class="text-amber-300">Descripción del Modelo:</strong> {{ receta.descripcion }}
+        </div>
+        <div v-else class="bg-stone-900/60 border border-amber-500/30 rounded-xl p-3">
+          <label class="block text-[11px] uppercase font-bold text-stone-400 mb-1.5">Nombre del Modelo</label>
+          <input v-model="editNombre" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-bold text-stone-100 mb-2" />
+          <label class="block text-[11px] uppercase font-bold text-stone-400 mb-1.5">Descripción del Modelo</label>
+          <textarea v-model="editDescripcion" rows="2" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-xs text-stone-300" placeholder="Detalles de patronaje..." />
+        </div>
+
         <div v-if="!isMock" class="border border-amber-500/30 bg-amber-950/10 rounded-xl p-3 space-y-3">
           <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 m-0 flex items-center gap-2"><i class="pi pi-plus" /> Agregar insumo al BOM</h4>
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -246,7 +332,6 @@ function exportarMatriz() {
           <p v-if="costoReal" class="text-[11px] text-stone-400">Costo total (backend): <span class="font-mono text-emerald-400 font-bold">{{ formatCOP(Number(costoReal.total ?? 0)) }}</span> — {{ costoReal.lineas.length }} líneas desglosadas</p>
         </div>
 
-        <!-- BOM Table -->
         <div class="border border-stone-800 rounded-xl overflow-hidden bg-stone-900/50">
           <div class="p-3 bg-stone-900/80 border-b border-stone-800 flex items-center justify-between">
             <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 m-0">Lista de Insumos & Escandallo (BOM)</h4>
@@ -297,17 +382,21 @@ function exportarMatriz() {
             <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 m-0 flex items-center gap-2"><i class="pi pi-dollar" /> Costeo & Fijación de Precio Sugerido</h4>
             <div class="space-y-2 text-xs divide-y divide-stone-800/60">
               <div class="flex justify-between py-1 text-stone-300"><span>(+) Costo Insumos Directos / Indirectos</span><span class="font-mono font-semibold">{{ formatCOP(isMock ? receta.costo_insumos : totalInsumosReal) }}</span></div>
-              <div class="flex justify-between py-1 text-stone-300"><span>(+) Mano de Obra ({{ receta.tiempo_confeccion_min }} min)</span><span class="font-mono font-semibold">{{ formatCOP(receta.mano_obra) }}</span></div>
-              <div class="flex justify-between py-1 text-stone-300"><span>(+) Costos CIF / Energía Eléctrica</span><span class="font-mono font-semibold">{{ formatCOP(receta.cif_energia) }}</span></div>
+              <div class="flex justify-between py-1 text-stone-300"><span>(+) Mano de Obra ({{ isEditing ? editTiempo : receta.tiempo_confeccion_min }} min)</span><span v-if="!isEditing" class="font-mono font-semibold">{{ formatCOP(receta.mano_obra) }}</span><input v-else v-model.number="editMano" type="number" class="w-24 bg-stone-950 border border-stone-700 rounded px-2 py-1 text-right font-mono text-stone-200" /></div>
+              <div class="flex justify-between py-1 text-stone-300"><span>(+) Costos CIF / Energía Eléctrica</span><span v-if="!isEditing" class="font-mono font-semibold">{{ formatCOP(receta.cif_energia) }}</span><input v-else v-model.number="editCif" type="number" class="w-24 bg-stone-950 border border-stone-700 rounded px-2 py-1 text-right font-mono text-stone-200" /></div>
               <div class="flex justify-between py-1.5 font-bold text-stone-100 bg-stone-950/40 px-2 rounded"><span>(=) Costo Unitario de Confección</span><span class="font-mono text-emerald-400">{{ formatCOP(costoTotalCalculado) }}</span></div>
-              <div class="flex justify-between py-2 items-center"><div><div class="font-bold text-amber-400 text-sm">PRECIO VENTA SUGERIDO</div><div class="text-[10px] text-stone-400">Margen comercial: {{ isMock ? receta.markup_pct : markupCalculado }}%</div></div><div class="font-mono text-lg font-extrabold text-amber-300">{{ formatCOP(receta.precio_venta) }}</div></div>
+              <div class="flex justify-between py-2 items-center"><div><div class="font-bold text-amber-400 text-sm">PRECIO VENTA SUGERIDO</div><div class="text-[10px] text-stone-400">Margen comercial: {{ isMock ? receta.markup_pct : markupCalculado }}%</div></div><div v-if="!isEditing" class="font-mono text-lg font-extrabold text-amber-300">{{ formatCOP(receta.precio_venta) }}</div><input v-else v-model.number="editPrecio" type="number" class="w-32 bg-stone-950 border border-amber-500/30 rounded px-2 py-1.5 text-right font-mono text-lg font-extrabold text-amber-300" /></div>
             </div>
           </div>
         </div>
 
-        <div class="bg-amber-950/20 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-200/90 flex items-start gap-2.5">
+        <div v-if="!isEditing" class="bg-amber-950/20 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-200/90 flex items-start gap-2.5">
           <i class="pi pi-info-circle text-amber-400 text-base flex-shrink-0 mt-0.5" />
           <div><strong class="text-amber-300 block mb-0.5">Recomendaciones del Taller para Confección:</strong> {{ receta.recomendaciones_taller }}</div>
+        </div>
+        <div v-else class="bg-amber-950/20 border border-amber-500/30 rounded-xl p-3">
+          <label class="block text-[11px] uppercase font-bold text-amber-300 mb-1.5">Recomendaciones del Taller</label>
+          <textarea v-model="editRecomendaciones" rows="2" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-xs text-amber-200/90" />
         </div>
       </div>
 
@@ -334,8 +423,8 @@ function exportarMatriz() {
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div class="bg-stone-900/90 border border-stone-800 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-stone-400">Costo Total Confección</div><div class="text-base font-mono font-bold text-stone-200 mt-1">{{ formatCOP(costoTotalCalculado) }}</div></div>
-          <div class="bg-stone-900/90 border border-amber-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-amber-400">Venta Sugerida Atelier</div><div class="text-base font-mono font-bold text-amber-300 mt-1">{{ formatCOP(receta.precio_venta) }}</div></div>
-          <div class="bg-stone-900/90 border border-emerald-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-emerald-400">Ganancia Neta Estimada</div><div class="text-base font-mono font-bold text-emerald-300 mt-1">{{ formatCOP(receta.precio_venta - costoTotalCalculado) }} ({{ isMock ? receta.markup_pct : markupCalculado }}%)</div></div>
+          <div class="bg-stone-900/90 border border-amber-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-amber-400">Venta Sugerida Atelier</div><div class="text-base font-mono font-bold text-amber-300 mt-1">{{ formatCOP(isEditing ? editPrecio : receta.precio_venta) }}</div></div>
+          <div class="bg-stone-900/90 border border-emerald-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-emerald-400">Ganancia Neta Estimada</div><div class="text-base font-mono font-bold text-emerald-300 mt-1">{{ formatCOP((isEditing ? editPrecio : receta.precio_venta) - costoTotalCalculado) }} ({{ isMock ? receta.markup_pct : markupCalculado }}%)</div></div>
         </div>
       </div>
     </div>

@@ -22,6 +22,7 @@ const showNuevaModal = ref(false)
 const showIaModal = ref(false)
 const recetaSeleccionada = ref<RecetaBOM | null>(null)
 const recetaEditar = ref<RecetaBOM | null>(null)
+const fichaStartEditing = ref(false)
 
 const categorias = [
   'Todos los Modelos',
@@ -89,12 +90,14 @@ function formatCOP(val: number) {
 
 function abrirFicha(r: RecetaBOM) {
   recetaSeleccionada.value = r
+  fichaStartEditing.value = false
   showFichaModal.value = true
 }
 
 function abrirEditar(r: RecetaBOM) {
-  recetaEditar.value = r
-  showNuevaModal.value = true
+  recetaSeleccionada.value = r
+  fichaStartEditing.value = true
+  showFichaModal.value = true
 }
 
 function abrirNueva() {
@@ -103,14 +106,19 @@ function abrirNueva() {
 }
 
 function handleFichaEditar(r: RecetaBOM) {
-  showFichaModal.value = false
-  recetaEditar.value = r
-  showNuevaModal.value = true
+  // legacy: now handled inside Ficha directly, keep for compat
+  recetaSeleccionada.value = r
+  fichaStartEditing.value = true
+  showFichaModal.value = true
 }
 
 async function handleRecetaGuardada() {
   if (!isMock.value) await cargarProductosReales()
   recetaEditar.value = null
+}
+async function handleFichaGuardada() {
+  if (!isMock.value) await cargarProductosReales()
+  fichaStartEditing.value = false
 }
 
 async function eliminarReceta(r: RecetaBOM) {
@@ -303,7 +311,7 @@ async function eliminarReceta(r: RecetaBOM) {
     </div>
 
     <!-- Modals -->
-    <FichaTecnicaModal v-model:visible="showFichaModal" :receta="recetaSeleccionada" @editar="handleFichaEditar" />
+    <FichaTecnicaModal v-model:visible="showFichaModal" :receta="recetaSeleccionada" :start-editing="fichaStartEditing" @editar="handleFichaEditar" @guardado="handleFichaGuardada" @update:visible="(v:boolean) => { if(!v) fichaStartEditing = false }" />
     <NuevaRecetaModal v-model:visible="showNuevaModal" :receta="recetaEditar" @receta-creada="handleRecetaGuardada" @receta-actualizada="handleRecetaGuardada" @update:visible="(v:boolean) => { if(!v) recetaEditar = null }" />
     <AsistenteIaModal v-model:visible="showIaModal" />
   </div>
