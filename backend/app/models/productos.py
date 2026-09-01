@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -38,6 +38,18 @@ class Producto(Base):
     precio_venta_sugerido: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
+    # Cabecera extendida 0020 — all nullable for backward compat
+    codigo: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
+    categoria: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    linea: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tiempo_confeccion_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    costo_insumos: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True)
+    mano_obra: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True)
+    cif_energia: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True)
+    markup_pct: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True)
+    recomendaciones_taller: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fases: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
 
     tipo_producto: Mapped[TipoProducto] = relationship(back_populates="productos")
     variantes: Mapped[list[VarianteProducto]] = relationship(

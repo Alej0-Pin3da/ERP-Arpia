@@ -7,6 +7,17 @@ export interface ProductoRead {
   requiere_fabricacion: boolean
   precio_venta_sugerido: number | string
   costos_operativos_fijos: number | string
+  codigo?: string | null
+  categoria?: string | null
+  linea?: string | null
+  descripcion?: string | null
+  tiempo_confeccion_min?: number | null
+  costo_insumos?: number | string | null
+  mano_obra?: number | string | null
+  cif_energia?: number | string | null
+  markup_pct?: number | string | null
+  recomendaciones_taller?: string | null
+  fases?: unknown | null
 }
 
 export interface ProductoCreate {
@@ -15,6 +26,17 @@ export interface ProductoCreate {
   requiere_fabricacion?: boolean
   precio_venta_sugerido?: number | string
   costos_operativos_fijos?: number | string
+  codigo?: string | null
+  categoria?: string | null
+  linea?: string | null
+  descripcion?: string | null
+  tiempo_confeccion_min?: number | null
+  costo_insumos?: number | string | null
+  mano_obra?: number | string | null
+  cif_energia?: number | string | null
+  markup_pct?: number | string | null
+  recomendaciones_taller?: string | null
+  fases?: unknown | null
 }
 
 export interface ProductoUpdate {
@@ -23,6 +45,17 @@ export interface ProductoUpdate {
   requiere_fabricacion?: boolean
   precio_venta_sugerido?: number | string
   costos_operativos_fijos?: number | string
+  codigo?: string | null
+  categoria?: string | null
+  linea?: string | null
+  descripcion?: string | null
+  tiempo_confeccion_min?: number | null
+  costo_insumos?: number | string | null
+  mano_obra?: number | string | null
+  cif_energia?: number | string | null
+  markup_pct?: number | string | null
+  recomendaciones_taller?: string | null
+  fases?: unknown | null
 }
 
 export interface TipoProductoRead {

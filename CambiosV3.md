@@ -565,3 +565,34 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 
 #### 6. Verificación
 - `npm run build` 168 módulos OK + `npm test` 70/70 + `node scripts/check-mock-leak.mjs` PASSED.
+
+---
+
+### [2026-08-30] — Migración 0020_productos_cabecera: 6 campos faltantes de Productos ahora persisten en REAL
+
+#### 1. Backend — Migración `0020_productos_cabecera` (`backend/alembic/versions/0020_productos_cabecera.py`)
+- **Tabla `Productos` +11 columnas nullable** (backward compat, índices + checks):
+  - `codigo VARCHAR(50) UNIQUE NULL` + `ix_productos_codigo`
+  - `categoria VARCHAR(100) NULL` + `ix_productos_categoria`
+  - `linea VARCHAR(100) NULL` + `ix_productos_linea`
+  - `descripcion TEXT NULL`
+  - `tiempo_confeccion_min INT NULL CHECK >=0`
+  - `costo_insumos NUMERIC(15,4) NULL CHECK >=0`
+  - `mano_obra NUMERIC(15,4) NULL CHECK >=0`
+  - `cif_energia NUMERIC(15,4) NULL CHECK >=0`
+  - `markup_pct NUMERIC(15,4) NULL CHECK 0-100`
+  - `recomendaciones_taller TEXT NULL`
+  - `fases JSONB NULL`
+  - Guards `_has_column` + `try/except` para constraints/índices idempotentes; downgrade revierte todo.
+
+#### 2. Backend — Modelos y Schemas
+- **`models/productos.py`**: `Producto` extendido con 11 `Mapped` cols nullable (`String/Text/Int/Numeric/JSONB`).
+- **`schemas/producto.py`**: `ProductoBase` + `ProductoUpdate` con 11 campos nuevos (`Field(...)` con `ge/le/max_length`), `ProductoRead` hereda todo vía `from_attributes`.
+
+#### 3. Frontend — Servicios y UI
+- **`services/api/productos.ts`**: `ProductoRead/Create/Update` con 11 campos nuevos tipados.
+- **`components/atelier/NuevaRecetaModal.vue`**: `guardar()` REAL ahora arma `basePayload` con los 6 campos reportados + `codigo/categoria/linea/descripcion/tiempo/markup/recomendaciones` + `costos_operativos_fijos` como suma; `PUT/POST /productos` persiste todo; `markupCalc` derivado; `codigo` input habilitado en REAL (ya no `disabled`).
+- **`views/ProductosView.vue`**: `recetasDisplay` mapea `p.categoria/linea/descripcion/tiempo_confeccion_min/costo_insumos/mano_obra/cif_energia/markup_pct/recomendaciones_taller/fases/codigo` sin hardcodear `General/60/0`; `costo_total_unitario` = suma 3 costos si vienen, sino `costos_operativos_fijos`; `FichaTecnica` ya refleja valores reales tras `F5`.
+
+#### 4. Verificación
+- `py_compile 0020 + models + schemas` OK; `npm run build` 168 OK + `npm test` 70/70. Migración aplica con `docker compose up --build` / `alembic upgrade head` cuando DB esté arriba (`localhost:5433` no alcanzable en este entorno offline, validado sintácticamente).

@@ -178,14 +178,26 @@ async function guardar() {
       } catch { tid = 1 }
     }
     const costosFijos = Number(costoInsumos.value ?? 0) + Number(manoObra.value ?? 0) + Number(cifEnergia.value ?? 0)
+    const markupCalc = precioVenta.value ? Math.round(((Number(precioVenta.value) - costosFijos) / Number(precioVenta.value)) * 100) : 0
+    const basePayload = {
+      nombre: nombre.value.trim(),
+      tipo_producto_id: tid!,
+      precio_venta_sugerido: Number(precioVenta.value ?? 0),
+      costos_operativos_fijos: costosFijos,
+      requiere_fabricacion: true,
+      codigo: codigo.value.trim() || null,
+      categoria: categoria.value || null,
+      linea: linea.value || null,
+      descripcion: descripcion.value.trim() || null,
+      tiempo_confeccion_min: Number(tiempoConfeccion.value ?? 0),
+      costo_insumos: Number(costoInsumos.value ?? 0),
+      mano_obra: Number(manoObra.value ?? 0),
+      cif_energia: Number(cifEnergia.value ?? 0),
+      markup_pct: markupCalc,
+      recomendaciones_taller: recomendaciones.value.trim() || null,
+    } as const
     if (isEditing.value && props.receta) {
-      const updated = await productosApi.updateProducto(props.receta.id, {
-        nombre: nombre.value.trim(),
-        tipo_producto_id: tid!,
-        precio_venta_sugerido: Number(precioVenta.value ?? 0),
-        costos_operativos_fijos: costosFijos,
-        requiere_fabricacion: true,
-      })
+      const updated = await productosApi.updateProducto(props.receta.id, basePayload)
       showToast('success', 'Producto actualizado', `${updated.nombre} actualizado correctamente.`)
       // Map to RecetaBOM for emit
       const mapped: RecetaBOM = {
@@ -208,13 +220,7 @@ async function guardar() {
       } as unknown as RecetaBOM
       emit('receta-actualizada', mapped)
     } else {
-      const created = await productosApi.createProducto({
-        nombre: nombre.value.trim(),
-        tipo_producto_id: tid!,
-        precio_venta_sugerido: Number(precioVenta.value ?? 0),
-        costos_operativos_fijos: costosFijos,
-        requiere_fabricacion: true,
-      })
+      const created = await productosApi.createProducto(basePayload)
       showToast('success', 'Producto creado', `${created.nombre} creado correctamente.`)
       const mapped: RecetaBOM = {
         id: created.id,
@@ -264,8 +270,8 @@ async function guardar() {
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Código Referencia</label>
-          <InputText v-model="codigo" placeholder="Ej: REC-ARP-09" class="w-full font-mono" :disabled="!isMock" />
-          <span v-if="!isMock" class="text-[10px] text-stone-500">Auto: PRD-{id} en modo REAL</span>
+          <InputText v-model="codigo" placeholder="Ej: REC-ARP-09" class="w-full font-mono" />
+          <span class="text-[10px] text-stone-500">Código único (opcional)</span>
         </div>
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Categoría</label>
