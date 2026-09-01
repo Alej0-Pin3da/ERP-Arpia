@@ -16,8 +16,8 @@ def upgrade() -> None:
     if not _has_table("precio_versions"):
         op.create_table("precio_versions",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("producto_id", sa.Integer(), sa.ForeignKey('"Productos".id', ondelete="CASCADE"), nullable=False),
-            sa.Column("variante_id", sa.Integer(), sa.ForeignKey('"Variantes_Producto".id', ondelete="CASCADE"), nullable=True),
+            sa.Column("producto_id", sa.Integer(), sa.ForeignKey("Productos.id", ondelete="CASCADE"), nullable=False),
+            sa.Column("variante_id", sa.Integer(), sa.ForeignKey("Variantes_Producto.id", ondelete="CASCADE"), nullable=True),
             sa.Column("precio", sa.Numeric(15,4), nullable=False),
             sa.Column("fecha_desde", sa.Date(), nullable=False),
             sa.Column("creado_por", sa.Integer(), nullable=True),
@@ -27,7 +27,7 @@ def upgrade() -> None:
     if not _has_table("costo_versions"):
         op.create_table("costo_versions",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("producto_id", sa.Integer(), sa.ForeignKey('"Productos".id', ondelete="CASCADE"), nullable=False),
+            sa.Column("producto_id", sa.Integer(), sa.ForeignKey("Productos.id", ondelete="CASCADE"), nullable=False),
             sa.Column("costo", sa.Numeric(15,4), nullable=False),
             sa.Column("fecha_desde", sa.Date(), nullable=False),
             sa.Column("creado_por", sa.Integer(), nullable=True),
