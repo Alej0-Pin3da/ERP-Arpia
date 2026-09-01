@@ -596,3 +596,21 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 
 #### 4. Verificación
 - `py_compile 0020 + models + schemas` OK; `npm run build` 168 OK + `npm test` 70/70. Migración aplica con `docker compose up --build` / `alembic upgrade head` cuando DB esté arriba (`localhost:5433` no alcanzable en este entorno offline, validado sintácticamente).
+
+---
+
+### [2026-08-30] — BOM Insumos wireado: Ficha Técnica con insumos reales + cálculo de costo
+
+#### 1. Nuevo servicio `src/services/api/bom.ts`
+- `BomInsumoRead/Create`, `CostoLineaRead/CostoProduccionRead`
+- `listBomInsumos(GET /productos/{id}/bom/insumos)`, `createBomInsumo(POST)`, `deleteBomInsumo(DELETE)`, `getCostoProduccion(GET /productos/{id}/costo)` tipados.
+
+#### 2. `src/components/atelier/FichaTecnicaModal.vue` — modo REAL con BOM
+- **State REAL:** `bomReal/costoReal/insumosOptions/loadingBom/newInsumoId/newCantidad/newDesperdicio` + `recetaId` computed.
+- **Carga:** `cargarInsumosOptions()` (`GET /insumos` 100) para Dropdown + `cargarBom()` (`GET /bom/insumos` + `GET /costo` en paralelo) en `watch(visible)` y `watch(receta.id)`.
+- **Display:** `displayItems` mapea `bomReal` con `insumosMap` (nombre/costo/unidad) + `cantidad * costo * (1+merma%) = subtotal`; en MOCK sigue `receta.items`. `totalInsumosReal` usa `costoReal.total` o suma subtotales.
+- **CRUD BOM:** form `Agregar insumo al BOM` (Dropdown insumo filter + cantidad + desperdicio% + `Agregar al BOM` → `POST /bom/insumos` con `insumo_id/cantidad_requerida/porcentaje_desperdicio`) + botón trash por renglón → `DELETE /bom/insumos/{id}` + reload + toasts 409/422.
+- **UI:** badge `BOM: N renglones` en header, empty-state `Sin renglones BOM`, footer `Total Insumos` usa `totalInsumosReal` en REAL, tabla con trash solo en REAL, `costoReal` hint con total backend.
+
+#### 3. Verificación
+- `npm run build` 168 OK + `npm test` 70/70. En REAL: crear producto → abrir Ficha → agregar 2-3 insumos → costo total se actualiza vía `GET /costo` y `F5` persiste BOM (Postgres). En MOCK sigue items mock sin API.
