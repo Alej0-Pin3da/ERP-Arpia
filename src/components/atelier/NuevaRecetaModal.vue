@@ -101,6 +101,12 @@ watch(() => props.receta, (r) => {
     categoria.value = r.categoria ?? 'Corsetería'
     linea.value = r.linea ?? 'Corsetería'
     descripcion.value = r.descripcion ?? ''
+    tiempoConfeccion.value = (r as any).tiempo_confeccion_min ?? 120
+    costoInsumos.value = (r as any).costo_insumos ?? 25000
+    manoObra.value = (r as any).mano_obra ?? 0
+    cifEnergia.value = (r as any).cif_energia ?? 1500
+    precioVenta.value = (r as any).precio_venta ?? (r as any).precio_venta_sugerido ?? 95000
+    recomendaciones.value = (r as any).recomendaciones_taller ?? ''
   }
 })
 
@@ -301,7 +307,7 @@ async function guardar() {
         <Textarea v-model="descripcion" rows="2" placeholder="Detalles de patronaje, copas, varillado y materiales." class="w-full" />
       </div>
 
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Tiempo (min)</label>
           <InputNumber v-model="tiempoConfeccion" :min="1" class="w-full font-mono" />
@@ -315,9 +321,17 @@ async function guardar() {
           <InputNumber v-model="manoObra" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono" />
         </div>
         <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">CIF / Energía ($)</label>
+          <InputNumber v-model="cifEnergia" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono" />
+        </div>
+        <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Precio Venta ($)</label>
           <InputNumber v-model="precioVenta" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono" />
         </div>
+      </div>
+      <div class="bg-stone-900/60 border border-stone-800 rounded-lg p-2.5 flex items-center justify-between text-xs">
+        <span class="text-stone-400 font-semibold uppercase tracking-wider">Costo total (Insumos + Mano + CIF)</span>
+        <span class="font-mono font-bold text-emerald-400 text-sm">$ {{ (Number(costoInsumos||0) + Number(manoObra||0) + Number(cifEnergia||0)).toLocaleString('es-CO') }}</span>
       </div>
 
       <div>
