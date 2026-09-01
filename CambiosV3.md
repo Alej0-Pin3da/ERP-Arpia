@@ -636,3 +636,17 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 
 #### 3. Verificación
 - `npm run build` 168 OK. En REAL: lápiz → Ficha abre ya en edición con todos los campos (código, categoría, tiempo, CIF, precio) editables + BOM, un solo Guardar persiste cabecera + precio en `PUT /productos` y refresca la grilla. Creación sigue vía `+ Nueva Receta`.
+
+---
+
+### [2026-08-31] — BOM edición inline: cantidad y desperdicio editables por renglón
+
+#### 1. `src/services/api/bom.ts`
+- Nuevo `updateBomInsumo(PUT /productos/{id}/bom/insumos/{lineaId})` tipado.
+
+#### 2. `src/components/atelier/FichaTecnicaModal.vue` — edición inline BOM
+- **State:** `editingBomId/editBomCantidad/editBomDesperdicio` + `startEditBom(bom)/cancelEditBom()/guardarEditBom(bom)` (PUT con `cantidad_requerida/porcentaje_desperdicio`, toast, reload `cargarBom()`).
+- **Template:** fila `displayItems` ahora con `editingBomId === bomId` muestra `input` para cantidad (step 0.1) y desperdicio% + `check/times` para Guardar/Cancelar; si no edita muestra `pencil` (editar) + `trash` (borrar). Fila en edición con `bg-amber-950/20`.
+
+#### 3. Verificación
+- `npm run build` 168 OK. En REAL: Ficha → lápiz en renglón → cambiá cantidad de 1.5 a 2.0 y desperdicio de 4% a 6% → check → `PUT 200` → costo total recalculado live + `F5` persiste.

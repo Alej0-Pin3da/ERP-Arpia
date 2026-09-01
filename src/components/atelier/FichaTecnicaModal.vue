@@ -50,6 +50,9 @@ const loadingBom = ref(false)
 const newInsumoId = ref<number | null>(null)
 const newCantidad = ref<number>(1)
 const newDesperdicio = ref<number>(0)
+const editingBomId = ref<number | null>(null)
+const editBomCantidad = ref<number>(1)
+const editBomDesperdicio = ref<number>(0)
 
 const recetaId = computed(() => (props.receta as unknown as { id: number })?.id)
 
@@ -258,6 +261,37 @@ async function eliminarInsumo(bomId: number) {
   }
 }
 
+function startEditBom(bom: bomApi.BomInsumoRead) {
+  editingBomId.value = bom.id
+  editBomCantidad.value = Number(bom.cantidad_requerida ?? 1)
+  editBomDesperdicio.value = Number(bom.porcentaje_desperdicio ?? 0)
+}
+
+function cancelEditBom() {
+  editingBomId.value = null
+}
+
+async function guardarEditBom(bom: bomApi.BomInsumoRead) {
+  if (!recetaId.value || editingBomId.value !== bom.id) return
+  if (Number(editBomCantidad.value) <= 0) {
+    showToast('warn', 'Cantidad inválida', 'Debe ser > 0.')
+    return
+  }
+  try {
+    await bomApi.updateBomInsumo(recetaId.value, bom.id, {
+      cantidad_requerida: Number(editBomCantidad.value),
+      porcentaje_desperdicio: Number(editBomDesperdicio.value ?? 0),
+    })
+    showToast('success', 'BOM actualizado', 'Cantidad y desperdicio guardados.')
+    editingBomId.value = null
+    await cargarBom()
+  } catch (e: unknown) {
+    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+    const msg = Array.isArray(detail) ? (detail as { msg?: string }[]).map((d) => d.msg ?? JSON.stringify(d)).join('; ') : (detail as string ?? (e as Error)?.message ?? 'Error al guardar')
+    showToast('error', 'Error al guardar', String(msg))
+  }
+}
+
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
 }
@@ -360,14 +394,29 @@ function exportarMatriz() {
                 <th class="py-2.5 px-3 font-semibold">Insumo / Material</th><th class="py-2.5 px-3 font-semibold">Tipo</th><th class="py-2.5 px-3 font-semibold text-right">Consumo Unit.</th><th class="py-2.5 px-3 font-semibold text-right">Merma %</th><th class="py-2.5 px-3 font-semibold text-right">Costo Unit.</th><th class="py-2.5 px-3 font-semibold text-right">Subtotal</th><th v-if="!isMock" class="py-2.5 px-3"></th>
               </tr></thead>
               <tbody class="divide-y divide-stone-800/50 text-stone-200">
-                <tr v-for="it in displayItems" :key="(it as any).id" class="hover:bg-stone-800/30">
+                <tr v-for="it in displayItems" :key="(it as any).id" class="hover:bg-stone-800/30" :class="editingBomId === (it as any).bomId ? 'bg-amber-950/20' : ''">
                   <td class="py-2.5 px-3 font-medium text-stone-100">{{ (it as any).nombre }}</td>
                   <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="(it as any).tipo === 'Directo' ? 'bg-amber-950/60 text-amber-300 border border-amber-500/30' : 'bg-stone-800 text-stone-400'">{{ (it as any).tipo }}</span></td>
-                  <td class="py-2.5 px-3 text-right font-mono">{{ (it as any).consumo_unitario }} {{ (it as any).unidad }}</td>
-                  <td class="py-2.5 px-3 text-right font-mono text-stone-400">{{ (it as any).merma_pct }}%</td>
+                  <td class="py-2.5 px-3 text-right font-mono">
+                    <span v-if="editingBomId !== (it as any).bomId">{{ (it as any).consumo_unitario }} {{ (it as any).unidad }}</span>
+                    <input v-else v-model.number="editBomCantidad" type="number" step="0.1" min="0.01" class="w-20 bg-stone-950 border border-amber-500/30 rounded px-1 py-0.5 text-right font-mono text-amber-300" />
+                  </td>
+                  <td class="py-2.5 px-3 text-right font-mono">
+                    <span v-if="editingBomId !== (it as any).bomId" class="text-stone-400">{{ (it as any).merma_pct }}%</span>
+                    <span v-else class="flex items-center justify-end gap-1"><input v-model.number="editBomDesperdicio" type="number" min="0" max="100" class="w-16 bg-stone-950 border border-amber-500/30 rounded px-1 py-0.5 text-right font-mono text-amber-300" />%</span>
+                  </td>
                   <td class="py-2.5 px-3 text-right font-mono">{{ formatCOP((it as any).costo_unitario) }}</td>
                   <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">{{ formatCOP((it as any).subtotal) }}</td>
-                  <td v-if="!isMock" class="py-2.5 px-3 text-right"><button type="button" class="text-stone-500 hover:text-red-400" title="Eliminar renglón" @click="eliminarInsumo((it as any).bomId ?? (it as any).id)"><i class="pi pi-trash text-xs" /></button></td>
+                  <td v-if="!isMock" class="py-2.5 px-3 text-right whitespace-nowrap">
+                    <template v-if="editingBomId !== (it as any).bomId">
+                      <button type="button" class="text-stone-500 hover:text-amber-400 p-1" title="Editar cantidad/desperdicio" @click="startEditBom(bomReal.find(b => b.id === (it as any).bomId)!)"><i class="pi pi-pencil text-xs" /></button>
+                      <button type="button" class="text-stone-500 hover:text-red-400 p-1" title="Eliminar renglón" @click="eliminarInsumo((it as any).bomId ?? (it as any).id)"><i class="pi pi-trash text-xs" /></button>
+                    </template>
+                    <template v-else>
+                      <button type="button" class="text-emerald-400 hover:text-emerald-300 p-1" title="Guardar" @click="guardarEditBom(bomReal.find(b => b.id === (it as any).bomId)!)"><i class="pi pi-check text-xs" /></button>
+                      <button type="button" class="text-stone-500 hover:text-stone-300 p-1" title="Cancelar" @click="cancelEditBom()"><i class="pi pi-times text-xs" /></button>
+                    </template>
+                  </td>
                 </tr>
               </tbody>
               <tfoot><tr class="bg-stone-950/70 border-t border-stone-800 font-bold">

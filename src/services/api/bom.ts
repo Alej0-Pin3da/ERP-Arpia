@@ -46,6 +46,11 @@ export async function createBomInsumo(productoId: number, payload: BomInsumoCrea
   return data
 }
 
+export async function updateBomInsumo(productoId: number, lineaId: number, payload: Partial<BomInsumoCreate>): Promise<BomInsumoRead> {
+  const { data } = await client.put<BomInsumoRead>(`/productos/${productoId}/bom/insumos/${lineaId}`, payload)
+  return data
+}
+
 export async function deleteBomInsumo(productoId: number, lineaId: number): Promise<void> {
   await client.delete(`/productos/${productoId}/bom/insumos/${lineaId}`)
 }
