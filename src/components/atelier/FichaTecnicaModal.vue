@@ -39,6 +39,9 @@ const editCif = ref(0)
 const editPrecio = ref(0)
 const editRecomendaciones = ref('')
 
+const categoriasOptions = ['Corsetería','Blusas y Tops','Conjuntos y Sets','Vestidos','Pantalones','Accesorios','Alta Costura','General']
+const lineasOptions = ['Corsetería', 'Prêt-à-Porter', 'Lencería Fina', 'Alta Costura', 'General']
+
 // REAL BOM state
 const bomReal = ref<bomApi.BomInsumoRead[]>([])
 const insumosOptions = ref<{ label: string; value: number; costo: number; unidad: string }[]>([])
@@ -295,8 +298,8 @@ function exportarMatriz() {
         </div>
         <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-stone-900/90 border border-amber-500/30 rounded-xl p-3.5">
           <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Código</label><input v-model="editCodigo" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-amber-400" placeholder="PRD-..." /></div>
-          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Categoría</label><input v-model="editCategoria" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm text-stone-200" /></div>
-          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Línea</label><input v-model="editLinea" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm text-stone-200" /></div>
+          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Categoría</label><Dropdown v-model="editCategoria" :options="categoriasOptions" class="w-full" /></div>
+          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Línea</label><Dropdown v-model="editLinea" :options="lineasOptions" class="w-full" /></div>
           <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Tiempo (min)</label><input v-model.number="editTiempo" type="number" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-stone-200" /></div>
         </div>
 
