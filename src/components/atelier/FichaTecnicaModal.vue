@@ -103,8 +103,32 @@ const displayItems = computed(() => {
 })
 
 const totalInsumosReal = computed(() => {
-  if (costoReal.value) return Number(costoReal.value.total ?? 0)
+  if (costoReal.value) {
+    // costoReal.total includes fijos + BOM, but we want only insumos part for breakdown
+    // Use sum of displayItems for insumos, or if no BOM, fallback to costoReal minus fijos
+    const sumBOM = displayItems.value.reduce((acc: number, it: unknown) => acc + Number((it as { subtotal: number }).subtotal ?? 0), 0)
+    if (sumBOM > 0) return sumBOM
+    return Number(costoReal.value.total ?? 0) - Number(props.receta?.cif_energia ?? 0) - Number(props.receta?.mano_obra ?? 0)
+  }
   return displayItems.value.reduce((acc: number, it: unknown) => acc + Number((it as { subtotal: number }).subtotal ?? 0), 0)
+})
+
+const costoTotalCalculado = computed(() => {
+  if (isMock.value || !props.receta) return props.receta?.costo_total_unitario ?? 0
+  const insumos = Number(totalInsumosReal.value ?? 0) || Number(props.receta.costo_insumos ?? 0)
+  const mano = Number(props.receta.mano_obra ?? 0)
+  const cif = Number(props.receta.cif_energia ?? 0)
+  // If BOM has items, use BOM total + mano + cif, else use stored costo_insumos + mano + cif
+  const base = insumos > 0 ? insumos : Number(props.receta.costo_insumos ?? 0)
+  return base + mano + cif
+})
+
+const markupCalculado = computed(() => {
+  if (!props.receta) return 0
+  const total = Number(costoTotalCalculado.value ?? 0)
+  const precio = Number(props.receta.precio_venta ?? 0)
+  if (!precio) return 0
+  return Math.round(((precio - total) / precio) * 100)
 })
 
 async function agregarInsumo() {
@@ -192,7 +216,7 @@ function exportarMatriz() {
           <div><div class="text-[11px] uppercase font-bold text-stone-400">Código Referencia</div><div class="text-sm font-mono font-bold text-amber-400 mt-0.5">{{ receta.codigo }}</div></div>
           <div><div class="text-[11px] uppercase font-bold text-stone-400">Línea / Categoría</div><div class="text-sm font-semibold text-stone-200 mt-0.5">{{ receta.categoria }}</div></div>
           <div><div class="text-[11px] uppercase font-bold text-stone-400">Tiempo Estimado</div><div class="text-sm font-semibold text-stone-200 mt-0.5">{{ receta.tiempo_confeccion_min }} min</div></div>
-          <div><div class="text-[11px] uppercase font-bold text-stone-400">Costo Unitario</div><div class="text-sm font-bold text-emerald-400 mt-0.5">{{ formatCOP(receta.costo_total_unitario) }}</div></div>
+          <div><div class="text-[11px] uppercase font-bold text-stone-400">Costo Unitario</div><div class="text-sm font-bold text-emerald-400 mt-0.5">{{ formatCOP(costoTotalCalculado) }}</div></div>
         </div>
 
         <div class="bg-stone-900/40 border border-stone-800/80 rounded-xl p-3 text-xs text-stone-300 leading-relaxed">
@@ -275,8 +299,8 @@ function exportarMatriz() {
               <div class="flex justify-between py-1 text-stone-300"><span>(+) Costo Insumos Directos / Indirectos</span><span class="font-mono font-semibold">{{ formatCOP(isMock ? receta.costo_insumos : totalInsumosReal) }}</span></div>
               <div class="flex justify-between py-1 text-stone-300"><span>(+) Mano de Obra ({{ receta.tiempo_confeccion_min }} min)</span><span class="font-mono font-semibold">{{ formatCOP(receta.mano_obra) }}</span></div>
               <div class="flex justify-between py-1 text-stone-300"><span>(+) Costos CIF / Energía Eléctrica</span><span class="font-mono font-semibold">{{ formatCOP(receta.cif_energia) }}</span></div>
-              <div class="flex justify-between py-1.5 font-bold text-stone-100 bg-stone-950/40 px-2 rounded"><span>(=) Costo Unitario de Confección</span><span class="font-mono text-emerald-400">{{ formatCOP(receta.costo_total_unitario) }}</span></div>
-              <div class="flex justify-between py-2 items-center"><div><div class="font-bold text-amber-400 text-sm">PRECIO VENTA SUGERIDO</div><div class="text-[10px] text-stone-400">Margen comercial: {{ receta.markup_pct }}%</div></div><div class="font-mono text-lg font-extrabold text-amber-300">{{ formatCOP(receta.precio_venta) }}</div></div>
+              <div class="flex justify-between py-1.5 font-bold text-stone-100 bg-stone-950/40 px-2 rounded"><span>(=) Costo Unitario de Confección</span><span class="font-mono text-emerald-400">{{ formatCOP(costoTotalCalculado) }}</span></div>
+              <div class="flex justify-between py-2 items-center"><div><div class="font-bold text-amber-400 text-sm">PRECIO VENTA SUGERIDO</div><div class="text-[10px] text-stone-400">Margen comercial: {{ isMock ? receta.markup_pct : markupCalculado }}%</div></div><div class="font-mono text-lg font-extrabold text-amber-300">{{ formatCOP(receta.precio_venta) }}</div></div>
             </div>
           </div>
         </div>
@@ -309,9 +333,9 @@ function exportarMatriz() {
           </table>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div class="bg-stone-900/90 border border-stone-800 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-stone-400">Costo Total Confección</div><div class="text-base font-mono font-bold text-stone-200 mt-1">{{ formatCOP(receta.costo_total_unitario) }}</div></div>
+          <div class="bg-stone-900/90 border border-stone-800 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-stone-400">Costo Total Confección</div><div class="text-base font-mono font-bold text-stone-200 mt-1">{{ formatCOP(costoTotalCalculado) }}</div></div>
           <div class="bg-stone-900/90 border border-amber-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-amber-400">Venta Sugerida Atelier</div><div class="text-base font-mono font-bold text-amber-300 mt-1">{{ formatCOP(receta.precio_venta) }}</div></div>
-          <div class="bg-stone-900/90 border border-emerald-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-emerald-400">Ganancia Neta Estimada</div><div class="text-base font-mono font-bold text-emerald-300 mt-1">{{ formatCOP(receta.precio_venta - receta.costo_total_unitario) }} ({{ receta.markup_pct }}%)</div></div>
+          <div class="bg-stone-900/90 border border-emerald-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-emerald-400">Ganancia Neta Estimada</div><div class="text-base font-mono font-bold text-emerald-300 mt-1">{{ formatCOP(receta.precio_venta - costoTotalCalculado) }} ({{ isMock ? receta.markup_pct : markupCalculado }}%)</div></div>
         </div>
       </div>
     </div>
