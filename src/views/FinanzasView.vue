@@ -20,6 +20,7 @@ import { showToast } from '@/utils/toast'
 import { useMode } from '@/composables/useMode'
 import { useSocios } from '@/composables/useSocios'
 import { useFinanzas } from '@/composables/useFinanzas'
+import * as movimientosApi from '@/services/api/movimientos'
 
 const atelier = useAtelierStore()
 const { isMock } = useMode()
@@ -30,6 +31,7 @@ const finanzasApi = useFinanzas()
 const sociasReal = ref<SociaAtelier[]>([])
 const liquidacionesReal = ref<LiquidacionSocias[]>([])
 const anticiposReal = ref<AnticipoSocia[]>([])
+const movimientosReal = ref<movimientosApi.MovimientoRead[]>([])
 const cargandoReal = ref(false)
 
 function normalizeSocia(raw: Record<string, unknown>): SociaAtelier {
@@ -105,14 +107,16 @@ async function cargarDatosReales() {
   if (isMock.value) return
   cargandoReal.value = true
   try {
-    const [socRes, liqRes, antRes] = await Promise.all([
+    const [socRes, liqRes, antRes, movRes] = await Promise.all([
       sociosApi.list({ limit: 100, offset: 0 }),
       finanzasApi.listLiquidaciones({ limit: 100, offset: 0 }),
       finanzasApi.listAnticipos({ limit: 100, offset: 0 }),
+      movimientosApi.listMovimientos({ limit: 100, offset: 0 }).catch(() => ({ items: [], total: 0 })),
     ])
     sociasReal.value = (socRes.items as unknown as Record<string, unknown>[]).map(normalizeSocia)
     liquidacionesReal.value = (liqRes.items as unknown as Record<string, unknown>[]).map(normalizeLiquidacion)
     anticiposReal.value = (antRes.items as unknown as Record<string, unknown>[]).map(normalizeAnticipo)
+    movimientosReal.value = (movRes.items as unknown as movimientosApi.MovimientoRead[]) ?? []
   } catch {
     // keep atelier fallback on error
   } finally {
@@ -132,15 +136,18 @@ watch(isMock, () => {
 const sociasList = computed<SociaAtelier[]>(() => (isMock.value ? (atelier.socias as unknown as SociaAtelier[]) : sociasReal.value))
 const liquidacionesList = computed<LiquidacionSocias[]>(() => (isMock.value ? (atelier.liquidaciones as unknown as LiquidacionSocias[]) : liquidacionesReal.value))
 const anticiposList = computed<AnticipoSocia[]>(() => (isMock.value ? (atelier.anticipos as unknown as AnticipoSocia[]) : anticiposReal.value))
+const movimientosList = computed<movimientosApi.MovimientoRead[]>(() => (isMock.value ? [] : movimientosReal.value))
 
 // Subtabs
-type TabType = 'liquidaciones' | 'socias' | 'anticipos' | 'simulador'
+type TabType = 'liquidaciones' | 'socias' | 'anticipos' | 'movimientos' | 'simulador'
 const activeTab = ref<TabType>('liquidaciones')
 
 // Search and Filter states
 const searchLiquidaciones = ref('')
 const filterEstadoLiquidacion = ref('TODOS')
 const searchAnticipos = ref('')
+const filterMovTipo = ref('TODOS')
+const filterMovEstado = ref('TODOS')
 
 // Modals state
 const showNuevaLiqModal = ref(false)
@@ -227,6 +234,34 @@ const anticiposFiltrados = computed(() => {
 
   return list
 })
+
+// Movimientos — solo-lectura; el backend soporta filtros tipo/estado (sin rango de fechas)
+const movimientosFiltrados = computed(() => {
+  let list = [...movimientosList.value]
+  if (filterMovTipo.value !== 'TODOS') {
+    list = list.filter((m) => m.tipo === filterMovTipo.value)
+  }
+  if (filterMovEstado.value !== 'TODOS') {
+    list = list.filter((m) => m.estado === filterMovEstado.value)
+  }
+  return list
+})
+
+async function recargarMovimientos() {
+  if (isMock.value) return
+  try {
+    const r = await movimientosApi.listMovimientos({
+      limit: 100,
+      offset: 0,
+      ...(filterMovTipo.value !== 'TODOS' ? { tipo: filterMovTipo.value as 'Gasto' | 'Inversion' | 'Retiro' } : {}),
+      ...(filterMovEstado.value !== 'TODOS' ? { estado: filterMovEstado.value as 'draft' | 'confirmed' | 'cancelled' | 'reversed' } : {}),
+    })
+    movimientosReal.value = r.items ?? []
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Error al cargar movimientos'
+    showToast('error', 'Error', msg)
+  }
+}
 
 // Total % of active socias (real or mock)
 const sumaPorcentajesSocias = computed(() => {
@@ -583,6 +618,15 @@ function imprimirBalance() {
       >
         <i class="pi pi-dollar" />
         Anticipos & Retiros ({{ anticiposList.length }})
+      </button>
+
+      <button
+        class="px-4 py-2 rounded-t-lg transition-all flex items-center gap-2 font-bold cursor-pointer"
+        :class="activeTab === 'movimientos' ? 'bg-amber-500/10 text-amber-300 border-b-2 border-amber-400' : 'text-stone-400 hover:text-stone-200'"
+        @click="activeTab = 'movimientos'"
+      >
+        <i class="pi pi-wallet" />
+        Movimientos ({{ movimientosList.length }})
       </button>
 
       <button
@@ -996,7 +1040,95 @@ function imprimirBalance() {
       </div>
     </div>
 
-    <!-- TAB 4: SIMULADOR DE PUNTO DE EQUILIBRIO TEXTIL -->
+    <!-- TAB 4: MOVIMIENTOS FINANCIEROS (solo-lectura) -->
+    <div v-if="activeTab === 'movimientos'" class="space-y-4">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-stone-900/60 p-3.5 rounded-xl border border-stone-800 text-xs font-mono">
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <span class="text-stone-400 text-xs font-mono">Tipo:</span>
+          <Dropdown
+            v-model="filterMovTipo"
+            :options="[
+              { label: 'Todos', value: 'TODOS' },
+              { label: 'Gasto', value: 'Gasto' },
+              { label: 'Inversión', value: 'Inversion' },
+              { label: 'Retiro', value: 'Retiro' },
+            ]"
+            option-label="label"
+            option-value="value"
+            class="text-xs w-36"
+            @change="recargarMovimientos"
+          />
+          <span class="text-stone-400 text-xs font-mono">Estado:</span>
+          <Dropdown
+            v-model="filterMovEstado"
+            :options="[
+              { label: 'Todos', value: 'TODOS' },
+              { label: 'Borrador', value: 'draft' },
+              { label: 'Confirmado', value: 'confirmed' },
+              { label: 'Anulado', value: 'cancelled' },
+              { label: 'Revertido', value: 'reversed' },
+            ]"
+            option-label="label"
+            option-value="value"
+            class="text-xs w-36"
+            @change="recargarMovimientos"
+          />
+        </div>
+        <Button
+          label="Recargar"
+          icon="pi pi-refresh"
+          size="small"
+          severity="secondary"
+          outlined
+          class="text-xs"
+          @click="recargarMovimientos"
+        />
+      </div>
+
+      <div v-if="isMock" class="rounded-2xl border border-stone-800 bg-stone-900/40 p-8 text-center">
+        <i class="pi pi-inbox text-2xl mb-2 block text-stone-500" />
+        <p class="text-sm font-bold text-stone-300">Sin movimientos en modo MOCK</p>
+        <p class="text-xs text-stone-400 mt-1">Los movimientos financieros viven en <code>GET /api/v1/finanzas/movimientos</code> (Postgres).</p>
+      </div>
+
+      <div v-else class="rounded-2xl border border-stone-800 bg-stone-900/40 backdrop-blur-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse font-mono">
+            <thead>
+              <tr class="bg-stone-950/90 border-b border-stone-800 text-[10px] uppercase text-stone-400">
+                <th class="py-3 px-4">Fecha</th>
+                <th class="py-3 px-4">Tipo</th>
+                <th class="py-3 px-4">Descripción</th>
+                <th class="py-3 px-3 text-right">Monto</th>
+                <th class="py-3 px-3 text-center">Estado</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-800/60">
+              <tr v-for="m in movimientosFiltrados" :key="m.id" class="hover:bg-stone-800/30">
+                <td class="py-3 px-4 text-stone-300">{{ m.fecha }}</td>
+                <td class="py-3 px-4 text-amber-300 font-bold">{{ m.tipo }}</td>
+                <td class="py-3 px-4 text-stone-300">{{ m.descripcion }}</td>
+                <td class="py-3 px-3 text-right font-bold text-stone-100">{{ formatCOP(Number(m.monto ?? 0)) }}</td>
+                <td class="py-3 px-3 text-center">
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border"
+                    :class="m.estado === 'confirmed' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : m.estado === 'draft' ? 'bg-stone-800 text-stone-400 border-stone-700' : 'bg-rose-950 text-rose-400 border-rose-800'">
+                    {{ m.estado }}
+                  </span>
+                </td>
+              </tr>
+              <tr v-if="!movimientosFiltrados.length">
+                <td colspan="5" class="py-8 text-center text-stone-500">
+                  <i class="pi pi-inbox text-2xl mb-2 block" />
+                  Sin movimientos con los filtros actuales.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: SIMULADOR DE PUNTO DE EQUILIBRIO TEXTIL -->
     <div v-if="activeTab === 'simulador'" class="rounded-2xl border border-amber-500/20 bg-stone-900/60 p-6 space-y-5">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-800 pb-3">
         <div>

@@ -756,6 +756,12 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - Título `auditoria: 'Auditoría Fiscal & Cierres'` en el `routeTitle` map de `AppLayout`.
 - Sin item de navegación: `MENU_ITEMS` (`src/utils/menu.ts`, fuente única del menú) no incluye `omisiones` visible, por lo que —según alcance— tampoco se agrega `auditoría`; la vista es accesible por URL directa `/auditoria`.
 
+### [2026-09-03] — P1-2: tab Movimientos financieros
+
+- **Servicio nuevo `src/services/api/movimientos.ts`:** tipos `MovimientoRead` / `ListMovimientosParams` (tipo, estado, limit, offset, sort_by, order) / `MovimientoStateTransition` + `listMovimientos` (`GET /finanzas/movimientos` → `{items,total}`) y `transitionMovimiento` (`PATCH /finanzas/movimientos/{id}/state`). Verificado contra `backend/app/api/routes/finanzas.py`: filtros `tipo` (Gasto|Inversion|Retiro) y `estado` (draft|confirmed|cancelled|reversed); sin filtro por fecha.
+- **`src/views/FinanzasView.vue`:** nuevo tab `Movimientos` solo-lectura con Dropdowns tipo/estado + tabla fecha/tipo/descripción/monto/estado + empty-state en MOCK. Branch `isMock ? [] : movimientosReal`.
+- Verificación: `npm run build` OK + `npm test` 70/70.
+
 ### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
 
 #### 1. Migración `0021_backfill_costo_insumos` (`backend/alembic/versions/0021_backfill_costo_insumos.py`)
