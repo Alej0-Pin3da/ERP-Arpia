@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
+import Dropdown from 'primevue/dropdown'
 import { useMode } from '@/composables/useMode'
+import { showToast } from '@/utils/toast'
 import * as devolucionesApi from '@/services/api/devoluciones'
 
 const { isMock } = useMode()
@@ -37,17 +42,111 @@ const devolucionesDisplay = computed(() => isMock.value ? devoluciones.value : (
   estado: d.estado || 'Registrada',
   fecha: d.creado_en || '',
 })) : []))
+
+// --- Create devolucion (P0-1) ---
+const showCreateDialog = ref(false)
+const saving = ref(false)
+const formVentaId = ref<number | null>(null)
+const formTipo = ref<'total' | 'parcial'>('total')
+const formMotivo = ref('')
+const formProductoId = ref<number | null>(null)
+const formCantidad = ref<number>(1)
+const formPrecio = ref<number>(0)
+const tipoOptions = [
+  { label: 'Total (cancela la venta completa)', value: 'total' },
+  { label: 'Parcial (requiere al menos un ítem)', value: 'parcial' },
+]
+
+function openCreateDialog() {
+  formVentaId.value = null
+  formTipo.value = 'total'
+  formMotivo.value = ''
+  formProductoId.value = null
+  formCantidad.value = 1
+  formPrecio.value = 0
+  showCreateDialog.value = true
+}
+
+function extractDetail(e: unknown): string {
+  const axiosDetail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+  if (Array.isArray(axiosDetail)) {
+    return axiosDetail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ')
+  }
+  if (typeof axiosDetail === 'string' && axiosDetail) return axiosDetail
+  if (e instanceof Error && e.message) return e.message
+  return 'No se pudo registrar la devolución'
+}
+
+async function submitCreate() {
+  if (!formVentaId.value || formVentaId.value <= 0) {
+    showToast('warn', 'Campo requerido', 'Indicá el ID de la venta a devolver.')
+    return
+  }
+  if (formTipo.value === 'parcial' && (!formProductoId.value || formProductoId.value <= 0)) {
+    showToast('warn', 'Campo requerido', 'La devolución parcial requiere al menos un ítem (ID de producto).')
+    return
+  }
+  saving.value = true
+  try {
+    const payload: devolucionesApi.DevolucionCreatePayload = {
+      venta_id: Number(formVentaId.value),
+      tipo: formTipo.value,
+      motivo: formMotivo.value.trim() || null,
+      items: formTipo.value === 'parcial'
+        ? [{
+            producto_id: Number(formProductoId.value),
+            cantidad: Number(formCantidad.value),
+            precio_unitario: Number(formPrecio.value),
+          }]
+        : null,
+    }
+    if (isMock.value) {
+      const nextId = devoluciones.value.length
+        ? Math.max(...devoluciones.value.map((d) => d.id)) + 1
+        : 1
+      devoluciones.value.unshift({
+        id: nextId,
+        codigo: `GAR-${String(nextId).padStart(3, '0')}`,
+        prenda: `Venta #${payload.venta_id}`,
+        cliente: `Cliente ${payload.venta_id}`,
+        motivo: payload.motivo || 'Ajuste Atelier',
+        tipo: payload.tipo === 'total' ? 'Devolución total' : 'Devolución parcial',
+        estado: 'Registrada',
+        fecha: new Date().toISOString().split('T')[0],
+      })
+      showToast('success', 'Devolución registrada', `Garantía GAR-${String(nextId).padStart(3, '0')} creada en modo MOCK.`)
+    } else {
+      const created = await devolucionesApi.createDevolucion(payload)
+      showToast('success', 'Devolución registrada', `Devolución #${created.id} creada para la venta #${payload.venta_id}.`)
+      await cargarDevolucionesReales()
+    }
+    showCreateDialog.value = false
+  } catch (e: unknown) {
+    showToast('error', 'Error al registrar', extractDetail(e))
+  } finally {
+    saving.value = false
+  }
+}
 </script>
 
 <template>
   <div class="space-y-6">
-    <div class="border-b border-stone-800 pb-4">
-      <h1 class="text-2xl font-serif font-bold text-amber-300 tracking-wide">
-        Garantías & Ajustes de Taller
-      </h1>
-      <p class="text-xs text-stone-400 mt-1 font-mono">
-        Control de calce, adaptaciones post-entrega y garantías de corsetería de autor.
-      </p>
+    <div class="border-b border-stone-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <h1 class="text-2xl font-serif font-bold text-amber-300 tracking-wide">
+          Garantías & Ajustes de Taller
+        </h1>
+        <p class="text-xs text-stone-400 mt-1 font-mono">
+          Control de calce, adaptaciones post-entrega y garantías de corsetería de autor.
+        </p>
+      </div>
+      <Button
+        label="Registrar devolución"
+        icon="pi pi-plus"
+        size="small"
+        class="p-button-warning text-xs font-semibold"
+        @click="openCreateDialog"
+      />
     </div>
 
     <div class="rounded-2xl border border-stone-800 bg-stone-900/40 p-6 space-y-4">
@@ -83,5 +182,70 @@ const devolucionesDisplay = computed(() => isMock.value ? devoluciones.value : (
         </tbody>
       </table>
     </div>
+
+    <Dialog
+      v-model:visible="showCreateDialog"
+      modal
+      header="Registrar devolución"
+      :style="{ width: '90vw', maxWidth: '480px' }"
+    >
+      <div class="space-y-3 pt-2 text-xs">
+        <div class="flex flex-col gap-1">
+          <label class="font-semibold text-stone-300">ID de venta *</label>
+          <InputText v-model.number="formVentaId" type="number" min="1" placeholder="Ej. 12" class="text-xs" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="font-semibold text-stone-300">Tipo *</label>
+          <Dropdown
+            v-model="formTipo"
+            :options="tipoOptions"
+            option-label="label"
+            option-value="value"
+            class="text-xs w-full"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="font-semibold text-stone-300">Motivo</label>
+          <InputText v-model="formMotivo" placeholder="Motivo de la devolución" class="text-xs" />
+        </div>
+        <div v-if="formTipo === 'parcial'" class="grid grid-cols-3 gap-2 border-t border-stone-800 pt-3">
+          <div class="flex flex-col gap-1">
+            <label class="font-semibold text-stone-300">Producto ID *</label>
+            <InputText v-model.number="formProductoId" type="number" min="1" placeholder="Ej. 5" class="text-xs" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="font-semibold text-stone-300">Cantidad *</label>
+            <InputText v-model.number="formCantidad" type="number" :min="1" class="text-xs" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="font-semibold text-stone-300">Precio unit.</label>
+            <InputText v-model.number="formPrecio" type="number" :min="0" class="text-xs" />
+          </div>
+          <p class="col-span-3 text-[11px] text-stone-500 font-mono">
+            El precio final se recalcula desde la venta original en el backend.
+          </p>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-stone-800">
+          <Button
+            label="Cancelar"
+            icon="pi pi-times"
+            size="small"
+            class="p-button-text p-button-secondary text-xs"
+            :disabled="saving"
+            @click="showCreateDialog = false"
+          />
+          <Button
+            label="Guardar devolución"
+            icon="pi pi-check"
+            size="small"
+            class="p-button-warning text-xs font-semibold"
+            :loading="saving"
+            @click="submitCreate"
+          />
+        </div>
+      </template>
+    </Dialog>
   </div>
 </template>

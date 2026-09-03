@@ -728,6 +728,17 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 
 ---
 
+### [2026-09-03] — P0-3 + P0-1 (AnalisisFull.md): rol fiscal + crear devolución
+
+#### 1. P0-3 — `POST /audit-fiscal/*` exigía rol `gerente` inexistente (`backend/app/api/routes/audit_fiscal.py`)
+- `require_roles("admin", "gerente")` → `require_roles("admin")` en los 3 POST (`precio-versions`, `costo-versions`, `cierres`). Decisión: `gerente` no existe en `models/usuarios.py` (`ck_usuarios_rol` = admin/operador/consulta), ni en `schemas/usuario.py` (`VALID_ROLES`), ni en seed (`seeder.py` solo crea admin), ni en frontend → cablear era inventar un rol; fix mínimo = restringir a `admin`.
+- Verificación: `python -m py_compile` OK + búsqueda `gerente` en `backend/` y `src/` sin resultados.
+
+#### 2. P0-1 — Devoluciones sin crear (`src/services/api/devoluciones.ts`, `src/views/DevolucionesView.vue`)
+- Servicio: nuevos tipos `DevolucionItemCreate` / `DevolucionCreatePayload` (venta_id, tipo total|parcial, motivo, items) + `createDevolucion` (`POST /devoluciones`) y `transitionDevolucion` (`PATCH /devoluciones/{id}/state`), espejo de `backend/app/schemas/devoluciones.py` (`parcial` exige items).
+- Vista: botón `Registrar devolución` + `Dialog` PrimeVue (venta_id, tipo Dropdown total/parcial, motivo, fila producto_id/cantidad/precio solo si parcial) + `submitCreate`: en MOCK hace `unshift` al ref local (atelier no tiene colección de devoluciones); en REAL llama `createDevolucion` y recarga `listDevoluciones`; error con `detail` del backend vía `showToast('error', ...)`.
+- Verificación: `npm run build` OK (vite 4.26s + esbuild server.mjs).
+
 ### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
 
 #### 1. Migración `0021_backfill_costo_insumos` (`backend/alembic/versions/0021_backfill_costo_insumos.py`)

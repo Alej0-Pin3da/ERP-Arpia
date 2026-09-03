@@ -27,7 +27,7 @@ def list_precios(producto_id: int | None = None, db: Session = Depends(get_db)):
     if producto_id: q = q.filter(PrecioVersion.producto_id == producto_id)
     return q.order_by(PrecioVersion.fecha_desde.desc()).all()
 
-@router.post("/precio-versions", dependencies=[Depends(require_roles("admin", "gerente"))])
+@router.post("/precio-versions", dependencies=[Depends(require_roles("admin"))])
 def create_precio(payload: PrecioVersionCreate, db: Session = Depends(get_db)):
     row = PrecioVersion(**payload.model_dump())
     db.add(row); db.commit(); db.refresh(row)
@@ -39,7 +39,7 @@ def list_costos(producto_id: int | None = None, db: Session = Depends(get_db)):
     if producto_id: q = q.filter(CostoVersion.producto_id == producto_id)
     return q.order_by(CostoVersion.fecha_desde.desc()).all()
 
-@router.post("/costo-versions", dependencies=[Depends(require_roles("admin", "gerente"))])
+@router.post("/costo-versions", dependencies=[Depends(require_roles("admin"))])
 def create_costo(payload: CostoVersionCreate, db: Session = Depends(get_db)):
     row = CostoVersion(**payload.model_dump())
     db.add(row); db.commit(); db.refresh(row)
@@ -49,7 +49,7 @@ def create_costo(payload: CostoVersionCreate, db: Session = Depends(get_db)):
 def list_cierres(db: Session = Depends(get_db)):
     return db.query(CierreMensual).order_by(CierreMensual.periodo.desc()).all()
 
-@router.post("/cierres", dependencies=[Depends(require_roles("admin", "gerente"))])
+@router.post("/cierres", dependencies=[Depends(require_roles("admin"))])
 def create_cierre(payload: CierreCreate, db: Session = Depends(get_db)):
     if db.query(CierreMensual).filter_by(periodo=payload.periodo).first():
         raise HTTPException(409, "Periodo ya cerrado")
