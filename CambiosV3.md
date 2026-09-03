@@ -769,6 +769,12 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - La ruta ya exigía `roles:['admin']`, toda la UI queda solo-admin sin guard extra.
 - Verificación: `npm run build` OK + `npm test` 70/70.
 
+### [2026-09-03] — P1-8: N ítems en devolución parcial
+
+- **Hallazgo:** `POST /devoluciones` ya aceptaba `items: [{producto_id, cantidad, precio_unitario}]` (`backend/app/schemas/devoluciones.py` + `registrar_devolucion`; parcial exige ≥1 ítem) — sin cambios backend.
+- **`src/views/DevolucionesView.vue`:** `formProductoId/Cantidad/Precio` únicos → array `formItems` con `Agregar ítem` / trash por fila (mínimo 1 fila); validación parcial exige ≥1 ítem con producto_id y cantidad > 0; tipo total → `items: null` como antes.
+- Verificación: `npm run build` OK.
+
 ### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
 
 #### 1. Migración `0021_backfill_costo_insumos` (`backend/alembic/versions/0021_backfill_costo_insumos.py`)

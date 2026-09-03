@@ -49,9 +49,8 @@ const saving = ref(false)
 const formVentaId = ref<number | null>(null)
 const formTipo = ref<'total' | 'parcial'>('total')
 const formMotivo = ref('')
-const formProductoId = ref<number | null>(null)
-const formCantidad = ref<number>(1)
-const formPrecio = ref<number>(0)
+interface FormItem { producto_id: number | null; cantidad: number; precio: number }
+const formItems = ref<FormItem[]>([{ producto_id: null, cantidad: 1, precio: 0 }])
 const tipoOptions = [
   { label: 'Total (cancela la venta completa)', value: 'total' },
   { label: 'Parcial (requiere al menos un ítem)', value: 'parcial' },
@@ -61,10 +60,17 @@ function openCreateDialog() {
   formVentaId.value = null
   formTipo.value = 'total'
   formMotivo.value = ''
-  formProductoId.value = null
-  formCantidad.value = 1
-  formPrecio.value = 0
+  formItems.value = [{ producto_id: null, cantidad: 1, precio: 0 }]
   showCreateDialog.value = true
+}
+
+function addItem() {
+  formItems.value.push({ producto_id: null, cantidad: 1, precio: 0 })
+}
+
+function removeItem(idx: number) {
+  if (formItems.value.length <= 1) return
+  formItems.value.splice(idx, 1)
 }
 
 function extractDetail(e: unknown): string {
@@ -82,9 +88,12 @@ async function submitCreate() {
     showToast('warn', 'Campo requerido', 'Indicá el ID de la venta a devolver.')
     return
   }
-  if (formTipo.value === 'parcial' && (!formProductoId.value || formProductoId.value <= 0)) {
-    showToast('warn', 'Campo requerido', 'La devolución parcial requiere al menos un ítem (ID de producto).')
-    return
+  if (formTipo.value === 'parcial') {
+    const valid = formItems.value.filter((it) => it.producto_id != null && Number(it.producto_id) > 0 && Number(it.cantidad) > 0)
+    if (!valid.length) {
+      showToast('warn', 'Campo requerido', 'La devolución parcial requiere al menos un ítem válido (ID de producto y cantidad > 0).')
+      return
+    }
   }
   saving.value = true
   try {
@@ -93,11 +102,13 @@ async function submitCreate() {
       tipo: formTipo.value,
       motivo: formMotivo.value.trim() || null,
       items: formTipo.value === 'parcial'
-        ? [{
-            producto_id: Number(formProductoId.value),
-            cantidad: Number(formCantidad.value),
-            precio_unitario: Number(formPrecio.value),
-          }]
+        ? formItems.value
+            .filter((it) => it.producto_id != null && Number(it.producto_id) > 0)
+            .map((it) => ({
+              producto_id: Number(it.producto_id),
+              cantidad: Number(it.cantidad),
+              precio_unitario: Number(it.precio),
+            }))
         : null,
     }
     if (isMock.value) {
@@ -208,20 +219,33 @@ async function submitCreate() {
           <label class="font-semibold text-stone-300">Motivo</label>
           <InputText v-model="formMotivo" placeholder="Motivo de la devolución" class="text-xs" />
         </div>
-        <div v-if="formTipo === 'parcial'" class="grid grid-cols-3 gap-2 border-t border-stone-800 pt-3">
-          <div class="flex flex-col gap-1">
-            <label class="font-semibold text-stone-300">Producto ID *</label>
-            <InputText v-model.number="formProductoId" type="number" min="1" placeholder="Ej. 5" class="text-xs" />
+        <div v-if="formTipo === 'parcial'" class="space-y-2 border-t border-stone-800 pt-3">
+          <div v-for="(it, idx) in formItems" :key="idx" class="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
+            <div class="flex flex-col gap-1">
+              <label class="font-semibold text-stone-300">Producto ID *</label>
+              <InputText v-model.number="it.producto_id" type="number" min="1" placeholder="Ej. 5" class="text-xs" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="font-semibold text-stone-300">Cantidad *</label>
+              <InputText v-model.number="it.cantidad" type="number" :min="1" class="text-xs" />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="font-semibold text-stone-300">Precio unit.</label>
+              <InputText v-model.number="it.precio" type="number" :min="0" class="text-xs" />
+            </div>
+            <Button
+              icon="pi pi-trash"
+              size="small"
+              text
+              rounded
+              class="p-button-danger text-rose-400"
+              title="Quitar ítem"
+              :disabled="formItems.length <= 1"
+              @click="removeItem(idx)"
+            />
           </div>
-          <div class="flex flex-col gap-1">
-            <label class="font-semibold text-stone-300">Cantidad *</label>
-            <InputText v-model.number="formCantidad" type="number" :min="1" class="text-xs" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="font-semibold text-stone-300">Precio unit.</label>
-            <InputText v-model.number="formPrecio" type="number" :min="0" class="text-xs" />
-          </div>
-          <p class="col-span-3 text-[11px] text-stone-500 font-mono">
+          <Button label="Agregar ítem" icon="pi pi-plus" size="small" text class="text-xs text-amber-300" @click="addItem" />
+          <p class="text-[11px] text-stone-500 font-mono">
             El precio final se recalcula desde la venta original en el backend.
           </p>
         </div>
