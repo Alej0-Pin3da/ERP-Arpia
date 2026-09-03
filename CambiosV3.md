@@ -781,6 +781,11 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **`src/components/atelier/FichaTecnicaModal.vue`:** sección `Combos (BOM productos)` solo en REAL (lista con nombre resuelto vía `GET /productos` + cantidad + trash; form Dropdown producto filter + cantidad + `Agregar`; validación cantidad > 0; toasts 409/422 con `detail`). Carga en `watch(visible)` y `watch(receta.id)` junto a BOM.
 - Verificación: `npm run build` OK.
 
+### [2026-09-03] — P1-3: tab Historial repuesto en Ficha
+
+- **`src/components/atelier/FichaTecnicaModal.vue`:** `cargarHistorial()` ahora lee `precio-versions` + `costo-versions` en paralelo (`?producto_id=`, arrays planos) con `slice(0, 20)` por tipo; nuevo tab `🕘 Historial` (tercer botón junto a Ficha/Matriz) con dos paneles Precios/Costos (fecha + monto) + empty-states + nota `20 más recientes`. El `v-else` de Matriz pasó a `v-else-if` para no tragarse el nuevo tab. En MOCK muestra aviso `solo REAL`.
+- Verificación: `npm run build` OK (398 módulos) + `npm test` 70/70.
+
 ### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
 
 #### 1. Migración `0021_backfill_costo_insumos` (`backend/alembic/versions/0021_backfill_costo_insumos.py`)

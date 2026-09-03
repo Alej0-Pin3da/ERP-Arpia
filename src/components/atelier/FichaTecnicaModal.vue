@@ -26,7 +26,7 @@ const emit = defineEmits<{
 }>()
 
 const { isMock } = useMode()
-const activeTab = ref<'ficha' | 'matriz'>('ficha')
+const activeTab = ref<'ficha' | 'matriz' | 'historial'>('ficha')
 const isEditing = ref(false)
 const saving = ref(false)
 const editNombre = ref('')
@@ -438,17 +438,22 @@ const semaforo = computed(() => {
   return { real, meta, diffPct, diffAbs, color, label }
 })
 
-    // Historial de precio
+    // Historial fiscal (precio + costo) — slice(0, 20) para no romper el render
     const historial = ref<any[]>([])
+    const historialCostos = ref<any[]>([])
     const loadingHistorial = ref(false)
     async function cargarHistorial() {
-      if (isMock.value || !recetaId.value) { historial.value = []; return }
+      if (isMock.value || !recetaId.value) { historial.value = []; historialCostos.value = []; return }
       loadingHistorial.value = true
       try {
         const { client } = await import('@/api/client')
-        const { data } = await client.get('/audit-fiscal/precio-versions', { params: { producto_id: recetaId.value } })
-        historial.value = Array.isArray(data) ? data : []
-      } catch { historial.value = [] }
+        const [precios, costos] = await Promise.all([
+          client.get('/audit-fiscal/precio-versions', { params: { producto_id: recetaId.value } }).catch(() => ({ data: [] })),
+          client.get('/audit-fiscal/costo-versions', { params: { producto_id: recetaId.value } }).catch(() => ({ data: [] })),
+        ])
+        historial.value = (Array.isArray(precios.data) ? precios.data : []).slice(0, 20)
+        historialCostos.value = (Array.isArray(costos.data) ? costos.data : []).slice(0, 20)
+      } catch { historial.value = []; historialCostos.value = [] }
       finally { loadingHistorial.value = false }
     }
 
@@ -566,6 +571,7 @@ function exportarMatriz() {
           <div class="inline-flex bg-stone-900 rounded-lg p-0.5 border border-stone-800">
             <button type="button" class="px-3 py-1.5 rounded-md text-xs font-semibold transition" :class="activeTab === 'ficha' ? 'bg-amber-500 text-stone-950 shadow' : 'text-stone-400 hover:text-stone-200'" @click="activeTab = 'ficha'">📋 Ficha Técnica</button>
             <button type="button" class="px-3 py-1.5 rounded-md text-xs font-semibold transition" :class="activeTab === 'matriz' ? 'bg-amber-500 text-stone-950 shadow' : 'text-stone-400 hover:text-stone-200'" @click="activeTab = 'matriz'">📊 Matriz Google Sheet</button>
+            <button type="button" class="px-3 py-1.5 rounded-md text-xs font-semibold transition" :class="activeTab === 'historial' ? 'bg-amber-500 text-stone-950 shadow' : 'text-stone-400 hover:text-stone-200'" @click="activeTab = 'historial'">🕘 Historial</button>
 
           </div>
           <Button v-if="!isEditing" label="Editar" icon="pi pi-pencil" severity="warning" size="small" outlined @click="enterEdit()" />
@@ -739,7 +745,7 @@ function exportarMatriz() {
         </div>
       </div>
 
-      <div v-else class="space-y-4 animate-fade-in">
+      <div v-else-if="activeTab === 'matriz'" class="space-y-4 animate-fade-in">
         <div class="bg-stone-900/80 border border-stone-800 rounded-xl p-3 flex items-center justify-between text-xs">
           <div class="text-stone-300"><strong class="text-amber-400">Matriz de Dimensiones & Consumo Textil</strong> • Escandallo tipo planilla de cálculo</div>
           <Button label="Exportar Planilla" icon="pi pi-file-excel" size="small" severity="warning" outlined @click="exportarMatriz" />
@@ -765,6 +771,38 @@ function exportarMatriz() {
           <div class="bg-stone-900/90 border border-amber-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-amber-400">Venta Sugerida Atelier</div><div class="text-base font-mono font-bold text-amber-300 mt-1">{{ formatCOP(precioMostrado) }}</div></div>
           <div class="bg-stone-900/90 border border-emerald-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-emerald-400">Ganancia Neta Estimada</div><div class="text-base font-mono font-bold text-emerald-300 mt-1">{{ formatCOP(precioMostrado - costoTotalCalculado) }} ({{ markupMostrado }}%)</div></div>
         </div>
+      </div>
+
+      <div v-else-if="activeTab === 'historial'" class="space-y-4 animate-fade-in">
+        <div v-if="isMock" class="p-8 text-center text-xs text-stone-500 border border-stone-800 rounded-xl">
+          Historial fiscal disponible solo en modo REAL (<code>GET /api/v1/audit-fiscal/*</code>).
+        </div>
+        <div v-else-if="loadingHistorial" class="p-8 text-center text-xs text-amber-300 border border-amber-500/30 rounded-xl">
+          Cargando historial...
+        </div>
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="border border-stone-800 rounded-xl overflow-hidden bg-stone-900/50">
+            <div class="p-3 bg-stone-900/80 border-b border-stone-800 text-xs font-bold uppercase tracking-wider text-amber-400">Precios ({{ historial.length }})</div>
+            <div v-if="!historial.length" class="p-6 text-center text-xs text-stone-500">Sin versiones de precio.</div>
+            <div v-else class="divide-y divide-stone-800/50 text-xs font-mono">
+              <div v-for="h in historial" :key="h.id" class="flex items-center justify-between px-3 py-2">
+                <span class="text-stone-400">{{ h.fecha_desde }}</span>
+                <span class="text-amber-300 font-bold">{{ formatCOP(Number(h.precio ?? 0)) }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="border border-stone-800 rounded-xl overflow-hidden bg-stone-900/50">
+            <div class="p-3 bg-stone-900/80 border-b border-stone-800 text-xs font-bold uppercase tracking-wider text-emerald-400">Costos ({{ historialCostos.length }})</div>
+            <div v-if="!historialCostos.length" class="p-6 text-center text-xs text-stone-500">Sin versiones de costo.</div>
+            <div v-else class="divide-y divide-stone-800/50 text-xs font-mono">
+              <div v-for="h in historialCostos" :key="h.id" class="flex items-center justify-between px-3 py-2">
+                <span class="text-stone-400">{{ h.fecha_desde }}</span>
+                <span class="text-emerald-300 font-bold">{{ formatCOP(Number(h.costo ?? 0)) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="text-[11px] text-stone-500 font-mono">Se muestran las 20 versiones más recientes por tipo.</p>
       </div>
 
 
