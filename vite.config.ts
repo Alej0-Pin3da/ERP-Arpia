@@ -86,6 +86,17 @@ const viteProxyTarget = (process.env.API_PROXY_TARGET || 'http://localhost:8000'
 export default defineConfig({
   base: '/',
   plugins: [vue(), tailwindcss(), mockApiPlugin()],
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['vue', 'vue-router', 'pinia'],
+          primevue: ['primevue'],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

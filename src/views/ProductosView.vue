@@ -17,6 +17,7 @@ const { isMock } = useMode()
 const search = ref('')
 const selectedCategory = ref('Todos los Modelos')
 const filtroMargen = ref<'Todos'|'Pérdida'|'Por debajo'|'En meta'|'Alto'>('Todos')
+const margenMetaGlobal = ref(35)
 const ordenarPor = ref<'nombre'|'precio'|'costo'|'margen'>('nombre')
 const ordenarDir = ref<'asc'|'desc'>('asc')
 
@@ -40,6 +41,15 @@ const categorias = [
 
 const productosReal = ref<any[]>([])
 const bomCounts = ref<Record<number, number>>({})
+async function cargarMargenMeta() {
+  if (isMock.value) return
+  try {
+    const { getParametros } = await import('@/services/api/maestros')
+    const p = await getParametros()
+    margenMetaGlobal.value = Number(p.margen_meta_global_pct ?? 35)
+  } catch { /* keep 35 */ }
+}
+
 async function cargarProductosReales() {
   if (isMock.value) return
   try {
@@ -62,8 +72,8 @@ async function cargarProductosReales() {
     } catch { /* ignore BOM counts */ }
   } catch { productosReal.value = [] }
 }
-onMounted(() => { void cargarProductosReales() })
-watch(isMock, () => { void cargarProductosReales() })
+onMounted(() => { void cargarProductosReales(); void cargarMargenMeta() })
+watch(isMock, () => { void cargarProductosReales(); void cargarMargenMeta() })
 const recetasDisplay = computed(() => isMock.value ? (atelier as any).recetas : productosReal.value.map((p: any) => ({
   id: p.id,
   codigo: p.codigo ?? `PRD-${p.id}`,
@@ -114,12 +124,13 @@ const recetasFiltradas = computed(() => {
       r.categoria === selectedCategory.value
 
     const m = Number(r.markup_pct ?? 0)
+    const meta = Number(margenMetaGlobal.value ?? 35)
     const matchesMargen =
       filtroMargen.value === 'Todos' ||
       (filtroMargen.value === 'Pérdida' && m < 0) ||
-      (filtroMargen.value === 'Por debajo' && m >= 0 && m < 35) ||
-      (filtroMargen.value === 'En meta' && m >= 35 && m <= 60) ||
-      (filtroMargen.value === 'Alto' && m > 60)
+      (filtroMargen.value === 'Por debajo' && m >= 0 && m < meta) ||
+      (filtroMargen.value === 'En meta' && m >= meta && m <= meta + 25) ||
+      (filtroMargen.value === 'Alto' && m > meta + 25)
 
     return matchesSearch && matchesCat && matchesMargen
   })

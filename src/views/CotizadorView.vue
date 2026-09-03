@@ -89,6 +89,21 @@ function onRecetaChange() {
 
 watch(recetaSeleccionada, () => { void cargarCostoRealCot() })
 
+function usarCostoReal() {
+  if (costoRealCot.value == null) return
+  // Distribuye el costo real entre los campos manuales de forma proporcional al cálculo actual
+  const totalManual = costoTotalConfeccion.value
+  if (totalManual > 0) {
+    const ratio = costoRealCot.value / totalManual
+    // Ajusta CIF para que el total manual iguale al real (lo más simple y reversible)
+    const diff = costoRealCot.value - totalManual
+    costoCif.value = Math.max(0, costoCif.value + diff)
+    showToast('success', 'Costo real aplicado', `CIF ajustado en ${diff > 0 ? '+' : ''}${Math.round(diff).toLocaleString('es-CO')} para igualar $${Math.round(costoRealCot.value).toLocaleString('es-CO')}`)
+  } else {
+    costoCif.value = costoRealCot.value
+  }
+}
+
 // Calculations
 const subtotalTelas = computed(() => {
   return (metrosTela.value * precioMetroTela.value) + (metrosForro.value * precioMetroForro.value)
@@ -300,6 +315,9 @@ function copiarPresupuestoWhatsApp() {
               <div v-if="!isMock && recetaSeleccionada" class="flex justify-between py-1.5 text-xs bg-amber-950/20 border border-amber-500/20 rounded-lg px-2">
                 <span class="text-amber-300 flex items-center gap-1"><i class="pi pi-database text-[10px]" /> Costo real BOM (DB):</span>
                 <span class="font-mono font-bold" :class="loadingCostoReal ? 'text-stone-400' : 'text-amber-300'">{{ loadingCostoReal ? 'Cargando...' : (costoRealCot !== null ? formatCOP(costoRealCot!) : 'Sin BOM') }}</span>
+              </div>
+              <div v-if="!isMock && costoRealCot !== null" class="flex justify-end">
+                <button type="button" class="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/30" @click="usarCostoReal">Usar costo real</button>
               </div>
               <div v-if="!isMock && costoRealCot !== null && Math.abs(costoRealCot - costoTotalConfeccion) > 100" class="text-[11px] text-center" :class="costoRealCot > costoTotalConfeccion ? 'text-amber-400' : 'text-emerald-400'">
                 {{ costoRealCot > costoTotalConfeccion ? '▲' : '▼' }} Diferencia {{ formatCOP(Math.abs(costoRealCot - costoTotalConfeccion)) }} vs cálculo manual
