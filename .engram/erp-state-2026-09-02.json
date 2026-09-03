@@ -1,0 +1,36 @@
+{
+  "topic": "erp/state",
+  "date": "2026-09-02T22:00:00",
+  "branch": "main",
+  "head": "4824cf7",
+  "status": "PAUSED_FOR_TODAY",
+  "ultimo_commit": "4824cf7 feat(ux): puntos 3-10 — filtros dinámicos, nueva receta validada, cotizador real, chunk split",
+  "commits_hoy": [
+    "cc4565c feat(ux): precio sugerido auto + semaforo + BOM stock + filtros margen + cotizador real",
+    "5740697 fix(productos): backfill costo_insumos + precio/costo versioning on update (0021)",
+    "4824cf7 feat(ux): puntos 3-10 — filtros dinámicos, nueva receta validada, cotizador real, chunk split"
+  ],
+  "estado_v5": "DONE + hardening + cabecera + BOM + UX 1-10 parcial",
+  "hardening": {
+    "mockGuard": "src/utils/mockGuard.ts — fail-loud en REAL",
+    "dataSourceBadge": "src/components/DataSourceBadge.vue",
+    "checkMockLeak": "scripts/check-mock-leak.mjs — PASSED"
+  },
+  "productos": {
+    "migration": "0021_backfill_costo_insumos — costo_insumos = GREATEST(costos_operativos_fijos - mano - cif, 0) WHERE NULL (PRD-2, PRD-15)",
+    "api": "PUT /productos/{id} ahora crea PrecioVersion/CostoVersion automáticamente (best-effort)",
+    "ui": "ProductosView: filtros Margen/Orden + barra margenColor dinámica + bomCounts (N+1) + costo_insumos derivado; Ficha: precio sugerido auto (35% global) con override + semáforo + dirty + BOM stock/costo + costo_insumos persistido; Cotizador: costo real BOM + Usar costo real"
+  },
+  "ux_hoy": {
+    "ficha_precios": "PRECIO VENTA $83k grande (guardado) + Sugerido $48k (35%) + Margen real 62% | Meta 35% + semáforo En meta/Por debajo/Pérdida + • sin guardar + confirm discard",
+    "bom": "Dropdown Stock 21,2 m + Stock crítico warning + toast Stock bajo",
+    "productos_card": "Costo Insumos derivado (total-mano-cif) + Mano — cuando null + barra margenColor dinámica",
+    "cotizador": "Costo real BOM via GET /productos/{id}/costo + botón Usar costo real (ajusta CIF)",
+    "filtros": "NuevaRecetaModal tiempo/costo null + validación requerida; Productos filtros Margen/Orden con margenMetaGlobal dinámico",
+    "build": "vite manualChunks vendor/primevue (553k -> 282k+336k) + favicon link"
+  },
+  "audit": "AUDIT-FALLAS-2026-09-02.md — 10 puntos (1-2 DONE, 3-10 parcial, Historial tab removido temporalmente por build)",
+  "pendiente_usuario": "Probar en REAL hard refresh Ctrl+F5 en /productos y /cotizador; Historial tab pendiente re-activar (backend ya guarda versiones)",
+  "proximo_paso": "Sprint 2: endpoint GET /productos?include_bom=1 para N+1 + re-activar Historial tab limpio",
+  "verificado": "npm run build 3.16s OK + npm test 70/70 + docker compose up -d --build api OK + alembic_version 0021"
+}
