@@ -725,3 +725,18 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Verificación:** `npm run build` OK (2.67s) + `npm test` 70/70. En REAL: `Productos` filtrar `Alto` muestra solo `>60%`; ordenar por `Margen` funciona; `Cotizador` al seleccionar `Corset Artemisia` muestra `Costo real BOM: $31.269` y diferencia.
 
 > Nota: `Ficha Historial` tab quedó pendiente por fix de template (se removió para no bloquear build). Se re-agregará en próximo commit limpio. `Producción Kanban` ya existía (`viewMode kanban/tabla`), no requirió cambios. `Mobile` ya responsive (grid 1/2/4).
+
+---
+
+### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
+
+#### 1. Migración `0021_backfill_costo_insumos` (`backend/alembic/versions/0021_backfill_costo_insumos.py`)
+- `UPDATE Productos SET costo_insumos = GREATEST(costos_operativos_fijos - COALESCE(mano_obra,0) - COALESCE(cif_energia,0), 0) WHERE costo_insumos IS NULL AND COALESCE(costos_operativos_fijos,0) > 0`
+- Backfill para `PRD-2 Corset Artemisia` ($31.268) y `PRD-15 Accesorio TEST` ($41.040); `downgrade` no-op.
+
+#### 2. Backend `PUT /productos/{id}` con versionado (`backend/app/api/routes/productos.py`)
+- Nuevo `from datetime import date` + captura `old_precio/old_costo/old_costo_insumos` antes del `setattr`.
+- Tras `setattr`, si `precio_venta_sugerido` cambió → `db.add(PrecioVersion(producto_id, precio, fecha_desde=today))`; si `costos_operativos_fijos` cambió → `CostoVersion`; fallback si solo `costo_insumos` cambió.
+- Best-effort en `try/except` para no bloquear el update principal; `db.commit()` incluye producto + versiones en misma transacción.
+- Verificación: `UPDATE Productos SET costo_insumos=41040 WHERE id=15` OK; `alembic_version` → `0021_backfill_costo_insumos`; `docker compose up -d --build api` OK; `GET /audit-fiscal/precio-versions?producto_id=15` ahora crea fila al cambiar precio.
+

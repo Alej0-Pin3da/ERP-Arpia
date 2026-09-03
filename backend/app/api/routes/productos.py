@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -115,8 +116,49 @@ def update_producto(
         and db.get(TipoProducto, payload.tipo_producto_id) is None
     ):
         raise HTTPException(status_code=400, detail="TipoProducto does not exist")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    # Capture old values for versioning
+    old_precio = producto.precio_venta_sugerido
+    old_costo = producto.costos_operativos_fijos
+    old_costo_insumos = producto.costo_insumos
+    data = payload.model_dump(exclude_unset=True)
+    for field, value in data.items():
         setattr(producto, field, value)
+    # Create audit versions if price/cost changed
+    try:
+        from app.models.audit_fiscal import CostoVersion, PrecioVersion
+
+        new_precio = data.get("precio_venta_sugerido")
+        if new_precio is not None and new_precio != old_precio:
+            db.add(
+                PrecioVersion(
+                    producto_id=producto_id,
+                    precio=new_precio,
+                    fecha_desde=date.today(),
+                )
+            )
+        new_costo = data.get("costos_operativos_fijos")
+        # Also track costo_insumos as cost version if it changed and costos_operativos_fijos didn't
+        if new_costo is not None and new_costo != old_costo:
+            db.add(
+                CostoVersion(
+                    producto_id=producto_id,
+                    costo=new_costo,
+                    fecha_desde=date.today(),
+                )
+            )
+        elif "costo_insumos" in data and data["costo_insumos"] != old_costo_insumos:
+            # Fallback: if only costo_insumos changed, version the total cost
+            total = data.get("costos_operativos_fijos", old_costo)
+            db.add(
+                CostoVersion(
+                    producto_id=producto_id,
+                    costo=total,
+                    fecha_desde=date.today(),
+                )
+            )
+    except Exception:
+        # Versioning is best-effort; don't block the main update
+        pass
     try:
         db.commit()
     except IntegrityError:
