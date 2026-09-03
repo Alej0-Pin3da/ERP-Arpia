@@ -775,6 +775,12 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **`src/views/DevolucionesView.vue`:** `formProductoId/Cantidad/Precio` únicos → array `formItems` con `Agregar ítem` / trash por fila (mínimo 1 fila); validación parcial exige ≥1 ítem con producto_id y cantidad > 0; tipo total → `items: null` como antes.
 - Verificación: `npm run build` OK.
 
+### [2026-09-03] — P1-1: combos BOM_Productos mínimo
+
+- **Servicio `src/services/api/bom.ts`:** `BomProductoRead/Create` + `listBomProductos` (`GET /productos/{id}/bom/productos`), `createBomProducto` (`POST`, requiere admin), `updateBomProducto` (`PUT`), `deleteBomProducto` (`DELETE`), espejo de `backend/app/api/routes/bom.py` (shape `{producto_incluido_id, cantidad}`).
+- **`src/components/atelier/FichaTecnicaModal.vue`:** sección `Combos (BOM productos)` solo en REAL (lista con nombre resuelto vía `GET /productos` + cantidad + trash; form Dropdown producto filter + cantidad + `Agregar`; validación cantidad > 0; toasts 409/422 con `detail`). Carga en `watch(visible)` y `watch(receta.id)` junto a BOM.
+- Verificación: `npm run build` OK.
+
 ### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
 
 #### 1. Migración `0021_backfill_costo_insumos` (`backend/alembic/versions/0021_backfill_costo_insumos.py`)

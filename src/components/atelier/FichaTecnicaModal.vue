@@ -58,6 +58,78 @@ const editingBomId = ref<number | null>(null)
 const editBomCantidad = ref<number>(1)
 const editBomDesperdicio = ref<number>(0)
 
+// REAL Combos (BOM_Productos) — sección mínima: lista + crear (2+ productos) + eliminar
+const combosReal = ref<bomApi.BomProductoRead[]>([])
+const productosOptions = ref<{ label: string; value: number }[]>([])
+const loadingCombos = ref(false)
+const newComboProductoId = ref<number | null>(null)
+const newComboCantidad = ref<number>(1)
+
+async function cargarProductosOptions() {
+  if (isMock.value) return
+  try {
+    const r = await productosApi.listProductos({ limit: 100 })
+    productosOptions.value = (r.items ?? []).map((p) => ({
+      label: `${p.nombre} (${p.codigo ?? `PRD-${p.id}`})`,
+      value: p.id,
+    }))
+  } catch { productosOptions.value = [] }
+}
+
+async function cargarCombos() {
+  if (isMock.value || !props.receta || !recetaId.value) {
+    combosReal.value = []
+    return
+  }
+  loadingCombos.value = true
+  try {
+    combosReal.value = await bomApi.listBomProductos(recetaId.value).catch(() => [] as bomApi.BomProductoRead[])
+  } finally {
+    loadingCombos.value = false
+  }
+}
+
+const comboNombre = (id: number) =>
+  productosOptions.value.find((o) => o.value === id)?.label ?? `Producto #${id}`
+
+async function agregarCombo() {
+  if (!props.receta || !recetaId.value || !newComboProductoId.value) {
+    showToast('warn', 'Seleccioná un producto', 'Elegí un producto del dropdown para armar el combo.')
+    return
+  }
+  if (Number(newComboCantidad.value) <= 0) {
+    showToast('warn', 'Cantidad inválida', 'La cantidad debe ser > 0.')
+    return
+  }
+  try {
+    await bomApi.createBomProducto(recetaId.value, {
+      producto_incluido_id: newComboProductoId.value,
+      cantidad: Number(newComboCantidad.value),
+    })
+    showToast('success', 'Combo actualizado', 'Producto agregado al combo.')
+    newComboProductoId.value = null
+    newComboCantidad.value = 1
+    await cargarCombos()
+  } catch (e: unknown) {
+    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+    const msg = Array.isArray(detail) ? (detail as { msg?: string }[]).map((d) => d.msg ?? JSON.stringify(d)).join('; ') : (detail as string ?? (e as Error)?.message ?? 'Error al agregar')
+    showToast('error', 'Error al agregar', String(msg))
+  }
+}
+
+async function eliminarCombo(lineaId: number) {
+  if (!recetaId.value) return
+  try {
+    await bomApi.deleteBomProducto(recetaId.value, lineaId)
+    showToast('success', 'Producto quitado', 'Combo actualizado.')
+    await cargarCombos()
+  } catch (e: unknown) {
+    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+    const msg = Array.isArray(detail) ? (detail as { msg?: string }[]).map((d) => d.msg ?? JSON.stringify(d)).join('; ') : (detail as string ?? (e as Error)?.message ?? 'Error al eliminar')
+    showToast('error', 'Error al eliminar', String(msg))
+  }
+}
+
 const recetaId = computed(() => (props.receta as unknown as { id: number })?.id)
 
 async function cargarInsumosOptions() {
@@ -216,7 +288,9 @@ watch(() => props.visible, (v) => {
     void cargarInsumosOptions()
     void cargarMargenMeta()
     void cargarBom()
-        void cargarHistorial()
+    void cargarHistorial()
+    void cargarCombos()
+    void cargarProductosOptions()
     if (props.startEditing) {
       setTimeout(() => enterEdit(), 50)
     } else {
@@ -227,7 +301,7 @@ watch(() => props.visible, (v) => {
   }
 })
 watch(() => props.receta?.id, () => {
-  if (props.visible) void cargarBom()
+  if (props.visible) { void cargarBom(); void cargarHistorial(); void cargarCombos() }
 })
 
 const insumosMap = computed(() => {
@@ -599,6 +673,36 @@ function exportarMatriz() {
                 <td v-if="!isMock"></td>
               </tr></tfoot>
             </table>
+          </div>
+        </div>
+
+        <div v-if="!isMock" class="border border-stone-800 rounded-xl overflow-hidden bg-stone-900/50">
+          <div class="p-3 bg-stone-900/80 border-b border-stone-800 flex items-center justify-between">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 m-0">Combos (BOM productos)</h4>
+            <span class="text-xs text-stone-400">{{ loadingCombos ? 'Cargando...' : `${combosReal.length} productos` }}</span>
+          </div>
+          <div v-if="!combosReal.length" class="p-6 text-center text-xs text-stone-500">
+            Sin productos en el combo. Agregá 2 o más productos con sus cantidades abajo.
+          </div>
+          <div v-else class="divide-y divide-stone-800/50 text-xs">
+            <div v-for="c in combosReal" :key="c.id" class="flex items-center justify-between px-3 py-2">
+              <span class="text-stone-200">{{ comboNombre(c.producto_incluido_id) }}</span>
+              <span class="flex items-center gap-2">
+                <span class="font-mono text-amber-300">x {{ c.cantidad }}</span>
+                <button type="button" class="text-stone-500 hover:text-red-400 p-1" title="Quitar del combo" @click="eliminarCombo(c.id)"><i class="pi pi-trash text-xs" /></button>
+              </span>
+            </div>
+          </div>
+          <div class="p-3 border-t border-stone-800 grid grid-cols-1 sm:grid-cols-[1fr_120px_auto] gap-2 items-end">
+            <div>
+              <label class="block text-[11px] font-semibold uppercase text-stone-400 mb-1">Producto</label>
+              <Dropdown v-model="newComboProductoId" :options="productosOptions" optionLabel="label" optionValue="value" placeholder="Seleccionar producto" class="w-full" filter />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold uppercase text-stone-400 mb-1">Cantidad</label>
+              <InputNumber v-model="newComboCantidad" :min="1" :step="1" class="w-full" />
+            </div>
+            <Button label="Agregar" icon="pi pi-plus" size="small" severity="warning" @click="agregarCombo" />
           </div>
         </div>
 

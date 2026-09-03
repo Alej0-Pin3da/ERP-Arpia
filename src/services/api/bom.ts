@@ -61,3 +61,45 @@ export async function getCostoProduccion(productoId: number, varianteId?: number
   const { data } = await client.get<CostoProduccionRead>(`/productos/${productoId}/costo`, { params })
   return data
 }
+
+// ---------------------------------------------------------------------------
+// BOM_Productos (combos): `GET/POST/PUT/DELETE /productos/{id}/bom/productos`
+// ---------------------------------------------------------------------------
+
+export interface BomProductoRead {
+  id: number
+  combo_id: number
+  producto_incluido_id: number
+  cantidad: number | string
+  fases?: unknown | null
+  tiempo_estimado_minutos?: number | null
+  markup_porcentual?: number | string | null
+}
+
+export interface BomProductoCreate {
+  producto_incluido_id: number
+  cantidad: number | string
+}
+
+export async function listBomProductos(productoId: number): Promise<BomProductoRead[]> {
+  const { data } = await client.get<BomProductoRead[]>(`/productos/${productoId}/bom/productos`)
+  return data
+}
+
+export async function createBomProducto(productoId: number, payload: BomProductoCreate): Promise<BomProductoRead> {
+  const { data } = await client.post<BomProductoRead>(`/productos/${productoId}/bom/productos`, payload)
+  return data
+}
+
+export async function updateBomProducto(
+  productoId: number,
+  lineaId: number,
+  payload: Partial<BomProductoCreate>,
+): Promise<BomProductoRead> {
+  const { data } = await client.put<BomProductoRead>(`/productos/${productoId}/bom/productos/${lineaId}`, payload)
+  return data
+}
+
+export async function deleteBomProducto(productoId: number, lineaId: number): Promise<void> {
+  await client.delete(`/productos/${productoId}/bom/productos/${lineaId}`)
+}
