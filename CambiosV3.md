@@ -762,6 +762,13 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **`src/views/FinanzasView.vue`:** nuevo tab `Movimientos` solo-lectura con Dropdowns tipo/estado + tabla fecha/tipo/descripción/monto/estado + empty-state en MOCK. Branch `isMock ? [] : movimientosReal`.
 - Verificación: `npm run build` OK + `npm test` 70/70.
 
+### [2026-09-03] — P1-7: UsuariosView cableada a REAL
+
+- **Servicio nuevo `src/services/api/usuarios.ts`:** espejo de `backend/app/api/routes/usuarios.py` — `listUsuarios` (q, rol, limit, offset → `Paginated`), `getUsuario`, `createUsuario`, `updateUsuario`, `deleteUsuario`, `changePassword` (`PATCH /usuarios/{id}/password`).
+- **`src/views/UsuariosView.vue` reescrita:** conserva cambio rápido de rol demo (`auth.changeRole`) + buscador `q`/filtro rol + grid con editar (nombre/email/rol + password opcional), dar de baja (`DELETE`; el backend no tiene campo `activo`) y cambio de password por usuario. En MOCK: lista local mínima de 3 usuarios + banner, sin romper.
+- La ruta ya exigía `roles:['admin']`, toda la UI queda solo-admin sin guard extra.
+- Verificación: `npm run build` OK + `npm test` 70/70.
+
 ### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
 
 #### 1. Migración `0021_backfill_costo_insumos` (`backend/alembic/versions/0021_backfill_costo_insumos.py`)
