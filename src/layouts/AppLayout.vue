@@ -70,6 +70,7 @@ const routeTitle = computed(() => {
     socias: 'Reparto de Utilidades (Socias)',
     maestros: 'Catálogos Maestros',
     omisiones: 'Bitácora de Omisiones',
+    auditoria: 'Auditoría Fiscal & Cierres',
     usuarios: 'Gestión de Usuarios & Roles',
   }
   const name = String(route.name || '')

@@ -739,6 +739,23 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - Vista: botón `Registrar devolución` + `Dialog` PrimeVue (venta_id, tipo Dropdown total/parcial, motivo, fila producto_id/cantidad/precio solo si parcial) + `submitCreate`: en MOCK hace `unshift` al ref local (atelier no tiene colección de devoluciones); en REAL llama `createDevolucion` y recarga `listDevoluciones`; error con `detail` del backend vía `showToast('error', ...)`.
 - Verificación: `npm run build` OK (vite 4.26s + esbuild server.mjs).
 
+### [2026-09-03] — P0-2 (AnalisisFull.md): auditoría fiscal mínima visible, solo-lectura
+
+#### 1. Servicio `src/services/api/auditoria.ts` (nuevo)
+- Tipos `PrecioVersionRead` / `CostoVersionRead` / `CierreMensualRead` espejo de `backend/app/models/audit_fiscal.py` (id, producto_id, variante_id?, precio/costo, fecha_desde, creado_por?, created_at?; cierre: periodo, estado?, cerrado_por?).
+- Funciones `listPrecioVersions({producto_id?})` (`GET /audit-fiscal/precio-versions`), `listCostoVersions({producto_id?})` (`GET /audit-fiscal/costo-versions`), `listCierres()` (`GET /audit-fiscal/cierres`).
+- Hallazgo: estos GET devuelven arrays planos (`.all()` de SQLAlchemy), NO el envelope `{items,total}` de `/omisiones` — el servicio retorna `data ?? []` sin paginado.
+
+#### 2. Vista `src/views/AuditoriaView.vue` (nueva, solo-lectura, patrón `OmisionesView.vue`)
+- Branch `isMock ? empty-state explicativo (sin mutar atelier) : datos reales`; refs `precios/costos/cierres` + `cargarReales()` en `onMounted` + `watch(isMock)`; sin POST (los 3 POST fiscales son solo-admin y quedan fuera de este P0).
+- 3 tabs con pills (sin TabView: el proyecto no usa `TabView` en ninguna vista) + filtro mínimo por `producto_id` (solo en tabs precio/costo) + `Limpiar`; toast de error con `detail` del backend (mismo `extractDetail` que P0-1).
+- Verificación: `npm run build` OK.
+
+#### 3. Router + layout (`src/router/index.ts`, `src/layouts/AppLayout.vue`)
+- Ruta `auditoria` (`/auditoria`, `getView('Auditoria')`, `roles: ALL_ROLES`) como hija de `AppLayout`, mismo guard/layout que `omisiones`.
+- Título `auditoria: 'Auditoría Fiscal & Cierres'` en el `routeTitle` map de `AppLayout`.
+- Sin item de navegación: `MENU_ITEMS` (`src/utils/menu.ts`, fuente única del menú) no incluye `omisiones` visible, por lo que —según alcance— tampoco se agrega `auditoría`; la vista es accesible por URL directa `/auditoria`.
+
 ### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
 
 #### 1. Migración `0021_backfill_costo_insumos` (`backend/alembic/versions/0021_backfill_costo_insumos.py`)
