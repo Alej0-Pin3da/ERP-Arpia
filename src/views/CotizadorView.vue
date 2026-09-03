@@ -10,11 +10,14 @@ import Slider from 'primevue/slider'
 import { useAtelierStore } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
+import * as bomApi from '@/services/api/bom'
 
 const router = useRouter()
 const atelier = useAtelierStore()
 const { isMock } = useMode()
 const productosRealCot = ref<any[]>([])
+const costoRealCot = ref<number | null>(null)
+const loadingCostoReal = ref(false)
 async function cargarProductosCotizador() {
   if (isMock.value) return
   try {
@@ -25,7 +28,7 @@ async function cargarProductosCotizador() {
 onMounted(() => { void cargarProductosCotizador() })
 watch(isMock, () => { void cargarProductosCotizador() })
 
-const recetaSeleccionada = ref<number | null>(null)
+const recetaSeleccionada = ref<number | null>(null)
 const nombrePrenda = ref('Bustier Estructurado en Tul y Satén')
 
 // Section 1: Telas & Forros
@@ -56,6 +59,16 @@ const recetasOptions = computed(() => {
   ]
 })
 
+async function cargarCostoRealCot() {
+  if (isMock.value || !recetaSeleccionada.value) { costoRealCot.value = null; return }
+  loadingCostoReal.value = true
+  try {
+    const c = await bomApi.getCostoProduccion(recetaSeleccionada.value)
+    costoRealCot.value = Number(c.total ?? 0)
+  } catch { costoRealCot.value = null }
+  finally { loadingCostoReal.value = false }
+}
+
 function onRecetaChange() {
   if (recetaSeleccionada.value) {
     const r = (isMock.value ? atelier.recetas : productosRealCot.value).find((x) => x.id === recetaSeleccionada.value)
@@ -73,6 +86,8 @@ function onRecetaChange() {
     }
   }
 }
+
+watch(recetaSeleccionada, () => { void cargarCostoRealCot() })
 
 // Calculations
 const subtotalTelas = computed(() => {
@@ -281,6 +296,14 @@ function copiarPresupuestoWhatsApp() {
               <span>Costo Total de Confección:</span>
               <span class="font-mono text-emerald-400">{{ formatCOP(costoTotalConfeccion) }}</span>
             </div>
+
+              <div v-if="!isMock && recetaSeleccionada" class="flex justify-between py-1.5 text-xs bg-amber-950/20 border border-amber-500/20 rounded-lg px-2">
+                <span class="text-amber-300 flex items-center gap-1"><i class="pi pi-database text-[10px]" /> Costo real BOM (DB):</span>
+                <span class="font-mono font-bold" :class="loadingCostoReal ? 'text-stone-400' : 'text-amber-300'">{{ loadingCostoReal ? 'Cargando...' : (costoRealCot !== null ? formatCOP(costoRealCot!) : 'Sin BOM') }}</span>
+              </div>
+              <div v-if="!isMock && costoRealCot !== null && Math.abs(costoRealCot - costoTotalConfeccion) > 100" class="text-[11px] text-center" :class="costoRealCot > costoTotalConfeccion ? 'text-amber-400' : 'text-emerald-400'">
+                {{ costoRealCot > costoTotalConfeccion ? '▲' : '▼' }} Diferencia {{ formatCOP(Math.abs(costoRealCot - costoTotalConfeccion)) }} vs cálculo manual
+              </div>
           </div>
 
           <!-- Suggested Sale Price Box -->

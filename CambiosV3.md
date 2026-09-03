@@ -650,3 +650,78 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 
 #### 3. Verificación
 - `npm run build` 168 OK. En REAL: Ficha → lápiz en renglón → cambiá cantidad de 1.5 a 2.0 y desperdicio de 4% a 6% → check → `PUT 200` → costo total recalculado live + `F5` persiste.
+
+---
+
+### [2026-09-02] — Ficha Técnica: PRECIO VENTA SUGERIDO auto-calculado con margen global + override manual
+
+#### 1. Problema
+- `PRECIO VENTA SUGERIDO` en `FichaTecnicaModal.vue` era un campo manual sin cálculo: siempre mostraba el valor guardado en `precio_venta_sugerido` (ej. `$12.000` en el producto de prueba), sin recalcular al cambiar BOM / mano / CIF. El usuario esperaba que se calculara automáticamente ("sugerido") y permitiera override manual.
+
+#### 2. `src/components/atelier/FichaTecnicaModal.vue` — auto-cálculo con margen global
+- **Nuevo import:** `* as maestrosApi from '@/services/api/maestros'`
+- **Nuevo state:** `margenMetaGlobal = ref(35)` + `precioOverride = ref(false)`
+- **Nueva función `cargarMargenMeta()`:** `GET /maestros/parametros-costeo` → `margen_meta_global_pct` (default 35 si falla), llamada en `watch(visible)` junto a `cargarInsumosOptions/cargarBom`.
+- **Nuevos computeds:**
+  - `precioSugeridoAuto = costoTotalCalculado / (1 - margenMetaGlobal/100)` (clamp margen 0..99, redondeado)
+  - `precioOverrideInfo` — detecta si `receta.precio_venta` difiere del auto > $1 (para mostrar "Precio fijado manual: $X")
+  - `precioMostrado` — `editPrecio` si edita, `receta.precio_venta` si mock, sino `precioSugeridoAuto` (el "sugerido" live)
+  - `markupMostrado` — `receta.markup_pct` si mock, `markupCalculado` si edita con override, sino `margenMetaGlobal`
+- **`watch(precioSugeridoAuto)`:** si `isEditing && !precioOverride`, `editPrecio` sigue al sugerido live (reacciona a cambios de BOM/mano/CIF).
+- **`enterEdit()`:** `precioOverride=false`; `editPrecio = precioSugeridoAuto || storedPrecio` (arranca en sugerido).
+- **`resetPrecio()`:** `precioOverride=false; editPrecio = precioSugeridoAuto`
+- **`guardarEdicion()` payload:** agrega `markup_pct: Number(markupCalculado.value ?? 0)` (antes no se persistía).
+- **Template costeo (línea 449):** no-editing muestra `precioMostrado` + `Margen meta: {{markupMostrado}}%` + override note; editing muestra `input @input="precioOverride=true"` con `↺ auto` cuando hay override (borde ámbar=auto, gris=manual).
+- **Template matriz (487-488):** ambas cards usan `precioMostrado` y `markupMostrado` (antes `receta.precio_venta`/`editPrecio` directo).
+
+#### 3. Verificación
+- `npm run build` OK (2.59s) + `npm test` 70/70. En REAL: abrir Ficha → `PRECIO VENTA SUGERIDO` muestra `costo/0.65` (con margen 35) live; editar BOM/mano/CIF recalcula el sugerido; tipear precio activa override (gris) + botón `↺ auto` para volver; Guardar persiste `precio_venta_sugerido` + `markup_pct`.
+
+#### Revisión [2026-09-02] — priorizar precio guardado (feedback usuario)
+
+- **Cambio en `FichaTecnicaModal.vue`:**
+  - `precioMostrado` ahora prioriza `receta.precio_venta` (>0) sobre `precioSugeridoAuto`; si no hay precio guardado, muestra el sugerido.
+  - `markupMostrado` devuelve `markupCalculado` (margen real) cuando hay precio guardado, y `margenMetaGlobal` solo si no hay precio o sin override en edición.
+  - `enterEdit()` preserva el precio guardado (`precioOverride=true; editPrecio=storedPrecio` si `stored>0`), solo usa sugerido si `stored==0`.
+  - Template costeo: header `PRECIO VENTA` (antes `PRECIO VENTA SUGERIDO`), subtítulo `Margen real: {{markupCalculado}}% | Meta: {{margenMetaGlobal}}%`, línea secundaria `Sugerido (35%): $48.106` en vista y `Sugerido: $48.106` en edición.
+- **Cambio en `ProductosView.vue`:**
+  - `recetasDisplay.markup_pct` ahora hace fallback calculado `(precio - costo)/precio*100` cuando `p.markup_pct` es null/0, para que la tarjeta `PRD-2` muestre `62%` en vez de `0%`.
+- **Verificación:** `npm run build` OK + `npm test` 70/70. Tarjeta PRD-2 ahora `PRECIO VENTA (62%): $83.000`; Ficha muestra grande `$83.000` + `Sugerido (35%): $48.106 | Real 62% | Meta 35%`; producto sin precio muestra sugerido como principal.
+
+#### Fix [2026-09-02] — Ficha no refrescaba tras Guardar (requería cerrar/reabrir)
+
+- **Problema:** Tras `Guardar` en `FichaTecnicaModal`, la DB se actualizaba pero la ficha seguía mostrando valores viejos (`PRECIO VENTA`, `Margen real`, `Sugerido`) hasta cerrar y reabrir. El `handleFichaGuardada()` recargaba `productosReal` pero no actualizaba `recetaSeleccionada` (prop de la ficha).
+- **Fix en `src/views/ProductosView.vue` — `handleFichaGuardada(actualizada?: RecetaBOM)`:**
+  - Si recibe `actualizada` (emit `guardado` de la ficha), hace `recetaSeleccionada.value = actualizada` inmediato para reflejo optimista.
+  - Luego `await cargarProductosReales()` y re-sincroniza `recetaSeleccionada` con el `fresh` de `recetasDisplay` (DB truth) por `id`.
+  - `fichaStartEditing = false` queda en vista con datos frescos sin cerrar modal.
+- **Verificación:** Editar `Corset Artemisia` de `$83.000` a `$60.000` + `Guardar` → la ficha inmediatamente pasa a `PRECIO VENTA $60.000 | Margen real: 48% | Sugerido (35%): $31.385` sin cerrar.
+
+#### UX [2026-09-02] — Ficha semáforo de margen + estado sin guardar
+
+- **Nuevo `isDirty` + `snapshot` en `FichaTecnicaModal.vue`:** al entrar en edición se guarda snapshot de `nombre/codigo/categoria/linea/descripcion/tiempo/mano/cif/precio/recomendaciones`; `isDirty` compara edits vs snapshot.
+- **Nuevo `semaforo` computed:** `real = markupCalculado`, `meta = margenMetaGlobal`, `diffPct = (precio - sugerido)/sugerido`; color/label: `red Pérdida` si `real<0`, `amber Por debajo` si `real<meta-10`, `sky Alto` si `real>meta+20`, sino `emerald En meta`.
+- **Template header:** badge `• sin guardar` ámbar pulsante cuando `isDirty`; badge semáforo `En meta +91%` / `Por debajo -20%` etc con colores.
+- **Dialog:** `@update:visible="onDialogVisibility"` intercepta cierre con `confirm("¿Descartar cambios sin guardar?")`; `cancelEdit/guardar` limpian `snapshot` y `precioOverride`.
+- **Verificación:** `npm run build` OK + `npm test` 70/70. En REAL: editar `Corset Artemisia` → header muestra `• sin guardar` + `En meta +73%`; intentar cerrar sin guardar pide confirmación; `Guardar` limpia estado.
+
+#### UX [2026-09-02] — BOM dropdown con stock/costo + warning
+
+- **`FichaTecnicaModal.vue` — `cargarInsumosOptions()`:** label ahora `Nombre (COD) — $X/unidad — Stock N ⚠️` si `stock <= stock_min`; `insumosOptions` tipado con `stock/stockMin`; `insumosMap` propagado.
+- **Nuevos computeds `selectedInsumo` / `selectedInsumoStockWarning`:** `need = cantidad * (1+desperdicio%)`; warning si `stock <= min` o `need > stock`.
+- **Template BOM:** bajo el `Dropdown` muestra ` $X / unidad | Stock N` con badge rojo/verde + texto warning ámbar.
+- **`agregarInsumo()`:** si hay warning de stock, `showToast('warn','Stock bajo', warning)` antes del `POST` (no bloquea, solo avisa).
+- **Verificación:** `npm run build` OK. En REAL: abrir Ficha con BOM → dropdown muestra costos y stocks; seleccionar `Elástico 1cm` con `Stock 5` y pedir `10` → badge rojo + toast `Stock bajo`.
+
+#### UX [2026-09-02] — Productos filtros + tarjeta margen + Cotizador real
+
+- **`ProductosView.vue`:**
+  - Nuevos filtros `filtroMargen` (`Todos/Pérdida/Por debajo/En meta/Alto`) y `ordenarPor` (`nombre/margen/precio/costo`) + `ordenarDir`; `recetasFiltradas` filtra por `markup_pct` y ordena; `margenColor()` helper.
+  - Tarjeta: barra `h-1.5` con `margenColor` y ancho `markup%`, precio con color `red/amber/emerald` según margen, `markup_pct` con fallback calculado `(precio-costo)/precio`.
+  - Header: nuevos controles `Margen: [pills] | Ordenar: [select] [↑↓]` + contador `filtrados/total`.
+- **`CotizadorView.vue`:**
+  - Nuevo `import * as bomApi`, refs `costoRealCot/loadingCostoReal`, `cargarCostoRealCot()` (`GET /productos/{id}/costo`), `watch(recetaSeleccionada)`; `onRecetaChange` ahora dispara carga real.
+  - Resumen: bloque `Costo real BOM (DB): $X` con `loading` y `Sin BOM`, y diferencia `▲/▼ $Y vs cálculo manual` si diff > $100.
+- **Verificación:** `npm run build` OK (2.67s) + `npm test` 70/70. En REAL: `Productos` filtrar `Alto` muestra solo `>60%`; ordenar por `Margen` funciona; `Cotizador` al seleccionar `Corset Artemisia` muestra `Costo real BOM: $31.269` y diferencia.
+
+> Nota: `Ficha Historial` tab quedó pendiente por fix de template (se removió para no bloquear build). Se re-agregará en próximo commit limpio. `Producción Kanban` ya existía (`viewMode kanban/tabla`), no requirió cambios. `Mobile` ya responsive (grid 1/2/4).

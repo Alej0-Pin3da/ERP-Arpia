@@ -11,6 +11,7 @@ import { showToast } from '@/utils/toast'
 import * as bomApi from '@/services/api/bom'
 import * as insumosApi from '@/services/api/insumos'
 import * as productosApi from '@/services/api/productos'
+import * as maestrosApi from '@/services/api/maestros'
 
 const props = defineProps<{
   visible: boolean
@@ -38,13 +39,16 @@ const editMano = ref(0)
 const editCif = ref(0)
 const editPrecio = ref(0)
 const editRecomendaciones = ref('')
+const margenMetaGlobal = ref(35)
+const precioOverride = ref(false)
+const snapshot = ref<Record<string, unknown> | null>(null)
 
 const categoriasOptions = ['Corsetería','Blusas y Tops','Conjuntos y Sets','Vestidos','Pantalones','Accesorios','Alta Costura','General']
 const lineasOptions = ['Corsetería', 'Prêt-à-Porter', 'Lencería Fina', 'Alta Costura', 'General']
 
 // REAL BOM state
 const bomReal = ref<bomApi.BomInsumoRead[]>([])
-const insumosOptions = ref<{ label: string; value: number; costo: number; unidad: string }[]>([])
+const insumosOptions = ref<{ label: string; value: number; costo: number; unidad: string; stock: number; stockMin: number }[]>([])
 const costoReal = ref<bomApi.CostoProduccionRead | null>(null)
 const loadingBom = ref(false)
 const newInsumoId = ref<number | null>(null)
@@ -60,8 +64,23 @@ async function cargarInsumosOptions() {
   if (isMock.value) return
   try {
     const r = await insumosApi.listInsumos({ limit: 100 })
-    insumosOptions.value = r.items.map((i) => ({ label: `${i.nombre} (${i.codigo ?? 'S/C'})`, value: i.id, costo: Number(i.costo_promedio_actual ?? 0), unidad: i.unidad_medida }))
+        insumosOptions.value = r.items.map((i) => ({
+          label: `${i.nombre} (${i.codigo ?? 'S/C'}) — $${Number(i.costo_promedio_actual ?? 0).toLocaleString('es-CO')}/${i.unidad_medida} — Stock ${Number(i.stock_actual).toLocaleString('es-CO', { maximumFractionDigits: 2 })} ${i.unidad_medida}${Number(i.stock_actual) <= Number(i.stock_minimo) ? ' ⚠️' : ''}`,
+          value: i.id,
+          costo: Number(i.costo_promedio_actual ?? 0),
+          unidad: i.unidad_medida,
+          stock: Number(i.stock_actual ?? 0),
+          stockMin: Number(i.stock_minimo ?? 0),
+        }))
   } catch { insumosOptions.value = [] }
+}
+
+async function cargarMargenMeta() {
+  if (isMock.value) return
+  try {
+    const p = await maestrosApi.getParametros()
+    margenMetaGlobal.value = Number(p.margen_meta_global_pct ?? 35)
+  } catch { margenMetaGlobal.value = 35 }
 }
 
 async function cargarBom() {
@@ -103,13 +122,52 @@ async function enterEdit() {
   editCif.value = Number(r.cif_energia ?? 0)
   // precio_venta_sugerido is the DB column, precio_venta is the mapped alias — try both, and handle string Decimal
   const precioRaw = (r.precio_venta_sugerido ?? r.precio_venta ?? 0) as unknown
-  editPrecio.value = Number(precioRaw ?? 0)
+  const storedPrecio = Number(precioRaw ?? 0)
+  if (storedPrecio > 0) {
+    precioOverride.value = true
+    editPrecio.value = storedPrecio
+  } else {
+    precioOverride.value = false
+    editPrecio.value = precioSugeridoAuto.value > 0 ? precioSugeridoAuto.value : storedPrecio
+  }
   editRecomendaciones.value = (r.recomendaciones_taller as string) ?? ''
+  snapshot.value = {
+    nombre: editNombre.value,
+    codigo: editCodigo.value,
+    categoria: editCategoria.value,
+    linea: editLinea.value,
+    descripcion: editDescripcion.value,
+    tiempo: editTiempo.value,
+    mano: editMano.value,
+    cif: editCif.value,
+    precio: editPrecio.value,
+    recomendaciones: editRecomendaciones.value,
+  }
   isEditing.value = true
 }
 
 function cancelEdit() {
   isEditing.value = false
+  snapshot.value = null
+  precioOverride.value = false
+}
+
+function onDialogVisibility(v: boolean) {
+  if (!v && isDirty.value) {
+    const ok = window.confirm('¿Descartar cambios sin guardar?')
+    if (!ok) return
+    cancelEdit()
+  }
+  if (!v) {
+    isEditing.value = false
+    snapshot.value = null
+  }
+  emit('update:visible', v)
+}
+
+function resetPrecio() {
+  precioOverride.value = false
+  editPrecio.value = Number(precioSugeridoAuto.value ?? 0)
 }
 
 async function guardarEdicion() {
@@ -132,11 +190,15 @@ async function guardarEdicion() {
       cif_energia: Number(editCif.value ?? 0),
       precio_venta_sugerido: Number(editPrecio.value ?? 0),
       costos_operativos_fijos: costosFijos,
+      costo_insumos: Number(totalInsumosReal.value ?? 0),
+      markup_pct: Number(markupCalculado.value ?? 0),
       recomendaciones_taller: editRecomendaciones.value.trim() || null,
     }
     const updated = await productosApi.updateProducto(recetaId.value, payload as unknown as Record<string, unknown>)
     showToast('success', 'Ficha actualizada', `${updated.nombre} guardado.`)
     isEditing.value = false
+    snapshot.value = null
+    precioOverride.value = false
     const mapped = { ...props.receta, ...payload, id: updated.id, codigo: (updated as unknown as Record<string,unknown>).codigo ?? editCodigo.value, precio_venta: editPrecio.value } as unknown as RecetaBOM
     emit('guardado', mapped)
     await cargarBom()
@@ -152,7 +214,9 @@ async function guardarEdicion() {
 watch(() => props.visible, (v) => {
   if (v) {
     void cargarInsumosOptions()
+    void cargarMargenMeta()
     void cargarBom()
+        void cargarHistorial()
     if (props.startEditing) {
       setTimeout(() => enterEdit(), 50)
     } else {
@@ -167,12 +231,26 @@ watch(() => props.receta?.id, () => {
 })
 
 const insumosMap = computed(() => {
-  const m = new Map<number, { nombre: string; costo: number; unidad: string }>()
-  insumosOptions.value.forEach((o) => m.set(o.value, { nombre: o.label, costo: o.costo, unidad: o.unidad }))
-  return m
+      const m = new Map<number, { nombre: string; costo: number; unidad: string; stock: number; stockMin: number }>()
+      insumosOptions.value.forEach((o) => m.set(o.value, { nombre: (o as unknown as { label: string }).label, costo: (o as unknown as { costo: number }).costo, unidad: (o as unknown as { unidad: string }).unidad, stock: (o as unknown as { stock: number }).stock ?? 0, stockMin: (o as unknown as { stockMin: number }).stockMin ?? 0 }))
+      return m
 })
 
-const displayItems = computed(() => {
+const selectedInsumo = computed(() => {
+      if (!newInsumoId.value) return null
+      return insumosMap.value.get(newInsumoId.value) ?? null
+    })
+
+    const selectedInsumoStockWarning = computed(() => {
+      const s = selectedInsumo.value
+      if (!s || !newCantidad.value) return null
+      const need = Number(newCantidad.value) * (1 + Number(newDesperdicio.value ?? 0) / 100)
+      if (s.stock <= s.stockMin) return `Stock crítico: ${s.stock} ${s.unidad} (mín ${s.stockMin})`
+      if (need > s.stock) return `Necesitás ${need.toFixed(1)} ${s.unidad}, stock ${s.stock}`
+      return null
+    })
+
+    const displayItems = computed(() => {
   if (isMock.value || !props.receta) return props.receta?.items ?? []
   return bomReal.value.map((b) => {
     const ins = insumosMap.value.get(b.insumo_id)
@@ -221,6 +299,91 @@ const markupCalculado = computed(() => {
   return Math.round(((precio - total) / precio) * 100)
 })
 
+// Precio venta sugerido = costo total / (1 - margen meta global). Live y con override manual.
+const precioSugeridoAuto = computed(() => {
+  const costo = Number(costoTotalCalculado.value ?? 0)
+  if (costo <= 0) return 0
+  const margen = Math.min(Math.max(Number(margenMetaGlobal.value ?? 35), 0), 99)
+  return Math.round(costo / (1 - margen / 100))
+})
+
+const precioOverrideInfo = computed(() => {
+  if (isMock.value || !props.receta) return false
+  const stored = Number(props.receta.precio_venta ?? 0)
+  const auto = Number(precioSugeridoAuto.value ?? 0)
+  return stored > 0 && auto > 0 && Math.abs(stored - auto) > 1
+})
+
+const precioMostrado = computed(() => {
+  if (isEditing.value) return Number(editPrecio.value ?? 0)
+  if (isMock.value || !props.receta) return Number(props.receta?.precio_venta ?? 0)
+  const stored = Number(props.receta?.precio_venta ?? 0)
+  if (stored > 0) return stored
+  return Number(precioSugeridoAuto.value ?? 0)
+})
+
+const markupMostrado = computed(() => {
+  if (isMock.value || !props.receta) return Number(props.receta?.markup_pct ?? 0)
+  if (isEditing.value) {
+    return precioOverride.value ? Number(markupCalculado.value ?? 0) : Number(margenMetaGlobal.value ?? 35)
+  }
+  const stored = Number(props.receta?.precio_venta ?? 0)
+  if (stored > 0) return Number(markupCalculado.value ?? 0)
+  return Number(margenMetaGlobal.value ?? 35)
+})
+
+const isDirty = computed(() => {
+  if (!isEditing.value || !snapshot.value) return false
+  const s = snapshot.value as Record<string, unknown>
+  return editNombre.value !== (s.nombre as string) ||
+    editCodigo.value !== (s.codigo as string) ||
+    editCategoria.value !== (s.categoria as string) ||
+    editLinea.value !== (s.linea as string) ||
+    editDescripcion.value !== (s.descripcion as string) ||
+    Number(editTiempo.value) !== Number(s.tiempo ?? 60) ||
+    Number(editMano.value) !== Number(s.mano ?? 0) ||
+    Number(editCif.value) !== Number(s.cif ?? 0) ||
+    Number(editPrecio.value) !== Number(s.precio ?? 0) ||
+    editRecomendaciones.value !== (s.recomendaciones as string)
+})
+
+const semaforo = computed(() => {
+  if (isMock.value || !props.receta) return null
+  const real = Number(markupCalculado.value ?? 0)
+  const meta = Number(margenMetaGlobal.value ?? 35)
+  const precio = Number(precioMostrado.value ?? 0)
+  const sugerido = Number(precioSugeridoAuto.value ?? 0)
+  const diffPct = sugerido > 0 ? Math.round(((precio - sugerido) / sugerido) * 100) : 0
+  const diffAbs = Math.round(precio - sugerido)
+  let color: 'emerald' | 'amber' | 'red' | 'sky' = 'emerald'
+  let label = 'En meta'
+  if (real < 0) { color = 'red'; label = 'Pérdida' }
+  else if (real < meta - 10) { color = 'amber'; label = 'Por debajo' }
+  else if (real > meta + 20) { color = 'sky'; label = 'Alto' }
+  else { color = 'emerald'; label = 'En meta' }
+  return { real, meta, diffPct, diffAbs, color, label }
+})
+
+    // Historial de precio
+    const historial = ref<any[]>([])
+    const loadingHistorial = ref(false)
+    async function cargarHistorial() {
+      if (isMock.value || !recetaId.value) { historial.value = []; return }
+      loadingHistorial.value = true
+      try {
+        const { client } = await import('@/api/client')
+        const { data } = await client.get('/audit-fiscal/precio-versions', { params: { producto_id: recetaId.value } })
+        historial.value = Array.isArray(data) ? data : []
+      } catch { historial.value = [] }
+      finally { loadingHistorial.value = false }
+    }
+
+watch(precioSugeridoAuto, (v) => {
+  if (isEditing.value && !precioOverride.value && v > 0) {
+    editPrecio.value = v
+  }
+})
+
 async function agregarInsumo() {
   if (!props.receta || !recetaId.value || !newInsumoId.value) {
     showToast('warn', 'Seleccioná un insumo', 'Elegí un insumo del dropdown.')
@@ -230,6 +393,9 @@ async function agregarInsumo() {
     showToast('warn', 'Cantidad inválida', 'La cantidad debe ser > 0.')
     return
   }
+      if (selectedInsumo.value && selectedInsumoStockWarning.value) {
+        showToast('warn', 'Stock bajo', selectedInsumoStockWarning.value!)
+      }
   try {
     await bomApi.createBomInsumo(recetaId.value, {
       insumo_id: newInsumoId.value,
@@ -311,12 +477,14 @@ function exportarMatriz() {
     modal
     :style="{ width: '92vw', maxWidth: '980px' }"
     :header="receta ? `${isEditing ? editNombre || receta.nombre : receta.nombre} (${isEditing ? editCodigo || receta.codigo : receta.codigo})` : 'Ficha Técnica'"
-    @update:visible="(v) => emit('update:visible', v)"
+    @update:visible="onDialogVisibility"
   >
     <div v-if="receta" class="space-y-5 pt-1">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-800 pb-3">
         <div class="flex items-center gap-2">
           <Tag severity="warning" class="font-bold tracking-wider text-xs uppercase">{{ isEditing ? editLinea || receta.linea : receta.linea }}</Tag>
+              <span v-if="isDirty" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">• sin guardar</span>
+              <span v-if="!isMock && semaforo" class="px-2 py-0.5 rounded-full text-[10px] font-bold border" :class="semaforo.color === 'emerald' ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30' : semaforo.color === 'amber' ? 'bg-amber-950/40 text-amber-300 border-amber-500/30' : semaforo.color === 'red' ? 'bg-red-950/40 text-red-300 border-red-500/30' : 'bg-sky-950/40 text-sky-300 border-sky-500/30'">{{ semaforo.label }} {{ semaforo.diffPct > 0 ? '+' : '' }}{{ semaforo.diffPct }}%</span>
           <span class="text-xs text-stone-400 font-medium">Ficha Técnica Oficial de Taller • Arpía Atelier</span>
           <span v-if="!isMock" class="px-2 py-0.5 rounded-full text-[10px] font-bold border" :class="loadingBom ? 'bg-amber-950/40 text-amber-300 border-amber-500/30' : 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'">{{ loadingBom ? 'Cargando BOM...' : `BOM: ${bomReal.length} renglones` }}</span>
         </div>
@@ -324,6 +492,7 @@ function exportarMatriz() {
           <div class="inline-flex bg-stone-900 rounded-lg p-0.5 border border-stone-800">
             <button type="button" class="px-3 py-1.5 rounded-md text-xs font-semibold transition" :class="activeTab === 'ficha' ? 'bg-amber-500 text-stone-950 shadow' : 'text-stone-400 hover:text-stone-200'" @click="activeTab = 'ficha'">📋 Ficha Técnica</button>
             <button type="button" class="px-3 py-1.5 rounded-md text-xs font-semibold transition" :class="activeTab === 'matriz' ? 'bg-amber-500 text-stone-950 shadow' : 'text-stone-400 hover:text-stone-200'" @click="activeTab = 'matriz'">📊 Matriz Google Sheet</button>
+
           </div>
           <Button v-if="!isEditing" label="Editar" icon="pi pi-pencil" severity="warning" size="small" outlined @click="enterEdit()" />
           <Button v-if="isEditing" label="Guardar" icon="pi pi-check" severity="success" size="small" :loading="saving" @click="guardarEdicion()" />
@@ -362,6 +531,11 @@ function exportarMatriz() {
             <div class="sm:col-span-2">
               <label class="block text-[11px] font-semibold uppercase text-stone-400 mb-1">Insumo</label>
               <Dropdown v-model="newInsumoId" :options="insumosOptions" optionLabel="label" optionValue="value" placeholder="Seleccionar insumo" class="w-full" filter />
+                  <div v-if="selectedInsumo" class="mt-1 flex items-center gap-2 text-[11px]">
+                    <span class="font-mono text-stone-300">${{ selectedInsumo.costo.toLocaleString('es-CO') }}/{{ selectedInsumo.unidad }}</span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold border" :class="selectedInsumo.stock <= selectedInsumo.stockMin ? 'bg-red-950/40 text-red-300 border-red-500/30' : 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'">Stock {{ selectedInsumo.stock }} {{ selectedInsumo.unidad }}</span>
+                    <span v-if="selectedInsumoStockWarning" class="text-amber-400">{{ selectedInsumoStockWarning }}</span>
+                  </div>
             </div>
             <div>
               <label class="block text-[11px] font-semibold uppercase text-stone-400 mb-1">Cantidad</label>
@@ -446,7 +620,7 @@ function exportarMatriz() {
               <div class="flex justify-between py-1 text-stone-300"><span>(+) Mano de Obra ({{ isEditing ? editTiempo : receta.tiempo_confeccion_min }} min)</span><span v-if="!isEditing" class="font-mono font-semibold">{{ formatCOP(receta.mano_obra) }}</span><input v-else v-model.number="editMano" type="number" class="w-24 bg-stone-950 border border-stone-700 rounded px-2 py-1 text-right font-mono text-stone-200" /></div>
               <div class="flex justify-between py-1 text-stone-300"><span>(+) Costos CIF / Energía Eléctrica</span><span v-if="!isEditing" class="font-mono font-semibold">{{ formatCOP(receta.cif_energia) }}</span><input v-else v-model.number="editCif" type="number" class="w-24 bg-stone-950 border border-stone-700 rounded px-2 py-1 text-right font-mono text-stone-200" /></div>
               <div class="flex justify-between py-1.5 font-bold text-stone-100 bg-stone-950/40 px-2 rounded"><span>(=) Costo Unitario de Confección</span><span class="font-mono text-emerald-400">{{ formatCOP(costoTotalCalculado) }}</span></div>
-              <div class="flex justify-between py-2 items-center"><div><div class="font-bold text-amber-400 text-sm">PRECIO VENTA SUGERIDO</div><div class="text-[10px] text-stone-400">Margen comercial: {{ isMock ? receta.markup_pct : markupCalculado }}%</div></div><div v-if="!isEditing" class="font-mono text-lg font-extrabold text-amber-300">{{ formatCOP(receta.precio_venta) }}</div><input v-else v-model.number="editPrecio" type="number" class="w-32 bg-stone-950 border border-amber-500/30 rounded px-2 py-1.5 text-right font-mono text-lg font-extrabold text-amber-300" /></div>
+              <div class="flex justify-between py-2 items-center gap-2"><div><div class="font-bold text-amber-400 text-sm">PRECIO VENTA</div><div class="text-[10px] text-stone-400">Margen real: {{ markupCalculado }}% <span class="text-stone-500">| Meta: {{ isMock ? receta.markup_pct : margenMetaGlobal }}%</span></div><div v-if="!isMock && !isEditing && precioSugeridoAuto > 0" class="text-[10px] text-amber-400/70">Sugerido ({{ margenMetaGlobal }}%): {{ formatCOP(precioSugeridoAuto) }}</div><div v-else-if="!isMock && isEditing" class="text-[10px] text-amber-400/70">Sugerido: {{ formatCOP(precioSugeridoAuto) }} <span v-if="precioOverride" class="text-stone-500">| editado</span></div></div><div v-if="!isEditing" class="font-mono text-lg font-extrabold text-amber-300">{{ formatCOP(precioMostrado) }}</div><div v-else class="flex items-center gap-1"><input v-model.number="editPrecio" type="number" @input="precioOverride = true" class="w-32 bg-stone-950 border rounded px-2 py-1.5 text-right font-mono text-lg font-extrabold" :class="precioOverride ? 'border-stone-600 text-stone-100' : 'border-amber-500/30 text-amber-300'" /><button v-if="precioOverride && precioSugeridoAuto > 0" type="button" class="text-[10px] px-2 py-1 rounded bg-stone-800 text-stone-400 hover:text-amber-300 whitespace-nowrap" title="Volver al precio sugerido" @click="resetPrecio()">&#8634; auto</button></div></div>
             </div>
           </div>
         </div>
@@ -484,10 +658,14 @@ function exportarMatriz() {
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div class="bg-stone-900/90 border border-stone-800 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-stone-400">Costo Total Confección</div><div class="text-base font-mono font-bold text-stone-200 mt-1">{{ formatCOP(costoTotalCalculado) }}</div></div>
-          <div class="bg-stone-900/90 border border-amber-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-amber-400">Venta Sugerida Atelier</div><div class="text-base font-mono font-bold text-amber-300 mt-1">{{ formatCOP(isEditing ? editPrecio : receta.precio_venta) }}</div></div>
-          <div class="bg-stone-900/90 border border-emerald-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-emerald-400">Ganancia Neta Estimada</div><div class="text-base font-mono font-bold text-emerald-300 mt-1">{{ formatCOP((isEditing ? editPrecio : receta.precio_venta) - costoTotalCalculado) }} ({{ isMock ? receta.markup_pct : markupCalculado }}%)</div></div>
+          <div class="bg-stone-900/90 border border-amber-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-amber-400">Venta Sugerida Atelier</div><div class="text-base font-mono font-bold text-amber-300 mt-1">{{ formatCOP(precioMostrado) }}</div></div>
+          <div class="bg-stone-900/90 border border-emerald-500/30 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-emerald-400">Ganancia Neta Estimada</div><div class="text-base font-mono font-bold text-emerald-300 mt-1">{{ formatCOP(precioMostrado - costoTotalCalculado) }} ({{ markupMostrado }}%)</div></div>
         </div>
       </div>
+
+
+
+          
     </div>
   </Dialog>
 </template>

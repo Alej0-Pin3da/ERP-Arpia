@@ -16,6 +16,9 @@ const { isMock } = useMode()
 
 const search = ref('')
 const selectedCategory = ref('Todos los Modelos')
+const filtroMargen = ref<'Todos'|'Pérdida'|'Por debajo'|'En meta'|'Alto'>('Todos')
+const ordenarPor = ref<'nombre'|'precio'|'costo'|'margen'>('nombre')
+const ordenarDir = ref<'asc'|'desc'>('asc')
 
 const showFichaModal = ref(false)
 const showNuevaModal = ref(false)
@@ -36,11 +39,27 @@ const categorias = [
 ]
 
 const productosReal = ref<any[]>([])
+const bomCounts = ref<Record<number, number>>({})
 async function cargarProductosReales() {
   if (isMock.value) return
   try {
     const r = await productosApi.listProductos({ limit: 100 })
     productosReal.value = (r.items as any) ?? []
+    // Cargar conteo BOM real por producto (no bloquea grilla)
+    try {
+      const { listBomInsumos } = await import('@/services/api/bom')
+      const counts = await Promise.all(
+        productosReal.value.map(async (p: any) => {
+          try {
+            const bom = await listBomInsumos(p.id)
+            return [p.id, bom.length] as const
+          } catch { return [p.id, 0] as const }
+        })
+      )
+      const map: Record<number, number> = {}
+      counts.forEach(([id, c]) => { map[id] = c })
+      bomCounts.value = map
+    } catch { /* ignore BOM counts */ }
   } catch { productosReal.value = [] }
 }
 onMounted(() => { void cargarProductosReales() })
@@ -55,7 +74,14 @@ const recetasDisplay = computed(() => isMock.value ? (atelier as any).recetas : 
   categoria: p.categoria ?? 'General',
   items: [],
   tiempo_confeccion_min: p.tiempo_confeccion_min ?? 60,
-  costo_insumos: p.costo_insumos ?? 0,
+  costo_insumos: (() => {
+    if (p.costo_insumos != null) return Number(p.costo_insumos)
+    const total = Number(p.costos_operativos_fijos ?? 0)
+    const mano = Number(p.mano_obra ?? 0)
+    const cif = Number(p.cif_energia ?? 0)
+    const derived = total - mano - cif
+    return derived > 0 ? derived : 0
+  })(),
   mano_obra: p.mano_obra ?? 0,
   cif_energia: p.cif_energia ?? p.costos_operativos_fijos ?? 0,
   costo_total_unitario: p.costo_insumos != null && p.mano_obra != null && p.cif_energia != null ? Number(p.costo_insumos) + Number(p.mano_obra) + Number(p.cif_energia) : (p.costos_operativos_fijos ?? 0),
@@ -63,12 +89,19 @@ const recetasDisplay = computed(() => isMock.value ? (atelier as any).recetas : 
   precio_venta_sugerido: p.precio_venta_sugerido ?? 0,
   costo_estimado_materiales: p.costo_insumos ?? 0,
   tiempo_estimado_confeccion_horas: p.tiempo_confeccion_min ? Math.round(p.tiempo_confeccion_min / 60 * 10)/10 : 1,
-  markup_pct: p.markup_pct ?? 0,
+  markup_pct: (() => {
+    const m = p.markup_pct
+    if (m != null && Number(m) !== 0) return Number(m)
+    const precio = Number(p.precio_venta_sugerido ?? 0)
+    const costo = p.costo_insumos != null && p.mano_obra != null && p.cif_energia != null ? Number(p.costo_insumos) + Number(p.mano_obra) + Number(p.cif_energia) : Number(p.costos_operativos_fijos ?? 0)
+    if (precio > 0 && costo > 0) return Math.round(((precio - costo) / precio) * 100)
+    return Number(m ?? 0)
+  })(),
   recomendaciones_taller: p.recomendaciones_taller ?? '',
   fases: p.fases ?? [],
 })))
 const recetasFiltradas = computed(() => {
-  return recetasDisplay.value.filter((r) => {
+  let list = recetasDisplay.value.filter((r) => {
     const q = search.value.trim().toLowerCase()
     const matchesSearch =
       !q ||
@@ -80,9 +113,32 @@ const recetasFiltradas = computed(() => {
       selectedCategory.value === 'Todos los Modelos' ||
       r.categoria === selectedCategory.value
 
-    return matchesSearch && matchesCat
+    const m = Number(r.markup_pct ?? 0)
+    const matchesMargen =
+      filtroMargen.value === 'Todos' ||
+      (filtroMargen.value === 'Pérdida' && m < 0) ||
+      (filtroMargen.value === 'Por debajo' && m >= 0 && m < 35) ||
+      (filtroMargen.value === 'En meta' && m >= 35 && m <= 60) ||
+      (filtroMargen.value === 'Alto' && m > 60)
+
+    return matchesSearch && matchesCat && matchesMargen
+  })
+
+  const dir = ordenarDir.value === 'asc' ? 1 : -1
+  return [...list].sort((a, b) => {
+    if (ordenarPor.value === 'margen') return (Number(a.markup_pct ?? 0) - Number(b.markup_pct ?? 0)) * dir
+    if (ordenarPor.value === 'precio') return (Number(a.precio_venta ?? 0) - Number(b.precio_venta ?? 0)) * dir
+    if (ordenarPor.value === 'costo') return (Number(a.costo_total_unitario ?? 0) - Number(b.costo_total_unitario ?? 0)) * dir
+    return a.nombre.localeCompare(b.nombre) * dir
   })
 })
+
+function margenColor(m: number) {
+  if (m < 0) return 'bg-red-500'
+  if (m < 35) return 'bg-amber-500'
+  if (m <= 60) return 'bg-emerald-500'
+  return 'bg-sky-500'
+}
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
@@ -216,9 +272,25 @@ async function eliminarReceta(r: RecetaBOM) {
           {{ cat }}
         </button>
       </div>
-    </div>
 
-    <div v-if="!recetasFiltradas.length" class="text-center py-12 bg-stone-900/40 border border-stone-800 rounded-2xl">
+          <!-- Filtros margen + orden -->
+          <div class="flex flex-wrap items-center gap-2 pt-2">
+            <span class="text-[11px] font-bold uppercase text-stone-500">Margen:</span>
+            <button v-for="f in (['Todos','Pérdida','Por debajo','En meta','Alto'] as const)" :key="f" type="button" class="px-2.5 py-1 rounded-lg text-xs font-semibold border transition" :class="filtroMargen === f ? 'bg-amber-500 text-stone-950 border-amber-500' : 'bg-stone-900 text-stone-400 border-stone-800 hover:text-stone-200'" @click="filtroMargen = f">{{ f }}</button>
+            <span class="h-4 w-px bg-stone-800 mx-1"></span>
+            <span class="text-[11px] font-bold uppercase text-stone-500">Ordenar:</span>
+            <select v-model="ordenarPor" class="bg-stone-900 border border-stone-800 rounded-lg px-2 py-1 text-xs text-stone-300">
+              <option value="nombre">Nombre</option>
+              <option value="margen">Margen</option>
+              <option value="precio">Precio</option>
+              <option value="costo">Costo</option>
+            </select>
+            <button type="button" class="px-2 py-1 rounded-lg bg-stone-900 border border-stone-800 text-xs text-stone-300" @click="ordenarDir = ordenarDir === 'asc' ? 'desc' : 'asc'">{{ ordenarDir === 'asc' ? '↑' : '↓' }}</button>
+            <span class="text-xs text-stone-500">{{ recetasFiltradas.length }} / {{ recetasDisplay.length }}</span>
+          </div>
+        </div>
+
+        <div v-if="!recetasFiltradas.length" class="text-center py-12 bg-stone-900/40 border border-stone-800 rounded-2xl">
       <i class="pi pi-inbox text-3xl text-stone-500 mb-3 block" />
       <p class="text-sm font-bold text-stone-300">Sin modelos registrados en modo {{ isMock ? 'MOCK' : 'REAL' }}</p>
       <p v-if="!isMock" class="text-xs text-stone-400 mt-1">Los datos vienen de <code>GET /api/v1/productos</code>. Creá un producto desde el backend o volvé a <code>VITE_USE_MOCK=true</code>.</p>
@@ -252,10 +324,10 @@ async function eliminarReceta(r: RecetaBOM) {
           <!-- Metadata Tags -->
           <div class="flex items-center gap-2 pt-1">
             <span class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono">
-              🧵 {{ r.items.length }} Insumos BOM
+              🧵 {{ isMock ? r.items.length : (bomCounts[r.id] ?? 0) }} Insumos BOM
             </span>
             <span class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono">
-              ⏱️ {{ r.tiempo_confeccion_min }} min confección
+              ⏱️ {{ r.tiempo_confeccion_min ?? '—' }}{{ r.tiempo_confeccion_min ? ' min confección' : '' }}
             </span>
           </div>
 
@@ -263,21 +335,24 @@ async function eliminarReceta(r: RecetaBOM) {
           <div class="bg-stone-950/70 border border-stone-800/80 rounded-xl p-3 space-y-1.5 text-xs">
             <div class="flex justify-between text-stone-400">
               <span>Costo Insumos:</span>
-              <span class="font-mono text-stone-200">{{ formatCOP(r.costo_insumos) }}</span>
+              <span class="font-mono" :class="Number(r.costo_insumos) > 0 ? 'text-stone-200' : 'text-stone-500'">{{ Number(r.costo_insumos) > 0 ? formatCOP(r.costo_insumos) : '—' }}</span>
             </div>
             <div class="flex justify-between text-stone-400">
-              <span>Mano de Obra ({{ r.tiempo_confeccion_min }}m):</span>
-              <span class="font-mono text-stone-200">{{ formatCOP(r.mano_obra) }}</span>
+              <span>Mano de Obra ({{ r.tiempo_confeccion_min ?? '—' }}{{ r.tiempo_confeccion_min ? 'm' : '' }}):</span>
+              <span class="font-mono" :class="Number(r.mano_obra) > 0 ? 'text-stone-200' : 'text-stone-500'">{{ Number(r.mano_obra) > 0 ? formatCOP(r.mano_obra) : '—' }}</span>
             </div>
             <div class="flex justify-between font-bold text-stone-200 border-t border-stone-800/80 pt-1">
               <span>Costo Total Unitario:</span>
               <span class="font-mono text-emerald-400">{{ formatCOP(r.costo_total_unitario) }}</span>
             </div>
-            <div class="flex justify-between items-center bg-stone-900/60 p-1.5 rounded mt-1">
-              <span class="text-amber-400 font-bold text-[11px]">PRECIO VENTA ({{ r.markup_pct }}%):</span>
-              <span class="font-mono text-sm font-extrabold text-amber-300">{{ formatCOP(r.precio_venta) }}</span>
-            </div>
-          </div>
+                            <div class="h-1.5 w-full bg-stone-800 rounded-full overflow-hidden mt-1">
+                  <div class="h-full rounded-full transition-all" :class="margenColor(Number(r.markup_pct ?? 0))" :style="{ width: Math.min(Math.max(Number(r.markup_pct ?? 0), 0), 100) + '%' }"></div>
+                </div>
+                <div class="flex justify-between items-center bg-stone-900/60 p-1.5 rounded">
+                  <span class="text-amber-400 font-bold text-[11px]">PRECIO VENTA ({{ r.markup_pct }}%):</span>
+                  <span class="font-mono text-sm font-extrabold" :class="Number(r.markup_pct ?? 0) < 0 ? 'text-red-400' : Number(r.markup_pct ?? 0) < 35 ? 'text-amber-300' : 'text-emerald-300'">{{ formatCOP(r.precio_venta) }}</span>
+                </div>
+              </div>
         </div>
 
         <!-- Footer Actions -->
