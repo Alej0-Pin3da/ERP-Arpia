@@ -811,6 +811,12 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Tests:** docstring 400 actualizado + nuevo `test_post_201_con_proveedor_maestro`.
 - Verificación: `alembic upgrade head` en test y dev (FK creada, 80 compras intactas); `pytest` 2 passed; `npm run build` OK.
 
+### [2026-09-03] — Tanda B P1 Punto 4 (P1-4): FK Movimientos.liquidacion_id → INVIABLE, no se crea
+
+- **Investigación:** la premisa era falsa. `Movimientos_Financieros.liquidacion_id` NO guarda códigos `LIQ-YYYY-NN`: el único escritor (`settle_liquidacion`) guarda claves sintéticas por socia de 12 chars (necesarias por el UNIQUE parcial `uq_liquidacion`), y tests/APIs usan códigos libres. Una FK a `liquidaciones(codigo)` rechaza cada insert de settlement (probado: rompió 2 tests). En dev había 0 valores no-nulos, ningún dato comprometido.
+- **Decisión:** NO crear la FK (forzarla rompería settlement + suite). Se creó, se probó, se revirtió: archivo de migración eliminado, modelo revertido con comentario explicativo, FK dropeada de dev y test. La conciliación sigue manual por prefijo de código; `uq_liquidacion` sigue como guard de settlement único.
+- Verificación: `pytest test_finanzas` 2 passed tras la reversión; `alembic history` limpio.
+
 ### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
 
 #### 1. Migración `0021_backfill_costo_insumos` (`backend/alembic/versions/0021_backfill_costo_insumos.py`)

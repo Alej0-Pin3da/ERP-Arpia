@@ -140,6 +140,11 @@ class MovimientoFinanciero(Base):
         server_default=DocumentState.CONFIRMED.value,
         default=DocumentState.CONFIRMED.value,
     )
+    # P1-4: NO FK here by design — settle_liquidacion stores synthetic
+    # per-socio keys ("<key10><idx2>"), never bare liquidaciones.codigo, so a
+    # FK to liquidaciones(codigo) would reject every settlement insert.
+    # Reconciliation stays manual via codigo prefix; uq_liquidacion guards
+    # one-time settlement. See 0023_ventas_canal_metodo_fk docstring.
     liquidacion_id: Mapped[str | None] = mapped_column(String(12), nullable=True)
     # Reversal tracking
     reversed_motivo: Mapped[str | None] = mapped_column(Text, nullable=True)
