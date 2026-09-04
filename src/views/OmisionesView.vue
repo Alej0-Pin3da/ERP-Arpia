@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useMode } from '@/composables/useMode'
-import * as omisionesApi from '@/services/api/omisiones'
+import { useOmisiones, type MockOmision } from '@/composables/useOmisiones'
 
 const { isMock } = useMode()
-const omisiones = ref([
+const omisionesApi = useOmisiones()
+const omisiones = ref<MockOmision[]>([
   {
     id: 1,
     fecha: '2026-08-20 14:30',
@@ -25,7 +26,7 @@ const omisionesReal = ref<any[]>([])
 async function cargarOmisionesReales() {
   if (isMock.value) return
   try {
-    const r = await omisionesApi.listOmisiones({ limit: 100 })
+    const r = await omisionesApi.list({ limit: 100 })
     omisionesReal.value = (r as any).items ?? []
   } catch { omisionesReal.value = [] }
 }

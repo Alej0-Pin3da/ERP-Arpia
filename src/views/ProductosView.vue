@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import * as productosApi from '@/services/api/productos'
+import { useProductos } from '@/composables/useProductos'
+import { useBom } from '@/composables/useBom'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import { useAtelierStore, type RecetaBOM } from '@/stores/atelier'
@@ -13,6 +14,8 @@ import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
 const { isMock } = useMode()
+const productosApi = useProductos()
+const bomApi = useBom()
 
 const search = ref('')
 const selectedCategory = ref('Todos los Modelos')
@@ -53,15 +56,14 @@ async function cargarMargenMeta() {
 async function cargarProductosReales() {
   if (isMock.value) return
   try {
-    const r = await productosApi.listProductos({ limit: 100 })
+    const r = await productosApi.list({ limit: 100 })
     productosReal.value = (r.items as any) ?? []
     // Cargar conteo BOM real por producto (no bloquea grilla)
     try {
-      const { listBomInsumos } = await import('@/services/api/bom')
       const counts = await Promise.all(
         productosReal.value.map(async (p: any) => {
           try {
-            const bom = await listBomInsumos(p.id)
+            const bom = await bomApi.listInsumos(p.id)
             return [p.id, bom.length] as const
           } catch { return [p.id, 0] as const }
         })
@@ -191,7 +193,7 @@ async function handleFichaGuardada() {
 async function eliminarReceta(r: RecetaBOM) {
   if (!isMock.value) {
     try {
-      await productosApi.deleteProducto(r.id)
+      await productosApi.remove(r.id)
       showToast('success','Producto eliminado', `${r.nombre} eliminado correctamente.`)
       await cargarProductosReales()
     } catch (e: any) {

@@ -6,12 +6,14 @@ import { useMode } from '@/composables/useMode'
 import { useInsumos } from '@/composables/useInsumos'
 import { useProduccion } from '@/composables/useProduccion'
 import { usePrendas } from '@/composables/usePrendas'
+import { useProductos } from '@/composables/useProductos'
 
 const atelier = useAtelierStore()
 const { isMock } = useMode()
 const insumosApi = useInsumos()
 const produccionApi = useProduccion()
 const prendasApi = usePrendas()
+const productosApi = useProductos()
 const insumosReal = ref<any[]>([])
 const pedidosReal = ref<any[]>([])
 const prendasReal = ref<any[]>([])
@@ -38,8 +40,7 @@ const productosRealAnalisis = ref<any[]>([])
 async function cargarProductosAnalisis() {
   if (isMock.value) return
   try {
-    const { listProductos } = await import('@/services/api/productos')
-    const r = await listProductos({ limit: 100 })
+    const r = await productosApi.list({ limit: 100 })
     productosRealAnalisis.value = (r.items as any) ?? []
   } catch { productosRealAnalisis.value = [] }
 }

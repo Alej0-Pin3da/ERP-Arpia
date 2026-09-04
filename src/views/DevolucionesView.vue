@@ -6,9 +6,11 @@ import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
 import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
-import * as devolucionesApi from '@/services/api/devoluciones'
+import { useDevoluciones } from '@/composables/useDevoluciones'
+import type { DevolucionCreatePayload } from '@/services/api/devoluciones'
 
 const { isMock } = useMode()
+const devolucionesApi = useDevoluciones()
 const devoluciones = ref([
 
   {
@@ -26,7 +28,7 @@ const devolucionesReal = ref<any[]>([])
 async function cargarDevolucionesReales() {
   if (isMock.value) return
   try {
-    const r = await devolucionesApi.listDevoluciones({ limit: 100 })
+    const r = await devolucionesApi.list({ limit: 100 })
     devolucionesReal.value = (r as any).items ?? []
   } catch { devolucionesReal.value = [] }
 }
@@ -102,7 +104,7 @@ async function confirmarEliminarDevolucion() {
       devoluciones.value = devoluciones.value.filter((d) => d.id !== target.id)
       showToast('info', 'Devolución eliminada', `Garantía ${target.codigo} eliminada en modo MOCK.`)
     } else {
-      await devolucionesApi.deleteDevolucion(target.id)
+      await devolucionesApi.remove(target.id)
       showToast('success', 'Devolución eliminada', `Devolución #${target.id} eliminada.`)
       await cargarDevolucionesReales()
     }
@@ -129,7 +131,7 @@ async function submitCreate() {
   }
   saving.value = true
   try {
-    const payload: devolucionesApi.DevolucionCreatePayload = {
+    const payload: DevolucionCreatePayload = {
       venta_id: Number(formVentaId.value),
       tipo: formTipo.value,
       motivo: formMotivo.value.trim() || null,
@@ -159,7 +161,7 @@ async function submitCreate() {
       })
       showToast('success', 'Devolución registrada', `Garantía GAR-${String(nextId).padStart(3, '0')} creada en modo MOCK.`)
     } else {
-      const created = await devolucionesApi.createDevolucion(payload)
+      const created = await devolucionesApi.create(payload) as { id: number }
       showToast('success', 'Devolución registrada', `Devolución #${created.id} creada para la venta #${payload.venta_id}.`)
       await cargarDevolucionesReales()
     }

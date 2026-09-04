@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import * as productosApi from '@/services/api/productos'
+import { useProductos } from '@/composables/useProductos'
+import { useBom } from '@/composables/useBom'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -10,18 +11,19 @@ import Slider from 'primevue/slider'
 import { useAtelierStore } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
-import * as bomApi from '@/services/api/bom'
 
 const router = useRouter()
 const atelier = useAtelierStore()
 const { isMock } = useMode()
+const productosApi = useProductos()
+const bomApi = useBom()
 const productosRealCot = ref<any[]>([])
 const costoRealCot = ref<number | null>(null)
 const loadingCostoReal = ref(false)
 async function cargarProductosCotizador() {
   if (isMock.value) return
   try {
-    const r = await productosApi.listProductos({ limit: 100 })
+    const r = await productosApi.list({ limit: 100 })
     productosRealCot.value = (r.items as any) ?? []
   } catch { productosRealCot.value = [] }
 }
@@ -63,7 +65,7 @@ async function cargarCostoRealCot() {
   if (isMock.value || !recetaSeleccionada.value) { costoRealCot.value = null; return }
   loadingCostoReal.value = true
   try {
-    const c = await bomApi.getCostoProduccion(recetaSeleccionada.value)
+    const c = await bomApi.getCosto(recetaSeleccionada.value) as { total?: number | string }
     costoRealCot.value = Number(c.total ?? 0)
   } catch { costoRealCot.value = null }
   finally { loadingCostoReal.value = false }

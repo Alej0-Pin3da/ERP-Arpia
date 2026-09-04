@@ -16,3 +16,9 @@ export async function listOmisiones(params?: Record<string, unknown>): Promise<P
   const { data } = await client.get<Paginated<OmisionRead>>('/omisiones', { params })
   return data
 }
+
+// P2-8: minimal resolve — mirrors PATCH /omisiones/{id} (admin only).
+export async function resolveOmision(id: number, resuelta = true): Promise<OmisionRead> {
+  const { data } = await client.patch<OmisionRead>(`/omisiones/${id}`, { resuelta })
+  return data
+}

@@ -886,3 +886,10 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Backend + frontend:** modelo `variante_id` nullable + relationship opcional; schema `int | None = None`; `create_prenda` valida existencia solo si viene. Servicio `prendas.ts`, `usePrendas` mock null-safe (talla `Sin talla`, sku `GENERICA`), `PrendasListasView` mapping null-safe. Nota: sin form de alta en REAL, la genérica se crea vía API directa; el display ya la soporta.
 - Verificación: `alembic upgrade head` + down/up en dev; insert NULL OK + cleanup; `pytest test_fase4_produccion` 5 passed.
 
+### [2026-09-03] — P2-8 (AnalisisFull.md): composables por dominio
+
+- **Nuevos `src/composables/`** (patrón `useClientes`: branch `isMock`, `list/get/create/update/remove` delegando al servicio en REAL; `useAnaliticos` ya entró con P2-1): `useProductos` (mock sobre `atelier.recetas`), `useBom` (insumos + combos + costo; combos mock vacíos/echo), `useDevoluciones` (+ `transition/remove`; mock module-scoped con seed `GAR-001`), `useOmisiones` (+ `resolve`; mock module-scoped con 2 seeds).
+- **Servicio mínimo:** `omisiones.ts` suma `resolveOmision(id, resuelta)` (`PATCH /omisiones/{id}`, espejo backend, solo-admin).
+- **Vistas refactorizadas** (mismo comportamiento, solo cambia la fuente): `ProductosView` (`list/remove` + conteo BOM vía `useBom`, fuera el `import` dinámico), `DevolucionesView`, `OmisionesView`, `CotizadorView` (`list` + costo vía `useBom`), `AnalisisView` (`list` vía `useProductos`).
+- Verificación: `npm run build` OK + `npm test` 70/70.
+
