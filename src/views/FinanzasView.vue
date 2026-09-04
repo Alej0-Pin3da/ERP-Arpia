@@ -433,12 +433,16 @@ async function marcarAnticipoDescontado(ant: AnticipoSocia) {
     showToast('success', 'Anticipo Actualizado', `Anticipo marcado como DESCONTADO.`)
     return
   }
+  // Camino único: PATCH /anticipos/{id}/descuento exige liquidacion_id.
+  // Sin liquidación no hay a qué imputar el descuento — se avisa y no se
+  // llama a ningún endpoint (el fallback a transitionAnticipo hacía doble
+  // escritura potencial: descontar + transición suelta sin vínculo).
+  if (!ant.liquidacion_id) {
+    showToast('warn', 'Falta liquidación', 'Seleccioná una liquidación para descontar el anticipo.')
+    return
+  }
   try {
-    const updated = await finanzasApi.descontarAnticipo(ant.id, ant.liquidacion_id ?? 0)
-    // fallback: reload if liquidacion_id missing (endpoint needs liquidacion; try transition)
-    if (!updated && !ant.liquidacion_id) {
-      await finanzasApi.transitionAnticipo(ant.id, { estado: 'DESCONTADO' })
-    }
+    await finanzasApi.descontarAnticipo(ant.id, ant.liquidacion_id)
     await cargarDatosReales()
     showToast('success', 'Anticipo Actualizado', `Anticipo marcado como DESCONTADO.`)
   } catch (e: unknown) {

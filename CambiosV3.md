@@ -784,7 +784,12 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 ### [2026-09-03] — P1-3: tab Historial repuesto en Ficha
 
 - **`src/components/atelier/FichaTecnicaModal.vue`:** `cargarHistorial()` ahora lee `precio-versions` + `costo-versions` en paralelo (`?producto_id=`, arrays planos) con `slice(0, 20)` por tipo; nuevo tab `🕘 Historial` (tercer botón junto a Ficha/Matriz) con dos paneles Precios/Costos (fecha + monto) + empty-states + nota `20 más recientes`. El `v-else` de Matriz pasó a `v-else-if` para no tragarse el nuevo tab. En MOCK muestra aviso `solo REAL`.
-- Verificación: `npm run build` OK (398 módulos) + `npm test` 70/70.
+  - Verificación: `npm run build` OK (398 módulos) + `npm test` 70/70.
+
+### [2026-09-03] — Tanda B P1 Punto 1 (P1-9): camino único en descontarAnticipo
+
+- **`src/views/FinanzasView.vue` (`marcarAnticipoDescontado`):** eliminado el fallback a `transitionAnticipo` cuando `liquidacion_id` es null (doble escritura potencial: `descontarAnticipo(id, 0)` + transición suelta sin vínculo). Camino único: si hay `liquidacion_id` → `descontarAnticipo`; si no → toast warn `Seleccioná una liquidación para descontar el anticipo` sin llamar a ningún endpoint. El backend `PATCH /anticipos/{id}/descuento` exige liquidación existente (404 si no), así que el toast es el flujo correcto.
+- Verificación: `npm run build` OK.
 
 ### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
 
