@@ -8,7 +8,7 @@ import { useMode } from '@/composables/useMode'
 import { useInsumos } from '@/composables/useInsumos'
 import { useProduccion } from '@/composables/useProduccion'
 import { useVentas } from '@/composables/useVentas'
-import * as analiticosApi from '@/services/api/analiticos' // eslint-disable-line @typescript-eslint/no-unused-vars
+import { useAnaliticos } from '@/composables/useAnaliticos'
 import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
@@ -19,9 +19,12 @@ const { isMock } = useMode()
 const insumosApi = useInsumos()
 const produccionApi = useProduccion()
 const ventasApi = useVentas()
+const analiticosApi = useAnaliticos()
 const insumosReal = ref<any[]>([])
 const pedidosReal = ref<any[]>([])
 const ventasReal = ref<any[]>([])
+// P2-1: resumen del backend en modo REAL con fallback al cómputo local si falla.
+const resumenReal = ref<any | null>(null)
 async function cargarDashboardReales() {
   if (isMock.value) return
   try {
@@ -34,6 +37,9 @@ async function cargarDashboardReales() {
     pedidosReal.value = (pr as any).items ?? []
     ventasReal.value = (vr as any).items ?? []
   } catch {}
+  try {
+    resumenReal.value = await analiticosApi.getResumen()
+  } catch { resumenReal.value = null }
 }
 onMounted(() => { void cargarDashboardReales() })
 watch(isMock, () => { void cargarDashboardReales() })
@@ -44,8 +50,18 @@ const pedidosDisplay = computed(() => isMock.value ? atelier.pedidos : (pedidosR
 const ventasDisplay = computed(() => isMock.value ? atelier.ventas : (ventasReal.value as any[]))
 
 const ventasMensuales = ref<any[]>([])
-const totalVentasReal = computed(() => isMock.value ? (atelier as any).totalVentas : (ventasReal.value as any[]).reduce((acc: number, v: any) => acc + Number(v.total_venta ?? v.total ?? 0), 0))
-const totalUtilidadReal = computed(() => isMock.value ? (atelier as any).totalUtilidad : (ventasReal.value as any[]).reduce((acc: number, v: any) => acc + Number(v.ganancia_neta ?? v.utilidad_neta ?? 0), 0))
+// P2-1: en REAL se prefiere el agregado del backend (snapshot, excluye anuladas);
+// si el endpoint falla, se usa el cómputo local sobre ventasReal.
+const totalVentasReal = computed(() => {
+  if (isMock.value) return (atelier as any).totalVentas
+  if (resumenReal.value != null) return Number(resumenReal.value.ventas_total ?? 0)
+  return (ventasReal.value as any[]).reduce((acc: number, v: any) => acc + Number(v.total_venta ?? v.total ?? 0), 0)
+})
+const totalUtilidadReal = computed(() => {
+  if (isMock.value) return (atelier as any).totalUtilidad
+  if (resumenReal.value != null) return Number(resumenReal.value.margen_total ?? 0)
+  return (ventasReal.value as any[]).reduce((acc: number, v: any) => acc + Number(v.ganancia_neta ?? v.utilidad_neta ?? 0), 0)
+})
 const rentabilidadReal = computed(()=> isMock.value ? atelier.rentabilidadPromedio : (() => { const v = ventasReal.value as any[]; if (!v.length) return 0; const total = v.reduce((a,c)=>a+Number(c.total_venta??0),0); const gan = v.reduce((a,c)=>a+Number(c.ganancia_neta??0),0); return total ? Math.round((gan/total)*100) : 0 })())
 const pedidosDisplayActivos = computed(() => pedidosDisplay.value.filter((p: any) => p.estado !== 'ENTREGADO' && p.estado !== 'entregado').length)
 const pipelineCountsReal = computed(() => {

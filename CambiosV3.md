@@ -838,3 +838,15 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - Best-effort en `try/except` para no bloquear el update principal; `db.commit()` incluye producto + versiones en misma transacción.
 - Verificación: `UPDATE Productos SET costo_insumos=41040 WHERE id=15` OK; `alembic_version` → `0021_backfill_costo_insumos`; `docker compose up -d --build api` OK; `GET /audit-fiscal/precio-versions?producto_id=15` ahora crea fila al cambiar precio.
 
+---
+
+### [2026-09-03] — P2-1 (AnalisisFull.md): analíticos `resumen` conectado al Dashboard en REAL
+
+#### 1. Servicio `src/services/api/analiticos.ts`
+- Nuevo `getResumen(params?)` (`GET /analiticos/resumen`) + tipo `AnaliticosResumen`. Viaja también `getTopInsumos` (`GET /analiticos/top-insumos`), usado por el composable nuevo.
+
+#### 2. Composable + vista
+- Nuevo `src/composables/useAnaliticos.ts` (patrón `useClientes`; en mock retorna `null` porque las vistas computan local).
+- `src/views/DashboardView.vue`: `resumenReal` fetcheado en `try/catch` independiente; `totalVentasReal` prefiere `resumen.ventas_total` (excluye anuladas) y `totalUtilidadReal` prefiere `resumen.margen_total`; sin resumen o en MOCK vale el cómputo local. Import `analiticosApi` ahora usado (fuera el `eslint-disable`).
+- Verificación: `npm run build` OK.
+
