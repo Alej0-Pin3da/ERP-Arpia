@@ -899,3 +899,9 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Fix (`src/components/atelier/NuevaVentaModal.vue`):** normaliza con `Number()` y solo aplica si es precio válido > 0; si el producto no tiene precio, conserva el valor del campo (edición manual intacta). Dropdown en REAL ahora muestra `Nombre (PVP: $X)` como en MOCK (antes `Nombre (ID: N)`).
 - Verificación: `npm run build` OK (403 módulos).
 
+### [2026-09-04] — P0-1 (auditoría tipos API→UI): borrado componentes dashboard muertos
+
+- **Borrados** `src/components/dashboard/BajoStockTable.vue`, `MargenTable.vue`, `KpiCards.vue`, `VentasMensualesChart.vue`: importaban `@/utils/format` y `@/utils/dashboard`, que no existen.
+- **Verificación previa:** grep confirma que ninguna vista los importa (dead code, por eso el build pasaba) y que `src/types/` no existe; decisión: borrar, no restaurar utils para código muerto.
+- Verificación: `npm run build` OK.
+
