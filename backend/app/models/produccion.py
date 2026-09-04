@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -34,6 +34,16 @@ class PedidoProduccionPrioridad(StrEnum):
 
 class PedidoProduccion(Base):
     __tablename__ = "pedidos_produccion"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('pendiente', 'en_produccion', 'completado', 'cancelado')",
+            name="ck_pedidos_produccion_estado",
+        ),
+        CheckConstraint(
+            "prioridad IN ('baja', 'normal', 'alta', 'urgente')",
+            name="ck_pedidos_produccion_prioridad",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     producto_id: Mapped[int] = mapped_column(
@@ -70,6 +80,12 @@ class PedidoProduccion(Base):
 
 class PrendaConfeccionada(Base):
     __tablename__ = "prendas_confeccionadas"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('disponible', 'reservada', 'vendida', 'defectuosa')",
+            name="ck_prendas_confeccionadas_estado",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     variante_id: Mapped[int] = mapped_column(

@@ -861,3 +861,10 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - Investigación previa: ningún consumidor usa PUT (servicios `prendas.ts`/`pedidos-produccion.ts` y tests solo `client.patch`).
 - Verificación: `py_compile` OK + `pytest test_fase4_produccion` 5 passed + `npm run build` OK.
 
+### [2026-09-03] — P2-4 (AnalisisFull.md): CHECKs para enums de producción/prendas
+
+- **Investigación (DB dev):** tablas vacías → sin valores inválidos que normalizar; los `UPDATE` de normalización quedan como no-ops protectores (pedidos.estado → `pendiente`, prioridad → `normal`, prendas.estado → `disponible`; nunca borra).
+- **Migración `0024_produccion_checks`:** 3 `CHECK` (`ck_pedidos_produccion_estado`, `ck_pedidos_produccion_prioridad`, `ck_prendas_confeccionadas_estado`) con guards estilo 0014/0022; downgrade con `DROP CONSTRAINT IF EXISTS`.
+- **Modelos:** `__table_args__` con los 3 `CheckConstraint` espejo.
+- Verificación: `alembic upgrade head` en dev + ciclo down/up; inserts inválidos rechazados ×3; `pytest test_fase4_produccion` 5 passed.
+
