@@ -873,3 +873,9 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Investigación (DB dev):** `Insumos` 79 filas con `ubicacion` 100% NULL; `prendas_confeccionadas` vacía; `maestros_ubicaciones_taller` con 1 sola fila de prueba — no hay catálogo de referencia confiable. Frontend usa `InputText` libre + fallback `'Bodega'`; no hay dropdowns que cablear.
 - **Decisión (c):** sin cambio de código. (a) FK exigiría inventar un seed no relevado; (b) validación contra maestros rechazaría texto libre legítimo. Camino futuro: relevar ubicaciones físicas, seedear el maestro, y recién ahí validación estilo `_codigos_maestros` o FK con backfill.
 
+### [2026-09-03] — P2-6 (AnalisisFull.md): Cotizador/Optimizador/Análisis sin persistencia — decisión de diseño
+
+- **Declaración:** `CotizadorView`, `OptimizadorView` y `AnalisisView` son herramientas de cálculo local sobre listas REALes; no persisten sus resultados. Decisión de diseño, no bug.
+- **Qué sí persiste:** `BOM_Insumos` (renglones), `Productos` (cabecera: costos, precio, markup), `Compras_Insumos` (compras que alimentan el WAC).
+- **Dónde ver el costo real:** `GET /productos/{id}/costo` (servicio `bom.ts → getCostoProduccion`, visible en Ficha Técnica y en el bloque `Costo real BOM (DB)` del Cotizador).
+
