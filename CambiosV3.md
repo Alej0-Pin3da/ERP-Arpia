@@ -868,3 +868,8 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Modelos:** `__table_args__` con los 3 `CheckConstraint` espejo.
 - Verificación: `alembic upgrade head` en dev + ciclo down/up; inserts inválidos rechazados ×3; `pytest test_fase4_produccion` 5 passed.
 
+### [2026-09-03] — P2-5 (AnalisisFull.md): ubicaciones libres vs maestro — documentado sin código (opción c)
+
+- **Investigación (DB dev):** `Insumos` 79 filas con `ubicacion` 100% NULL; `prendas_confeccionadas` vacía; `maestros_ubicaciones_taller` con 1 sola fila de prueba — no hay catálogo de referencia confiable. Frontend usa `InputText` libre + fallback `'Bodega'`; no hay dropdowns que cablear.
+- **Decisión (c):** sin cambio de código. (a) FK exigiría inventar un seed no relevado; (b) validación contra maestros rechazaría texto libre legítimo. Camino futuro: relevar ubicaciones físicas, seedear el maestro, y recién ahí validación estilo `_codigos_maestros` o FK con backfill.
+
