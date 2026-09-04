@@ -37,7 +37,8 @@ const criticos = computed(() => isMock.value ? atelier.insumosCriticos : (critic
 const totalSugerido = computed(() => {
   return criticos.value.reduce((sum, item) => {
     const deficit = Math.max(0, item.stock_minimo * 2 - item.stock_actual)
-    return sum + (deficit * item.costo_unitario)
+    // P0-4: en REAL la API manda costo_promedio_actual (Numeric → string), no costo_unitario
+    return sum + (deficit * Number(item.costo_unitario ?? item.costo_promedio_actual ?? 0))
   }, 0)
 })
 
@@ -55,7 +56,7 @@ async function generarOrden() {
         await comprasApi.createCompraInsumo({
           insumo_id: item.id,
           cantidad_comprada: deficit,
-          precio_unitario_compra: item.costo_unitario ?? item.costo_promedio_actual ?? 0,
+          precio_unitario_compra: Number(item.costo_unitario ?? item.costo_promedio_actual ?? 0),
         })
       } catch (e) { /* continue */ }
     }
@@ -103,7 +104,7 @@ async function generarOrden() {
                 +{{ (it.stock_minimo * 2 - it.stock_actual).toFixed(1) }} {{ it.unidad_medida }}
               </td>
               <td class="py-2.5 px-3 text-right font-mono font-bold">
-                ${{ Math.round((it.stock_minimo * 2 - it.stock_actual) * it.costo_unitario).toLocaleString('es-CO') }}
+                ${{ Math.round((it.stock_minimo * 2 - it.stock_actual) * Number(it.costo_unitario ?? it.costo_promedio_actual ?? 0)).toLocaleString('es-CO') }}
               </td>
             </tr>
           </tbody>

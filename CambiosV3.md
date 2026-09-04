@@ -917,3 +917,9 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Fix:** `(Number(stock_actual ?? stock ?? 0) * Number(costo_unitario ?? costo ?? 0))`, consistente con el store. Vale para MOCK y REAL.
 - Verificación: `npm run build` OK.
 
+### [2026-09-04] — P0-4 (auditoría tipos API→UI): SugerirOrdenModal $NaN en REAL
+
+- **`src/components/atelier/SugerirOrdenModal.vue`:** en REAL usaba `item.costo_unitario` (undefined; la API manda `costo_promedio_actual` string) → `Total Est.` e `Inversión Estimada` en `$NaN`.
+- **Fix:** `Number(item.costo_unitario ?? item.costo_promedio_actual ?? 0)` en `totalSugerido`, celda `Total Est.` y `precio_unitario_compra` del payload (evita mandar string Numeric a la API).
+- Verificación: `npm run build` OK.
+
