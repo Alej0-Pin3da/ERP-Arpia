@@ -47,6 +47,25 @@ watch(isMock, () => { void cargarDashboardReales() })
 const insumosCriticosReal = computed(() => (insumosReal.value as any[]).filter((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
 const insumosCriticosDisplay = computed(() => isMock.value ? atelier.insumosCriticos : insumosCriticosReal.value)
 const pedidosDisplay = computed(() => isMock.value ? atelier.pedidos : (pedidosReal.value as any[]))
+// P0-2: en REAL la API (PedidoProduccionRead) no trae codigo/cliente_nombre/
+// prenda_nombre ni montos; se normaliza como en ProduccionView para no
+// renderizar celdas vacías ni $NaN (Numeric serializa como string).
+const pedidosTabla = computed(() => {
+  if (isMock.value) return pedidosDisplay.value
+  return (pedidosReal.value as any[]).map((p: any) => {
+    const rawEstado = String(p.estado ?? '')
+    return {
+      ...p,
+      codigo: `ORD-${p.id}`,
+      cliente_nombre: p.nombre_variante || p.nombre_producto || 'Taller Arpía',
+      prenda_nombre: p.nombre_producto || `Producto #${p.producto_id}`,
+      estado: rawEstado === 'pendiente' ? 'CORTE' : rawEstado === 'en_produccion' ? 'COSTURA' : rawEstado === 'completado' ? 'LISTO' : (rawEstado.toUpperCase() || 'COTIZADO'),
+      precio_venta: Number(p.precio_venta ?? 0),
+      utilidad_neta: Number(p.utilidad_neta ?? 0),
+      margen_pct: Number(p.margen_pct ?? 0),
+    }
+  })
+})
 const ventasDisplay = computed(() => isMock.value ? atelier.ventas : (ventasReal.value as any[]))
 
 const ventasMensuales = ref<any[]>([])
@@ -353,7 +372,7 @@ function getEstadoBadgeClass(estado: string) {
             <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400 m-0 flex items-center gap-2">
               <i class="pi pi-list" /> Seguimiento de Producción & Rentabilidad
             </h3>
-            <span class="text-xs text-stone-400">{{ pedidosDisplay.length }} órdenes</span>
+            <span class="text-xs text-stone-400">{{ pedidosTabla.length }} órdenes</span>
           </div>
 
           <div class="overflow-x-auto">
@@ -363,13 +382,13 @@ function getEstadoBadgeClass(estado: string) {
                   <th class="py-2.5 px-3">Código / Cliente</th>
                   <th class="py-2.5 px-3">Prenda Solicitada</th>
                   <th class="py-2.5 px-3 text-center">Estado</th>
-                  <th class="py-2.5 px-3 text-right">Venta</th>
-                  <th class="py-2.5 px-3 text-right">Utilidad</th>
-                  <th class="py-2.5 px-3 text-right">Margen</th>
+                  <th class="py-2.5 px-3 text-right" v-if="isMock">Venta</th>
+                  <th class="py-2.5 px-3 text-right" v-if="isMock">Utilidad</th>
+                  <th class="py-2.5 px-3 text-right" v-if="isMock">Margen</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-stone-800/50 text-stone-200">
-                <tr v-for="p in pedidosDisplay.slice(0, 6)" :key="p.id" class="hover:bg-stone-800/30">
+                <tr v-for="p in pedidosTabla.slice(0, 6)" :key="p.id" class="hover:bg-stone-800/30">
                   <td class="py-2.5 px-3">
                     <div class="font-mono font-bold text-amber-300">{{ p.codigo }}</div>
                     <div class="text-[11px] text-stone-400 truncate max-w-[130px]">{{ p.cliente_nombre }}</div>
@@ -382,9 +401,9 @@ function getEstadoBadgeClass(estado: string) {
                       {{ p.estado }}
                     </span>
                   </td>
-                  <td class="py-2.5 px-3 text-right font-mono">{{ formatCOP(p.precio_venta) }}</td>
-                  <td class="py-2.5 px-3 text-right font-mono font-bold text-emerald-400">{{ formatCOP(p.utilidad_neta) }}</td>
-                  <td class="py-2.5 px-3 text-right font-mono text-stone-300">{{ p.margen_pct }}%</td>
+                  <td v-if="isMock" class="py-2.5 px-3 text-right font-mono">{{ formatCOP(p.precio_venta) }}</td>
+                  <td v-if="isMock" class="py-2.5 px-3 text-right font-mono font-bold text-emerald-400">{{ formatCOP(p.utilidad_neta) }}</td>
+                  <td v-if="isMock" class="py-2.5 px-3 text-right font-mono text-stone-300">{{ p.margen_pct }}%</td>
                 </tr>
               </tbody>
             </table>

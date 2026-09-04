@@ -905,3 +905,9 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Verificación previa:** grep confirma que ninguna vista los importa (dead code, por eso el build pasaba) y que `src/types/` no existe; decisión: borrar, no restaurar utils para código muerto.
 - Verificación: `npm run build` OK.
 
+### [2026-09-04] — P0-2 (auditoría tipos API→UI): tabla Producción del Dashboard en REAL
+
+- **`src/views/DashboardView.vue`:** en REAL iteraba `PedidoProduccionRead` crudo pero el template leía `p.codigo, p.precio_venta, p.utilidad_neta` (inexistentes) → celdas vacías + `$NaN`.
+- **Fix:** nuevo computed `pedidosTabla` que en REAL normaliza como `ProduccionView` (`ORD-${id}`, `nombre_variante || nombre_producto`, mapeo de `estado` a etapas en mayúsculas) + `Number()` en montos; en MOCK pasa intacto. Columnas `Venta/Utilidad/Margen` (sin dato real) con `v-if="isMock"`; el `v-for` y el contador usan `pedidosTabla`. Patrón `isMock` intacto.
+- Verificación: `npm run build` OK.
+
