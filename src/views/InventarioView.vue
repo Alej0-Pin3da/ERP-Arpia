@@ -92,7 +92,7 @@ const insumosFiltrados = computed(() => {
 const directosCount = computed(() => insumosList.value.filter((i) => i.tipo === 'Directo').length)
 const indirectosCount = computed(() => insumosList.value.filter((i) => i.tipo === 'Indirecto').length)
 const insumosCriticosCount = computed(() => insumosList.value.filter((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)).length)
-const valorTotalInventarioReal = computed(() => insumosList.value.reduce((acc: number, i: any) => acc + ((i.stock_actual ?? i.stock ?? 0) * (i.costo_promedio ?? i.costo ?? 0)), 0))
+const valorTotalInventarioReal = computed(() => insumosList.value.reduce((acc: number, i: any) => acc + (Number(i.stock_actual ?? i.stock ?? 0) * Number(i.costo_unitario ?? i.costo ?? 0)), 0))
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`

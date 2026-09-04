@@ -911,3 +911,9 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Fix:** nuevo computed `pedidosTabla` que en REAL normaliza como `ProduccionView` (`ORD-${id}`, `nombre_variante || nombre_producto`, mapeo de `estado` a etapas en mayúsculas) + `Number()` en montos; en MOCK pasa intacto. Columnas `Venta/Utilidad/Margen` (sin dato real) con `v-if="isMock"`; el `v-for` y el contador usan `pedidosTabla`. Patrón `isMock` intacto.
 - Verificación: `npm run build` OK.
 
+### [2026-09-04] — P0-3 (auditoría tipos API→UI): KPI Valor Total Inventario en $0
+
+- **`src/views/InventarioView.vue:95`:** `valorTotalInventarioReal` leía `i.costo_promedio ?? i.costo` (inexistentes; el map los renombró a `costo_unitario` vía `Number(costo_promedio_actual)`) → siempre 0.
+- **Fix:** `(Number(stock_actual ?? stock ?? 0) * Number(costo_unitario ?? costo ?? 0))`, consistente con el store. Vale para MOCK y REAL.
+- Verificación: `npm run build` OK.
+
