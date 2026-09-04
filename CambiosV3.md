@@ -929,3 +929,9 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Fix:** `Number(... ?? 0)` en cada asignación (tiempo, CIF, margen vía `Math.round(Number(...))`, precios vía `Math.round(Number(costo_insumos ?? 0) * factor)`).
 - Verificación: `npm run build` OK.
 
+### [2026-09-04] — P0-6 (auditoría tipos API→UI): ProduccionView $0 mentiroso en REAL
+
+- **`src/views/ProduccionView.vue:28-41`:** el mapping hardcodea `precio_venta/costo/utilidad/margen = 0` porque `PedidoProduccionRead` no trae montos.
+- **Decisión mínima:** sin join a productos (fuera de alcance); se ocultan en REAL con `v-if="isMock"` el bloque `Venta/Utilidad` de las cards Kanban y las columnas `Precio Venta/Utilidad Neta` de la vista tabla (+ comentario en el mapping). En MOCK todo visible como antes.
+- Verificación: `npm run build` OK + `npm test` 70/70.
+

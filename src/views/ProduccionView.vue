@@ -32,6 +32,8 @@ async function cargarPedidosReales() {
       cliente_nombre: p.nombre_variante || p.nombre_producto || 'Taller Arpía',
       prenda_nombre: p.nombre_producto || `Producto #${p.producto_id}`,
       estado: p.estado === 'pendiente' ? 'CORTE' : p.estado === 'en_produccion' ? 'COSTURA' : p.estado === 'completado' ? 'LISTO' : 'COTIZADO',
+      // P0-6: PedidoProduccionRead no trae montos (sin join a productos, fuera de alcance);
+      // se mantienen en 0 y el template los oculta en REAL para no mostrar $0 mentiroso.
       precio_venta: 0,
       costo_produccion: 0,
       utilidad_neta: 0,
@@ -268,8 +270,8 @@ function abrirWhatsApp(p: PedidoProduccion) {
                   {{ p.prenda_nombre }}
                 </div>
 
-                <!-- Price & Profit -->
-                <div class="flex justify-between text-[11px] font-mono pt-1">
+                <!-- Price & Profit (solo MOCK: en REAL no hay montos) -->
+                <div v-if="isMock" class="flex justify-between text-[11px] font-mono pt-1">
                   <span class="text-stone-400">Venta: {{ formatCOP(p.precio_venta) }}</span>
                   <span class="text-emerald-400 font-bold">Utilidad: {{ formatCOP(p.utilidad_neta) }}</span>
                 </div>
@@ -317,8 +319,8 @@ function abrirWhatsApp(p: PedidoProduccion) {
               <th class="py-3 px-4">Cliente</th>
               <th class="py-3 px-4">Prenda / Modelo</th>
               <th class="py-3 px-4 text-center">Fase de Producción</th>
-              <th class="py-3 px-4 text-right">Precio Venta</th>
-              <th class="py-3 px-4 text-right">Utilidad Neta</th>
+              <th v-if="isMock" class="py-3 px-4 text-right">Precio Venta</th>
+              <th v-if="isMock" class="py-3 px-4 text-right">Utilidad Neta</th>
               <th class="py-3 px-4 text-right">Acciones</th>
             </tr>
           </thead>
@@ -335,8 +337,8 @@ function abrirWhatsApp(p: PedidoProduccion) {
                   {{ p.estado }}
                 </span>
               </td>
-              <td class="py-3 px-4 text-right font-mono">{{ formatCOP(p.precio_venta) }}</td>
-              <td class="py-3 px-4 text-right font-mono font-bold text-emerald-400">{{ formatCOP(p.utilidad_neta) }}</td>
+              <td v-if="isMock" class="py-3 px-4 text-right font-mono">{{ formatCOP(p.precio_venta) }}</td>
+              <td v-if="isMock" class="py-3 px-4 text-right font-mono font-bold text-emerald-400">{{ formatCOP(p.utilidad_neta) }}</td>
               <td class="py-3 px-4 text-right">
                 <div class="flex items-center justify-end gap-2">
                   <button
