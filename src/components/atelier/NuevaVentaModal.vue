@@ -194,11 +194,15 @@ const catalogoPrendasOptions = computed(() => {
       prenda: p,
     }))
   }
-  return productosReal.value.map((p) => ({
-    label: `${p.nombre} (ID: ${p.id})`,
-    value: p.id,
-    prenda: p as unknown as (typeof atelier.prendasListas)[number],
-  }))
+  return productosReal.value.map((p) => {
+    const pvRaw = (p as unknown as { precio_venta_sugerido?: number | string }).precio_venta_sugerido
+    const pv = Number(pvRaw ?? 0)
+    return {
+      label: Number.isFinite(pv) && pv > 0 ? `${p.nombre} (PVP: $${pv.toLocaleString('es-CO')})` : `${p.nombre} (ID: ${p.id})`,
+      value: p.id,
+      prenda: p as unknown as (typeof atelier.prendasListas)[number],
+    }
+  })
 })
 
 // Financial calculations
@@ -264,8 +268,12 @@ async function seleccionarPrendaCatalogo(it: LocalItem, prendaId: number | null)
   if (p) {
     it.producto_id = p.id
     it.nombre_prenda = p.nombre
-    const precio = (p as unknown as { precio_venta?: number; precio_venta_sugerido?: number }).precio_venta ?? (p as unknown as { precio_venta_sugerido?: number }).precio_venta_sugerido ?? it.precio_unitario
-    it.precio_unitario = precio
+    const rawPrecio = (p as unknown as { precio_venta?: number | string; precio_venta_sugerido?: number | string }).precio_venta ?? (p as unknown as { precio_venta_sugerido?: number | string }).precio_venta_sugerido
+    // Backend Numeric serializa como string ("83000.0000"): normalizar a number
+    // para que el InputNumber lo muestre. Si no hay precio válido, se conserva
+    // el valor actual del ítem (edición manual).
+    const numPrecio = Number(rawPrecio ?? NaN)
+    it.precio_unitario = Number.isFinite(numPrecio) && numPrecio > 0 ? numPrecio : it.precio_unitario
     it.costo_unitario = (p as unknown as { costo_unitario?: number }).costo_unitario ?? it.costo_unitario
     if ((p as unknown as { variantes?: { talla: string }[] }).variantes?.[0]) {
       it.talla = (p as unknown as { variantes: { talla: string }[] }).variantes[0].talla

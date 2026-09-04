@@ -893,3 +893,9 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Vistas refactorizadas** (mismo comportamiento, solo cambia la fuente): `ProductosView` (`list/remove` + conteo BOM vía `useBom`, fuera el `import` dinámico), `DevolucionesView`, `OmisionesView`, `CotizadorView` (`list` + costo vía `useBom`), `AnalisisView` (`list` vía `useProductos`).
 - Verificación: `npm run build` OK + `npm test` 70/70.
 
+### [2026-09-04] — Fix: precio no se auto-cargaba al elegir producto en NuevaVentaModal
+
+- **Causa:** el backend manda `precio_venta_sugerido` como string (Postgres `Numeric` serializa ej. `"83000.0000"`) y `seleccionarPrendaCatalogo` lo asignaba crudo al `InputNumber`, que con string no muestra nada.
+- **Fix (`src/components/atelier/NuevaVentaModal.vue`):** normaliza con `Number()` y solo aplica si es precio válido > 0; si el producto no tiene precio, conserva el valor del campo (edición manual intacta). Dropdown en REAL ahora muestra `Nombre (PVP: $X)` como en MOCK (antes `Nombre (ID: N)`).
+- Verificación: `npm run build` OK (403 módulos).
+
