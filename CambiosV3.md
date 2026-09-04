@@ -850,3 +850,8 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - `src/views/DashboardView.vue`: `resumenReal` fetcheado en `try/catch` independiente; `totalVentasReal` prefiere `resumen.ventas_total` (excluye anuladas) y `totalUtilidadReal` prefiere `resumen.margen_total`; sin resumen o en MOCK vale el cómputo local. Import `analiticosApi` ahora usado (fuera el `eslint-disable`).
 - Verificación: `npm run build` OK.
 
+### [2026-09-03] — P2-2 (AnalisisFull.md): fallback `CANALES_VENTA` fail-loud
+
+- Se mantiene el fallback estático (no rompe ventas), pero ante error de red `tryFetch` ahora hace `console.warn` + toast `Maestros no disponibles, usando valores locales`. Aplica a `listCanales/listMetodosPago/listCanalesLegacy/listMetodosLegacy` (criterio unificado).
+- Verificación `NuevaVentaModal`: con red → maestros reales; sin red → fallback estático que pasa `canalToCodigo/metodoToCodigo` sin 422. `npm run build` OK.
+

@@ -3,6 +3,7 @@
  * Keeps canales/metodos backward compatible by wrapping static arrays as Paginated when API unavailable.
  */
 import { client } from '@/api/client'
+import { showToast } from '@/utils/toast'
 
 export interface Paginated<T> {
   items: T[]
@@ -142,6 +143,12 @@ async function tryFetch<T>(path: string, fallback: T, params?: Record<string, un
     const { data } = await client.get<T>(path, { params })
     return data
   } catch {
+    // P2-2: fail-loud — el fallback estático se mantiene para no romper ventas,
+    // pero se avisa en vez de enmascarar la caída del backend.
+    console.warn(`[maestros] ${path} no disponible, usando valores locales`)
+    try {
+      showToast('warn', 'Maestros no disponibles, usando valores locales', path)
+    } catch { /* toast sin suscriptores: solo el console.warn vale */ }
     return fallback
   }
 }
