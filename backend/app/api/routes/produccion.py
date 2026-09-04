@@ -120,7 +120,8 @@ def create_prenda(
     db: Session = Depends(get_db),
     _: PrendaConfeccionada = Depends(require_admin),
 ):
-    if db.get(VarianteProducto, payload.variante_id) is None:
+    # P2-7: variante_id nullable (generic stock); only validate when given.
+    if payload.variante_id is not None and db.get(VarianteProducto, payload.variante_id) is None:
         raise HTTPException(status_code=400, detail="Variante de producto no existe")
     if payload.pedido_id is not None and db.get(PedidoProduccion, payload.pedido_id) is None:
         raise HTTPException(status_code=400, detail="Pedido de producción no existe")
@@ -138,7 +139,6 @@ def create_prenda(
 
 
 @router_prendas.patch("/{prenda_id}", response_model=PrendaConfeccionadaRead)
-@router_prendas.put("/{prenda_id}", response_model=PrendaConfeccionadaRead)
 def update_prenda(
     prenda_id: int,
     payload: PrendaConfeccionadaUpdate,
@@ -165,6 +165,18 @@ def update_prenda(
         raise HTTPException(status_code=409, detail=f"Error de integridad: {e}") from e
 
     return _prenda_to_read(prenda)
+
+
+# @deprecated: PUT alias — PATCH is the canonical verb for partial updates.
+# Kept so existing clients don't break; new code must use PATCH.
+@router_prendas.put("/{prenda_id}", response_model=PrendaConfeccionadaRead, deprecated=True)
+def update_prenda_put(
+    prenda_id: int,
+    payload: PrendaConfeccionadaUpdate,
+    db: Session = Depends(get_db),
+    _admin: PrendaConfeccionada = Depends(require_admin),
+):
+    return update_prenda(prenda_id, payload, db, _admin)
 
 
 @router_prendas.delete("/{prenda_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -285,7 +297,6 @@ def create_pedido(
 
 
 @router_pedidos.patch("/{pedido_id}", response_model=PedidoProduccionRead)
-@router_pedidos.put("/{pedido_id}", response_model=PedidoProduccionRead)
 def update_pedido(
     pedido_id: int,
     payload: PedidoProduccionUpdate,
@@ -312,6 +323,18 @@ def update_pedido(
         raise HTTPException(status_code=409, detail=f"Error de integridad: {e}") from e
 
     return _pedido_to_read(pedido)
+
+
+# @deprecated: PUT alias — PATCH is the canonical verb for partial updates.
+# Kept so existing clients don't break; new code must use PATCH.
+@router_pedidos.put("/{pedido_id}", response_model=PedidoProduccionRead, deprecated=True)
+def update_pedido_put(
+    pedido_id: int,
+    payload: PedidoProduccionUpdate,
+    db: Session = Depends(get_db),
+    _admin: PedidoProduccion = Depends(require_admin),
+):
+    return update_pedido(pedido_id, payload, db, _admin)
 
 
 @router_pedidos.delete("/{pedido_id}", status_code=status.HTTP_204_NO_CONTENT)

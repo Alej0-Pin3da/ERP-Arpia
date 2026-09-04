@@ -855,3 +855,9 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - Se mantiene el fallback estático (no rompe ventas), pero ante error de red `tryFetch` ahora hace `console.warn` + toast `Maestros no disponibles, usando valores locales`. Aplica a `listCanales/listMetodosPago/listCanalesLegacy/listMetodosLegacy` (criterio unificado).
 - Verificación `NuevaVentaModal`: con red → maestros reales; sin red → fallback estático que pasa `canalToCodigo/metodoToCodigo` sin 422. `npm run build` OK.
 
+### [2026-09-03] — P2-3 (AnalisisFull.md): PATCH canónico en producción, PUT alias deprecated
+
+- `update_prenda` y `update_pedido` quedan solo con `@patch` (parcial, canónico). Nuevos `update_prenda_put` / `update_pedido_put` con `@put(..., deprecated=True)` que delegan al handler PATCH (no se borran para no romper clientes).
+- Investigación previa: ningún consumidor usa PUT (servicios `prendas.ts`/`pedidos-produccion.ts` y tests solo `client.patch`).
+- Verificación: `py_compile` OK + `pytest test_fase4_produccion` 5 passed + `npm run build` OK.
+
