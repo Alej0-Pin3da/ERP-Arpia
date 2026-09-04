@@ -923,3 +923,9 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Fix:** `Number(item.costo_unitario ?? item.costo_promedio_actual ?? 0)` en `totalSugerido`, celda `Total Est.` y `precio_unitario_compra` del payload (evita mandar string Numeric a la API).
 - Verificación: `npm run build` OK.
 
+### [2026-09-04] — P0-5 (auditoría tipos API→UI): CotizadorView inputs vacíos
+
+- **`src/views/CotizadorView.vue:80-86`:** `onRecetaChange` asignaba `tiempo_confeccion_min` (int|null) y `cif_energia/costo_insumos/markup_pct` (Numeric|null → string) crudos a `InputNumber`/slider → inputs vacíos (mismo patrón del bug de `NuevaVentaModal`).
+- **Fix:** `Number(... ?? 0)` en cada asignación (tiempo, CIF, margen vía `Math.round(Number(...))`, precios vía `Math.round(Number(costo_insumos ?? 0) * factor)`).
+- Verificación: `npm run build` OK.
+

@@ -76,13 +76,15 @@ function onRecetaChange() {
     const r = (isMock.value ? atelier.recetas : productosRealCot.value).find((x) => x.id === recetaSeleccionada.value)
     if (r) {
       nombrePrenda.value = r.nombre
-      tiempoConfeccionMin.value = r.tiempo_confeccion_min
-      costoCif.value = r.cif_energia
-      margenPct.value = Math.round(r.markup_pct)
+      // P0-5: la API manda Numeric como string ("83000.0000") y nulls; normalizar
+      // con Number() para que InputNumber/slider no queden vacíos.
+      tiempoConfeccionMin.value = Number(r.tiempo_confeccion_min ?? 0)
+      costoCif.value = Number(r.cif_energia ?? 0)
+      margenPct.value = Math.round(Number(r.markup_pct ?? 0))
       metrosTela.value = 1.0
-      precioMetroTela.value = Math.round(r.costo_insumos * 0.7)
+      precioMetroTela.value = Math.round(Number(r.costo_insumos ?? 0) * 0.7)
       metrosForro.value = 0.5
-      precioMetroForro.value = Math.round(r.costo_insumos * 0.3)
+      precioMetroForro.value = Math.round(Number(r.costo_insumos ?? 0) * 0.3)
       costoAvios.value = 4000
       costoEmpaque.value = 3500
     }
