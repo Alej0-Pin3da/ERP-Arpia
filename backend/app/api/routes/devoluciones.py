@@ -22,9 +22,19 @@ from app.core.limiter import user_limiter
 from app.models.usuarios import Usuario
 from app.models.ventas import Devolucion, DocumentState
 from app.schemas.common import Paginated
-from app.schemas.devoluciones import DevolucionCreate, DevolucionRead, DevolucionStateTransition
+from app.schemas.devoluciones import (
+    DevolucionCreate,
+    DevolucionRead,
+    DevolucionStateTransition,
+    DevolucionUpdate,
+)
 from app.services.audit import audit_devolucion_create
-from app.services.devoluciones import listar_devoluciones, registrar_devolucion
+from app.services.devoluciones import (
+    actualizar_devolucion,
+    eliminar_devolucion,
+    listar_devoluciones,
+    registrar_devolucion,
+)
 
 router = APIRouter(prefix="/devoluciones", tags=["devoluciones"])
 
@@ -87,6 +97,63 @@ def list_devoluciones(
         offset=offset,
     )
     return Paginated[DevolucionRead](items=list(rows), total=total)
+
+
+@router.get("/{devolucion_id}", response_model=DevolucionRead)
+@user_limiter.limit("300/minute")
+def get_devolucion(
+    request: Request,
+    devolucion_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(audited_user),
+):
+    """Get a single devolucion with its items + Venta reference."""
+    devolucion = db.get(Devolucion, devolucion_id)
+    if devolucion is None:
+        raise HTTPException(status_code=404, detail="Devolución no encontrada")
+    return devolucion
+
+
+@router.put("/{devolucion_id}", response_model=DevolucionRead)
+@_critical_limiter.limit("30/minute")
+def update_devolucion(
+    request: Request,
+    devolucion_id: int,
+    payload: DevolucionUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Edit motivo and/or transition estado.
+
+    motivo is correctable on draft/confirmed/cancelled; estado must follow
+    the DocumentState FSM (400 otherwise); reversed is immutable (422).
+    """
+    if current_user.rol not in ("admin", "operador"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    return actualizar_devolucion(
+        db,
+        devolucion_id,
+        motivo=payload.motivo,
+        estado=payload.estado,
+        reversed_by=current_user.id,
+    )
+
+
+@router.delete("/{devolucion_id}", status_code=status.HTTP_204_NO_CONTENT)
+@_critical_limiter.limit("30/minute")
+def delete_devolucion(
+    request: Request,
+    devolucion_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Hard-delete a devolucion ONLY in draft state (204). Non-draft ->
+    400: use the state transition (cancelled/reversed) instead, since the
+    return already restored stock."""
+    if current_user.rol not in ("admin", "operador"):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    eliminar_devolucion(db, devolucion_id)
+    return None
 
 
 @router.patch("/{devolucion_id}/state", response_model=DevolucionRead)

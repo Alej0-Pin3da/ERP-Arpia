@@ -44,6 +44,17 @@ class DevolucionStateTransition(BaseModel):
     motivo: str | None = None
 
 
+class DevolucionUpdate(BaseModel):
+    """Edit a devolucion: motivo is free text; estado (optional) must follow
+    the DocumentState FSM (draft -> confirmed|cancelled, confirmed ->
+    cancelled|reversed, cancelled -> reversed, reversed terminal). Only
+    draft devoluciones accept motivo edits without restriction; confirmed /
+    cancelled accept motivo corrections; reversed is immutable."""
+
+    motivo: str | None = None
+    estado: Literal["draft", "confirmed", "cancelled", "reversed"] | None = None
+
+
 class DevolucionItemRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -710,6 +710,137 @@ def test_get_devoluciones_filtros_y_paginacion(client, admin_token):
         _cleanup_tipo(tipo_id)
 
 
+def _insert_draft_devolucion(venta_id: int) -> int:
+    """Insert a draft devolucion straight into the DB (POST defaults to
+    confirmed, so draft rows are only reachable this way in tests)."""
+    db = SessionLocal()
+    try:
+        dev = Devolucion(
+            venta_id=venta_id,
+            tipo="parcial",
+            monto_reembolsado=Decimal("0"),
+            motivo="borrador de prueba",
+            estado="draft",
+        )
+        db.add(dev)
+        db.commit()
+        db.refresh(dev)
+        return dev.id
+    finally:
+        db.close()
+
+
+def test_get_devolucion_by_id_200_y_404(client, admin_token):
+    """GET /devoluciones/{id} returns the row; unknown id -> 404."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        venta = _crear_venta(client, admin_token, _venta_payload(prod_id))
+        resp = client.post(
+            "/api/v1/devoluciones",
+            json={"venta_id": venta["id"], "tipo": "total", "motivo": "falla"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 201
+        dev_id = resp.json()["id"]
+
+        resp = client.get(f"/api/v1/devoluciones/{dev_id}", headers=_auth(admin_token))
+        assert resp.status_code == 200
+        assert resp.json()["id"] == dev_id
+        assert resp.json()["venta_id"] == venta["id"]
+
+        resp = client.get("/api/v1/devoluciones/99999999", headers=_auth(admin_token))
+        assert resp.status_code == 404
+    finally:
+        _cleanup_devoluciones([venta["id"]])
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_put_devolucion_motivo_200_y_transicion_invalida_400(client, admin_token):
+    """PUT motivo corrects the text; PUT estado confirmed->draft -> 400."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        venta = _crear_venta(client, admin_token, _venta_payload(prod_id))
+        resp = client.post(
+            "/api/v1/devoluciones",
+            json={"venta_id": venta["id"], "tipo": "total", "motivo": "viejo"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 201
+        dev_id = resp.json()["id"]
+
+        resp = client.put(
+            f"/api/v1/devoluciones/{dev_id}",
+            json={"motivo": "nuevo motivo"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["motivo"] == "nuevo motivo"
+
+        resp = client.put(
+            f"/api/v1/devoluciones/{dev_id}",
+            json={"estado": "draft"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 400
+    finally:
+        _cleanup_devoluciones([venta["id"]])
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_delete_devolucion_solo_draft(client, admin_token):
+    """DELETE confirmed -> 400 (usar transición); DELETE draft -> 204."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        venta = _crear_venta(client, admin_token, _venta_payload(prod_id))
+        resp = client.post(
+            "/api/v1/devoluciones",
+            json={"venta_id": venta["id"], "tipo": "total"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 201
+        dev_id = resp.json()["id"]
+
+        resp = client.delete(f"/api/v1/devoluciones/{dev_id}", headers=_auth(admin_token))
+        assert resp.status_code == 400
+
+        venta2 = _crear_venta(client, admin_token, _venta_payload(prod_id))
+        draft_id = _insert_draft_devolucion(venta2["id"])
+        resp = client.delete(f"/api/v1/devoluciones/{draft_id}", headers=_auth(admin_token))
+        assert resp.status_code == 204
+        resp = client.get(f"/api/v1/devoluciones/{draft_id}", headers=_auth(admin_token))
+        assert resp.status_code == 404
+
+        resp = client.delete("/api/v1/devoluciones/99999999", headers=_auth(admin_token))
+        assert resp.status_code == 404
+    finally:
+        _cleanup_devoluciones([venta["id"], venta2["id"]])
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
 def test_get_devoluciones_q_motivo(client, admin_token):
     """Global q searches the motivo field (DEV-4 + API-3)."""
     cat_id = _make_categoria()

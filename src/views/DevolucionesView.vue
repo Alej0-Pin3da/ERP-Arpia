@@ -83,6 +83,38 @@ function extractDetail(e: unknown): string {
   return 'No se pudo registrar la devolución'
 }
 
+// --- Delete devolucion (P1-8: solo draft) ---
+const showDeleteDialog = ref(false)
+const devolucionAEliminar = ref<{ id: number; codigo: string } | null>(null)
+const deleting = ref(false)
+
+function solicitarEliminarDevolucion(d: { id: number; codigo: string }) {
+  devolucionAEliminar.value = d
+  showDeleteDialog.value = true
+}
+
+async function confirmarEliminarDevolucion() {
+  if (!devolucionAEliminar.value) return
+  const target = devolucionAEliminar.value
+  deleting.value = true
+  try {
+    if (isMock.value) {
+      devoluciones.value = devoluciones.value.filter((d) => d.id !== target.id)
+      showToast('info', 'Devolución eliminada', `Garantía ${target.codigo} eliminada en modo MOCK.`)
+    } else {
+      await devolucionesApi.deleteDevolucion(target.id)
+      showToast('success', 'Devolución eliminada', `Devolución #${target.id} eliminada.`)
+      await cargarDevolucionesReales()
+    }
+    devolucionAEliminar.value = null
+    showDeleteDialog.value = false
+  } catch (e: unknown) {
+    showToast('error', 'No se pudo eliminar', extractDetail(e))
+  } finally {
+    deleting.value = false
+  }
+}
+
 async function submitCreate() {
   if (!formVentaId.value || formVentaId.value <= 0) {
     showToast('warn', 'Campo requerido', 'Indicá el ID de la venta a devolver.')
@@ -169,11 +201,12 @@ async function submitCreate() {
             <th class="py-2.5 px-3">Cliente</th>
             <th class="py-2.5 px-3">Motivo / Tipo de Ajuste</th>
             <th class="py-2.5 px-3">Estado</th>
+            <th class="py-2.5 px-3 text-center">Acciones</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-stone-800/60 font-mono">
           <tr v-if="!devolucionesDisplay.length">
-                <td colspan="5" class="py-8 text-center text-stone-500">
+                <td colspan="6" class="py-8 text-center text-stone-500">
                   <i class="pi pi-inbox text-2xl mb-2 block" />
                   Sin garantías registradas en modo {{ isMock ? 'MOCK' : 'REAL' }}.
                   <span v-if="!isMock" class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/devoluciones</code>.</span>
@@ -188,6 +221,19 @@ async function submitCreate() {
               <span class="px-2.5 py-1 rounded bg-amber-950/80 text-amber-300 border border-amber-500/30 text-[10px]">
                 {{ d.estado }}
               </span>
+            </td>
+            <td class="py-3 px-3 text-center">
+              <Button
+                v-if="d.estado === 'draft'"
+                icon="pi pi-trash"
+                size="small"
+                text
+                rounded
+                class="p-button-danger text-rose-400 hover:bg-rose-950/40"
+                title="Eliminar borrador"
+                @click="solicitarEliminarDevolucion(d)"
+              />
+              <span v-else class="text-stone-600 text-[10px]" title="Solo los borradores se pueden eliminar; el resto se anula por transición de estado">—</span>
             </td>
           </tr>
         </tbody>
@@ -267,6 +313,39 @@ async function submitCreate() {
             class="p-button-warning text-xs font-semibold"
             :loading="saving"
             @click="submitCreate"
+          />
+        </div>
+      </template>
+    </Dialog>
+
+    <Dialog
+      v-model:visible="showDeleteDialog"
+      modal
+      header="Eliminar devolución"
+      :style="{ width: '90vw', maxWidth: '420px' }"
+    >
+      <p class="text-xs text-stone-300 pt-2">
+        ¿Eliminar el borrador <strong class="text-amber-300">{{ devolucionAEliminar?.codigo }}</strong>?
+        Solo los borradores se eliminan; las devoluciones confirmadas se anulan por transición de estado.
+      </p>
+      <template #footer>
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-stone-800">
+          <Button
+            label="Cancelar"
+            icon="pi pi-times"
+            size="small"
+            class="p-button-text p-button-secondary text-xs"
+            :disabled="deleting"
+            @click="showDeleteDialog = false"
+          />
+          <Button
+            label="Eliminar"
+            icon="pi pi-trash"
+            size="small"
+            severity="danger"
+            class="text-xs font-semibold"
+            :loading="deleting"
+            @click="confirmarEliminarDevolucion"
           />
         </div>
       </template>

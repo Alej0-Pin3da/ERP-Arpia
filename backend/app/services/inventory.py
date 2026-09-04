@@ -197,7 +197,10 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
         descuento_porcentaje=descuento,
         total_venta=total_venta,
         es_regalo=es_regalo,
-        estado="completada",
+        # Document-state domain (ck_ventas_estado): a new sale is confirmed.
+        # The legacy 'completada' value violates the CHECK on
+        # migrations-built schemas and 409s every POST /ventas.
+        estado=DocumentState.CONFIRMED.value,
     )
     db.add(venta)
     for i, detalle in enumerate(detalles):

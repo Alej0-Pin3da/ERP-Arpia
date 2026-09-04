@@ -791,6 +791,17 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **`src/views/FinanzasView.vue` (`marcarAnticipoDescontado`):** eliminado el fallback a `transitionAnticipo` cuando `liquidacion_id` es null (doble escritura potencial: `descontarAnticipo(id, 0)` + transición suelta sin vínculo). Camino único: si hay `liquidacion_id` → `descontarAnticipo`; si no → toast warn `Seleccioná una liquidación para descontar el anticipo` sin llamar a ningún endpoint. El backend `PATCH /anticipos/{id}/descuento` exige liquidación existente (404 si no), así que el toast es el flujo correcto.
 - Verificación: `npm run build` OK.
 
+### [2026-09-03] — Tanda B P1 Punto 2 (P1-8): GET-by-id / PUT / DELETE devoluciones
+
+- **Schemas (`backend/app/schemas/devoluciones.py`):** nuevo `DevolucionUpdate` (`motivo?`, `estado?` Literal draft|confirmed|cancelled|reversed).
+- **Service (`backend/app/services/devoluciones.py`):** `actualizar_devolucion` (motivo corregible en draft/confirmed/cancelled; `estado` vía FSM `transition_to`, 400 si inválida; `reversed` inmutable 422; un commit) + `eliminar_devolucion` (solo `draft` 204 con borrado de ítems; no-draft → 400 con hint a `cancelled/reversed`, porque el alta ya restauró stock y pudo anular la venta).
+- **Routes (`backend/app/api/routes/devoluciones.py`):** `GET /devoluciones/{id}` (audited), `PUT /devoluciones/{id}` + `DELETE /devoluciones/{id}` 204 (admin|operador).
+- **Frontend (`src/services/api/devoluciones.ts`, `src/views/DevolucionesView.vue`):** `getDevolucion/updateDevolucion/deleteDevolucion` + botón trash con `Dialog` de confirm solo visible si `estado === 'draft'`.
+- **Fix colateral (bloqueante):** `registrar_venta` (`backend/app/services/inventory.py`) insertaba `estado="completada"` legacy → 409 en todo `POST /ventas`; ahora `DocumentState.CONFIRMED.value`.
+- **Fix colateral (bloqueante):** migración `0020_productos_cabecera` reescrita con guards `_has_*` (estilo 0014): el `try/except: pass` sobre DDL + `CAST(:table AS regclass)` en tablas case-sensitive envenenaba la transacción y rompía `alembic upgrade head` en DBs frescas. Regla: guards exactos + `DROP ... IF EXISTS` crudo, nunca `try/except` sobre DDL.
+- **Tests (`backend/tests/test_devoluciones_api.py`, +3):** `GET by-id 200/404`, `PUT motivo 200 + transición inválida 400`, `DELETE confirmed 400 / draft 204 / 404`.
+- Verificación: `pytest test_devoluciones_api + test_devoluciones` 29 passed; `pytest test_ventas_api` 32 passed; `npm run build` OK.
+
 ### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
 
 #### 1. Migración `0021_backfill_costo_insumos` (`backend/alembic/versions/0021_backfill_costo_insumos.py`)

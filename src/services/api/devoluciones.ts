@@ -42,3 +42,22 @@ export async function transitionDevolucion(id: number, payload: DevolucionStateT
   const { data } = await client.patch<DevolucionRead>(`/devoluciones/${id}/state`, payload)
   return data
 }
+
+export interface DevolucionUpdatePayload {
+  motivo?: string | null
+  estado?: 'draft' | 'confirmed' | 'cancelled' | 'reversed'
+}
+
+export async function getDevolucion(id: number): Promise<DevolucionRead> {
+  const { data } = await client.get<DevolucionRead>(`/devoluciones/${id}`)
+  return data
+}
+
+export async function updateDevolucion(id: number, payload: DevolucionUpdatePayload): Promise<DevolucionRead> {
+  const { data } = await client.put<DevolucionRead>(`/devoluciones/${id}`, payload)
+  return data
+}
+
+export async function deleteDevolucion(id: number): Promise<void> {
+  await client.delete(`/devoluciones/${id}`)
+}

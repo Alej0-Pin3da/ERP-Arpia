@@ -160,6 +160,86 @@ def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Dev
         raise
 
 
+def actualizar_devolucion(
+    db: Session,
+    devolucion_id: int,
+    motivo=None,
+    estado: str | None = None,
+    reversed_by: int | None = None,
+) -> Devolucion:
+    """Edit motivo and/or transition estado of a devolucion.
+
+    - reversed is terminal and immutable (422).
+    - motivo can be corrected on draft/confirmed/cancelled.
+    - estado (when given) must be a valid DocumentState transition from the
+      current state (400 otherwise; reversal requires motivo).
+    Single commit; nothing persisted on error.
+    """
+    devolucion = db.get(Devolucion, devolucion_id)
+    if devolucion is None:
+        raise HTTPException(status_code=404, detail="Devolución no encontrada")
+    if devolucion.estado == DocumentState.REVERSED.value:
+        raise HTTPException(
+            status_code=422, detail="Una devolución revertida es inmutable"
+        )
+    if motivo is not None:
+        devolucion.motivo = motivo
+    if estado is not None:
+        try:
+            new_state = DocumentState(estado)
+            devolucion.transition_to(
+                new_state,
+                motivo=motivo,
+                reversed_by=reversed_by if new_state == DocumentState.REVERSED else None,
+            )
+        except ValueError as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=str(e)) from e
+    try:
+        db.commit()
+        db.refresh(devolucion)
+        return devolucion
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Conflicto al actualizar la devolución; no se persistió nada",
+        ) from None
+    except Exception:
+        db.rollback()
+        raise
+
+
+def eliminar_devolucion(db: Session, devolucion_id: int) -> None:
+    """Hard-delete a devolucion ONLY in draft state.
+
+    Non-draft returns already restored stock (and a 'total' return anulled
+    the sale), so hard-deleting them would leave inventory/venta
+    inconsistent — use the state transition (cancelled/reversed) instead
+    (400 with that hint). Draft deletes remove line items first (ORM-level,
+    DB cascade is the backstop) in a single commit.
+    """
+    devolucion = db.get(Devolucion, devolucion_id)
+    if devolucion is None:
+        raise HTTPException(status_code=404, detail="Devolución no encontrada")
+    if devolucion.estado != DocumentState.DRAFT.value:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Solo se puede eliminar una devolución en borrador; "
+                "usá la transición de estado (cancelled/reversed) para anularla"
+            ),
+        )
+    try:
+        for item in list(devolucion.items):
+            db.delete(item)
+        db.delete(devolucion)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
 def listar_devoluciones(
     db: Session,
     venta_id: int | None = None,
