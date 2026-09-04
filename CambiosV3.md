@@ -802,6 +802,15 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Tests (`backend/tests/test_devoluciones_api.py`, +3):** `GET by-id 200/404`, `PUT motivo 200 + transición inválida 400`, `DELETE confirmed 400 / draft 204 / 404`.
 - Verificación: `pytest test_devoluciones_api + test_devoluciones` 29 passed; `pytest test_ventas_api` 32 passed; `npm run build` OK.
 
+### [2026-09-03] — Tanda B P1 Punto 3 (P1-5): FK Compras.proveedor_id → maestros_proveedores
+
+- **Investigación (DB dev):** `Compras_Insumos` 80 filas, 100% `proveedor_id NULL`; `maestros_proveedores` vacía; 0 huérfanos; columna nullable → `ON DELETE SET NULL`.
+- **Migración `0022_compras_proveedor_fk`:** huérfanos → NULL (nunca borra) + `op.create_foreign_key(... ON DELETE SET NULL)` con guards; downgrade dropea la FK.
+- **Modelo (`backend/app/models/insumos.py`):** `proveedor_id` ahora `ForeignKey("maestros_proveedores.id", ondelete="SET NULL")`.
+- **Ruta (`backend/app/api/routes/compras_insumos.py`):** la validación apuntaba a la tabla `Proveedores` eliminada en 0008 (todo no-NULL → 400); ahora valida contra `maestros_proveedores` (desconocido → 400, contrato intacto).
+- **Tests:** docstring 400 actualizado + nuevo `test_post_201_con_proveedor_maestro`.
+- Verificación: `alembic upgrade head` en test y dev (FK creada, 80 compras intactas); `pytest` 2 passed; `npm run build` OK.
+
 ### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
 
 #### 1. Migración `0021_backfill_costo_insumos` (`backend/alembic/versions/0021_backfill_costo_insumos.py`)

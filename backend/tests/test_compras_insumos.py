@@ -447,7 +447,8 @@ def test_post_total_422_no_write_infinity_nan(client, operador_token, categoria_
 
 
 def test_post_404_insumo_and_400_proveedor(client, operador_token, categoria_fixture):
-    """Unknown insumo -> 404; unknown proveedor -> 400 (Proveedores missing -> 400)."""
+    """Unknown insumo -> 404; unknown proveedor -> 400 (P1-5: validated
+    against maestros_proveedores, FK is the backstop)."""
     resp = client.post(
         URL,
         json=_valid_payload(99999999),
@@ -461,11 +462,49 @@ def test_post_404_insumo_and_400_proveedor(client, operador_token, categoria_fix
             json={**_valid_payload(insumo_id), "proveedor_id": 999999},
             headers=_auth(operador_token),
         )
-        # Proveedores table removed -> expect 400 not FK violation
         assert resp.status_code == 400, resp.text
         assert "Proveedor" in resp.text
     finally:
         _cleanup_insumo(insumo_id)
+
+
+def test_post_201_con_proveedor_maestro(
+    client, operador_token, admin_token, categoria_fixture
+):
+    """P1-5: a compra with a real maestros_proveedores id -> 201 (FK holds)."""
+    insumo_id = _make_insumo(categoria_fixture["id"])
+    prov_id = None
+    try:
+        resp = client.post(
+            "/api/v1/maestros/proveedores",
+            json={
+                "nombre": f"Prov FK {uuid.uuid4().hex[:8]}",
+                "categoria": "Telas",
+            },
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 201, resp.text
+        prov_id = resp.json()["id"]
+        resp = client.post(
+            URL,
+            json={**_valid_payload(insumo_id), "proveedor_id": prov_id},
+            headers=_auth(operador_token),
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["proveedor_id"] == prov_id
+    finally:
+        _cleanup_insumo(insumo_id)
+        if prov_id is not None:
+            db = SessionLocal()
+            try:
+                from app.models import ProveedorMaestro
+
+                db.query(ProveedorMaestro).filter(
+                    ProveedorMaestro.id == prov_id
+                ).delete()
+                db.commit()
+            finally:
+                db.close()
 
 
 def test_get_desc_order_and_rbac(client, operador_token, consulta_token, categoria_fixture):

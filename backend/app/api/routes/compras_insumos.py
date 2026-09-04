@@ -45,23 +45,18 @@ def create_compra_insumo(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(mutation_user),
 ):
-    # Proveedor validation: Proveedores was removed (0008). If proveedor_id is provided,
-    # treat as 400 unless the table exists and the id is found. This keeps the
-    # spec's 400 contract while respecting the current schema without FK.
+    # P1-5 (0022): proveedor_id references maestros_proveedores(id) (FK).
+    # Unknown id -> 400 (spec contract); the DB FK is the hard backstop.
     if payload.proveedor_id is not None:
         try:
-            has_table = db.execute(text("SELECT to_regclass('public.Proveedores')")).scalar()
+            found = db.execute(
+                text("SELECT 1 FROM maestros_proveedores WHERE id = :pid"),
+                {"pid": payload.proveedor_id},
+            ).scalar()
         except Exception:
-            has_table = None
-        if has_table is None:
-            raise HTTPException(status_code=400, detail="Proveedor not found")
-        # Table exists — verify id exists via raw SQL to avoid model import
-        found = db.execute(
-            text('SELECT 1 FROM "Proveedores" WHERE id = :pid'),
-            {"pid": payload.proveedor_id},
-        ).scalar()
+            found = None
         if not found:
-            raise HTTPException(status_code=400, detail="Proveedor not found")
+            raise HTTPException(status_code=400, detail="Proveedor no encontrado")
 
     compra = registrar_compra(
         db,

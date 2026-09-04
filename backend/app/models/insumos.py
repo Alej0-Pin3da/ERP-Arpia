@@ -58,9 +58,13 @@ class CompraInsumo(Base):
     insumo_id: Mapped[int] = mapped_column(
         ForeignKey("Insumos.id", ondelete="RESTRICT"), nullable=False, index=True
     )
-    # Proveedores entity was removed (0008_remove_proveedores). Keep column nullable
-    # without FK so history can store an optional external reference; no constraint.
-    proveedor_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
+    # P1-5 (0022): nullable FK to maestros_proveedores(id) ON DELETE SET
+    # NULL — an optional external reference with referential guarantee.
+    proveedor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("maestros_proveedores.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     fecha_compra: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )
