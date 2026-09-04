@@ -879,3 +879,10 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Qué sí persiste:** `BOM_Insumos` (renglones), `Productos` (cabecera: costos, precio, markup), `Compras_Insumos` (compras que alimentan el WAC).
 - **Dónde ver el costo real:** `GET /productos/{id}/costo` (servicio `bom.ts → getCostoProduccion`, visible en Ficha Técnica y en el bloque `Costo real BOM (DB)` del Cotizador).
 
+### [2026-09-03] — P2-7 (AnalisisFull.md): `prendas.variante_id` nullable (stock genérico/sin talla)
+
+- **Investigación:** modelo/schema/endpoint exigían variante; tabla vacía en dev → sin backfill. `_prenda_to_read` ya era null-safe.
+- **Migración `0025_prendas_variante_nullable`:** `DROP NOT NULL` con guards; downgrade aborta con error si hay NULLs (revertirlas primero) en vez de tocar datos.
+- **Backend + frontend:** modelo `variante_id` nullable + relationship opcional; schema `int | None = None`; `create_prenda` valida existencia solo si viene. Servicio `prendas.ts`, `usePrendas` mock null-safe (talla `Sin talla`, sku `GENERICA`), `PrendasListasView` mapping null-safe. Nota: sin form de alta en REAL, la genérica se crea vía API directa; el display ya la soporta.
+- Verificación: `alembic upgrade head` + down/up en dev; insert NULL OK + cleanup; `pytest test_fase4_produccion` 5 passed.
+

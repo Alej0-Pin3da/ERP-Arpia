@@ -8,7 +8,8 @@ from app.models.produccion import PedidoProduccionEstado, PedidoProduccionPriori
 
 
 class PrendaConfeccionadaBase(BaseModel):
-    variante_id: int
+    # P2-7: nullable — allows generic/no-size stock ("Sin talla").
+    variante_id: int | None = Field(default=None)
     talla: str | None = Field(default=None, max_length=20)
     estado: str = Field(default=PrendaEstado.DISPONIBLE, max_length=30)
     ubicacion: str | None = Field(default=None, max_length=100)

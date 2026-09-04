@@ -69,10 +69,11 @@ export function usePrendas(): UsePrendasReturn {
         disponible_total: 1,
         variantes: [
           {
-            id: payload.variante_id,
-            talla: payload.talla || 'M',
+            // P2-7: prenda genérica sin variante → id 0 + "Sin talla".
+            id: payload.variante_id ?? 0,
+            talla: payload.talla || (payload.variante_id == null ? 'Sin talla' : 'M'),
             color: 'Estándar',
-            sku: `VAR-${payload.variante_id}`,
+            sku: payload.variante_id == null ? 'GENERICA' : `VAR-${payload.variante_id}`,
             stock_fisico: 1,
             reservado: 0,
             disponible: 1,

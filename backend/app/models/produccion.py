@@ -88,8 +88,8 @@ class PrendaConfeccionada(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    variante_id: Mapped[int] = mapped_column(
-        ForeignKey("Variantes_Producto.id", ondelete="CASCADE"), nullable=False, index=True
+    variante_id: Mapped[int | None] = mapped_column(
+        ForeignKey("Variantes_Producto.id", ondelete="CASCADE"), nullable=True, index=True
     )
     talla: Mapped[str | None] = mapped_column(String(20), nullable=True)
     estado: Mapped[str] = mapped_column(String(30), nullable=False, default=PrendaEstado.DISPONIBLE)
@@ -107,7 +107,7 @@ class PrendaConfeccionada(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    variante: Mapped[VarianteProducto] = relationship(lazy="selectin")
+    variante: Mapped[VarianteProducto | None] = relationship(lazy="selectin")
     pedido: Mapped[PedidoProduccion | None] = relationship(
         back_populates="prendas", lazy="selectin"
     )

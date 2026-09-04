@@ -34,9 +34,10 @@ async function cargarPrendasReales() {
       variantes: [
         {
           id: p.variante_id,
-          talla: p.talla || 'M',
+          // P2-7: prenda genérica sin variante → "Sin talla".
+          talla: p.talla || (p.variante_id == null ? 'Sin talla' : 'M'),
           color: 'Estándar',
-          sku: `VAR-${p.variante_id}`,
+          sku: p.variante_id == null ? 'GENERICA' : `VAR-${p.variante_id}`,
           stock_fisico: p.estado === 'disponible' ? 1 : 0,
           reservado: p.estado === 'reservada' ? 1 : 0,
           disponible: p.estado === 'disponible' ? 1 : 0,
