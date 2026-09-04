@@ -13,9 +13,12 @@ class DetalleVentaCreate(BaseModel):
 
 
 class VentaCreate(BaseModel):
+    # P1-6 (0024): canal/metodo are validated against maestros_canales_venta /
+    # maestros_metodos_pago in the service (any active maestro codigo is
+    # accepted, not just the 5/4 canonicals) — the DB FK is the hard backstop.
     cliente_id: int | None = None
-    canal_venta: Literal["web", "whatsapp", "instagram", "feria", "showroom_pereira"]
-    metodo_pago: Literal["efectivo", "transferencia", "tarjeta", "contraentrega"] | None = None
+    canal_venta: str = Field(min_length=1, max_length=50)
+    metodo_pago: str | None = Field(default=None, max_length=50)
     descuento_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
     es_regalo: bool = False
     detalles: list[DetalleVentaCreate] = Field(min_length=1)

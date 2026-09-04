@@ -817,6 +817,15 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Decisión:** NO crear la FK (forzarla rompería settlement + suite). Se creó, se probó, se revirtió: archivo de migración eliminado, modelo revertido con comentario explicativo, FK dropeada de dev y test. La conciliación sigue manual por prefijo de código; `uq_liquidacion` sigue como guard de settlement único.
 - Verificación: `pytest test_finanzas` 2 passed tras la reversión; `alembic history` limpio.
 
+### [2026-09-03] — Tanda B P1 Punto 5 (P1-6): canal/método de Ventas conectados a maestros
+
+- **Investigación (DB dev):** valores del CHECK == `codigo` de maestros (matchean exacto); ventas existentes 100% canónicas; maestros con 5+4 seeds activos. FK viable.
+- **Migración `0023_ventas_canal_metodo_fk`:** normalización legacy `Ventas.estado` (`completada→confirmed`, `anulada→cancelled`; el CHECK legacy se dropea ANTES de los UPDATEs) + swap a CHECK document-state; seed canónicos idempotente; backfill (valores custom que falten en maestros se insertan como filas maestras, nunca se reescriben ventas); drop `ck_ventas_canal_venta` + 2 FKs (`canal→maestros_canales_venta(codigo)` RESTRICT/UPDATE CASCADE NOT NULL; `metodo→maestros_metodos_pago(codigo)` SET NULL/UPDATE CASCADE). Downgrade revierte. Aplicada en test (up/down/up) y dev (25 ventas normalizadas, 0 huérfanos).
+- **Backend:** `VentaCreate.canal_venta/metodo_pago` `Literal` → `str` + `_validar_canal_metodo` en `registrar/actualizar_venta` contra maestros (desconocido → 422, mismo contrato); filtros `GET /ventas` aceptan `str` (desconocido → 200 vacío, cambio intencional); `eliminar_canal/metodo` ahora 409 si tienen ventas (antes 500).
+- **Frontend:** payload acepta `string`; dropdowns de `NuevaVentaModal` leen `listCanales/listMetodosPago` en REAL (incluye valores nuevos; fallback legacy).
+- **Tests:** +2 (`custom_maestro_canal_201`, `delete_canal_con_ventas_409`) y contrato de filtro actualizado.
+- Verificación: `pytest test_ventas_api + test_maestros_ventas_extend` 39 passed; `npm run build` OK + `npm test` 70/70.
+
 ### [2026-09-02] — Fix crítico 1 y 2: backfill costo_insumos + versionado precio/costo
 
 #### 1. Migración `0021_backfill_costo_insumos` (`backend/alembic/versions/0021_backfill_costo_insumos.py`)

@@ -6,7 +6,8 @@ test PostgreSQL:
   persisted at engine precision (4-dec).
 - 401 unauth, 403 role-restricted (consulta may NOT create; operador MAY),
   404 missing product / cliente, 409 insufficient stock, 400 foreign
-  variant, 422 invalid canal / discount / quantity.
+  variant, 422 invalid canal (create) / discount / quantity; unknown canal
+  *filter* -> 200 empty (P1-6).
 - GET /ventas audited (admin/operador/consulta).
 
 Reuses the _unique() uuid4 helper and direct model setup (mirroring
@@ -315,13 +316,16 @@ def test_get_ventas_paginado_filtros(client, operador_token):
         assert resp.status_code == 200
         assert resp.json() == {"items": [], "total": 0}
 
-        # invalid canal -> 422
+        # P1-6: unknown canal filter -> 200 empty (filters don't validate;
+        # only writes validate against maestros). Custom maestro canales
+        # must be filterable, so the Literal-422 filter contract is gone.
         resp = client.get(
             "/api/v1/ventas",
             params={"canal_venta": "tienda"},
             headers={"Authorization": f"Bearer {operador_token}"},
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 200
+        assert resp.json() == {"items": [], "total": 0}
     finally:
         _cleanup_ventas_for_producto(prod_id)
         _cleanup_producto(prod_id)
@@ -652,6 +656,99 @@ def test_create_venta_invalid_canal_422(client, admin_token):
         _cleanup_insumo(ins_id)
         _cleanup_categoria(cat_id)
         _cleanup_tipo(tipo_id)
+
+
+def test_create_venta_custom_maestro_canal_201(client, admin_token):
+    """P1-6: a canal created in Maestros is accepted by POST /ventas (was 422
+    with the Literal/CHECK). Unknown canal still 422 (covered above)."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    codigo = f"canal_{_unique()}"
+    venta_id = None
+    canal_id = None
+    try:
+        resp = client.post(
+            "/api/v1/maestros/canales-venta",
+            json={"codigo": codigo, "nombre": f"Canal {_unique()}"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 201, resp.text
+        canal_id = resp.json()["id"]
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id, canal=codigo),
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["canal_venta"] == codigo
+        venta_id = resp.json()["id"]
+    finally:
+        if venta_id is not None:
+            _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+        if canal_id is not None:
+            db = SessionLocal()
+            try:
+                from app.models import CanalVentaMaestro
+
+                db.query(CanalVentaMaestro).filter(
+                    CanalVentaMaestro.id == canal_id
+                ).delete()
+                db.commit()
+            finally:
+                db.close()
+
+
+def test_delete_canal_con_ventas_409(client, admin_token):
+    """P1-6: deleting a canal referenced by Ventas -> 409 (FK RESTRICT)."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    codigo = f"canal_{_unique()}"
+    canal_id = None
+    try:
+        resp = client.post(
+            "/api/v1/maestros/canales-venta",
+            json={"codigo": codigo, "nombre": f"Canal {_unique()}"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 201, resp.text
+        canal_id = resp.json()["id"]
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id, canal=codigo),
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 201, resp.text
+        resp = client.delete(
+            f"/api/v1/maestros/canales-venta/{canal_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 409
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+        db = SessionLocal()
+        try:
+            from app.models import CanalVentaMaestro
+
+            db.query(CanalVentaMaestro).filter(
+                CanalVentaMaestro.codigo == codigo
+            ).delete()
+            db.commit()
+        finally:
+            db.close()
 
 
 def test_create_venta_invalid_discount_422(client, admin_token):

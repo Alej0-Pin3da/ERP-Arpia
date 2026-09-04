@@ -7,6 +7,10 @@ import { client } from '@/api/client'
 
 export type CanalVenta = 'web' | 'whatsapp' | 'instagram' | 'feria' | 'showroom_pereira'
 export type MetodoPago = 'efectivo' | 'transferencia' | 'tarjeta' | 'contraentrega'
+// P1-6 (0024): canal/metodo accept any maestro-defined codigo, not just the
+// canonical unions above — backend validates membership + FK enforces it.
+export type CanalVentaInput = CanalVenta | string
+export type MetodoPagoInput = MetodoPago | string
 
 export interface DetalleVentaCreate {
   producto_id: number
@@ -17,8 +21,8 @@ export interface DetalleVentaCreate {
 
 export interface VentaCreatePayload {
   cliente_id?: number | null
-  canal_venta: CanalVenta
-  metodo_pago?: MetodoPago | null
+  canal_venta: CanalVentaInput
+  metodo_pago?: MetodoPagoInput | null
   descuento_porcentaje?: number | string
   es_regalo?: boolean
   detalles: DetalleVentaCreate[]
@@ -67,7 +71,7 @@ export interface Paginated<T> {
 }
 
 export interface ListVentasParams {
-  canal_venta?: CanalVenta
+  canal_venta?: CanalVentaInput
   estado?: string
   producto_id?: number
   limit?: number

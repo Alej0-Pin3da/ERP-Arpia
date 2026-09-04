@@ -24,6 +24,51 @@ from app.models.productos import BomInsumo, BomProducto, Producto, VarianteProdu
 from app.models.ventas import DetalleVenta, DocumentState, Venta
 from app.services.costos import _lineas_insumo_efectivas, calcular_costo_produccion
 
+# P1-6: canonical canal/metodo values (0010 seeds). Used as fallback when the
+# maestros tables are unavailable; otherwise membership is read from maestros.
+CANALES_CANONICOS = frozenset({"web", "whatsapp", "instagram", "feria", "showroom_pereira"})
+METODOS_CANONICOS = frozenset({"efectivo", "transferencia", "tarjeta", "contraentrega"})
+
+
+def _codigos_maestros(db: Session, tabla: str, fallback: frozenset[str]) -> frozenset[str]:
+    """Active maestro codigos for tabla, or fallback when the table is missing.
+
+    Only rows with activo IS DISTINCT FROM false count — a deactivated canal
+    or metodo stays valid for history but is rejected for new sales.
+    Plain text SQL keeps this independent of the maestros models.
+    """
+    from sqlalchemy import text as _text
+
+    try:
+        rows = db.execute(
+            _text(f"SELECT codigo FROM {tabla} WHERE activo IS DISTINCT FROM false")
+        ).scalars().all()
+        validos = frozenset(r for r in rows if r)
+        return validos or fallback
+    except Exception:
+        db.rollback()
+        return fallback
+
+
+def _validar_canal_metodo(db: Session, canal_venta: str, metodo_pago: str | None) -> None:
+    """P1-6: canal/metodo must exist in maestros (422 otherwise).
+
+    Keeps the pre-0024 contract (unknown values -> 422, as pydantic Literal
+    did) while accepting any maestro-defined codigo — the DB FK is the hard
+    backstop against races (deleted canal between validation and commit).
+    """
+    canales = _codigos_maestros(db, "maestros_canales_venta", CANALES_CANONICOS)
+    if canal_venta not in canales:
+        raise DomainValidationError(
+            f"canal_venta '{canal_venta}' no existe en maestros", status_code=422
+        )
+    if metodo_pago is not None:
+        metodos = _codigos_maestros(db, "maestros_metodos_pago", METODOS_CANONICOS)
+        if metodo_pago not in metodos:
+            raise DomainValidationError(
+                f"metodo_pago '{metodo_pago}' no existe en maestros", status_code=422
+            )
+
 
 def explosion_materiales(
     db: Session, producto_id: int, variante_id: int | None, cantidad: Decimal
@@ -156,6 +201,7 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
 
     canal_venta = payload.get("canal_venta", "feria")
     metodo_pago = payload.get("metodo_pago")
+    _validar_canal_metodo(db, canal_venta, metodo_pago)
     descuento = Decimal(payload.get("descuento_porcentaje", "0"))
     descuento_factor = Decimal("1") - descuento / Decimal("100")
 
@@ -279,6 +325,7 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
 
     canal_venta = payload.get("canal_venta", "feria")
     metodo_pago = payload.get("metodo_pago")
+    _validar_canal_metodo(db, canal_venta, metodo_pago)
     descuento = Decimal(payload.get("descuento_porcentaje", "0"))
     descuento_factor = Decimal("1") - descuento / Decimal("100")
 

@@ -15,6 +15,7 @@ import { useClientes } from '@/composables/useClientes'
 import { client } from '@/api/client'
 import type { CanalVenta, MetodoPago, VentaCreatePayload } from '@/services/api/ventas'
 import { updateVenta } from '@/services/api/ventas'
+import { listCanales, listMetodosPago } from '@/services/api/maestros'
 
 const props = defineProps<{
   visible: boolean
@@ -33,16 +34,34 @@ const clientesApi = useClientes()
 
 const clientesReal = ref<{ id: number; nombre: string; telefono?: string | null; ciudad?: string | null }[]>([])
 const productosReal = ref<{ id: number; nombre: string; precio_venta_sugerido?: number; precio_base?: number }[]>([])
+// P1-6: maestros-driven canal/metodo (con fallback a canónicos si la API falla)
+const canalesReal = ref<{ codigo: string; nombre: string }[]>([])
+const metodosReal = ref<{ codigo: string; nombre: string }[]>([])
 
 async function cargarOpcionesReales() {
   if (isMock.value) return
   try {
-    const [cliRes, prodRes] = await Promise.all([
+    const [cliRes, prodRes, canRes, metRes] = await Promise.all([
       clientesApi.list({ limit: 100, offset: 0 }),
       client.get<{ items: { id: number; nombre: string; precio_venta_sugerido?: number }[] }>('/productos', { params: { limit: 100 } }),
+      listCanales({ limit: 100 }).catch(() => ({ items: [], total: 0 })),
+      listMetodosPago({ limit: 100 }).catch(() => ({ items: [], total: 0 })),
     ])
     clientesReal.value = (cliRes.items as unknown as typeof clientesReal.value) ?? []
     productosReal.value = (prodRes.data.items as unknown as typeof productosReal.value) ?? []
+    if (canRes.items?.length) {
+      canalesReal.value = canRes.items
+        .filter((c) => c.activo !== false)
+        .map((c) => ({ codigo: c.codigo, nombre: c.nombre }))
+      // normaliza etiqueta legacy (mock) a codigo maestro para el submit
+      canal.value = canalToCodigo(canal.value)
+    }
+    if (metRes.items?.length) {
+      metodosReal.value = metRes.items
+        .filter((m) => m.activo !== false)
+        .map((m) => ({ codigo: m.codigo, nombre: m.nombre }))
+      metodoPago.value = metodoToCodigo(metodoPago.value)
+    }
   } catch {
     // keep mock fallback silent — will show empty placeholder and fallback producto_id 1
   }
@@ -79,7 +98,7 @@ interface LocalItem {
 
 const items = ref<LocalItem[]>([])
 
-const canalesOptions = [
+const canalesOptionsLegacy = [
   { label: 'Showroom Pereira', value: 'Showroom Pereira' },
   { label: 'WhatsApp / DM', value: 'WhatsApp / DM' },
   { label: 'Feria / Evento NANA', value: 'Feria / Evento NANA' },
@@ -88,13 +107,28 @@ const canalesOptions = [
   { label: 'Encargo Personalizado', value: 'Encargo Personalizado' },
 ]
 
-const metodosPagoOptions = [
+const metodosPagoOptionsLegacy = [
   { label: 'Transferencia Bancolombia', value: 'Transferencia Bancolombia' },
   { label: 'Transferencia Nequi / Daviplata', value: 'Transferencia Nequi' },
   { label: 'Efectivo Showroom', value: 'Efectivo Showroom' },
   { label: 'Datáfono / Tarjeta', value: 'Datáfono / Tarjeta' },
   { label: 'Contraentrega', value: 'Contraentrega' },
 ]
+
+// P1-6: en REAL los dropdowns leen de maestros (value = codigo, incluye
+// valores nuevos creados en Maestros); en MOCK o si falla la carga, fallback
+// a las etiquetas legacy.
+const canalesOptions = computed(() =>
+  !isMock.value && canalesReal.value.length
+    ? canalesReal.value.map((c) => ({ label: c.nombre, value: c.codigo }))
+    : canalesOptionsLegacy,
+)
+
+const metodosPagoOptions = computed(() =>
+  !isMock.value && metodosReal.value.length
+    ? metodosReal.value.map((m) => ({ label: m.nombre, value: m.codigo }))
+    : metodosPagoOptionsLegacy,
+)
 
 // Mappers from UI display values to backend Literal enums — keep UI labels intact, only translate payload
 const canalToApi: Record<string, CanalVenta> = {
@@ -116,6 +150,24 @@ const metodoToApi: Record<string, MetodoPago> = {
   'Datáfono / Tarjeta': 'tarjeta',
   Tarjeta: 'tarjeta',
   Contraentrega: 'contraentrega',
+}
+
+// P1-6: resuelve el valor del dropdown a codigo maestro. Si ya es un codigo
+// conocido (maestros cargados o canónicos) pasa directo — así los valores
+// nuevos creados en Maestros llegan al backend sin 422; si es etiqueta legacy
+// usa los mappers; último recurso, feria/efectivo.
+function canalToCodigo(v: string): string {
+  if (!v) return 'feria'
+  if (canalesReal.value.some((c) => c.codigo === v)) return v
+  if ((Object.values(canalToApi) as string[]).includes(v)) return v
+  return canalToApi[v] ?? 'feria'
+}
+
+function metodoToCodigo(v: string): string {
+  if (!v) return 'efectivo'
+  if (metodosReal.value.some((m) => m.codigo === v)) return v
+  if ((Object.values(metodoToApi) as string[]).includes(v)) return v
+  return metodoToApi[v] ?? 'efectivo'
 }
 
 const estadosOptions = [
@@ -397,11 +449,11 @@ async function guardar() {
     return
   }
 
-  // Real API — map UI values to backend Literals via typed mappers (fallback feria/efectivo per spec)
+  // Real API — P1-6: valores resueltos a codigo maestro (ver canalToCodigo)
   const apiPayload: VentaCreatePayload = {
     cliente_id: cidFinal,
-    canal_venta: canalToApi[canal.value] ?? 'feria',
-    metodo_pago: metodoToApi[metodoPago.value] ?? 'efectivo',
+    canal_venta: canalToCodigo(canal.value),
+    metodo_pago: metodoToCodigo(metodoPago.value),
     descuento_porcentaje: Number(descuentoPct.value) || 0,
     es_regalo: false,
     detalles: items.value.map((it) => ({

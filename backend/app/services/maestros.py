@@ -133,8 +133,15 @@ def eliminar_canal(db: Session, cid: int) -> None:
     obj = db.get(CanalVentaMaestro, cid)
     if not obj:
         raise HTTPException(status_code=404, detail="Canal no encontrado")
-    db.delete(obj)
-    db.commit()
+    try:
+        db.delete(obj)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="El canal tiene ventas asociadas y no se puede eliminar",
+        ) from None
 
 
 # Metodo
@@ -153,8 +160,15 @@ def eliminar_metodo(db: Session, mid: int) -> None:
     obj = db.get(MetodoPagoMaestro, mid)
     if not obj:
         raise HTTPException(status_code=404, detail="Metodo no encontrado")
-    db.delete(obj)
-    db.commit()
+    try:
+        db.delete(obj)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="El método de pago tiene ventas asociadas y no se puede eliminar",
+        ) from None
 
 
 # Talla
