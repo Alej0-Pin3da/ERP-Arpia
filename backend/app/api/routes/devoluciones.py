@@ -49,6 +49,17 @@ mutation_user = require_roles("admin", "operador")
 audited_user = require_roles("admin", "operador", "consulta")
 
 
+def _devolucion_to_read(d: Devolucion) -> DevolucionRead:
+    res = DevolucionRead.model_validate(d)
+    venta = d.venta
+    if venta is not None:
+        res.cliente_nombre = venta.cliente_nombre
+        detalles = venta.detalles or []
+        if detalles:
+            res.prenda_nombre = detalles[0].nombre_prenda
+    return res
+
+
 @router.post("", response_model=DevolucionRead, status_code=status.HTTP_201_CREATED)
 @_critical_limiter.limit("30/minute")
 def create_devolucion(
@@ -68,7 +79,8 @@ def create_devolucion(
     except Exception:
         pass
     devolucion = db.get(Devolucion, devolucion_id)
-    return devolucion
+    assert devolucion is not None
+    return _devolucion_to_read(devolucion)
 
 
 @router.get("", response_model=Paginated[DevolucionRead])
@@ -96,7 +108,9 @@ def list_devoluciones(
         limit=limit,
         offset=offset,
     )
-    return Paginated[DevolucionRead](items=list(rows), total=total)
+    return Paginated[DevolucionRead](
+        items=[_devolucion_to_read(d) for d in rows], total=total
+    )
 
 
 @router.get("/{devolucion_id}", response_model=DevolucionRead)
@@ -111,7 +125,7 @@ def get_devolucion(
     devolucion = db.get(Devolucion, devolucion_id)
     if devolucion is None:
         raise HTTPException(status_code=404, detail="Devolución no encontrada")
-    return devolucion
+    return _devolucion_to_read(devolucion)
 
 
 @router.put("/{devolucion_id}", response_model=DevolucionRead)

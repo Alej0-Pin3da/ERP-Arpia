@@ -82,3 +82,6 @@ class DevolucionRead(BaseModel):
     reversed_motivo: str | None = None
     reversed_by: int | None = None
     reversed_at: datetime | None = None
+    # Venta reference (resolved by the route mapper, not stored).
+    cliente_nombre: str | None = None
+    prenda_nombre: str | None = None
