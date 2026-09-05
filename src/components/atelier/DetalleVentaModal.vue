@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { computed, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import { type VentaAtelier, useAtelierStore } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
+import { useClientes } from '@/composables/useClientes'
 
 const props = defineProps<{
   visible: boolean
@@ -17,13 +19,26 @@ const emit = defineEmits<{
 
 const atelier = useAtelierStore()
 const { isMock } = useMode()
+const clientesApi = useClientes()
+const clienteReal = ref<any>(null)
+
+async function cargarCliente() {
+  clienteReal.value = null
+  if (isMock.value || !props.venta?.cliente_id) return
+  try {
+    clienteReal.value = await clientesApi.get(props.venta.cliente_id)
+  } catch { clienteReal.value = null }
+}
+watch(() => props.venta, () => { void cargarCliente() }, { immediate: true })
+watch(isMock, () => { void cargarCliente() })
 
 const clienteVinculado = computed(() => {
   if (!props.venta?.cliente_id) return null
-  if (!isMock.value) return null
-  if (!isMock.value) return null
+  if (!isMock.value) return clienteReal.value
   return atelier.clientes.find((c) => c.id === props.venta?.cliente_id) || null
 })
+
+const telefonoLimpio = computed(() => String(clienteVinculado.value?.telefono || '').replace(/\D/g, ''))
 
 const margenPct = computed(() => {
   if (!props.venta) return 0
@@ -61,8 +76,9 @@ function compartirWhatsApp() {
     `*Método de Pago:* ${v.metodo_pago}%0A%0A` +
     `¡Gracias por apoyar la corsetería y confección de autor de Atelier Arpía! ✨🖤`
 
-  const phone = (clienteVinculado.value?.telefono || '').replace(/\D/g, '')
-  const url = `https://wa.me/${phone || ''}?text=${msg}`
+  const phone = telefonoLimpio.value
+  if (!phone) return
+  const url = `https://wa.me/${phone}?text=${msg}`
   window.open(url, '_blank')
 }
 </script>
@@ -125,6 +141,7 @@ function compartirWhatsApp() {
 
         <div class="flex items-center gap-2">
           <Button
+            v-if="telefonoLimpio"
             label="Enviar por WhatsApp"
             icon="pi pi-whatsapp"
             size="small"
