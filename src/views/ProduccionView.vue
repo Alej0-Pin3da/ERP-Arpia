@@ -19,7 +19,7 @@ const viewMode = ref<'kanban' | 'tabla'>('kanban')
 const showNuevoPedidoModal = ref(false)
 const showDetallePedidoModal = ref(false)
 const pedidoSeleccionado = ref<PedidoProduccion | null>(null)
-const pedidosApi = ref<PedidoProduccion[]>([])
+const pedidosApi = ref<(PedidoProduccion & { estadoReal?: string })[]>([])
 
 async function cargarPedidosReales() {
   if (isMock.value) return
@@ -31,7 +31,10 @@ async function cargarPedidosReales() {
       cliente_id: 0,
       cliente_nombre: p.nombre_variante || p.nombre_producto || 'Taller Arpía',
       prenda_nombre: p.nombre_producto || `Producto #${p.producto_id}`,
+      // Display: etapas del kanban MOCK. estadoReal guarda el enum del backend
+      // (pendiente/en_produccion/completado/cancelado) para las transiciones.
       estado: p.estado === 'pendiente' ? 'CORTE' : p.estado === 'en_produccion' ? 'COSTURA' : p.estado === 'completado' ? 'LISTO' : 'COTIZADO',
+      estadoReal: p.estado,
       // P0-6: PedidoProduccionRead no trae montos (sin join a productos, fuera de alcance);
       // se mantienen en 0 y el template los oculta en REAL para no mostrar $0 mentiroso.
       precio_venta: 0,
@@ -92,43 +95,61 @@ function getPedidosPorEstado(est: EstadoPedido) {
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
+// Transiciones dentro del enum del backend (CHECK ck_pedidos_produccion_estado):
+// pendiente -> en_produccion -> completado. Cancelado es terminal.
+const AVANZAR_REAL: Record<string, string> = { pendiente: 'en_produccion', en_produccion: 'completado' }
+const RETROCEDER_REAL: Record<string, string> = { en_produccion: 'pendiente', completado: 'en_produccion' }
+const ETAPA_DISPLAY: Record<string, string> = { pendiente: 'CORTE', en_produccion: 'COSTURA', completado: 'LISTO', cancelado: 'CANCELADO' }
+
 async function avanzarEstado(pedido: PedidoProduccion) {
-  const currentIndex = estados.indexOf(pedido.estado)
-  if (currentIndex < estados.length - 1) {
-    const nextState = estados[currentIndex + 1]
-    if (isMock.value) {
-      atelier.cambiarEstadoPedido(pedido.id, nextState)
-      showToast('success', 'Etapa Actualizada', `Orden ${pedido.codigo} avanzada a ${nextState}.`)
+  if (!isMock.value) {
+    const raw = (pedido as unknown as { estadoReal?: string }).estadoReal
+    const next = raw ? AVANZAR_REAL[raw] : undefined
+    if (!next) {
+      showToast('info', 'Sin transición', raw === 'cancelado' ? `La orden ${pedido.codigo} está cancelada.` : `La orden ${pedido.codigo} ya está en su etapa final.`)
       return
     }
     try {
-      await produccionService.update(pedido.id, { estado: nextState } as unknown as Record<string, unknown> as never)
+      await produccionService.update(pedido.id, { estado: next } as unknown as Record<string, unknown> as never)
       await cargarPedidosReales()
-      showToast('success', 'Etapa Actualizada', `Orden ${pedido.codigo} avanzada a ${nextState}.`)
+      showToast('success', 'Etapa Actualizada', `Orden ${pedido.codigo} avanzada a ${ETAPA_DISPLAY[next] ?? next}.`)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error al avanzar estado'
       showToast('error', 'Error', String(msg))
     }
+    return
+  }
+  const currentIndex = estados.indexOf(pedido.estado)
+  if (currentIndex < estados.length - 1) {
+    const nextState = estados[currentIndex + 1]
+    atelier.cambiarEstadoPedido(pedido.id, nextState)
+    showToast('success', 'Etapa Actualizada', `Orden ${pedido.codigo} avanzada a ${nextState}.`)
   }
 }
 
 async function retrocederEstado(pedido: PedidoProduccion) {
-  const currentIndex = estados.indexOf(pedido.estado)
-  if (currentIndex > 0) {
-    const prevState = estados[currentIndex - 1]
-    if (isMock.value) {
-      atelier.cambiarEstadoPedido(pedido.id, prevState)
-      showToast('info', 'Etapa Actualizada', `Orden ${pedido.codigo} movida a ${prevState}.`)
+  if (!isMock.value) {
+    const raw = (pedido as unknown as { estadoReal?: string }).estadoReal
+    const prev = raw ? RETROCEDER_REAL[raw] : undefined
+    if (!prev) {
+      showToast('info', 'Sin transición', `La orden ${pedido.codigo} no puede retroceder desde ${ETAPA_DISPLAY[raw ?? ''] ?? raw ?? 'su estado'}.`)
       return
     }
     try {
-      await produccionService.update(pedido.id, { estado: prevState } as unknown as Record<string, unknown> as never)
+      await produccionService.update(pedido.id, { estado: prev } as unknown as Record<string, unknown> as never)
       await cargarPedidosReales()
-      showToast('info', 'Etapa Actualizada', `Orden ${pedido.codigo} movida a ${prevState}.`)
+      showToast('info', 'Etapa Actualizada', `Orden ${pedido.codigo} movida a ${ETAPA_DISPLAY[prev] ?? prev}.`)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error al retroceder estado'
       showToast('error', 'Error', String(msg))
     }
+    return
+  }
+  const currentIndex = estados.indexOf(pedido.estado)
+  if (currentIndex > 0) {
+    const prevState = estados[currentIndex - 1]
+    atelier.cambiarEstadoPedido(pedido.id, prevState)
+    showToast('info', 'Etapa Actualizada', `Orden ${pedido.codigo} movida a ${prevState}.`)
   }
 }
 
