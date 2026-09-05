@@ -1086,3 +1086,39 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Fix:** botones deshabilitados en REAL con tooltip explicativo; el handler informa y recarga en vez de fingir.
 - Verificación: `npm run build` OK.
 
+### [2026-09-05] — Fix P1-3/P1-11 (auditoría funcional): reload en Maestros + edición de liquidación
+
+- **`src/views/MaestrosView.vue`:** única vista sin `watch(isMock)` → catálogo desactualizado al cambiar MOCK↔REAL. Fix: watcher que recarga.
+- **`src/views/FinanzasView.vue` + `DetalleLiquidacionModal.vue`:** el botón "Editar liquidación" abría un form que en REAL nunca puede guardar (la API solo permite transición). Fix: oculto en REAL con aviso en el título.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P1-6/P2-6 (auditoría funcional): estados MOCK de devoluciones normalizados
+
+- **`src/views/DevolucionesView.vue`:** el seed usaba `'En Modificación'` y las creadas `'Registrada'` → el botón eliminar (solo `draft`) nunca aparecía y las etiquetas bypasseaban el mapa.
+- **Fix:** seed `confirmed`, nuevas `draft` (eliminar visible + etiquetas del mapa).
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P1-7 (auditoría funcional): WhatsApp de venta roto en REAL
+
+- **`src/components/atelier/DetalleVentaModal.vue`:** `clienteVinculado` retornaba `null` en REAL (con el `if` duplicado) → link `wa.me/?text=` muerto.
+- **Fix:** carga el cliente vía `useClientes().get()` en REAL; el botón se oculta si no hay teléfono.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P1-10 (auditoría funcional): PATCH /omisiones sin UI
+
+- **`src/views/OmisionesView.vue`:** `useOmisiones().resolve()` nunca se llamaba desde el template.
+- **Fix:** columna Estado con badge `Resuelta` o botón `Resolver` (PATCH + reload, `solo-admin` con mensaje de permiso).
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P1-9 (auditoría funcional): confirmación antes de eliminar
+
+- **Antes:** deletes de un clic en Clientas, Insumos, Recetas y los 7 maestros (sin try/catch en Maestros: un 409 quedaba en silencio).
+- **Fix:** nuevo `src/components/ConfirmActionDialog.vue` compartido, cableado en `ClientesView`, `InventarioView`, `ProductosView` y `MaestrosView` (genérico por tipo con manejo de 409); los deletes ahora confirman y reportan loading/error.
+- Verificación: `npm run build` OK + `npm test` 70/70.
+
+### [2026-09-05] — Fix P2-1 (auditoría funcional): mockGuard con nombres inexistentes
+
+- **`src/utils/mockGuard.ts`:** vigilaba `categoriasColeccion/ubicacionesTaller/tallasEstandar/productosSinTalla`, pero el store expone esos con sufijo `Maestros` → el guard los salteaba en silencio (`if (!(prop in atelier)) return`).
+- **Fix:** nombres exactos + cobertura de computadas (`totalVentas/totalUtilidad/rentabilidadPromedio/valorTotalInventario/distribucionSocias/pipelineCounts`).
+- Verificación: `npm run build` OK + `npm test` 70/70.
+
