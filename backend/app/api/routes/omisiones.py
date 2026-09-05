@@ -10,7 +10,7 @@ surface:
   MIG-4); 404 when the row does not exist.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -37,8 +37,10 @@ def list_omisiones(
     nivel: Literal["WARN", "ERROR"] | None = None,
     hoja: str | None = None,
     resuelta: bool | None = None,
-    fecha_desde: datetime | None = None,
-    fecha_hasta: datetime | None = None,
+    # date (not datetime): callers filter by calendar day ("2026-08-01");
+    # pydantic v2 datetime rejects date-only strings with 422.
+    fecha_desde: date | None = None,
+    fecha_hasta: date | None = None,
     q: str | None = None,
     db: Session = Depends(get_db),
     _: Usuario = Depends(audited_user),
