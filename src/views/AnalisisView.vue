@@ -35,7 +35,7 @@ watch(isMock, () => { void cargarAnalisisReales(); void cargarProductosAnalisis(
 
 const pedidosSrc = computed(() => isMock.value ? atelier.pedidos : (pedidosReal.value as any[]))
 const prendasSrc = computed(() => isMock.value ? (atelier as any).prendas ?? [] : (prendasReal.value as any[]))
-const insumosAlertasReal = computed(() => (insumosReal.value as any[]).filter((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)).length)
+const insumosAlertasReal = computed(() => (insumosReal.value as any[]).filter((i: any) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)).length)
 const productosRealAnalisis = ref<any[]>([])
 async function cargarProductosAnalisis() {
   if (isMock.value) return
@@ -45,12 +45,14 @@ async function cargarProductosAnalisis() {
   } catch { productosRealAnalisis.value = [] }
 }
 // append to existing cargarAnalisisReales
+// Numeric de Postgres serializa como string: normalizar a number para que
+// formatCOP y el margen no reciban strings ni nulls.
 const recetasDisplay = computed(() => isMock.value ? (atelier as any).recetas : productosRealAnalisis.value.map((p: any) => ({
   id: p.id,
   nombre: p.nombre,
-  costo_estimado_materiales: 0,
-  tiempo_estimado_confeccion_horas: 1,
-  precio_venta_sugerido: p.precio_venta_sugerido ?? 0,
+  costo_estimado_materiales: Number(p.costo_insumos ?? 0),
+  tiempo_estimado_confeccion_horas: p.tiempo_confeccion_min ? Math.round(Number(p.tiempo_confeccion_min) / 60 * 10) / 10 : 1,
+  precio_venta_sugerido: Number(p.precio_venta_sugerido ?? 0),
 })))
 
 const metricas = computed(() => {
@@ -126,13 +128,13 @@ function formatCOP(v: number): string {
                 </tr>
             <tr v-for="r in recetasDisplay" :key="r.id" class="hover:bg-stone-900/50">
               <td class="py-3 px-3 font-serif text-sm font-semibold text-stone-200">{{ r.nombre }}</td>
-              <td class="py-3 px-3 text-stone-300">{{ formatCOP(r.costo_estimado_materiales) }}</td>
+              <td class="py-3 px-3 text-stone-300">{{ formatCOP(Number(r.costo_estimado_materiales ?? 0)) }}</td>
               <td class="py-3 px-3 text-stone-400">{{ r.tiempo_estimado_confeccion_horas }}h</td>
-              <td class="py-3 px-3 text-amber-300 font-bold">{{ formatCOP(r.precio_venta_sugerido) }}</td>
+              <td class="py-3 px-3 text-amber-300 font-bold">{{ formatCOP(Number(r.precio_venta_sugerido ?? 0)) }}</td>
               <td class="py-3 px-3 text-emerald-400 font-bold">
-                {{ formatCOP(r.precio_venta_sugerido - r.costo_estimado_materiales) }}
+                {{ formatCOP(Number(r.precio_venta_sugerido ?? 0) - Number(r.costo_estimado_materiales ?? 0)) }}
                 <span class="text-[10px] opacity-75">
-                  ({{ Math.round(((r.precio_venta_sugerido - r.costo_estimado_materiales) / r.precio_venta_sugerido) * 100) }}%)
+                  ({{ Number(r.precio_venta_sugerido ?? 0) > 0 ? Math.round(((Number(r.precio_venta_sugerido ?? 0) - Number(r.costo_estimado_materiales ?? 0)) / Number(r.precio_venta_sugerido ?? 0)) * 100) : 0 }}%)
                 </span>
               </td>
             </tr>
