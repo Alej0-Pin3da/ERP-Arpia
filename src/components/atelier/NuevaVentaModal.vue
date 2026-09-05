@@ -274,7 +274,11 @@ async function seleccionarPrendaCatalogo(it: LocalItem, prendaId: number | null)
     // el valor actual del ítem (edición manual).
     const numPrecio = Number(rawPrecio ?? NaN)
     it.precio_unitario = Number.isFinite(numPrecio) && numPrecio > 0 ? numPrecio : it.precio_unitario
-    it.costo_unitario = (p as unknown as { costo_unitario?: number }).costo_unitario ?? it.costo_unitario
+    const rawCosto = (p as unknown as { costo_unitario?: number | string; costos_operativos_fijos?: number | string; costo_insumos?: number | string }).costo_unitario ?? (p as unknown as { costos_operativos_fijos?: number | string }).costos_operativos_fijos ?? (p as unknown as { costo_insumos?: number | string }).costo_insumos
+    const numCosto = Number(rawCosto ?? NaN)
+    if (Number.isFinite(numCosto) && numCosto > 0) {
+      it.costo_unitario = numCosto
+    }
     if ((p as unknown as { variantes?: { talla: string }[] }).variantes?.[0]) {
       it.talla = (p as unknown as { variantes: { talla: string }[] }).variantes[0].talla
     }
