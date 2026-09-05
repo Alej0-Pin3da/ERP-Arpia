@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import {
   useAtelierStore,
   type ProveedorMaestro,
@@ -13,6 +13,7 @@ import {
 } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
 import { useMaestros } from '@/composables/useMaestros'
+import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 import { showToast } from '@/utils/toast'
 
 const store = useAtelierStore()
@@ -160,6 +161,7 @@ async function cargarDatosReales() {
 onMounted(() => {
   void cargarDatosReales()
 })
+watch(isMock, () => { void cargarDatosReales() })
 
 // Tab active
 type TabType = 'proveedores' | 'canales' | 'pagos' | 'categorias' | 'ubicaciones' | 'costeo' | 'tallas'
@@ -566,6 +568,38 @@ async function eliminarUbicacionWrapper(id: number) {
   else { await maestros.removeUbicacion(id); await cargarDatosReales() }
 }
 
+const showEliminarDialog = ref(false)
+const eliminarTarget = ref<{ tipo: string; id: number; nombre: string } | null>(null)
+const eliminarEnCurso = ref(false)
+
+function solicitarEliminar(tipo: string, id: number, nombre: string) {
+  eliminarTarget.value = { tipo, id, nombre }
+  showEliminarDialog.value = true
+}
+
+async function confirmarEliminar() {
+  const t = eliminarTarget.value
+  if (!t) return
+  eliminarEnCurso.value = true
+  try {
+    if (t.tipo === 'proveedor') await eliminarProveedorWrapper(t.id)
+    else if (t.tipo === 'canal') await eliminarCanalWrapper(t.id)
+    else if (t.tipo === 'metodo') await eliminarMetodoWrapper(t.id)
+    else if (t.tipo === 'talla') await eliminarTallaWrapper(t.id)
+    else if (t.tipo === 'sintalla') await eliminarSinTallaWrapper(t.id)
+    else if (t.tipo === 'categoria') await eliminarCategoriaWrapper(t.id)
+    else if (t.tipo === 'ubicacion') await eliminarUbicacionWrapper(t.id)
+    showToast('info', 'Eliminado', `${t.nombre} eliminado del catálogo.`)
+  } catch (e: unknown) {
+    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+    showToast('error', 'No se pudo eliminar', typeof detail === 'string' ? detail : 'Es posible que tenga registros asociados.')
+  } finally {
+    eliminarEnCurso.value = false
+    eliminarTarget.value = null
+    showEliminarDialog.value = false
+  }
+}
+
 // ==========================================
 // 8. PARÁMETROS GLOBALES DE COSTEO
 // ==========================================
@@ -856,7 +890,7 @@ function formatoCOP(val: number) {
               </button>
               <button
                 :id="`btn-eliminar-prov-${prov.id}`"
-                @click="eliminarProveedorWrapper(prov.id)"
+                @click="solicitarEliminar('proveedor', prov.id, prov.nombre)"
                 class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
                 title="Eliminar Proveedor"
               >
@@ -942,7 +976,7 @@ function formatoCOP(val: number) {
             </button>
             <button
               :id="`btn-eliminar-canal-${canal.id}`"
-              @click="eliminarCanalWrapper(canal.id)"
+              @click="solicitarEliminar('canal', canal.id, canal.nombre)"
               class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
               title="Eliminar Canal"
             >
@@ -1020,7 +1054,7 @@ function formatoCOP(val: number) {
             </button>
             <button
               :id="`btn-eliminar-pago-${pago.id}`"
-              @click="eliminarMetodoWrapper(pago.id)"
+              @click="solicitarEliminar('metodo', pago.id, pago.nombre)"
               class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
               title="Eliminar Método"
             >
@@ -1092,7 +1126,7 @@ function formatoCOP(val: number) {
                       </button>
                       <button
                         :id="`btn-eliminar-talla-${t.id}`"
-                        @click="eliminarTallaWrapper(t.id)"
+                        @click="solicitarEliminar('talla', t.id, `Talla ${t.talla}`)"
                         class="text-[11px] text-stone-500 hover:text-rose-400 p-1"
                         title="Eliminar Talla"
                       >
@@ -1174,7 +1208,7 @@ function formatoCOP(val: number) {
               </button>
               <button
                 :id="`btn-eliminar-sintalla-${p.id}`"
-                @click="eliminarSinTallaWrapper(p.id)"
+                @click="solicitarEliminar('sintalla', p.id, p.nombre)"
                 class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
                 title="Eliminar Producto Sin Talla"
               >
@@ -1247,7 +1281,7 @@ function formatoCOP(val: number) {
               </button>
               <button
                 :id="`btn-eliminar-cat-${cat.id}`"
-                @click="eliminarCategoriaWrapper(cat.id)"
+                @click="solicitarEliminar('categoria', cat.id, cat.nombre)"
                 class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
                 title="Eliminar Categoría"
               >
@@ -1314,7 +1348,7 @@ function formatoCOP(val: number) {
               </button>
               <button
                 :id="`btn-eliminar-ub-${ub.id}`"
-                @click="eliminarUbicacionWrapper(ub.id)"
+                @click="solicitarEliminar('ubicacion', ub.id, ub.nombre || ub.codigo)"
                 class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
                 title="Eliminar Ubicación"
               >
@@ -2186,5 +2220,14 @@ function formatoCOP(val: number) {
         </form>
       </div>
     </div>
+
+    <ConfirmActionDialog
+      v-model:visible="showEliminarDialog"
+      titulo="Eliminar maestro"
+      mensaje="¿Eliminar este registro maestro? Esta acción no se puede deshacer."
+      :detalle="eliminarTarget?.nombre"
+      :loading="eliminarEnCurso"
+      @confirmar="confirmarEliminar"
+    />
   </div>
 </template>
