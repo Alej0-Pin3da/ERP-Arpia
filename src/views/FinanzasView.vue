@@ -777,12 +777,13 @@ function imprimirBalance() {
                       @click="abrirDetalleLiquidacion(l)"
                     />
                     <Button
+                      v-if="isMock"
                       icon="pi pi-pencil"
                       size="small"
                       text
                       rounded
                       class="p-button-secondary text-stone-300 hover:bg-stone-800"
-                      title="Editar Liquidación"
+                      title="Editar Liquidación (solo MOCK: la API solo permite transición de estado)"
                       @click="abrirEditarLiquidacion(l)"
                     />
                     <Button

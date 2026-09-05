@@ -283,6 +283,7 @@ function compartirWhatsApp() {
     <template #footer>
       <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-stone-800">
         <Button
+          v-if="isMock"
           label="Editar Liquidación"
           icon="pi pi-pencil"
           size="small"
