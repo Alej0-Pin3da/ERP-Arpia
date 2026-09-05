@@ -419,9 +419,9 @@ async function eliminar(item: InsumoAtelier) {
     </div>
 
     <!-- Modals -->
-    <NuevoInsumoModal v-model:visible="showNuevoModal" />
-    <CompraInsumoModal v-model:visible="showCompraModal" :insumo="insumoSeleccionado" />
-    <SugerirOrdenModal v-model:visible="showSugerirModal" />
-    <OrdenCompraProveedorModal v-model:visible="showOrdenProveedorModal" />
+    <NuevoInsumoModal v-model:visible="showNuevoModal" @insumo-creado="cargarInsumosReales" />
+    <CompraInsumoModal v-model:visible="showCompraModal" :insumo="insumoSeleccionado" @compra-registrada="cargarInsumosReales" />
+    <SugerirOrdenModal v-model:visible="showSugerirModal" @update:visible="(v: boolean) => { if (!v) void cargarInsumosReales() }" />
+    <OrdenCompraProveedorModal v-model:visible="showOrdenProveedorModal" @update:visible="(v: boolean) => { if (!v) void cargarInsumosReales() }" />
   </div>
 </template>
