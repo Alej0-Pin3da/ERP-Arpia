@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { ref, computed, onMounted, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -8,6 +9,8 @@ import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import { useAtelierStore, type InsumoAtelier } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
+import { useInsumos } from '@/composables/useInsumos'
+import { client } from '@/api/client'
 import { showToast } from '@/utils/toast'
 
 defineProps<{
@@ -21,18 +24,33 @@ const emit = defineEmits<{
 
 const atelier = useAtelierStore()
 const { isMock } = useMode()
+const insumosApi = useInsumos()
 
 const codigo = ref('')
 const nombre = ref('')
 const descripcion = ref('')
 const tipo = ref<'Directo' | 'Indirecto'>('Directo')
 const categoria = ref('Telas Principales')
+const categoriaId = ref<number | null>(null)
+const categoriasReal = ref<{ id: number; nombre: string }[]>([])
 const ubicacion = ref('Estante Telas A1')
 const proveedor = ref('Atenea Bordados y Encajes')
 const stockActual = ref(10)
 const stockMinimo = ref(5)
 const unidadMedida = ref('m')
 const costoUnitario = ref(15000)
+const guardando = ref(false)
+
+async function cargarCategorias() {
+  if (isMock.value) return
+  try {
+    const { data } = await client.get<{ items: { id: number; nombre: string }[] }>('/categorias-insumos', { params: { limit: 100 } })
+    categoriasReal.value = data.items ?? []
+    if (categoriasReal.value.length === 1) categoriaId.value = categoriasReal.value[0].id
+  } catch { categoriasReal.value = [] }
+}
+onMounted(() => { void cargarCategorias() })
+watch(isMock, () => { void cargarCategorias() })
 
 const tiposOptions = [
   { label: 'Directo (Telas, Encajes, Forros, Copas)', value: 'Directo' },
@@ -47,6 +65,8 @@ const categoriasOptions = [
   'Elásticos y Sesgos',
 ]
 
+const categoriasRealOptions = computed(() => categoriasReal.value.map((c) => ({ label: c.nombre, value: c.id })))
+
 const unidadesOptions = [
   { label: 'Metros (m)', value: 'm' },
   { label: 'Unidades (un)', value: 'un' },
@@ -54,13 +74,53 @@ const unidadesOptions = [
   { label: 'Rollos (rll)', value: 'rll' },
 ]
 
+function extractDetail(e: unknown): string {
+  const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+  if (Array.isArray(detail)) return detail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ')
+  if (typeof detail === 'string' && detail) return detail
+  if (e instanceof Error && e.message) return e.message
+  return 'No se pudo crear el insumo'
+}
+
+async function guardarReal() {
+  if (categoriaId.value == null) {
+    showToast('warn', 'Categoría requerida', 'Elegí la categoría del insumo (el backend la exige como categoria_id).')
+    return
+  }
+  guardando.value = true
+  try {
+    const creado = await insumosApi.create({
+      categoria_id: categoriaId.value,
+      nombre: nombre.value.trim(),
+      unidad_medida: unidadMedida.value,
+      codigo: codigo.value.trim() || null,
+      descripcion: descripcion.value.trim() || null,
+      tipo: tipo.value,
+      ubicacion: ubicacion.value.trim() || null,
+      stock_actual: Number(stockActual.value) || 0,
+      stock_minimo: Number(stockMinimo.value) || 0,
+      costo_promedio_actual: Number(costoUnitario.value) || 0,
+    })
+    showToast('success', 'Insumo creado', `${(creado as any).nombre ?? nombre.value} registrado en el inventario.`)
+    emit('insumo-creado', creado as unknown as InsumoAtelier)
+    emit('update:visible', false)
+    nombre.value = ''
+    codigo.value = ''
+    descripcion.value = ''
+  } catch (e: unknown) {
+    showToast('error', 'No se pudo crear', extractDetail(e))
+  } finally {
+    guardando.value = false
+  }
+}
+
 function guardar() {
   if (!nombre.value.trim()) {
     showToast('warn', 'Nombre requerido', 'Ingresa el nombre del insumo o textil.')
     return
   }
 
-  if (!isMock.value) { showToast('info','Modo REAL','Creación de insumos vía Inventario API.'); return }
+  if (!isMock.value) { void guardarReal(); return }
   const item = atelier.crearInsumo({
     codigo: codigo.value.trim() || `TEL-AUTO-${Date.now().toString().slice(-4)}`,
     nombre: nombre.value.trim(),
@@ -112,9 +172,13 @@ function guardar() {
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
+        <div v-if="isMock">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Categoría</label>
           <Dropdown v-model="categoria" :options="categoriasOptions" class="w-full" />
+        </div>
+        <div v-else>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Categoría *</label>
+          <Dropdown v-model="categoriaId" :options="categoriasRealOptions" option-label="label" option-value="value" placeholder="Seleccionar categoría..." class="w-full" />
         </div>
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Unidad de Medida</label>
@@ -127,7 +191,7 @@ function guardar() {
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Ubicación en Taller</label>
           <InputText v-model="ubicacion" placeholder="Ej: Estante Telas Atenea A1" class="w-full" />
         </div>
-        <div>
+        <div v-if="isMock">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Proveedor Habitual</label>
           <InputText v-model="proveedor" placeholder="Ej: Atenea Bordados y Encajes" class="w-full" />
         </div>
@@ -155,7 +219,7 @@ function guardar() {
 
       <div class="flex justify-end gap-2 pt-2 border-t border-stone-800">
         <Button label="Cancelar" severity="secondary" text @click="emit('update:visible', false)" />
-        <Button label="Guardar Insumo" icon="pi pi-check" class="p-button-warning font-semibold" @click="guardar" />
+        <Button label="Guardar Insumo" icon="pi pi-check" class="p-button-warning font-semibold" :loading="guardando" @click="guardar" />
       </div>
     </div>
   </Dialog>
