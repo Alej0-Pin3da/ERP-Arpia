@@ -5,6 +5,7 @@ import InputText from 'primevue/inputtext'
 import { useAtelierStore, type PrendaConfeccionada, type PrendaVariante } from '@/stores/atelier'
 import { usePrendas } from '@/composables/usePrendas'
 import EtiquetaPrendaModal from '@/components/atelier/EtiquetaPrendaModal.vue'
+import IngresarPrendaModal from '@/components/atelier/IngresarPrendaModal.vue'
 import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
@@ -13,6 +14,7 @@ const prendasService = usePrendas()
 const search = ref('')
 
 const showEtiquetaModal = ref(false)
+const showIngresarModal = ref(false)
 const selectedPrenda = ref<PrendaConfeccionada | null>(null)
 const selectedVariante = ref<PrendaVariante | null>(null)
 const prendasApi = ref<PrendaConfeccionada[]>([])
@@ -101,7 +103,11 @@ function verEtiqueta(p: PrendaConfeccionada, v?: PrendaVariante) {
 }
 
 function ingresarPrendaModal() {
-  showToast('info', 'Ingreso de Prendas', 'Selecciona el modelo para registrar unidades confeccionadas al perchero.')
+  showIngresarModal.value = true
+}
+
+async function onPrendaIngresada() {
+  await cargarPrendasReales()
 }
 </script>
 
@@ -293,6 +299,12 @@ function ingresarPrendaModal() {
       v-model:visible="showEtiquetaModal"
       :prenda="selectedPrenda"
       :variante="selectedVariante"
+    />
+
+    <!-- Ingresar Prenda Modal -->
+    <IngresarPrendaModal
+      v-model:visible="showIngresarModal"
+      @prenda-ingresada="onPrendaIngresada"
     />
   </div>
 </template>
