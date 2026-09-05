@@ -169,6 +169,7 @@ const sociaAEliminar = ref<SociaAtelier | null>(null)
 
 const showDeleteAnticipoModal = ref(false)
 const anticipoAEliminar = ref<AnticipoSocia | null>(null)
+const descontandoAnticipoId = ref<number | null>(null)
 
 // Break-even simulator parameters
 const precioPromedioCorse = ref(450000)
@@ -428,6 +429,7 @@ function abrirEditarAnticipo(ant: AnticipoSocia) {
 }
 
 async function marcarAnticipoDescontado(ant: AnticipoSocia) {
+  if (descontandoAnticipoId.value === ant.id) return
   if (isMock.value) {
     atelier.cambiarEstadoAnticipo(ant.id, 'DESCONTADO')
     showToast('success', 'Anticipo Actualizado', `Anticipo marcado como DESCONTADO.`)
@@ -441,6 +443,7 @@ async function marcarAnticipoDescontado(ant: AnticipoSocia) {
     showToast('warn', 'Falta liquidación', 'Seleccioná una liquidación para descontar el anticipo.')
     return
   }
+  descontandoAnticipoId.value = ant.id
   try {
     await finanzasApi.descontarAnticipo(ant.id, ant.liquidacion_id)
     await cargarDatosReales()
@@ -448,6 +451,8 @@ async function marcarAnticipoDescontado(ant: AnticipoSocia) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Error al descontar anticipo'
     showToast('error', 'Error', msg)
+  } finally {
+    descontandoAnticipoId.value = null
   }
 }
 
@@ -1009,6 +1014,7 @@ function imprimirBalance() {
                       rounded
                       class="p-button-success text-emerald-400 hover:bg-emerald-950/40"
                       title="Marcar como Descontado"
+                      :loading="descontandoAnticipoId === a.id"
                       @click="marcarAnticipoDescontado(a)"
                     />
                     <Button

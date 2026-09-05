@@ -44,6 +44,8 @@ const estado = ref<AnticipoSocia['estado']>('PENDIENTE_DESCUENTO')
 const comprobante = ref('')
 const observaciones = ref('')
 
+const guardando = ref(false)
+
 const sociasReal = ref<any[]>([])
 
 async function cargarSocias() {
@@ -118,6 +120,7 @@ function formatCOP(val: number) {
 }
 
 async function guardar() {
+  if (guardando.value) return
   if (!concepto.value.trim()) {
     showToast('warn', 'Campo requerido', 'Por favor indique el concepto o justificación del anticipo.')
     return
@@ -163,6 +166,7 @@ async function guardar() {
     showToast('warn', 'Socia requerida', 'Elegí la socia beneficiaria del anticipo.')
     return
   }
+  guardando.value = true
   const apiPayload = {
     socia_id: sociaId.value,
     monto: Number(monto.value) || 0,
@@ -192,6 +196,8 @@ async function guardar() {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al guardar anticipo'
     showToast('error', 'Error', String(msg))
+  } finally {
+    guardando.value = false
   }
 }
 </script>
@@ -321,6 +327,7 @@ async function guardar() {
           icon="pi pi-check"
           size="small"
           class="p-button-warning text-xs font-semibold px-4"
+          :loading="guardando"
           @click="guardar"
         />
       </div>

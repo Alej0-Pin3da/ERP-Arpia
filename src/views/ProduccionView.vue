@@ -57,6 +57,22 @@ watch(isMock, () => void cargarPedidosReales())
 
 const pedidosList = computed(() => (isMock.value ? atelier.pedidos : pedidosApi.value))
 
+// Anti doble-submit por fila: un doble clic en "Siguiente" saltaba etapas
+// (pendiente→en_produccion→completado de una). Terminal = sin transiciones.
+const transicionandoId = ref<number | null>(null)
+function estadoRealDe(p: PedidoProduccion): string | undefined {
+  return (p as unknown as { estadoReal?: string }).estadoReal
+}
+function esTerminal(p: PedidoProduccion): boolean {
+  if (isMock.value) return false
+  const raw = estadoRealDe(p)
+  return raw === 'completado' || raw === 'cancelado'
+}
+function etapaBadge(p: PedidoProduccion): string {
+  if (!isMock.value && estadoRealDe(p) === 'cancelado') return 'CANCELADO'
+  return p.estado
+}
+
 function abrirFichaTaller(p: PedidoProduccion) {
   pedidoSeleccionado.value = p
   showDetallePedidoModal.value = true
@@ -103,12 +119,14 @@ const ETAPA_DISPLAY: Record<string, string> = { pendiente: 'CORTE', en_produccio
 
 async function avanzarEstado(pedido: PedidoProduccion) {
   if (!isMock.value) {
-    const raw = (pedido as unknown as { estadoReal?: string }).estadoReal
+    if (transicionandoId.value === pedido.id) return
+    const raw = estadoRealDe(pedido)
     const next = raw ? AVANZAR_REAL[raw] : undefined
     if (!next) {
       showToast('info', 'Sin transición', raw === 'cancelado' ? `La orden ${pedido.codigo} está cancelada.` : `La orden ${pedido.codigo} ya está en su etapa final.`)
       return
     }
+    transicionandoId.value = pedido.id
     try {
       await produccionService.update(pedido.id, { estado: next } as unknown as Record<string, unknown> as never)
       await cargarPedidosReales()
@@ -116,6 +134,8 @@ async function avanzarEstado(pedido: PedidoProduccion) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error al avanzar estado'
       showToast('error', 'Error', String(msg))
+    } finally {
+      transicionandoId.value = null
     }
     return
   }
@@ -129,12 +149,14 @@ async function avanzarEstado(pedido: PedidoProduccion) {
 
 async function retrocederEstado(pedido: PedidoProduccion) {
   if (!isMock.value) {
-    const raw = (pedido as unknown as { estadoReal?: string }).estadoReal
+    if (transicionandoId.value === pedido.id) return
+    const raw = estadoRealDe(pedido)
     const prev = raw ? RETROCEDER_REAL[raw] : undefined
     if (!prev) {
       showToast('info', 'Sin transición', `La orden ${pedido.codigo} no puede retroceder desde ${ETAPA_DISPLAY[raw ?? ''] ?? raw ?? 'su estado'}.`)
       return
     }
+    transicionandoId.value = pedido.id
     try {
       await produccionService.update(pedido.id, { estado: prev } as unknown as Record<string, unknown> as never)
       await cargarPedidosReales()
@@ -142,6 +164,8 @@ async function retrocederEstado(pedido: PedidoProduccion) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error al retroceder estado'
       showToast('error', 'Error', String(msg))
+    } finally {
+      transicionandoId.value = null
     }
     return
   }
@@ -302,7 +326,7 @@ function abrirWhatsApp(p: PedidoProduccion) {
                   <button
                     type="button"
                     class="text-[11px] text-stone-400 hover:text-stone-200 transition disabled:opacity-30 disabled:cursor-not-allowed"
-                    :disabled="estados.indexOf(p.estado) === 0"
+                    :disabled="estados.indexOf(p.estado) === 0 || transicionandoId === p.id || esTerminal(p)"
                     @click="retrocederEstado(p)"
                   >
                     ← Anterior
@@ -310,7 +334,7 @@ function abrirWhatsApp(p: PedidoProduccion) {
                   <button
                     type="button"
                     class="text-[11px] text-amber-400 hover:text-amber-300 font-bold transition disabled:opacity-30 disabled:cursor-not-allowed"
-                    :disabled="estados.indexOf(p.estado) === estados.length - 1"
+                    :disabled="estados.indexOf(p.estado) === estados.length - 1 || transicionandoId === p.id || esTerminal(p)"
                     @click="avanzarEstado(p)"
                   >
                     Siguiente →
@@ -355,7 +379,7 @@ function abrirWhatsApp(p: PedidoProduccion) {
               <td class="py-3 px-4">{{ p.prenda_nombre }}</td>
               <td class="py-3 px-4 text-center">
                 <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-950/60 text-amber-300 border border-amber-500/30">
-                  {{ p.estado }}
+                  {{ etapaBadge(p) }}
                 </span>
               </td>
               <td v-if="isMock" class="py-3 px-4 text-right font-mono">{{ formatCOP(p.precio_venta) }}</td>
@@ -364,7 +388,8 @@ function abrirWhatsApp(p: PedidoProduccion) {
                 <div class="flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    class="text-amber-400 hover:underline font-bold text-xs"
+                    class="text-amber-400 hover:underline font-bold text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+                    :disabled="transicionandoId === p.id || esTerminal(p)"
                     @click="avanzarEstado(p)"
                   >
                     Avanzar Fase

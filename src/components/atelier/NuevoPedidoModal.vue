@@ -49,6 +49,7 @@ const fechaEntregaReal = ref<string>('')
 const clientesReal = ref<any[]>([])
 const productosReal = ref<any[]>([])
 const variantesReal = ref<{ id: number; nombre_variante: string }[]>([])
+const guardando = ref(false)
 
 async function cargarDatosReales() {
   if (isMock.value) return
@@ -140,6 +141,7 @@ function extractDetail(e: unknown): string {
 }
 
 async function guardarPedidoReal() {
+  if (guardando.value) return
   if (recetaSeleccionada.value == null) {
     showToast('warn', 'Seleccioná un producto', 'Elegí el modelo del catálogo para crear el pedido de producción.')
     return
@@ -162,6 +164,7 @@ async function guardarPedidoReal() {
     }
     clienteIdFinal = clienteSeleccionado.value
   }
+  guardando.value = true
   try {
     const creado = await produccionService.create({
       producto_id: recetaSeleccionada.value,
@@ -184,6 +187,8 @@ async function guardarPedidoReal() {
     observaciones.value = ''
   } catch (e: unknown) {
     showToast('error', 'No se pudo crear', extractDetail(e))
+  } finally {
+    guardando.value = false
   }
 }
 
@@ -409,6 +414,7 @@ function guardarPedido() {
           label="Crear Pedido"
           icon="pi pi-check"
           class="p-button-warning font-semibold"
+          :loading="guardando"
           @click="guardarPedido"
         />
       </div>

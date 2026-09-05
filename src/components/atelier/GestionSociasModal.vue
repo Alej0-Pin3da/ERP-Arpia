@@ -43,6 +43,8 @@ const titularCuenta = ref('')
 const activo = ref(true)
 const notas = ref('')
 
+const guardando = ref(false)
+
 const sumaPorcentajesActuales = computed(() => {
   const sociasSrc = isMock.value ? atelier.socias : [] as any[]
   const otros = sociasSrc.filter((s) => s.activo && (!props.sociaEditar || s.id !== props.sociaEditar.id))
@@ -104,6 +106,7 @@ watch(
 )
 
 async function guardar() {
+  if (guardando.value) return
   if (!nombre.value.trim()) {
     showToast('warn', 'Campo requerido', 'Por favor ingrese el nombre de la socia.')
     return
@@ -159,6 +162,7 @@ async function guardar() {
     activo: activo.value,
     notas: notas.value.trim() || null,
   }
+  guardando.value = true
   try {
     if (isEditing.value && props.sociaEditar) {
       const updated = await sociosApi.update(props.sociaEditar.id, apiPayload)
@@ -173,6 +177,8 @@ async function guardar() {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al guardar socia'
     showToast('error', 'Error', String(msg))
+  } finally {
+    guardando.value = false
   }
 }
 </script>
@@ -317,6 +323,7 @@ async function guardar() {
           icon="pi pi-check"
           size="small"
           class="p-button-warning text-xs font-semibold px-4"
+          :loading="guardando"
           @click="guardar"
         />
       </div>

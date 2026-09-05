@@ -37,6 +37,7 @@ const costoInsumos = ref(0)
 const gastosOperativos = ref(1500000)
 const estado = ref<LiquidacionSocias['estado']>('BORRADOR')
 const observaciones = ref('')
+const guardando = ref(false)
 
 interface LocalItemDistribucion {
   socia_id: number
@@ -160,6 +161,7 @@ watch([totalVentas, costoInsumos, gastosOperativos], () => {
 })
 
 async function guardar() {
+  if (guardando.value) return
   if (!periodo.value.trim()) {
     showToast('warn', 'Campo requerido', 'Por favor indique el nombre o periodo de la liquidación.')
     return
@@ -224,6 +226,7 @@ async function guardar() {
     utilidad_repartible: utilidadRepartibleSocias.value,
     observaciones: observaciones.value || null,
   }
+  guardando.value = true
   try {
     if (isEditing.value && props.liquidacionEditar) {
       // Editing not supported via API (only state transition); keep local mock for edit
@@ -238,6 +241,8 @@ async function guardar() {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al crear liquidación'
     showToast('error', 'Error', String(msg))
+  } finally {
+    guardando.value = false
   }
 }
 </script>
@@ -464,6 +469,7 @@ async function guardar() {
           icon="pi pi-check"
           size="small"
           class="p-button-warning text-xs font-semibold px-4"
+          :loading="guardando"
           @click="guardar"
         />
       </div>

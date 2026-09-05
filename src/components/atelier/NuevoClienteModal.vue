@@ -25,6 +25,8 @@ const atelier = useAtelierStore()
 const { isMock } = useMode()
 const clientesApi = useClientes()
 
+const guardando = ref(false)
+
 const nombre = ref('')
 const tipo = ref('Clienta Habitual')
 const telefono = ref('')
@@ -104,6 +106,7 @@ function seleccionarTallaRapida(talla: string) {
 }
 
 async function guardar() {
+  if (guardando.value) return
   if (!nombre.value.trim()) {
     showToast('warn', 'Nombre requerido', 'Ingresa el nombre de la clienta.')
     return
@@ -157,6 +160,7 @@ async function guardar() {
     tipo_producto_frecuente: tipoFrecuente,
     notas: notas.value.trim() || null,
   }
+  guardando.value = true
   try {
     if (props.clienteEditar) {
       await clientesApi.update(props.clienteEditar.id, apiPayload)
@@ -169,6 +173,8 @@ async function guardar() {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al guardar clienta'
     showToast('error', 'Error', String(msg))
+  } finally {
+    guardando.value = false
   }
 }
 </script>
@@ -356,6 +362,7 @@ async function guardar() {
           icon="pi pi-check"
           size="small"
           class="p-button-warning text-xs font-semibold px-4"
+          :loading="guardando"
           @click="guardar"
         />
       </div>

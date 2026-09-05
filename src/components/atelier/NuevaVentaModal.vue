@@ -97,6 +97,7 @@ interface LocalItem {
 }
 
 const items = ref<LocalItem[]>([])
+const guardando = ref(false)
 
 const canalesOptionsLegacy = [
   { label: 'Showroom Pereira', value: 'Showroom Pereira' },
@@ -383,6 +384,7 @@ watch(isMock, () => {
 })
 
 async function guardar() {
+  if (guardando.value) return
   if (items.value.length === 0) {
     showToast('warn', 'Items requeridos', 'Debe agregar al menos una prenda o producto a la venta.')
     return
@@ -468,6 +470,7 @@ async function guardar() {
     showToast('warn', 'Producto requerido', `La fila ${sinProducto + 1} ("${items.value[sinProducto].nombre_prenda || 'sin nombre'}") no tiene producto del catálogo. Elegilo del dropdown para vender en modo REAL.`)
     return
   }
+  guardando.value = true
   const apiPayload: VentaCreatePayload = {
     cliente_id: cidFinal,
     canal_venta: canalToCodigo(canal.value),
@@ -500,6 +503,8 @@ async function guardar() {
       msg = axiosDetail ? `Stock insuficiente: ${axiosDetail}` : 'Stock insuficiente para los insumos de esa prenda (409). Revisá el inventario o elegí otro producto con stock.'
     }
     showToast('error', 'Error', String(msg))
+  } finally {
+    guardando.value = false
   }
 }
 </script>
@@ -827,6 +832,7 @@ async function guardar() {
           icon="pi pi-check"
           size="small"
           class="p-button-warning text-xs font-semibold px-4"
+          :loading="guardando"
           @click="guardar"
         />
       </div>
