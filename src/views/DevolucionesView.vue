@@ -41,8 +41,9 @@ const devolucionesDisplay = computed(() => isMock.value ? devoluciones.value : (
   cliente: `Cliente ${d.venta_id}`,
   motivo: d.motivo || 'Ajuste Atelier',
   tipo: d.tipo || 'Garantía',
-  estado: d.estado || 'Registrada',
-  fecha: d.creado_en || '',
+  estado: d.estado || 'draft',
+  // DevolucionRead manda `fecha` (no `creado_en`); se aceptan alias por compat.
+  fecha: (d.fecha ?? d.creado_en ?? d.created_at ?? '') as string,
 })) : []))
 
 // --- Create devolucion (P0-1) ---
@@ -221,7 +222,7 @@ async function submitCreate() {
             <td class="py-3 px-3 text-stone-400">{{ d.motivo }} ({{ d.tipo }})</td>
             <td class="py-3 px-3">
               <span class="px-2.5 py-1 rounded bg-amber-950/80 text-amber-300 border border-amber-500/30 text-[10px]">
-                {{ d.estado }}
+                {{ ({ draft: 'Borrador', confirmed: 'Confirmada', cancelled: 'Anulada', reversed: 'Revertida' } as Record<string, string>)[d.estado] ?? d.estado }}
               </span>
             </td>
             <td class="py-3 px-3 text-center">
