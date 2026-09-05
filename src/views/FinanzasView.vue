@@ -272,18 +272,31 @@ const sumaPorcentajesSocias = computed(() => {
 // KPI aggregates — mirror atelier getters but over the active data source
 const totalHistoricoFacturado = computed(() => liquidacionesList.value.reduce((a, l) => a + l.total_ventas_brutas, 0))
 const totalHistoricoFondo = computed(() => liquidacionesList.value.reduce((a, l) => a + l.fondo_reinversion_monto, 0))
-const totalRepartidoMargara = computed(() =>
-  liquidacionesList.value.reduce((a, l) => {
-    const item = l.distribucion.find((d) => d.socia_id === 2 || d.nombre_socia.toLowerCase().includes('marg'))
-    return a + (item ? item.monto_neto_pagar : 0)
-  }, 0),
+// Socias de reparto dinámicas (primeras 2 activas no-fondo): en REAL los ids
+// no son 2/3 ni los nombres Margara/Valqui, así que nada puede hardcodearlos.
+const sociasReparto = computed(() =>
+  (sociasList.value as any[]).filter((s) => !s.es_fondo_taller && s.activo !== false).slice(0, 2),
 )
-const totalRepartidoValqui = computed(() =>
-  liquidacionesList.value.reduce((a, l) => {
-    const item = l.distribucion.find((d) => d.socia_id === 3 || d.nombre_socia.toLowerCase().includes('valq'))
+function totalRepartidoSocia(sociaId: number | undefined): number {
+  if (sociaId == null) return 0
+  return liquidacionesList.value.reduce((a, l) => {
+    const item = l.distribucion.find((d) => d.socia_id === sociaId)
     return a + (item ? item.monto_neto_pagar : 0)
-  }, 0),
-)
+  }, 0)
+}
+const totalRepartidoMargara = computed(() => totalRepartidoSocia((sociasReparto.value[0] as any)?.id))
+const totalRepartidoValqui = computed(() => totalRepartidoSocia((sociasReparto.value[1] as any)?.id))
+function nombreSociaReparto(i: number, fallback: string): string {
+  return ((sociasReparto.value[i] as any)?.nombre as string) ?? fallback
+}
+function porcentajeSociaReparto(i: number, fallback: number): number {
+  const s = sociasReparto.value[i] as any
+  return Number(s?.porcentaje ?? s?.porcentaje_participacion ?? fallback) || fallback
+}
+function itemDistribucion(l: LiquidacionSocias, sociaId: number | undefined) {
+  if (sociaId == null) return undefined
+  return l.distribucion.find((d) => d.socia_id === sociaId)
+}
 const totalAnticiposPendientes = computed(() =>
   anticiposList.value.filter((a) => a.estado === 'PENDIENTE_DESCUENTO').reduce((a, x) => a + x.monto, 0),
 )
@@ -352,11 +365,9 @@ async function cambiarEstadoLiq(liq: LiquidacionSocias, nuevoEstado: Liquidacion
     return
   }
   try {
-    const updated = await finanzasApi.transitionLiquidacion(liq.id, { estado: nuevoEstado })
-    // patch local real list optimistically
-    const idx = liquidacionesReal.value.findIndex((l) => l.id === liq.id)
-    if (idx !== -1 && updated) liquidacionesReal.value[idx] = normalizeLiquidacion(updated as unknown as Record<string, unknown>)
-    else await cargarDatosReales()
+    await finanzasApi.transitionLiquidacion(liq.id, { estado: nuevoEstado })
+    // Siempre refetch: el parcheo optimista quedaba stale si el shape deriva.
+    await cargarDatosReales()
     showToast('success', 'Estado Actualizado', `Liquidación ${liq.codigo} marcada como ${nuevoEstado}.`)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Transición no permitida'
@@ -565,7 +576,7 @@ function imprimirBalance() {
 
       <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-3.5 flex flex-col justify-between">
         <div>
-          <div class="text-[10px] text-stone-400 uppercase tracking-wider">🪡 Margara Restrepo (30%)</div>
+          <div class="text-[10px] text-stone-400 uppercase tracking-wider">🪡 {{ nombreSociaReparto(0, 'Margara Restrepo') }} ({{ porcentajeSociaReparto(0, 30) }}%)</div>
           <div class="text-lg font-serif font-bold text-stone-100 mt-1">
             {{ formatCOP(totalRepartidoMargara) }}
           </div>
@@ -577,7 +588,7 @@ function imprimirBalance() {
 
       <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-3.5 flex flex-col justify-between">
         <div>
-          <div class="text-[10px] text-stone-400 uppercase tracking-wider">🎨 Valeria Quintero (30%)</div>
+          <div class="text-[10px] text-stone-400 uppercase tracking-wider">🎨 {{ nombreSociaReparto(1, 'Valeria Quintero') }} ({{ porcentajeSociaReparto(1, 30) }}%)</div>
           <div class="text-lg font-serif font-bold text-stone-100 mt-1">
             {{ formatCOP(totalRepartidoValqui) }}
           </div>
@@ -696,8 +707,7 @@ function imprimirBalance() {
                 <th class="py-3 px-3 text-right">Costos / Gastos</th>
                 <th class="py-3 px-3 text-right">Utilidad Neta</th>
                 <th class="py-3 px-3 text-center">Fondo Taller (40%)</th>
-                <th class="py-3 px-3 text-center">Margara (30%)</th>
-                <th class="py-3 px-3 text-center">Valqui (30%)</th>
+                <th v-for="(s, i) in sociasReparto" :key="(s as any).id" class="py-3 px-3 text-center">{{ (s as any).nombre }} ({{ porcentajeSociaReparto(i, 30) }}%)</th>
                 <th class="py-3 px-3 text-center">Estado</th>
                 <th class="py-3 px-4 text-center">Acciones</th>
               </tr>
@@ -731,27 +741,15 @@ function imprimirBalance() {
                   <span class="text-amber-300 font-bold text-xs">{{ formatCOP(l.fondo_reinversion_monto) }}</span>
                 </td>
 
-                <td class="py-3.5 px-3 text-center">
+                <td v-for="(s, i) in sociasReparto" :key="(s as any).id" class="py-3.5 px-3 text-center">
                   <div class="text-stone-200 font-semibold text-xs">
-                    {{ formatCOP(l.distribucion.find((d) => d.socia_id === 2)?.monto_neto_pagar || 0) }}
+                    {{ formatCOP(itemDistribucion(l, (s as any).id)?.monto_neto_pagar || 0) }}
                   </div>
                   <span
                     class="text-[9px] px-1.5 py-0.2 rounded"
-                    :class="l.distribucion.find((d) => d.socia_id === 2)?.estado_pago === 'PAGADO' ? 'bg-emerald-950 text-emerald-400' : 'bg-stone-800 text-amber-400'"
+                    :class="itemDistribucion(l, (s as any).id)?.estado_pago === 'PAGADO' ? 'bg-emerald-950 text-emerald-400' : 'bg-stone-800 text-amber-400'"
                   >
-                    {{ l.distribucion.find((d) => d.socia_id === 2)?.estado_pago || 'PENDIENTE' }}
-                  </span>
-                </td>
-
-                <td class="py-3.5 px-3 text-center">
-                  <div class="text-stone-200 font-semibold text-xs">
-                    {{ formatCOP(l.distribucion.find((d) => d.socia_id === 3)?.monto_neto_pagar || 0) }}
-                  </div>
-                  <span
-                    class="text-[9px] px-1.5 py-0.2 rounded"
-                    :class="l.distribucion.find((d) => d.socia_id === 3)?.estado_pago === 'PAGADO' ? 'bg-emerald-950 text-emerald-400' : 'bg-stone-800 text-amber-400'"
-                  >
-                    {{ l.distribucion.find((d) => d.socia_id === 3)?.estado_pago || 'PENDIENTE' }}
+                    {{ itemDistribucion(l, (s as any).id)?.estado_pago || 'PENDIENTE' }}
                   </span>
                 </td>
 
