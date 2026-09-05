@@ -12,8 +12,8 @@ export interface PrendaRead {
   talla?: string | null
   estado: string
   ubicacion?: string | null
-  costo_real?: number | null
-  precio_venta?: number | null
+  costo_real?: number | string | null
+  precio_venta?: number | string | null
   fecha_confeccion?: string | null
   pedido_id?: number | null
   created_at: string

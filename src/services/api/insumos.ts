@@ -14,9 +14,9 @@ export interface InsumoRead {
   descripcion?: string | null
   tipo?: string | null
   ubicacion?: string | null
-  stock_actual: number
-  stock_minimo: number
-  costo_promedio_actual: number
+  stock_actual: number | string
+  stock_minimo: number | string
+  costo_promedio_actual: number | string
   nombre_categoria?: string | null
 }
 
