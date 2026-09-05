@@ -990,3 +990,21 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Fix:** `(props.variante.sku ?? '').slice(-4) || '0000'`; `formatCOP` acepta `number | string` con `Number()`.
 - Verificación: `npm run build` OK + `npm test` 70/70.
 
+### [2026-09-05] — Fix funcional 1: "Ingresar prenda confeccionada" era un stub
+
+- **Síntoma (`/prendas`):** el botón solo mostraba un toast ("Selecciona el modelo...") sin forma de elegir modelo.
+- **Fix:** nuevo `src/components/atelier/IngresarPrendaModal.vue` — selector de modelo (catálogo REAL vía `useProductos` / recetas en MOCK), variante/talla (variantes REAL vía `GET /productos/{id}/variantes`, tallas en MOCK), unidades, costo, precio, estado y ubicación; crea N prendas vía `usePrendas.create` (ambos modos) con `POST /prendas-confeccionadas` en REAL. `PrendasListasView` abre el modal y recarga al guardar.
+- Verificación: `npm run build` OK (405 módulos) + `npm test` 70/70.
+
+### [2026-09-05] — Fix funcional 2: NuevoPedidoModal no cargaba datos reales ni creaba en REAL
+
+- **Síntoma (`/produccion`):** dropdowns de clientas y recetas vacíos en REAL (`[]` hardcodeado) y guardar solo mostraba "Usá POST /pedidos-produccion". Bonus: la rama REAL de "nuevo cliente" retornaba una variable en TDZ (`return c as any` → ReferenceError).
+- **Fix (`src/components/atelier/NuevoPedidoModal.vue`):** branch REAL completo — productos y clientas reales, variantes por producto, cantidad, estado/prioridad con los enums del backend (`pendiente/en_produccion`, `baja/normal/alta/urgente`), fecha de entrega y `POST /pedidos-produccion` vía `useProduccion.create` con manejo de `detail` 422. Selector de clienta y precios quedan MOCK-only (el modelo `pedidos_produccion` no tiene cliente ni montos — la clienta vive en CRM/Ventas). `ProduccionView` recarga la lista al crear (`@pedido-creado`).
+- Verificación: `npm run build` OK + `npm test` 70/70.
+
+### [2026-09-05] — Fix funcional 3: mock leak `parametrosCosteo` en MaestrosView
+
+- **Síntoma (`/maestros` en REAL):** toast "Mock leak detectado — atelier.parametrosCosteo leído en modo REAL". Causas: fallback `parametrosApi.value ?? store.parametrosCosteo` (se evalúa en REAL antes de que resuelva la API) e inicializador `ref({ ...store.parametrosCosteo })` en setup.
+- **Fix:** constante local `PARAMETROS_COSTEO_DEFAULT` (espejo del seed) usada en ambos puntos; `restaurarParametrosDefecto` reutiliza la constante para no divergir.
+- Verificación: `npm run build` OK + `npm test` 70/70.
+

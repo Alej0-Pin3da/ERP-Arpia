@@ -36,7 +36,19 @@ const categoriasList = computed(() => (isMock.value ? store.categoriasColeccionM
 const ubicacionesList = computed(() => (isMock.value ? store.ubicacionesTallerMaestros : ubicacionesApi.value))
 const tallasList = computed(() => (isMock.value ? store.tallasEstandarMaestros : tallasApi.value))
 const sinTallaList = computed(() => (isMock.value ? store.productosSinTallaMaestros : sinTallaApi.value))
-const parametrosData = computed(() => (isMock.value ? store.parametrosCosteo : (parametrosApi.value ?? store.parametrosCosteo)))
+// Defaults locales (espejo del seed del store): en REAL no se lee atelier.*
+// ni siquiera como fallback, para no disparar el mockGuard.
+const PARAMETROS_COSTEO_DEFAULT: ParametrosCosteoMaestro = {
+  costo_minuto_costura: 280,
+  costo_hora_patronaje: 22000,
+  margen_meta_global_pct: 65,
+  desperdicio_textil_default_pct: 12,
+  iva_regimen_pct: 0,
+  distribucion_reinversion_pct: 40,
+  distribucion_margara_pct: 30,
+  distribucion_valqui_pct: 30,
+}
+const parametrosData = computed(() => (isMock.value ? store.parametrosCosteo : (parametrosApi.value ?? PARAMETROS_COSTEO_DEFAULT)))
 
 function sanitizeProveedorPayload(form: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
@@ -557,7 +569,7 @@ async function eliminarUbicacionWrapper(id: number) {
 // ==========================================
 // 8. PARÁMETROS GLOBALES DE COSTEO
 // ==========================================
-const parametrosForm = ref<ParametrosCosteoMaestro>({ ...store.parametrosCosteo })
+const parametrosForm = ref<ParametrosCosteoMaestro>({ ...(isMock.value ? store.parametrosCosteo : PARAMETROS_COSTEO_DEFAULT) })
 const guardandoParametros = ref(false)
 const mensajeParametros = ref('')
 
@@ -593,16 +605,7 @@ async function guardarParametros() {
 }
 
 function restaurarParametrosDefecto() {
-  parametrosForm.value = {
-    costo_minuto_costura: 280,
-    costo_hora_patronaje: 22000,
-    margen_meta_global_pct: 65,
-    desperdicio_textil_default_pct: 12,
-    iva_regimen_pct: 0,
-    distribucion_reinversion_pct: 40,
-    distribucion_margara_pct: 30,
-    distribucion_valqui_pct: 30,
-  }
+  parametrosForm.value = { ...PARAMETROS_COSTEO_DEFAULT }
 }
 
 // ==========================================
