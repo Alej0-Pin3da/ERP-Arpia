@@ -20,7 +20,7 @@ const devoluciones = ref([
     cliente: 'Carolina Gómez',
     motivo: 'Ajuste de varillas laterales por reducción de talle',
     tipo: 'Ajuste a Medida (Garantía Atelier)',
-    estado: 'En Modificación',
+    estado: 'confirmed',
     fecha: '2026-08-19',
   },
 ])
@@ -157,7 +157,7 @@ async function submitCreate() {
         cliente: `Cliente ${payload.venta_id}`,
         motivo: payload.motivo || 'Ajuste Atelier',
         tipo: payload.tipo === 'total' ? 'Devolución total' : 'Devolución parcial',
-        estado: 'Registrada',
+        estado: 'draft',
         fecha: new Date().toISOString().split('T')[0],
       })
       showToast('success', 'Devolución registrada', `Garantía GAR-${String(nextId).padStart(3, '0')} creada en modo MOCK.`)
