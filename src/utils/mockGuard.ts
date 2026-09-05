@@ -26,14 +26,21 @@ const CRITICAL_PROPS = [
   'proveedoresMaestros',
   'canalesVentaMaestros',
   'metodosPagoMaestros',
-  'categoriasColeccion',
-  'ubicacionesTaller',
-  'tallasEstandar',
-  'productosSinTalla',
+  // Ojo: el store expone estos con sufijo Maestros (sin él, el guard los saltea en silencio).
+  'categoriasColeccionMaestros',
+  'ubicacionesTallerMaestros',
+  'tallasEstandarMaestros',
+  'productosSinTallaMaestros',
   'parametrosCosteo',
   // computed helpers
   'insumosCriticos',
   'totalVentasRealizadas',
+  'totalVentas',
+  'totalUtilidad',
+  'rentabilidadPromedio',
+  'valorTotalInventario',
+  'distribucionSocias',
+  'pipelineCounts',
 ] as const
 
 let installed = false
