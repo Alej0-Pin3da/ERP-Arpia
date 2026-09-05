@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import Button from 'primevue/button'
 import { useMode } from '@/composables/useMode'
 import { useOmisiones, type MockOmision } from '@/composables/useOmisiones'
+import { showToast } from '@/utils/toast'
 
 const { isMock } = useMode()
 const omisionesApi = useOmisiones()
@@ -38,7 +40,24 @@ const omisionesDisplay = computed(() => isMock.value ? omisiones.value : (omisio
   usuario: o.hoja || 'Sistema',
   evento: o.mensaje || o.fase || 'Omisión',
   impacto: o.nivel || '',
+  resuelta: Boolean(o.resuelta),
 })) : []))
+
+const resolviendoId = ref<number | null>(null)
+
+async function marcarResuelta(o: { id: number }) {
+  resolviendoId.value = o.id
+  try {
+    await omisionesApi.resolve(o.id, true)
+    showToast('success', 'Omisión resuelta', `Omisión #${o.id} marcada como resuelta.`)
+    await cargarOmisionesReales()
+  } catch (e: unknown) {
+    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+    showToast('error', 'No se pudo resolver', typeof detail === 'string' ? detail : 'Revisá permisos (solo admin) e intentá de nuevo.')
+  } finally {
+    resolviendoId.value = null
+  }
+}
 </script>
 
 <template>
@@ -60,11 +79,12 @@ const omisionesDisplay = computed(() => isMock.value ? omisiones.value : (omisio
             <th class="py-2.5 px-3">Responsable</th>
             <th class="py-2.5 px-3">Detalle del Evento</th>
             <th class="py-2.5 px-3 text-right">Impacto</th>
+            <th class="py-2.5 px-3 text-center">Estado</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-stone-800/60 font-mono">
           <tr v-if="!omisionesDisplay.length">
-                <td colspan="4" class="py-8 text-center text-stone-500">
+                <td colspan="5" class="py-8 text-center text-stone-500">
                   <i class="pi pi-inbox text-2xl mb-2 block" />
                   Sin omisiones registradas en modo {{ isMock ? 'MOCK' : 'REAL' }}.
                   <span v-if="!isMock" class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/omisiones</code>.</span>
@@ -75,6 +95,24 @@ const omisionesDisplay = computed(() => isMock.value ? omisiones.value : (omisio
             <td class="py-3 px-3 text-amber-300 font-bold">{{ o.usuario }}</td>
             <td class="py-3 px-3 text-stone-300">{{ o.evento }}</td>
             <td class="py-3 px-3 text-right text-stone-400 font-semibold">{{ o.impacto }}</td>
+            <td class="py-3 px-3 text-center">
+              <span
+                v-if="(o as any).resuelta"
+                class="px-2.5 py-1 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 text-[10px]"
+              >
+                Resuelta
+              </span>
+              <Button
+                v-else
+                label="Resolver"
+                icon="pi pi-check"
+                size="small"
+                text
+                class="text-emerald-400 text-xs"
+                :loading="resolviendoId === o.id"
+                @click="marcarResuelta(o)"
+              />
+            </td>
           </tr>
         </tbody>
       </table>
