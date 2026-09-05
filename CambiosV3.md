@@ -1130,3 +1130,47 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Tests:** nuevo `test_pedido_con_cliente_y_cliente_invalido` (create con cliente, list resuelve nombre, 400 con cliente fantasma, PATCH reasigna/limpia).
 - Verificación: `pytest test_fase4_produccion` 6 passed; `alembic upgrade head` + ciclo down/up en dev; `npm run build` OK + `npm test` 70/70.
 
+### [2026-09-05] - Fix P2-3 (auditoría funcional): anti doble-submit
+
+- **Antes:** creates y transiciones sin guard permitían doble POST con doble clic (ventas/pedidos/socias/liquidaciones/anticipos/clientas duplicados, etapas de producción salteadas).
+- **Fix:** `guardando` + `:loading` en los 6 modales de alta/edición; `transicionandoId` por fila en `ProduccionView` (más badge `CANCELADO` y botones apagados en terminales); busy por fila en descontar anticipos.
+- Verificación: `npm run build` OK + `npm test` 70/70.
+
+### [2026-09-05] - Fix auth P0 (auditoría 2): endpoints abiertos o con rol débil
+
+- **`audit_fiscal.py`:** los 3 GETs no pedían auth → ahora `audited_user` (admin/operador/consulta); los POST validan `producto_id` (desconocido → 400) y `periodo` con formato `YYYY-MM`.
+- **`observability.py`:** `/alerts` abierto y con SQL roto (columnas inexistentes, siempre `[]` por el `except` mudo) → ahora con auth y query ORM real (`stock_actual < stock_minimo`). `/summary` y `/metrics` quedan abiertos a propósito (telemetría para scrapers).
+- **`ventas.py` + `finanzas.py`:** `PATCH .../state` aceptaba cualquier rol autenticado → ahora `mutation_user` (admin/operador), manteniendo `current_user` para auditoría de reversiones.
+- Verificación: `py_compile` OK + suites ventas/finanzas/omisiones en verde.
+
+### [2026-09-05] - Fix N+1 (auditoría 2): `selectinload` en listas de finanzas
+
+- **`finanzas.py`:** `_liquidacion_response`/`_anticipo_response` disparaban una query por fila (`d.socia.nombre`).
+- **Fix:** `selectinload` de distribución+socia y de socia en los listados (mismo patrón que producción).
+- Verificación: suites finanzas en verde.
+
+### [2026-09-05] - Fix omisiones (auditoría 2): filtro de fechas daba 422 + índices 0027
+
+- **Bug real (test en rojo en main):** `GET /omisiones?fecha_desde=2026-08-01` devolvía 422 porque pydantic v2 `datetime` rechaza fechas sin hora. Fix: params como `date`.
+- **Migración `0027_audit_omisiones_indexes`:** índices en `precio_versions(producto_id)`, `costo_versions(producto_id)`, `Migracion_Omisiones(resuelta/nivel)`; aplicada en dev.
+- Verificación: `test_omisiones_api.py` 12 passed; `alembic upgrade head` OK.
+
+### [2026-09-05] - Fix devoluciones (auditoría 2): cliente/prenda reales en la lista
+
+- **Antes:** `Cliente ${venta_id}` / `Venta #id` inventados como si fueran datos.
+- **Fix backend:** `DevolucionRead` suma `cliente_nombre`/`prenda_nombre` resueltos por mapper (`venta` ya venía con `selectinload`).
+- **Fix frontend:** usa los nombres reales con fallback honesto (`Venta #id` / `—`).
+- Verificación: suites devoluciones 29 passed; `npm run build` OK.
+
+### [2026-09-05] - Fix finanzas (auditoría 2): socias dinámicas + reload tras transición
+
+- **Antes:** KPIs y tabla hardcodeaban `socia_id 2/3` y nombres Margara/Valqui → con otras socias, plata mal atribuida o en 0.
+- **Fix:** `sociasReparto` (primeras 2 activas no-fondo) con nombres/porcentajes/celdas dinámicos; `cambiarEstadoLiq` siempre refetchea en vez del parche optimista.
+- Verificación: `npm run build` OK + `npm test` 70/70.
+
+### [2026-09-05] - Fix optimizador (auditoría 2): eficiencia calculada
+
+- **Antes:** el resultado mostraba `88.4%` fijo tras "optimizar".
+- **Fix:** headline bindeado a `porcentajeAprovechamiento` real con etiqueta por tramo.
+- Verificación: `npm run build` OK.
+

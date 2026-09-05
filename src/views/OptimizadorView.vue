@@ -78,6 +78,15 @@ const porcentajeAprovechamiento = computed(() => {
   return Math.min(100, Math.round((totalMetrosRequeridos.value / largoTotalDisponible.value) * 100))
 })
 
+// Etiqueta según el cálculo real (antes: "88.4%" hardcodeado).
+const etiquetaEficiencia = computed(() => {
+  const p = porcentajeAprovechamiento.value
+  if (p >= 85) return 'Alta Eficiencia'
+  if (p >= 60) return 'Eficiencia Media'
+  if (p > 0) return 'Baja Eficiencia'
+  return 'Sin cálculo'
+})
+
 function agregarPrenda() {
   const nextId = (prendas.value.length ? Math.max(...prendas.value.map((p) => p.id)) : 0) + 1
   prendas.value.push({
@@ -255,7 +264,7 @@ function ejecutarOptimizacion() {
             <div>
               <div class="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Eficiencia de Corte en Mesa</div>
               <div class="text-3xl font-extrabold font-mono text-stone-100 mt-1">
-                88.4% <span class="text-xs text-emerald-400 font-sans font-semibold">(Alta Eficiencia)</span>
+                {{ porcentajeAprovechamiento }}% <span class="text-xs text-emerald-400 font-sans font-semibold">({{ etiquetaEficiencia }})</span>
               </div>
             </div>
             <div class="text-xs text-stone-300 space-y-1 sm:text-right font-mono">
