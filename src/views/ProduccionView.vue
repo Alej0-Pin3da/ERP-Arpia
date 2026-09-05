@@ -28,8 +28,8 @@ async function cargarPedidosReales() {
     pedidosApi.value = res.items.map((p: any) => ({
       id: p.id,
       codigo: `ORD-${p.id}`,
-      cliente_id: 0,
-      cliente_nombre: p.nombre_variante || p.nombre_producto || 'Taller Arpía',
+      cliente_id: p.cliente_id ?? 0,
+      cliente_nombre: p.cliente_nombre || p.nombre_variante || p.nombre_producto || 'Taller Arpía',
       prenda_nombre: p.nombre_producto || `Producto #${p.producto_id}`,
       // Display: etapas del kanban MOCK. estadoReal guarda el enum del backend
       // (pendiente/en_produccion/completado/cancelado) para las transiciones.

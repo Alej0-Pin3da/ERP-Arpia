@@ -144,9 +144,28 @@ async function guardarPedidoReal() {
     showToast('warn', 'Seleccioná un producto', 'Elegí el modelo del catálogo para crear el pedido de producción.')
     return
   }
+  // Clienta del pedido: existente de CRM o alta rápida por nombre.
+  let clienteIdFinal: number | null = null
+  if (modoCliente.value === 'nuevo' && nuevoClienteNombre.value.trim()) {
+    try {
+      const creada = await clientesApi.create({ nombre: nuevoClienteNombre.value.trim() })
+      clienteIdFinal = (creada as unknown as { id: number }).id ?? null
+    } catch (e: unknown) {
+      showToast('error', 'No se pudo crear la clienta', extractDetail(e))
+      return
+    }
+  } else if (modoCliente.value === 'existente' && clienteSeleccionado.value) {
+    const existe = (clientesReal.value as any[]).some((c) => c.id === clienteSeleccionado.value)
+    if (!existe) {
+      showToast('warn', 'Clienta inválida', 'La clienta seleccionada ya no existe. Elegí otra o cargá el nombre manual.')
+      return
+    }
+    clienteIdFinal = clienteSeleccionado.value
+  }
   try {
     const creado = await produccionService.create({
       producto_id: recetaSeleccionada.value,
+      cliente_id: clienteIdFinal,
       variante_id: varianteReal.value,
       cantidad: Math.max(1, Math.round(Number(cantidadReal.value) || 1)),
       estado: estadoReal.value,
@@ -160,6 +179,8 @@ async function guardarPedidoReal() {
     recetaSeleccionada.value = null
     varianteReal.value = null
     cantidadReal.value = 1
+    clienteSeleccionado.value = null
+    nuevoClienteNombre.value = ''
     observaciones.value = ''
   } catch (e: unknown) {
     showToast('error', 'No se pudo crear', extractDetail(e))
@@ -214,8 +235,8 @@ function guardarPedido() {
     @update:visible="(v) => emit('update:visible', v)"
   >
     <div class="space-y-4 pt-1">
-      <!-- Client Selector (MOCK only: el pedido REAL se vincula a producto) -->
-      <div v-if="isMock">
+      <!-- Client Selector -->
+      <div>
         <div class="flex items-center justify-between mb-1.5">
           <label class="text-xs font-semibold uppercase tracking-wider text-stone-400">Cliente / Destinatario</label>
           <div class="text-xs space-x-2">
@@ -257,10 +278,6 @@ function guardarPedido() {
       </div>
 
       <!-- Garment Recipe Selector -->
-      <div v-if="!isMock" class="bg-sky-950/20 border border-sky-500/20 rounded-xl p-3 text-xs text-sky-200/90 flex items-start gap-2">
-        <i class="pi pi-info-circle text-sky-400 text-base flex-shrink-0 mt-0.5" />
-        <span>En modo REAL el pedido se vincula al <strong>producto del catálogo</strong> (<code>POST /pedidos-produccion</code>). La clienta se gestiona en CRM y Ventas.</span>
-      </div>
       <div>
         <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Cargar desde Receta / Ficha BOM (Opcional)</label>
         <Dropdown

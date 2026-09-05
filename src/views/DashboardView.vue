@@ -57,7 +57,7 @@ const pedidosTabla = computed(() => {
     return {
       ...p,
       codigo: `ORD-${p.id}`,
-      cliente_nombre: p.nombre_variante || p.nombre_producto || 'Taller Arpía',
+      cliente_nombre: p.cliente_nombre || p.nombre_variante || p.nombre_producto || 'Taller Arpía',
       prenda_nombre: p.nombre_producto || `Producto #${p.producto_id}`,
       estado: rawEstado === 'pendiente' ? 'CORTE' : rawEstado === 'en_produccion' ? 'COSTURA' : rawEstado === 'completado' ? 'LISTO' : (rawEstado.toUpperCase() || 'COTIZADO'),
       precio_venta: Number(p.precio_venta ?? 0),

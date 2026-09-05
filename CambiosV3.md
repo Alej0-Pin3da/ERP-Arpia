@@ -1122,3 +1122,11 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Fix:** nombres exactos + cobertura de computadas (`totalVentas/totalUtilidad/rentabilidadPromedio/valorTotalInventario/distribucionSocias/pipelineCounts`).
 - Verificación: `npm run build` OK + `npm test` 70/70.
 
+### [2026-09-05] - Pedido con clienta: `cliente_id` end-to-end (migración 0026)
+
+- **Motivo:** el modal de pedido en REAL no permitía elegir clienta porque `pedidos_produccion` no tenía la columna (solo el mock la modelaba).
+- **Backend:** migración `0026_pedidos_cliente_fk` (`cliente_id` nullable + FK a `Clientes(id)` `ON DELETE SET NULL`, guards estilo 0022, downgrade verificado con ciclo down/up en dev); modelo + relationship `selectin`; schemas (`Create/Update/Read` + `cliente_nombre`); ruta valida `cliente_id` (desconocido → 400) y resuelve `cliente_nombre` en get/list.
+- **Frontend:** servicio con los nuevos campos; `NuevoPedidoModal` muestra el selector en REAL (existente de CRM + alta rápida por nombre vía `POST /clientes`); `ProduccionView` y `DashboardView` muestran el nombre real.
+- **Tests:** nuevo `test_pedido_con_cliente_y_cliente_invalido` (create con cliente, list resuelve nombre, 400 con cliente fantasma, PATCH reasigna/limpia).
+- Verificación: `pytest test_fase4_produccion` 6 passed; `alembic upgrade head` + ciclo down/up en dev; `npm run build` OK + `npm test` 70/70.
+

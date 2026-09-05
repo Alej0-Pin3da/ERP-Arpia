@@ -8,6 +8,8 @@ import { client } from '@/api/client'
 export interface PedidoProduccionRead {
   id: number
   producto_id: number
+  // Clienta que realiza el pedido (migración 0026, nullable).
+  cliente_id?: number | null
   variante_id?: number | null
   cantidad: number
   cantidad_producida: number
@@ -20,10 +22,12 @@ export interface PedidoProduccionRead {
   updated_at: string
   nombre_producto?: string | null
   nombre_variante?: string | null
+  cliente_nombre?: string | null
 }
 
 export interface PedidoProduccionCreatePayload {
   producto_id: number
+  cliente_id?: number | null
   variante_id?: number | null
   cantidad: number
   cantidad_producida?: number
@@ -34,7 +38,9 @@ export interface PedidoProduccionCreatePayload {
   observaciones?: string | null
 }
 
-export type PedidoProduccionUpdatePayload = Partial<PedidoProduccionCreatePayload>
+export type PedidoProduccionUpdatePayload = Partial<PedidoProduccionCreatePayload> & {
+  cliente_id?: number | null
+}
 
 export interface Paginated<T> {
   items: T[]
