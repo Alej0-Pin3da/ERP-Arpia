@@ -30,7 +30,7 @@ async function cargarInsumosSugerir() {
 }
 onMounted(() => { void cargarInsumosSugerir() })
 watch(isMock, () => { void cargarInsumosSugerir() })
-const criticosReal = computed(() => (insumosRealList.value as any[]).filter((i:any)=>(i.stock_actual??i.stock??0)<=(i.stock_minimo??0)))
+const criticosReal = computed(() => (insumosRealList.value as any[]).filter((i:any)=>Number(i.stock_actual??i.stock??0)<=Number(i.stock_minimo??0)))
 
 const criticos = computed(() => isMock.value ? atelier.insumosCriticos : (criticosReal.value as any))
 
@@ -96,7 +96,7 @@ async function generarOrden() {
             <tr v-for="it in criticos" :key="it.id" class="hover:bg-stone-800/30">
               <td class="py-2.5 px-3">
                 <div class="font-medium text-stone-100">{{ it.nombre }}</div>
-                <div class="text-[11px] text-stone-400">{{ it.proveedor }}</div>
+                <div class="text-[11px] text-stone-400">{{ it.proveedor ?? it.nombre_categoria ?? '—' }}</div>
               </td>
               <td class="py-2.5 px-3 text-right font-mono text-red-400 font-bold">{{ it.stock_actual }} {{ it.unidad_medida }}</td>
               <td class="py-2.5 px-3 text-right font-mono text-stone-400">{{ it.stock_minimo }} {{ it.unidad_medida }}</td>

@@ -44,7 +44,7 @@ async function cargarDashboardReales() {
 onMounted(() => { void cargarDashboardReales() })
 watch(isMock, () => { void cargarDashboardReales() })
 
-const insumosCriticosReal = computed(() => (insumosReal.value as any[]).filter((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
+const insumosCriticosReal = computed(() => (insumosReal.value as any[]).filter((i: any) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)))
 const insumosCriticosDisplay = computed(() => isMock.value ? atelier.insumosCriticos : insumosCriticosReal.value)
 const pedidosDisplay = computed(() => isMock.value ? atelier.pedidos : (pedidosReal.value as any[]))
 // P0-2: en REAL la API (PedidoProduccionRead) no trae codigo/cliente_nombre/
@@ -436,7 +436,7 @@ function getEstadoBadgeClass(estado: string) {
             <div class="flex justify-between items-start">
               <div>
                 <div class="font-bold text-stone-200 text-xs">{{ it.nombre }}</div>
-                <div class="text-[11px] text-stone-400">{{ it.proveedor }}</div>
+                <div class="text-[11px] text-stone-400">{{ it.proveedor ?? it.nombre_categoria ?? '—' }}</div>
               </div>
               <span class="text-xs font-mono font-bold text-red-400">{{ it.stock_actual }} {{ it.unidad_medida }}</span>
             </div>
