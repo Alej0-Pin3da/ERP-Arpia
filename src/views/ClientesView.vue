@@ -66,6 +66,11 @@ const clienteSeleccionado = ref<ClienteCRM | null>(null)
 
 watch(showModal, (v) => { if (!v && !isMock.value) void cargarClientesReales() })
 
+async function onFichaGuardada() {
+  showTallasModal.value = false
+  await cargarClientesReales()
+}
+
 const tallasFiltroOptions = [
   { label: 'Todas las Tallas', value: 'TODAS' },
   { label: 'Talla XXS', value: 'XXS' },
@@ -98,7 +103,7 @@ const clientasSinTalla = computed(() => {
   return clientesList.value.filter((c) => {
     const t = c.talla_habitual || ''
     const cat = c.categoria_preferida || ''
-    return t.includes('Sin Talla') || t.includes('Tote') || cat.includes('Tote Bags') || cat.includes('Accesorios')
+    return t.includes('Sin Talla') || t.includes('Tote') || t.includes('SIN_TALLA') || t.includes('UNICA') || cat.includes('Tote Bags') || cat.includes('Accesorios')
   }).length
 })
 
@@ -524,7 +529,7 @@ function abrirWhatsApp(c: ClienteCRM) {
     <FichaTallasClienteModal
       v-model:visible="showTallasModal"
       :cliente="clienteSeleccionado"
-      @guardar="showTallasModal = false"
+      @guardar="onFichaGuardada"
     />
   </div>
 </template>

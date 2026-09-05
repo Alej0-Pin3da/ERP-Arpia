@@ -6,6 +6,8 @@ import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import { type ClienteCRM, useAtelierStore } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
+import { useClientes } from '@/composables/useClientes'
+import { toTallaCode, fromTallaCode } from '@/utils/tallas'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps<{
@@ -20,6 +22,8 @@ const emit = defineEmits<{
 
 const atelier = useAtelierStore()
 const { isMock } = useMode()
+const clientesApi = useClientes()
+const guardando = ref(false)
 
 const tallaSeleccionada = ref('S')
 const tallaSuperior = ref('S')
@@ -60,9 +64,11 @@ watch(
   () => props.cliente,
   (c) => {
     if (c) {
-      tallaSeleccionada.value = c.talla_habitual || 'S'
-      tallaSuperior.value = c.talla_superior || c.talla_habitual || 'S'
-      tallaInferior.value = c.talla_inferior || c.talla_habitual || 'S'
+      // En REAL la API devuelve códigos cortos (SIN_TALLA/UNICA): se
+      // mapean a la etiqueta del dropdown.
+      tallaSeleccionada.value = fromTallaCode(c.talla_habitual)
+      tallaSuperior.value = fromTallaCode(c.talla_superior, fromTallaCode(c.talla_habitual))
+      tallaInferior.value = fromTallaCode(c.talla_inferior, fromTallaCode(c.talla_habitual))
       categoriaPreferida.value = c.categoria_preferida || 'Corsetería & Tops'
       notasCalce.value = c.notas || ''
     }
@@ -77,22 +83,45 @@ const esClientaSinTalla = computed(() => {
   )
 })
 
-function guardarFicha() {
-  if (props.cliente) {
-    const updated: Partial<ClienteCRM> = {
-      talla_habitual: tallaSeleccionada.value,
-      talla_superior: tallaSuperior.value,
-      talla_inferior: tallaInferior.value,
-      categoria_preferida: categoriaPreferida.value,
-      tipo_producto_frecuente: esClientaSinTalla.value ? 'PRODUCTOS_SIN_TALLA' : 'PRENDAS_TALLAS',
-      notas: notasCalce.value.trim(),
-    }
-    if (isMock.value) atelier.actualizarCliente(props.cliente.id, updated)
-    else showToast('info','Modo REAL','Actualice la talla vía Gestión de Clientas API.')
+async function guardarFicha() {
+  if (!props.cliente) {
+    emit('update:visible', false)
+    return
+  }
+  const updated: Partial<ClienteCRM> = {
+    talla_habitual: tallaSeleccionada.value,
+    talla_superior: tallaSuperior.value,
+    talla_inferior: tallaInferior.value,
+    categoria_preferida: categoriaPreferida.value,
+    tipo_producto_frecuente: esClientaSinTalla.value ? 'PRODUCTOS_SIN_TALLA' : 'PRENDAS_TALLAS',
+    notas: notasCalce.value.trim(),
+  }
+  if (isMock.value) {
+    atelier.actualizarCliente(props.cliente.id, updated)
     showToast('success', 'Ficha de Talla Actualizada', `Talla guardada como ${tallaSeleccionada.value} para ${props.cliente.nombre}.`)
     emit('guardar', updated)
+    emit('update:visible', false)
+    return
   }
-  emit('update:visible', false)
+  guardando.value = true
+  try {
+    await clientesApi.update(props.cliente.id, {
+      talla_habitual: toTallaCode(tallaSeleccionada.value),
+      talla_superior: toTallaCode(tallaSuperior.value),
+      talla_inferior: toTallaCode(tallaInferior.value),
+      categoria_preferida: categoriaPreferida.value || null,
+      tipo_producto_frecuente: esClientaSinTalla.value ? 'PRODUCTOS_SIN_TALLA' : 'PRENDAS_TALLAS',
+      notas: notasCalce.value.trim() || null,
+    })
+    showToast('success', 'Ficha de Talla Actualizada', `Talla guardada como ${tallaSeleccionada.value} para ${props.cliente.nombre}.`)
+    emit('guardar', updated)
+    emit('update:visible', false)
+  } catch (e: unknown) {
+    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+    showToast('error', 'No se pudo guardar', typeof detail === 'string' ? detail : 'Revisá los datos e intentá de nuevo.')
+  } finally {
+    guardando.value = false
+  }
 }
 
 function enviarGuiaWhatsApp() {
@@ -318,6 +347,7 @@ function enviarGuiaWhatsApp() {
           icon="pi pi-check"
           size="small"
           class="p-button-warning text-xs font-semibold px-4"
+          :loading="guardando"
           @click="guardarFicha"
         />
       </div>

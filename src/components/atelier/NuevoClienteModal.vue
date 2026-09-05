@@ -9,6 +9,7 @@ import { useAtelierStore, type ClienteCRM } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
 import { useMode } from '@/composables/useMode'
 import { useClientes } from '@/composables/useClientes'
+import { toTallaCode } from '@/utils/tallas'
 
 const props = defineProps<{
   visible: boolean
@@ -148,9 +149,10 @@ async function guardar() {
     email: email.value.trim() || null,
     ciudad: ciudad.value.trim() || null,
     direccion: direccion.value.trim() || null,
-    talla_habitual: tallaHabitual.value || null,
-    talla_superior: tallaSuperior.value || null,
-    talla_inferior: tallaInferior.value || null,
+    // Backend talla_* max_length=10: se persiste el código corto.
+    talla_habitual: toTallaCode(tallaHabitual.value),
+    talla_superior: toTallaCode(tallaSuperior.value),
+    talla_inferior: toTallaCode(tallaInferior.value),
     categoria_preferida: categoriaPreferida.value || null,
     tipo_producto_frecuente: tipoFrecuente,
     notas: notas.value.trim() || null,

@@ -1008,3 +1008,51 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Fix:** constante local `PARAMETROS_COSTEO_DEFAULT` (espejo del seed) usada en ambos puntos; `restaurarParametrosDefecto` reutiliza la constante para no divergir.
 - Verificación: `npm run build` OK + `npm test` 70/70.
 
+### [2026-09-05] — Fix P0-2 (auditoría funcional): transiciones de producción daban 422 en REAL
+
+- **`src/views/ProduccionView.vue`:** el mapping convertía el estado a etapas MOCK (`COSTURA`...) y `avanzar/retrocederEstado` mandaban esa etapa al backend, cuyo CHECK solo acepta `pendiente/en_produccion/completado/cancelado` → toda transición REAL fallaba.
+- **Fix:** el mapping guarda `estadoReal` (enum crudo) además de la etapa de display; avanzar/retroceden transicionan dentro del enum (`pendiente→en_produccion→completado`, cancelado terminal con aviso honesto).
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P0-11 (auditoría funcional): contadores de Análisis siempre en 0
+
+- **`src/views/AnalisisView.vue`:** filtraba `estado === 'entregado'` y `['corte','confeccion','prueba']`, que no existen en ningún modo (MOCK usa mayúsculas, REAL el enum del backend); `!p.vendida` contaba todo en REAL (`PrendaRead` no trae `vendida`).
+- **Fix:** normalización case-insensitive (`entregado/completado/listo` vs etapas activas de ambos modos); stock REAL = `estado === 'disponible'`.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P0-3 (auditoría funcional): NuevoInsumoModal crea en REAL
+
+- **Antes:** toast "Creación de insumos vía Inventario API" sin persistir; además la UI mandaba `categoria` string y el backend exige `categoria_id: int`.
+- **Fix (`src/components/atelier/NuevoInsumoModal.vue`):** dropdown de categorías reales (`GET /categorias-insumos`), `POST /insumos` vía `useInsumos().create` con `detail` de error, proveedor MOCK-only (el modelo no lo tiene) y `:loading` anti doble-submit.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P0-4 (auditoría funcional): CompraInsumoModal persistía solo en MOCK
+
+- **Antes:** en REAL mostraba "Compra registrada" sin guardar nada.
+- **Fix:** `POST /compras-insumos` vía `createCompraInsumo`, éxito solo si persiste, evento `compra-registrada` + `:loading`.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P0-7 (auditoría funcional): OrdenCompraProveedorModal vacía y ficticia en REAL
+
+- **Antes:** operaba sobre `[]` (tabla vacía) y el "éxito" mutaba nada.
+- **Fix:** en REAL carga `useInsumos().list()` con `Number()` y fallback de proveedor a categoría; confirma con `POST /compras-insumos` por fila (reporta `ok/total` + último error) en vez de mutar el mock.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P1-2 (auditoría funcional): InventarioView recarga tras modales
+
+- **Antes:** ningún modal tenía handler → lista REAL desactualizada hasta refresh manual.
+- **Fix:** `@insumo-creado/@compra-registrada` y reload al cerrar Sugerir/OrdenProveedor (`cargarInsumosReales` ya hace early-return en MOCK).
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P0-5 (auditoría funcional): falso "Pago Registrado" en REAL
+
+- **`src/components/atelier/DetalleLiquidacionModal.vue`:** el toast de éxito se mostraba siempre aunque en REAL no se persistía nada (la API no tiene pago por socia, solo transición de la liquidación completa).
+- **Fix:** éxito solo en MOCK; en REAL aviso honesto sin fingir persistencia.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P0-6/P0-8 (auditoría funcional): ficha de tallas persiste en REAL + códigos cortos
+
+- **Antes:** `FichaTallasClienteModal` (y el muerto `MedidasAnatomicasModal`, borrado por no usarse en ningún lado) fingían guardado en REAL; además los valores `Sin Talla (Tote Bags)`/`Talla Unica / Surtido` (21 chars) violan `max_length=10` del backend → 422.
+- **Fix:** nuevo `src/utils/tallas.ts` (`toTallaCode/fromTallaCode`: `SIN_TALLA`/`UNICA`); ficha guarda vía `PUT /clientes/:id` + reload en `ClientesView` (`onFichaGuardada`); `NuevoClienteModal` persiste códigos; contador `clientasSinTalla` reconoce ambos formatos.
+- Verificación: `npm run build` OK.
+
