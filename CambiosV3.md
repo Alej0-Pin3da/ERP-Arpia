@@ -935,3 +935,58 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Decisión mínima:** sin join a productos (fuera de alcance); se ocultan en REAL con `v-if="isMock"` el bloque `Venta/Utilidad` de las cards Kanban y las columnas `Precio Venta/Utilidad Neta` de la vista tabla (+ comentario en el mapping). En MOCK todo visible como antes.
 - Verificación: `npm run build` OK + `npm test` 70/70.
 
+### [2026-09-05] — P1-1 (auditoría tipos API→UI): types `number|string` en insumos/prendas
+
+- **`src/services/api/insumos.ts`:** `stock_actual/stock_minimo/costo_promedio_actual` ahora `number | string` (Postgres Numeric serializa string).
+- **`src/services/api/prendas.ts`:** `costo_real/precio_venta` ahora `number | string | null`.
+- Los consumos ya normalizaban con `Number()` (`InventarioView`, `PrendasListasView`, `FichaTecnicaModal`); el type mentía `number` puro y ocultaba el patrón.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — P1-2 (auditoría tipos API→UI): costo ficticio $25.000 en NuevaVentaModal
+
+- **`src/components/atelier/NuevaVentaModal.vue:seleccionarPrendaCatalogo`:** `it.costo_unitario` quedaba en el default ficticio ($25.000) porque leía solo `p.costo_unitario` (inexistente en `ProductoRead` REAL).
+- **Fix:** fallback `costo_unitario ?? costos_operativos_fijos ?? costo_insumos` normalizado con `Number()`, solo si es > 0 (edición manual intacta).
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — P1-3 (auditoría tipos API→UI): mano_obra/cif crudos + thresholds fijos en ProductosView
+
+- **`src/views/ProductosView.vue`:** `mano_obra/cif_energia` se asignaban crudos (string Numeric o null) y `costo_total_unitario/precio_venta/costo_estimado_materiales` podían quedar string.
+- **Fix:** `Number()` en cada campo del mapping; `margenColor()` usa `margenMetaGlobal` (`meta` / `meta+25`) en vez de thresholds fijos `35/60` (mismo bug que `AUDIT-FALLAS` ítem 5).
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — P2-1 (auditoría tipos API→UI): markup mostraba "60.00%"
+
+- **`src/views/ProductosView.vue`:** la tarjeta mostraba `{{ r.markup_pct }}%` crudo (string Numeric `"60.00"`).
+- **Fix:** `{{ Math.round(Number(r.markup_pct ?? 0)) }}%`.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — P2-2 (auditoría tipos API→UI): AnalisisView con costo 0 y margen 100% ficticios
+
+- **`src/views/AnalisisView.vue`:** en REAL `costo_estimado_materiales` hardcodeado en 0 (margen siempre 100%), `precio_venta_sugerido` crudo (string), y el filtro de stock crítico comparaba strings (`"5" <= "10"` lexicográfico = falso, alertas perdidas).
+- **Fix:** mapping con `Number(p.costo_insumos ?? 0)`, `Number(p.precio_venta_sugerido ?? 0)`, tiempo derivado de `tiempo_confeccion_min`; filtro con `Number()`; template con `Number()` + guard de división por cero en el margen.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — P2-3/P2-4 (auditoría tipos API→UI): proveedor vacío + filtro string en Dashboard/Sugerir
+
+- **`src/views/DashboardView.vue` / `src/components/atelier/SugerirOrdenModal.vue`:** columna `{{ it.proveedor }}` vacía en REAL (`InsumoRead` no trae proveedor) y filtro de críticos con comparación lexicográfica de strings.
+- **Fix:** fallback `it.proveedor ?? it.nombre_categoria ?? '—'`; filtros con `Number()` en ambos archivos.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — P2-5 (auditoría tipos API→UI): Devoluciones fecha vacía y estado crudo
+
+- **`src/views/DevolucionesView.vue`:** el mapping leía `d.creado_en` pero `DevolucionRead` manda `fecha` → fecha siempre vacía; `estado` mostraba el enum crudo (`draft`, `confirmed`…) con fallback inventado `'Registrada'`.
+- **Fix:** `fecha: d.fecha ?? d.creado_en ?? d.created_at ?? ''`; estado conserva el enum real (el botón eliminar `draft` sigue funcionando) y el template muestra etiqueta (`Borrador/Confirmada/Anulada/Revertida`).
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — P2-6 (auditoría tipos API→UI): Cotizador mostraba "(null)"
+
+- **`src/views/CotizadorView.vue:recetasOptions`:** label `` `${r.nombre} (${r.codigo})` `` con `codigo` null → `Nombre (null)`.
+- **Fix:** fallback `r.codigo ?? \`PRD-${r.id}\``.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — P2-7 (auditoría tipos API→UI): crash en EtiquetaPrenda con sku nulo
+
+- **`src/components/atelier/EtiquetaPrendaModal.vue`:** `props.variante.sku.slice(-4)` rompía si `sku` era null/undefined (prenda genérica P2-7).
+- **Fix:** `(props.variante.sku ?? '').slice(-4) || '0000'`; `formatCOP` acepta `number | string` con `Number()`.
+- Verificación: `npm run build` OK + `npm test` 70/70.
+

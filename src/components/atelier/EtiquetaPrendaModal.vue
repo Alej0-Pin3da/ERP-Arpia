@@ -17,11 +17,12 @@ const emit = defineEmits<{
 
 const serialNumber = computed(() => {
   if (!props.prenda || !props.variante) return 'ARP-2026-0001'
-  return `${props.prenda.codigo}-${props.variante.talla}-${props.variante.sku.slice(-4)}`
+  const sufijo = (props.variante.sku ?? '').slice(-4) || '0000'
+  return `${props.prenda.codigo}-${props.variante.talla}-${sufijo}`
 })
 
-function formatCOP(val: number) {
-  return `$${Math.round(val).toLocaleString('es-CO')}`
+function formatCOP(val: number | string) {
+  return `$${Math.round(Number(val ?? 0)).toLocaleString('es-CO')}`
 }
 
 function imprimirEtiqueta() {
