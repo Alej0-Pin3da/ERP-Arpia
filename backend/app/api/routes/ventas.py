@@ -196,6 +196,7 @@ def transition_venta_state(
     payload: VentaStateTransition,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
+    _: Usuario = Depends(mutation_user),
 ):
     """Transition venta to a new state with validation.
 

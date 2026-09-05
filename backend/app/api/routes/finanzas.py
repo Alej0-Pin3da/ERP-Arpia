@@ -23,7 +23,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from slowapi import Limiter
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
 from app.core.deps import get_current_user, get_db, require_roles
@@ -33,6 +33,7 @@ from app.models.finanzas import (
     AnticipoEstado,
     DocumentState,
     Liquidacion,
+    LiquidacionDistribucion,
     MovimientoFinanciero,
     SociosConfiguracion,
 )
@@ -202,6 +203,7 @@ def transition_movimiento_state(
     payload: MovimientoStateTransition,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
+    _: Usuario = Depends(mutation_user),
 ):
     """Transition movimiento to a new state with validation.
 
@@ -433,7 +435,11 @@ def list_liquidaciones(
     _: Usuario = Depends(audited_user),
 ):
     """Paginated list of real liquidaciones (LIQ-1)."""
-    stmt = select(Liquidacion).order_by(Liquidacion.id)
+    stmt = (
+        select(Liquidacion)
+        .options(selectinload(Liquidacion.distribucion).selectinload(LiquidacionDistribucion.socia))
+        .order_by(Liquidacion.id)
+    )
     if estado is not None:
         stmt = stmt.where(Liquidacion.estado == estado)
     if periodo is not None:
@@ -506,7 +512,7 @@ def list_anticipos(
     _: Usuario = Depends(audited_user),
 ):
     """Paginated list of anticipos, filter by socia_id/estado (ANT-3)."""
-    stmt = select(Anticipo).order_by(Anticipo.id)
+    stmt = select(Anticipo).options(selectinload(Anticipo.socia)).order_by(Anticipo.id)
     if socia_id is not None:
         stmt = stmt.where(Anticipo.socia_id == socia_id)
     if estado is not None:
