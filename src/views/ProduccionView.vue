@@ -365,7 +365,7 @@ function abrirWhatsApp(p: PedidoProduccion) {
     </div>
 
     <!-- Modals -->
-    <NuevoPedidoModal v-model:visible="showNuevoPedidoModal" />
+    <NuevoPedidoModal v-model:visible="showNuevoPedidoModal" @pedido-creado="cargarPedidosReales" />
     <DetallePedidoTallerModal
       v-model:visible="showDetallePedidoModal"
       :pedido="pedidoSeleccionado"

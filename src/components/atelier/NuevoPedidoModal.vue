@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -9,6 +9,10 @@ import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import { useAtelierStore, type PedidoProduccion } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
+import { useClientes } from '@/composables/useClientes'
+import { useProductos } from '@/composables/useProductos'
+import { useProduccion } from '@/composables/useProduccion'
+import { client } from '@/api/client'
 import { showToast } from '@/utils/toast'
 
 defineProps<{
@@ -22,6 +26,9 @@ const emit = defineEmits<{
 
 const atelier = useAtelierStore()
 const { isMock } = useMode()
+const clientesApi = useClientes()
+const productosApi = useProductos()
+const produccionService = useProduccion()
 
 const clienteSeleccionado = ref<number | null>(null)
 const nuevoClienteNombre = ref('')
@@ -32,6 +39,33 @@ const precioVenta = ref<number>(90000)
 const costoEstimado = ref<number>(25000)
 const estadoInicial = ref<PedidoProduccion['estado']>('COTIZADO')
 const observaciones = ref('')
+// REAL-only (POST /pedidos-produccion): producto + variante + cantidad + enums del backend.
+const varianteReal = ref<number | null>(null)
+const cantidadReal = ref<number>(1)
+const estadoReal = ref<string>('pendiente')
+const prioridadReal = ref<string>('normal')
+const fechaEntregaReal = ref<string>('')
+
+const clientesReal = ref<any[]>([])
+const productosReal = ref<any[]>([])
+const variantesReal = ref<{ id: number; nombre_variante: string }[]>([])
+
+async function cargarDatosReales() {
+  if (isMock.value) return
+  try {
+    const [c, p] = await Promise.all([
+      clientesApi.list({ limit: 100 }),
+      productosApi.list({ limit: 100 }),
+    ])
+    clientesReal.value = (c.items as any) ?? []
+    productosReal.value = (p.items as any) ?? []
+  } catch {
+    clientesReal.value = []
+    productosReal.value = []
+  }
+}
+onMounted(() => { void cargarDatosReales() })
+watch(isMock, () => { void cargarDatosReales() })
 
 const estadosOptions = [
   { label: '1. Cotizado', value: 'COTIZADO' },
@@ -44,42 +78,105 @@ const estadosOptions = [
   { label: '8. Entregado al Cliente', value: 'ENTREGADO' },
 ]
 
+const estadosOptionsReal = [
+  { label: 'Pendiente', value: 'pendiente' },
+  { label: 'En producción', value: 'en_produccion' },
+]
+
+const prioridadesOptions = [
+  { label: 'Baja', value: 'baja' },
+  { label: 'Normal', value: 'normal' },
+  { label: 'Alta', value: 'alta' },
+  { label: 'Urgente', value: 'urgente' },
+]
+
+const variantesOptions = computed(() => [
+  { label: 'Sin variante (genérico)', value: null },
+  ...variantesReal.value.map((v) => ({ label: v.nombre_variante, value: v.id })),
+])
+
 const clientesOptions = computed(() => {
-  return (isMock.value ? atelier.clientes : [] as any[]).map((c) => ({
+  return (isMock.value ? atelier.clientes : clientesReal.value as any[]).map((c) => ({
     label: `${c.nombre} (${c.telefono || 'Sin tel'})`,
     value: c.id,
   }))
 })
 
 const recetasOptions = computed(() => {
-  return (isMock.value ? (atelier as any).recetas : [] as any[]).map((r) => ({
-    label: `${r.nombre} (PVP Sugerido: $${r.precio_venta.toLocaleString('es-CO')})`,
+  return (isMock.value ? (atelier as any).recetas : productosReal.value as any[]).map((r) => ({
+    label: isMock.value
+      ? `${r.nombre} (PVP Sugerido: $${Number(r.precio_venta ?? 0).toLocaleString('es-CO')})`
+      : `${r.nombre} (${r.codigo ?? `PRD-${r.id}`})`,
     value: r.id,
   }))
 })
 
-function onRecetaChange() {
+async function onRecetaChange() {
   if (recetaSeleccionada.value) {
-    const r = (isMock.value ? (atelier as any).recetas : [] as any[]).find((x) => x.id === recetaSeleccionada.value)
+    const r = (isMock.value ? (atelier as any).recetas : productosReal.value as any[]).find((x) => x.id === recetaSeleccionada.value)
     if (r) {
       nombrePrendaManual.value = r.nombre
-      precioVenta.value = r.precio_venta
-      costoEstimado.value = r.costo_total_unitario
+      const pv = Number(r.precio_venta_sugerido ?? r.precio_venta ?? 0)
+      if (Number.isFinite(pv) && pv > 0) precioVenta.value = Math.round(pv)
+      const ct = Number(r.costo_total_unitario ?? r.costos_operativos_fijos ?? r.costo_insumos ?? 0)
+      if (Number.isFinite(ct) && ct > 0) costoEstimado.value = Math.round(ct)
+    }
+    if (!isMock.value) {
+      varianteReal.value = null
+      try {
+        const { data } = await client.get<{ id: number; nombre_variante: string }[]>(`/productos/${recetaSeleccionada.value}/variantes`)
+        variantesReal.value = data ?? []
+      } catch { variantesReal.value = [] }
     }
   }
 }
 
+function extractDetail(e: unknown): string {
+  const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+  if (Array.isArray(detail)) return detail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ')
+  if (typeof detail === 'string' && detail) return detail
+  if (e instanceof Error && e.message) return e.message
+  return 'No se pudo crear el pedido'
+}
+
+async function guardarPedidoReal() {
+  if (recetaSeleccionada.value == null) {
+    showToast('warn', 'Seleccioná un producto', 'Elegí el modelo del catálogo para crear el pedido de producción.')
+    return
+  }
+  try {
+    const creado = await produccionService.create({
+      producto_id: recetaSeleccionada.value,
+      variante_id: varianteReal.value,
+      cantidad: Math.max(1, Math.round(Number(cantidadReal.value) || 1)),
+      estado: estadoReal.value,
+      prioridad: prioridadReal.value,
+      fecha_entrega_estimada: fechaEntregaReal.value || null,
+      observaciones: observaciones.value.trim() || null,
+    }) as unknown as PedidoProduccion
+    showToast('success', 'Pedido Registrado', `Pedido #${(creado as any).id ?? ''} creado en estado ${estadoReal.value}.`)
+    emit('pedido-creado', creado)
+    emit('update:visible', false)
+    recetaSeleccionada.value = null
+    varianteReal.value = null
+    cantidadReal.value = 1
+    observaciones.value = ''
+  } catch (e: unknown) {
+    showToast('error', 'No se pudo crear', extractDetail(e))
+  }
+}
+
 function guardarPedido() {
+  if (!isMock.value) { void guardarPedidoReal(); return }
   let clienteId = clienteSeleccionado.value
   let clienteNombre = 'Cliente'
 
   if (modoCliente.value === 'nuevo' && nuevoClienteNombre.value.trim()) {
-    if (!isMock.value) { showToast('info','Modo REAL','Creación de clientas vía CRM API.'); return c as any }
     const c = atelier.crearCliente({ nombre: nuevoClienteNombre.value.trim() })
     clienteId = c.id
     clienteNombre = c.nombre
   } else if (clienteId) {
-    const c = (isMock.value ? atelier.clientes : [] as any[]).find((x) => x.id === clienteId)
+    const c = atelier.clientes.find((x) => x.id === clienteId)
     if (c) clienteNombre = c.nombre
   } else {
     showToast('warn', 'Seleccione un cliente', 'Debe seleccionar o ingresar el nombre de la clienta.')
@@ -87,8 +184,6 @@ function guardarPedido() {
   }
 
   const prenda = nombrePrendaManual.value.trim() || 'Prenda a Medida Atelier'
-  if (!isMock.value) { showToast('info','Modo REAL','Usá POST /pedidos-produccion'); return }
-  if (!isMock.value) { showToast('info','Modo REAL','Creación de pedidos vía Producción API.'); return }
   const p = atelier.crearPedido({
     cliente_id: clienteId || 1,
     cliente_nombre: clienteNombre,
@@ -119,8 +214,8 @@ function guardarPedido() {
     @update:visible="(v) => emit('update:visible', v)"
   >
     <div class="space-y-4 pt-1">
-      <!-- Client Selector -->
-      <div>
+      <!-- Client Selector (MOCK only: el pedido REAL se vincula a producto) -->
+      <div v-if="isMock">
         <div class="flex items-center justify-between mb-1.5">
           <label class="text-xs font-semibold uppercase tracking-wider text-stone-400">Cliente / Destinatario</label>
           <div class="text-xs space-x-2">
@@ -162,6 +257,10 @@ function guardarPedido() {
       </div>
 
       <!-- Garment Recipe Selector -->
+      <div v-if="!isMock" class="bg-sky-950/20 border border-sky-500/20 rounded-xl p-3 text-xs text-sky-200/90 flex items-start gap-2">
+        <i class="pi pi-info-circle text-sky-400 text-base flex-shrink-0 mt-0.5" />
+        <span>En modo REAL el pedido se vincula al <strong>producto del catálogo</strong> (<code>POST /pedidos-produccion</code>). La clienta se gestiona en CRM y Ventas.</span>
+      </div>
       <div>
         <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Cargar desde Receta / Ficha BOM (Opcional)</label>
         <Dropdown
@@ -176,7 +275,7 @@ function guardarPedido() {
       </div>
 
       <!-- Garment Name -->
-      <div>
+      <div v-if="isMock">
         <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Nombre o Descripción de la Prenda</label>
         <InputText
           v-model="nombrePrendaManual"
@@ -185,8 +284,27 @@ function guardarPedido() {
         />
       </div>
 
-      <!-- Pricing & Costs -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <!-- Variante + Cantidad (REAL: payload de POST /pedidos-produccion) -->
+      <div v-if="!isMock" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Variante / Talla</label>
+          <Dropdown
+            v-model="varianteReal"
+            :options="variantesOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Sin variante (genérico)"
+            class="w-full"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Cantidad</label>
+          <InputNumber v-model="cantidadReal" :min="1" :max-fraction-digits="0" class="w-full font-mono" />
+        </div>
+      </div>
+
+      <!-- Pricing & Costs (MOCK only: el backend no guarda precios en el pedido) -->
+      <div v-if="isMock" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Precio de Venta ($ COP)</label>
           <InputNumber
@@ -212,7 +330,7 @@ function guardarPedido() {
       </div>
 
       <!-- Stage Selection -->
-      <div>
+      <div v-if="isMock">
         <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Fase Inicial del Flujo</label>
         <Dropdown
           v-model="estadoInicial"
@@ -221,6 +339,34 @@ function guardarPedido() {
           option-value="value"
           class="w-full"
         />
+      </div>
+
+      <!-- Estado + Prioridad + Entrega (REAL: enums del backend) -->
+      <div v-if="!isMock" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Estado inicial</label>
+          <Dropdown
+            v-model="estadoReal"
+            :options="estadosOptionsReal"
+            option-label="label"
+            option-value="value"
+            class="w-full"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Prioridad</label>
+          <Dropdown
+            v-model="prioridadReal"
+            :options="prioridadesOptions"
+            option-label="label"
+            option-value="value"
+            class="w-full"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Entrega estimada</label>
+          <InputText v-model="fechaEntregaReal" type="date" class="w-full" />
+        </div>
       </div>
 
       <!-- Notes -->
