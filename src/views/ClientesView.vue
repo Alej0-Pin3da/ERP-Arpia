@@ -6,6 +6,7 @@ import Dropdown from 'primevue/dropdown'
 import { useAtelierStore, type ClienteCRM } from '@/stores/atelier'
 import NuevoClienteModal from '@/components/atelier/NuevoClienteModal.vue'
 import FichaTallasClienteModal from '@/components/atelier/FichaTallasClienteModal.vue'
+import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 import { showToast } from '@/utils/toast'
 import { useMode } from '@/composables/useMode'
 import { useClientes } from '@/composables/useClientes'
@@ -169,23 +170,37 @@ function abrirGuiaGeneral() {
 }
 
 async function eliminar(c: ClienteCRM) {
-  if (isMock.value) {
-    const idx = atelier.clientes.findIndex((x) => x.id === c.id)
-    if (idx !== -1) {
-      const eliminado = atelier.clientes[idx].nombre
-      atelier.clientes.splice(idx, 1)
-      showToast('info', 'Clienta eliminada', `${eliminado} ha sido removida del CRM.`)
-    }
-    return
-  }
+  eliminarEnCurso.value = true
   try {
-    await clientesApi.remove(c.id)
-    await cargarClientesReales()
-    showToast('info', 'Clienta eliminada', `${c.nombre} eliminada del CRM.`)
+    if (isMock.value) {
+      const idx = atelier.clientes.findIndex((x) => x.id === c.id)
+      if (idx !== -1) {
+        const eliminado = atelier.clientes[idx].nombre
+        atelier.clientes.splice(idx, 1)
+        showToast('info', 'Clienta eliminada', `${eliminado} ha sido removida del CRM.`)
+      }
+    } else {
+      await clientesApi.remove(c.id)
+      await cargarClientesReales()
+      showToast('info', 'Clienta eliminada', `${c.nombre} eliminada del CRM.`)
+    }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Error al eliminar clienta'
     showToast('error', 'Error', String(msg))
+  } finally {
+    eliminarEnCurso.value = false
+    clientaAEliminar.value = null
+    showEliminarDialog.value = false
   }
+}
+
+const showEliminarDialog = ref(false)
+const clientaAEliminar = ref<ClienteCRM | null>(null)
+const eliminarEnCurso = ref(false)
+
+function solicitarEliminar(c: ClienteCRM) {
+  clientaAEliminar.value = c
+  showEliminarDialog.value = true
 }
 
 function abrirWhatsApp(c: ClienteCRM) {
@@ -403,7 +418,7 @@ function abrirWhatsApp(c: ClienteCRM) {
                 type="button"
                 class="p-1.5 text-stone-400 hover:text-red-400 rounded transition"
                 title="Eliminar Clienta"
-                @click="eliminar(c)"
+                @click="solicitarEliminar(c)"
               >
                 <i class="pi pi-trash text-xs" />
               </button>
@@ -530,6 +545,14 @@ function abrirWhatsApp(c: ClienteCRM) {
       v-model:visible="showTallasModal"
       :cliente="clienteSeleccionado"
       @guardar="onFichaGuardada"
+    />
+    <ConfirmActionDialog
+      v-model:visible="showEliminarDialog"
+      titulo="Eliminar clienta"
+      mensaje="¿Eliminar a la clienta del CRM? Esta acción no se puede deshacer."
+      :detalle="clientaAEliminar?.nombre"
+      :loading="eliminarEnCurso"
+      @confirmar="() => clientaAEliminar && void eliminar(clientaAEliminar)"
     />
   </div>
 </template>

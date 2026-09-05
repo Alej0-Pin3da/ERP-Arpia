@@ -10,6 +10,7 @@ import NuevoInsumoModal from '@/components/atelier/NuevoInsumoModal.vue'
 import CompraInsumoModal from '@/components/atelier/CompraInsumoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
 import OrdenCompraProveedorModal from '@/components/atelier/OrdenCompraProveedorModal.vue'
+import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
@@ -120,22 +121,36 @@ async function ajustar(item: InsumoAtelier, delta: number) {
 }
 
 async function eliminar(item: InsumoAtelier) {
-  if (isMock.value) {
-    const idx = atelier.insumos.findIndex((i) => i.id === item.id)
-    if (idx !== -1) {
-      atelier.insumos.splice(idx, 1)
+  eliminarEnCurso.value = true
+  try {
+    if (isMock.value) {
+      const idx = atelier.insumos.findIndex((i) => i.id === item.id)
+      if (idx !== -1) {
+        atelier.insumos.splice(idx, 1)
+        showToast('info', 'Insumo eliminado', `${item.nombre} ha sido removido del catálogo.`)
+      }
+    } else {
+      await insumosService.remove(item.id)
+      await cargarInsumosReales()
       showToast('info', 'Insumo eliminado', `${item.nombre} ha sido removido del catálogo.`)
     }
-    return
-  }
-  try {
-    await insumosService.remove(item.id)
-    await cargarInsumosReales()
-    showToast('info', 'Insumo eliminado', `${item.nombre} ha sido removido del catálogo.`)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Error al eliminar insumo'
     showToast('error', 'Error', String(msg))
+  } finally {
+    eliminarEnCurso.value = false
+    insumoAEliminar.value = null
+    showEliminarDialog.value = false
   }
+}
+
+const showEliminarDialog = ref(false)
+const insumoAEliminar = ref<InsumoAtelier | null>(null)
+const eliminarEnCurso = ref(false)
+
+function solicitarEliminar(item: InsumoAtelier) {
+  insumoAEliminar.value = item
+  showEliminarDialog.value = true
 }
 </script>
 
@@ -406,7 +421,7 @@ async function eliminar(item: InsumoAtelier) {
                     type="button"
                     class="p-1.5 text-stone-400 hover:text-red-400 rounded transition"
                     title="Eliminar Insumo"
-                    @click="eliminar(it)"
+                    @click="solicitarEliminar(it)"
                   >
                     <i class="pi pi-trash text-xs" />
                   </button>
@@ -423,5 +438,13 @@ async function eliminar(item: InsumoAtelier) {
     <CompraInsumoModal v-model:visible="showCompraModal" :insumo="insumoSeleccionado" @compra-registrada="cargarInsumosReales" />
     <SugerirOrdenModal v-model:visible="showSugerirModal" @update:visible="(v: boolean) => { if (!v) void cargarInsumosReales() }" />
     <OrdenCompraProveedorModal v-model:visible="showOrdenProveedorModal" @update:visible="(v: boolean) => { if (!v) void cargarInsumosReales() }" />
+    <ConfirmActionDialog
+      v-model:visible="showEliminarDialog"
+      titulo="Eliminar insumo"
+      mensaje="¿Eliminar el insumo del catálogo? Esta acción no se puede deshacer."
+      :detalle="insumoAEliminar?.nombre"
+      :loading="eliminarEnCurso"
+      @confirmar="() => insumoAEliminar && void eliminar(insumoAEliminar)"
+    />
   </div>
 </template>

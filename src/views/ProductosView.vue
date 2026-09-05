@@ -10,6 +10,7 @@ import FichaTecnicaModal from '@/components/atelier/FichaTecnicaModal.vue'
 import DataSourceBadge from '@/components/DataSourceBadge.vue'
 import NuevaRecetaModal from '@/components/atelier/NuevaRecetaModal.vue'
 import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
+import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
@@ -192,23 +193,37 @@ async function handleFichaGuardada() {
 }
 
 async function eliminarReceta(r: RecetaBOM) {
-  if (!isMock.value) {
-    try {
+  eliminarEnCurso.value = true
+  try {
+    if (!isMock.value) {
       await productosApi.remove(r.id)
       showToast('success','Producto eliminado', `${r.nombre} eliminado correctamente.`)
       await cargarProductosReales()
-    } catch (e: any) {
-      const detail = e?.response?.data?.detail
-      const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ') : (detail ?? e?.message ?? 'Error al eliminar')
-      showToast('error','Error al eliminar', String(msg))
+    } else {
+      const idx = atelier.recetas.findIndex((x) => x.id === r.id)
+      if (idx !== -1) {
+        atelier.recetas.splice(idx, 1)
+        showToast('info', 'Receta eliminada', `${r.nombre} ha sido removida del catálogo.`)
+      }
     }
-    return
+  } catch (e: any) {
+    const detail = e?.response?.data?.detail
+    const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ') : (detail ?? e?.message ?? 'Error al eliminar')
+    showToast('error','Error al eliminar', String(msg))
+  } finally {
+    eliminarEnCurso.value = false
+    recetaAEliminar.value = null
+    showEliminarDialog.value = false
   }
-  const idx = atelier.recetas.findIndex((x) => x.id === r.id)
-  if (idx !== -1) {
-    atelier.recetas.splice(idx, 1)
-    showToast('info', 'Receta eliminada', `${r.nombre} ha sido removida del catálogo.`)
-  }
+}
+
+const showEliminarDialog = ref(false)
+const recetaAEliminar = ref<RecetaBOM | null>(null)
+const eliminarEnCurso = ref(false)
+
+function solicitarEliminar(r: RecetaBOM) {
+  recetaAEliminar.value = r
+  showEliminarDialog.value = true
 }
 </script>
 
@@ -390,7 +405,7 @@ async function eliminarReceta(r: RecetaBOM) {
               type="button"
               class="text-stone-500 hover:text-red-400 p-1.5 transition rounded hover:bg-stone-800"
               title="Eliminar Receta"
-              @click="eliminarReceta(r)"
+              @click="solicitarEliminar(r)"
             >
               <i class="pi pi-trash text-xs" />
             </button>
@@ -403,5 +418,13 @@ async function eliminarReceta(r: RecetaBOM) {
     <FichaTecnicaModal v-model:visible="showFichaModal" :receta="recetaSeleccionada" :start-editing="fichaStartEditing" @editar="handleFichaEditar" @guardado="handleFichaGuardada" @update:visible="(v:boolean) => { if(!v) fichaStartEditing = false }" />
     <NuevaRecetaModal v-model:visible="showNuevaModal" :receta="recetaEditar" @receta-creada="handleRecetaGuardada" @receta-actualizada="handleRecetaGuardada" @update:visible="(v:boolean) => { if(!v) recetaEditar = null }" />
     <AsistenteIaModal v-model:visible="showIaModal" />
+    <ConfirmActionDialog
+      v-model:visible="showEliminarDialog"
+      titulo="Eliminar receta"
+      mensaje="¿Eliminar la receta del catálogo? Esta acción no se puede deshacer."
+      :detalle="recetaAEliminar?.nombre"
+      :loading="eliminarEnCurso"
+      @confirmar="() => recetaAEliminar && void eliminarReceta(recetaAEliminar)"
+    />
   </div>
 </template>
