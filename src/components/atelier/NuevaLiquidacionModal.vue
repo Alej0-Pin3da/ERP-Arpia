@@ -135,7 +135,8 @@ function initForm() {
   } else {
     const nextNum = isMock.value ? (atelier.liquidaciones.length ? Math.max(...atelier.liquidaciones.map((l) => l.id)) : 0) + 1 : 1
     codigo.value = `LIQ-${new Date().getFullYear()}-${String(nextNum).padStart(2, '0')}`
-    periodo.value = `Liquidación Periodo ${new Date().toLocaleString('es-CO', { month: 'long', year: 'numeric' })}`
+    // El backend exige periodo de 1..20 chars: default corto YYYY-MM.
+    periodo.value = new Date().toISOString().slice(0, 7)
     fechaCierre.value = new Date().toISOString().split('T')[0]
     totalVentas.value = isMock.value ? (atelier.totalVentasRealizadas || 24800000) : totalVentas.value || 0
     costoInsumos.value = 7200000
@@ -161,6 +162,11 @@ watch([totalVentas, costoInsumos, gastosOperativos], () => {
 async function guardar() {
   if (!periodo.value.trim()) {
     showToast('warn', 'Campo requerido', 'Por favor indique el nombre o periodo de la liquidación.')
+    return
+  }
+  // El backend exige periodo de 1..20 chars: se valida antes del POST.
+  if (periodo.value.trim().length > 20) {
+    showToast('warn', 'Periodo muy largo', 'El periodo admite máximo 20 caracteres (ej: 2026-09).')
     return
   }
 
@@ -258,7 +264,7 @@ async function guardar() {
           <label class="block text-[11px] font-bold text-stone-300 uppercase tracking-wider mb-1">
             Periodo o Concepto de Cierre
           </label>
-          <InputText v-model="periodo" class="w-full text-xs" placeholder="Ej: Agosto 2026 / Colección Set Aelo" />
+          <InputText v-model="periodo" class="w-full text-xs" placeholder="Ej: 2026-09 (máx. 20 caracteres)" maxlength="20" />
         </div>
 
         <div>
