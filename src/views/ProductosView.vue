@@ -363,7 +363,7 @@ async function eliminarReceta(r: RecetaBOM) {
                   <div class="h-full rounded-full transition-all" :class="margenColor(Number(r.markup_pct ?? 0))" :style="{ width: Math.min(Math.max(Number(r.markup_pct ?? 0), 0), 100) + '%' }"></div>
                 </div>
                 <div class="flex justify-between items-center bg-stone-900/60 p-1.5 rounded">
-                   <span class="text-amber-400 font-bold text-[11px]">PRECIO VENTA ({{ r.markup_pct }}%):</span>
+                   <span class="text-amber-400 font-bold text-[11px]">PRECIO VENTA ({{ Math.round(Number(r.markup_pct ?? 0)) }}%):</span>
                   <span class="font-mono text-sm font-extrabold" :class="Number(r.markup_pct ?? 0) < 0 ? 'text-red-400' : Number(r.markup_pct ?? 0) < 35 ? 'text-amber-300' : 'text-emerald-300'">{{ formatCOP(r.precio_venta) }}</span>
                 </div>
               </div>
