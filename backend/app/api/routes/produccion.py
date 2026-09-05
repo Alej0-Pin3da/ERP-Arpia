@@ -14,6 +14,7 @@ from app.models.produccion import (
     PrendaEstado,
 )
 from app.models.productos import Producto, VarianteProducto
+from app.models.clientes import Cliente
 from app.schemas.common import Paginated
 from app.schemas.produccion import (
     PedidoProduccionCreate,
@@ -212,6 +213,8 @@ def _pedido_to_read(pedido: PedidoProduccion) -> PedidoProduccionRead:
         res.nombre_producto = pedido.producto.nombre
     if pedido.variante is not None:
         res.nombre_variante = pedido.variante.nombre_variante
+    if pedido.cliente is not None:
+        res.cliente_nombre = pedido.cliente.nombre
     return res
 
 
@@ -234,6 +237,7 @@ def list_pedidos(
         .options(
             selectinload(PedidoProduccion.producto),
             selectinload(PedidoProduccion.variante),
+            selectinload(PedidoProduccion.cliente),
             selectinload(PedidoProduccion.prendas),
         )
         .order_by(PedidoProduccion.id.desc())
@@ -283,6 +287,8 @@ def create_pedido(
         raise HTTPException(status_code=400, detail="Producto no existe")
     if payload.variante_id is not None and db.get(VarianteProducto, payload.variante_id) is None:
         raise HTTPException(status_code=400, detail="Variante de producto no existe")
+    if payload.cliente_id is not None and db.get(Cliente, payload.cliente_id) is None:
+        raise HTTPException(status_code=400, detail="Cliente no existe")
 
     pedido = PedidoProduccion(**payload.model_dump())
     db.add(pedido)
@@ -311,6 +317,8 @@ def update_pedido(
         raise HTTPException(status_code=400, detail="Producto no existe")
     if payload.variante_id is not None and db.get(VarianteProducto, payload.variante_id) is None:
         raise HTTPException(status_code=400, detail="Variante de producto no existe")
+    if payload.cliente_id is not None and db.get(Cliente, payload.cliente_id) is None:
+        raise HTTPException(status_code=400, detail="Cliente no existe")
 
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(pedido, k, v)

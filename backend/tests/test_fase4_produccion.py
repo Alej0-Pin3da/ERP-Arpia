@@ -3,6 +3,7 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 
+from app.models.clientes import Cliente
 from app.models.insumos import CategoriaInsumo, Insumo
 from app.models.produccion import PedidoProduccion, PrendaConfeccionada
 from app.models.productos import BomInsumo, Producto, TipoProducto, VarianteProducto
@@ -215,6 +216,54 @@ def test_prendas_y_pedidos_invalid_fks_400(client: TestClient, admin_token):
         headers=headers,
     )
     assert resp2.status_code == 400
+
+
+def test_pedido_con_cliente_y_cliente_invalido(client: TestClient, db_session, admin_token):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    tipo_p = TipoProducto(nombre="Vestidos Cliente")
+    db_session.add(tipo_p)
+    db_session.commit()
+    prod = Producto(tipo_producto_id=tipo_p.id, nombre="Vestido Cliente", costos_operativos_fijos=Decimal("10000"))
+    db_session.add(prod)
+    cli = Cliente(nombre="Clienta Pedido")
+    db_session.add(cli)
+    db_session.commit()
+
+    # 1. Create with cliente_id -> cliente_nombre resolved
+    resp = client.post(
+        "/api/v1/pedidos-produccion",
+        json={"producto_id": prod.id, "cliente_id": cli.id, "cantidad": 2},
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()
+    assert data["cliente_id"] == cli.id
+    assert data["cliente_nombre"] == "Clienta Pedido"
+    pedido_id = data["id"]
+
+    # 2. List resolves cliente_nombre too
+    resp_list = client.get("/api/v1/pedidos-produccion", headers=headers)
+    assert resp_list.status_code == 200
+    row = next(p for p in resp_list.json()["items"] if p["id"] == pedido_id)
+    assert row["cliente_nombre"] == "Clienta Pedido"
+
+    # 3. Unknown cliente_id -> 400
+    resp_bad = client.post(
+        "/api/v1/pedidos-produccion",
+        json={"producto_id": prod.id, "cliente_id": 999999, "cantidad": 1},
+        headers=headers,
+    )
+    assert resp_bad.status_code == 400
+
+    # 4. PATCH can reassign / clear cliente
+    resp_up = client.patch(
+        f"/api/v1/pedidos-produccion/{pedido_id}",
+        json={"cliente_id": None},
+        headers=headers,
+    )
+    assert resp_up.status_code == 200
+    assert resp_up.json()["cliente_id"] is None
+    assert resp_up.json()["cliente_nombre"] is None
 
 
 def test_prendas_y_pedidos_not_found_404(client: TestClient, admin_token):

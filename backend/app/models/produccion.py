@@ -8,6 +8,7 @@ from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, Num
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models.clientes import Cliente
 from app.models.productos import Producto, VarianteProducto
 
 
@@ -49,6 +50,10 @@ class PedidoProduccion(Base):
     producto_id: Mapped[int] = mapped_column(
         ForeignKey("Productos.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    # Clienta que realiza el pedido (0026, nullable: pedidos de mostrador sin cliente).
+    cliente_id: Mapped[int | None] = mapped_column(
+        ForeignKey("Clientes.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     variante_id: Mapped[int | None] = mapped_column(
         ForeignKey("Variantes_Producto.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -70,6 +75,7 @@ class PedidoProduccion(Base):
 
     producto: Mapped[Producto] = relationship(lazy="selectin")
     variante: Mapped[VarianteProducto | None] = relationship(lazy="selectin")
+    cliente: Mapped[Cliente | None] = relationship(lazy="selectin")
     prendas: Mapped[list[PrendaConfeccionada]] = relationship(
         back_populates="pedido", lazy="selectin"
     )

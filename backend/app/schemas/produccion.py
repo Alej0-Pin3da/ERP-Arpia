@@ -46,6 +46,8 @@ class PrendaConfeccionadaRead(PrendaConfeccionadaBase):
 
 class PedidoProduccionBase(BaseModel):
     producto_id: int
+    # Clienta que realiza el pedido (0026, nullable).
+    cliente_id: int | None = None
     variante_id: int | None = None
     cantidad: int = Field(gt=0)
     cantidad_producida: int = Field(default=0, ge=0)
@@ -62,6 +64,7 @@ class PedidoProduccionCreate(PedidoProduccionBase):
 
 class PedidoProduccionUpdate(BaseModel):
     producto_id: int | None = None
+    cliente_id: int | None = None
     variante_id: int | None = None
     cantidad: int | None = Field(default=None, gt=0)
     cantidad_producida: int | None = Field(default=None, ge=0)
@@ -80,3 +83,4 @@ class PedidoProduccionRead(PedidoProduccionBase):
     updated_at: datetime
     nombre_producto: str | None = None
     nombre_variante: str | None = None
+    cliente_nombre: str | None = None
