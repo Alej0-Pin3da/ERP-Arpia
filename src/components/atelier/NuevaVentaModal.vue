@@ -462,6 +462,12 @@ async function guardar() {
   }
 
   // Real API — P1-6: valores resueltos a codigo maestro (ver canalToCodigo)
+  // P1-5: producto_id es requerido por el backend; se prohibe el fantasma `?? 1`.
+  const sinProducto = items.value.findIndex((it) => it.producto_id == null)
+  if (sinProducto !== -1) {
+    showToast('warn', 'Producto requerido', `La fila ${sinProducto + 1} ("${items.value[sinProducto].nombre_prenda || 'sin nombre'}") no tiene producto del catálogo. Elegilo del dropdown para vender en modo REAL.`)
+    return
+  }
   const apiPayload: VentaCreatePayload = {
     cliente_id: cidFinal,
     canal_venta: canalToCodigo(canal.value),
@@ -469,7 +475,7 @@ async function guardar() {
     descuento_porcentaje: Number(descuentoPct.value) || 0,
     es_regalo: false,
     detalles: items.value.map((it) => ({
-      producto_id: it.producto_id ?? 1,
+      producto_id: it.producto_id as number,
       variante_id: it.variante_id ?? null,
       cantidad: it.cantidad,
       precio_unitario: it.precio_unitario,
