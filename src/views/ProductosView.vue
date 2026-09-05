@@ -94,12 +94,12 @@ const recetasDisplay = computed(() => isMock.value ? (atelier as any).recetas : 
     const derived = total - mano - cif
     return derived > 0 ? derived : 0
   })(),
-  mano_obra: p.mano_obra ?? 0,
-  cif_energia: p.cif_energia ?? p.costos_operativos_fijos ?? 0,
-  costo_total_unitario: p.costo_insumos != null && p.mano_obra != null && p.cif_energia != null ? Number(p.costo_insumos) + Number(p.mano_obra) + Number(p.cif_energia) : (p.costos_operativos_fijos ?? 0),
-  precio_venta: p.precio_venta_sugerido ?? 0,
-  precio_venta_sugerido: p.precio_venta_sugerido ?? 0,
-  costo_estimado_materiales: p.costo_insumos ?? 0,
+  mano_obra: p.mano_obra != null ? Number(p.mano_obra) : 0,
+  cif_energia: p.cif_energia != null ? Number(p.cif_energia) : Number(p.costos_operativos_fijos ?? 0),
+  costo_total_unitario: p.costo_insumos != null && p.mano_obra != null && p.cif_energia != null ? Number(p.costo_insumos) + Number(p.mano_obra) + Number(p.cif_energia) : Number(p.costos_operativos_fijos ?? 0),
+  precio_venta: Number(p.precio_venta_sugerido ?? 0),
+  precio_venta_sugerido: Number(p.precio_venta_sugerido ?? 0),
+  costo_estimado_materiales: Number(p.costo_insumos ?? 0),
   tiempo_estimado_confeccion_horas: p.tiempo_confeccion_min ? Math.round(p.tiempo_confeccion_min / 60 * 10)/10 : 1,
   markup_pct: (() => {
     const m = p.markup_pct
@@ -147,9 +147,10 @@ const recetasFiltradas = computed(() => {
 })
 
 function margenColor(m: number) {
+  const meta = Number(margenMetaGlobal.value ?? 35)
   if (m < 0) return 'bg-red-500'
-  if (m < 35) return 'bg-amber-500'
-  if (m <= 60) return 'bg-emerald-500'
+  if (m < meta) return 'bg-amber-500'
+  if (m <= meta + 25) return 'bg-emerald-500'
   return 'bg-sky-500'
 }
 
@@ -362,7 +363,7 @@ async function eliminarReceta(r: RecetaBOM) {
                   <div class="h-full rounded-full transition-all" :class="margenColor(Number(r.markup_pct ?? 0))" :style="{ width: Math.min(Math.max(Number(r.markup_pct ?? 0), 0), 100) + '%' }"></div>
                 </div>
                 <div class="flex justify-between items-center bg-stone-900/60 p-1.5 rounded">
-                  <span class="text-amber-400 font-bold text-[11px]">PRECIO VENTA ({{ r.markup_pct }}%):</span>
+                   <span class="text-amber-400 font-bold text-[11px]">PRECIO VENTA ({{ r.markup_pct }}%):</span>
                   <span class="font-mono text-sm font-extrabold" :class="Number(r.markup_pct ?? 0) < 0 ? 'text-red-400' : Number(r.markup_pct ?? 0) < 35 ? 'text-amber-300' : 'text-emerald-300'">{{ formatCOP(r.precio_venta) }}</span>
                 </div>
               </div>
