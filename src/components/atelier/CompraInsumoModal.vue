@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import { useAtelierStore, type InsumoAtelier } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
+import * as comprasApi from '@/services/api/compras-insumos'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps<{
@@ -14,12 +15,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
+  (e: 'compra-registrada'): void
 }>()
 
 const atelier = useAtelierStore()
 const { isMock } = useMode()
 const cantidad = ref(10)
 const costoUnitario = ref(0)
+const guardando = ref(false)
 
 watch(
   () => props.insumo,
@@ -32,12 +35,30 @@ watch(
   { immediate: true },
 )
 
-function registrar() {
+async function registrar() {
   if (!props.insumo) return
-  if (isMock.value) atelier.agregarCompraInsumo(props.insumo.id, cantidad.value, costoUnitario.value)
-  else showToast('info','Modo REAL','Usá el flujo real de compras-insumos.')
-  showToast('success', 'Compra registrada', `Se sumaron ${cantidad.value} ${props.insumo.unidad_medida} a ${props.insumo.nombre}.`)
-  emit('update:visible', false)
+  if (isMock.value) {
+    atelier.agregarCompraInsumo(props.insumo.id, cantidad.value, costoUnitario.value)
+    showToast('success', 'Compra registrada', `Se sumaron ${cantidad.value} ${props.insumo.unidad_medida} a ${props.insumo.nombre}.`)
+    emit('update:visible', false)
+    return
+  }
+  guardando.value = true
+  try {
+    await comprasApi.createCompraInsumo({
+      insumo_id: props.insumo.id,
+      cantidad_comprada: Number(cantidad.value) || 0,
+      precio_unitario_compra: Number(costoUnitario.value) || 0,
+    })
+    showToast('success', 'Compra registrada', `Se sumaron ${cantidad.value} ${props.insumo.unidad_medida} a ${props.insumo.nombre}.`)
+    emit('compra-registrada')
+    emit('update:visible', false)
+  } catch (e: unknown) {
+    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+    showToast('error', 'No se pudo registrar', typeof detail === 'string' ? detail : 'Revisá los datos e intentá de nuevo.')
+  } finally {
+    guardando.value = false
+  }
 }
 </script>
 
@@ -78,7 +99,7 @@ function registrar() {
 
       <div class="flex justify-end gap-2 pt-2 border-t border-stone-800">
         <Button label="Cancelar" severity="secondary" text @click="emit('update:visible', false)" />
-        <Button label="Registrar Entrada" icon="pi pi-check" class="p-button-warning font-semibold" @click="registrar" />
+        <Button label="Registrar Entrada" icon="pi pi-check" class="p-button-warning font-semibold" :loading="guardando" @click="registrar" />
       </div>
     </div>
   </Dialog>
