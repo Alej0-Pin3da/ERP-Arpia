@@ -5,6 +5,7 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
+import Dropdown from 'primevue/dropdown'
 import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
 import { useAtelierStore, type SociaAtelier } from '@/stores/atelier'
@@ -49,6 +50,19 @@ const sumaPorcentajesActuales = computed(() => {
   return sumOtros + (porcentaje.value || 0)
 })
 
+// El backend solo acepta Literal["AHORROS","CORRIENTE","OTRA"]: el texto
+// libre ("Nequi", "Digital"...) se nulificaba silenciosamente en REAL.
+const TIPOS_CUENTA = ['AHORROS', 'CORRIENTE', 'OTRA'] as const
+const tiposCuentaOptions = [
+  { label: 'Ahorros', value: 'AHORROS' },
+  { label: 'Corriente', value: 'CORRIENTE' },
+  { label: 'Otra', value: 'OTRA' },
+]
+function toTipoLiteral(v: unknown): 'AHORROS' | 'CORRIENTE' | 'OTRA' {
+  const u = String(v ?? '').trim().toUpperCase()
+  return (TIPOS_CUENTA as readonly string[]).includes(u) ? (u as 'AHORROS' | 'CORRIENTE' | 'OTRA') : 'AHORROS'
+}
+
 function initForm() {
   if (props.sociaEditar) {
     const s = props.sociaEditar
@@ -59,7 +73,8 @@ function initForm() {
     telefono.value = s.telefono || ''
     email.value = s.email || ''
     banco.value = s.banco || 'Bancolombia'
-    tipoCuenta.value = s.tipo_cuenta || 'Ahorros'
+    // En REAL el backend solo acepta el Literal: se normaliza al cargarlo.
+    tipoCuenta.value = isMock.value ? (s.tipo_cuenta || 'Ahorros') : toTipoLiteral(s.tipo_cuenta)
     numeroCuenta.value = s.numero_cuenta || ''
     titularCuenta.value = s.titular_cuenta || s.nombre
     activo.value = s.activo
@@ -72,7 +87,7 @@ function initForm() {
     telefono.value = ''
     email.value = ''
     banco.value = 'Bancolombia'
-    tipoCuenta.value = 'Ahorros'
+    tipoCuenta.value = isMock.value ? 'Ahorros' : 'AHORROS'
     numeroCuenta.value = ''
     titularCuenta.value = ''
     activo.value = true
@@ -95,8 +110,9 @@ async function guardar() {
   }
 
   // isMock ? atelier shape (porcentaje) : API shape (porcentaje_participacion + Literal tipo_cuenta)
-  const rawTipo = tipoCuenta.value.trim().toUpperCase()
-  const tipoCuentaLiteral = (['AHORROS', 'CORRIENTE', 'OTRA'] as const).includes(rawTipo as never) ? (rawTipo as 'AHORROS' | 'CORRIENTE' | 'OTRA') : null
+  // En REAL el dropdown ya entrega el Literal; esto es red de seguridad.
+  const rawTipo = toTipoLiteral(tipoCuenta.value)
+  const tipoCuentaLiteral = rawTipo as 'AHORROS' | 'CORRIENTE' | 'OTRA'
 
   if (isMock.value) {
     const payload: Partial<SociaAtelier> = {
@@ -226,7 +242,8 @@ async function guardar() {
             <label class="block text-[10px] text-stone-400 uppercase font-bold tracking-wider mb-1">
               Tipo de Cuenta
             </label>
-            <InputText v-model="tipoCuenta" class="w-full text-xs" placeholder="Ahorros / Corriente / Digital" />
+            <Dropdown v-if="!isMock" v-model="tipoCuenta" :options="tiposCuentaOptions" option-label="label" option-value="value" class="w-full text-xs" />
+            <InputText v-else v-model="tipoCuenta" class="w-full text-xs" placeholder="Ahorros / Corriente / Digital" />
           </div>
 
           <div>
