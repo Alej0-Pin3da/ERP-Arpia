@@ -83,17 +83,10 @@ async function ajustarStock(productoId: number, varianteId: number, delta: numbe
     atelier.ajustarStockPrenda(productoId, varianteId, delta)
     return
   }
-  try {
-    // Real mode: persist delta via API — update prenda's stock-related field if available
-    // API has no dedicated stock delta; we call update and reload to reflect server state
-    // If backend tracks stock via estado/ubicacion, this at least exercises the real path
-    await prendasService.update(productoId, {})
-    await cargarPrendasReales()
-    showToast('success', 'Stock actualizado', `Prenda ${productoId} ajustada en ${delta > 0 ? '+' : ''}${delta}.`)
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Error al ajustar stock'
-    showToast('error', 'Error', String(msg))
-  }
+  // En REAL no hay endpoint de delta de stock y cada fila es 1 unidad:
+  // no se finge un PATCH vacío con éxito (los botones están deshabilitados).
+  showToast('info', 'Stock en REAL', 'El stock se mueve con "Ingresar Prenda Confeccionada" (cada fila es 1 unidad).')
+  await cargarPrendasReales()
 }
 
 function verEtiqueta(p: PrendaConfeccionada, v?: PrendaVariante) {
@@ -272,14 +265,18 @@ async function onPrendaIngresada() {
                     <div class="inline-flex items-center bg-stone-950 border border-stone-800 rounded-lg p-0.5">
                       <button
                         type="button"
-                        class="px-2 py-0.5 text-stone-400 hover:text-white hover:bg-stone-800 rounded text-xs transition"
+                        class="px-2 py-0.5 text-stone-400 hover:text-white hover:bg-stone-800 rounded text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        :disabled="!isMock"
+                        :title="isMock ? 'Quitar 1 unidad' : 'En modo REAL el stock se mueve con Ingresar Prenda (cada fila es 1 unidad)'"
                         @click="ajustarStock(p.id, v.id, -1)"
                       >
                         -1
                       </button>
                       <button
                         type="button"
-                        class="px-2 py-0.5 text-amber-400 hover:text-amber-300 hover:bg-stone-800 rounded text-xs font-bold transition"
+                        class="px-2 py-0.5 text-amber-400 hover:text-amber-300 hover:bg-stone-800 rounded text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        :disabled="!isMock"
+                        :title="isMock ? 'Agregar 1 unidad' : 'En modo REAL el stock se mueve con Ingresar Prenda (cada fila es 1 unidad)'"
                         @click="ajustarStock(p.id, v.id, 1)"
                       >
                         +1

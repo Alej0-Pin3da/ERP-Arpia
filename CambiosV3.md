@@ -1056,3 +1056,33 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Fix:** nuevo `src/utils/tallas.ts` (`toTallaCode/fromTallaCode`: `SIN_TALLA`/`UNICA`); ficha guarda vía `PUT /clientes/:id` + reload en `ClientesView` (`onFichaGuardada`); `NuevoClienteModal` persiste códigos; contador `clientasSinTalla` reconoce ambos formatos.
 - Verificación: `npm run build` OK.
 
+### [2026-09-05] — Fix P0-9 (auditoría funcional): periodo de liquidación daba 422
+
+- **`src/components/atelier/NuevaLiquidacionModal.vue`:** el default `Liquidación Periodo septiembre de 2026` (~35 chars) viola `periodo max_length=20` → todo POST en REAL daba 422.
+- **Fix:** default `YYYY-MM` + validación ≤20 antes de guardar + `maxlength` y placeholder en el input.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P1-5 (auditoría funcional): venta REAL con producto fantasma
+
+- **`src/components/atelier/NuevaVentaModal.vue:472`:** `producto_id: it.producto_id ?? 1` inventaba el producto #1 cuando la fila no tenía catálogo.
+- **Fix:** validación previa que exige producto de catálogo por fila (con n° de fila y nombre en el aviso) en vez del fallback.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P1-8 (auditoría funcional): tipo_cuenta se nulificaba en silencio
+
+- **`src/components/atelier/GestionSociasModal.vue`:** texto libre ("Nequi", "Digital"...) que no matcheaba el Literal se mandaba `null` sin aviso.
+- **Fix:** Dropdown `Ahorros/Corriente/Otra` en REAL (texto libre intacto en MOCK) + normalización al cargar + red de seguridad `toTipoLiteral`.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P0-12/P1-4 (auditoría funcional): anticipos con socia fantasma + edición muda
+
+- **`src/components/atelier/NuevoAnticipoModal.vue`:** dropdown de socias vacío en REAL con default `socia_id: 2` (404/422 o socia equivocada); al editar en REAL, monto/concepto se descartaban en silencio.
+- **Fix:** socias reales vía `useSocios().list()`, default a primera no-fondo sin id fantasma (validado antes del POST); al editar en REAL los campos no-estado se deshabilitan con aviso explícito.
+- Verificación: `npm run build` OK.
+
+### [2026-09-05] — Fix P1-12 (auditoría funcional): +1/-1 de prendas era un PATCH vacío
+
+- **`src/views/PrendasListasView.vue`:** en REAL hacía `update(id, {})` + toast de éxito sin cambiar nada (no hay endpoint de delta; cada fila es 1 unidad).
+- **Fix:** botones deshabilitados en REAL con tooltip explicativo; el handler informa y recarga en vez de fingir.
+- Verificación: `npm run build` OK.
+
