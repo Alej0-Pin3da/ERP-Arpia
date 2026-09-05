@@ -55,7 +55,7 @@ const recetasOptions = computed(() => {
   return [
     { label: '-- Cargar desde Receta BOM --', value: null },
     ...(isMock.value ? atelier.recetas : productosRealCot.value).map((r) => ({
-      label: `${r.nombre} (${r.codigo})`,
+      label: `${r.nombre} (${r.codigo ?? `PRD-${r.id}`})`,
       value: r.id,
     })),
   ]
