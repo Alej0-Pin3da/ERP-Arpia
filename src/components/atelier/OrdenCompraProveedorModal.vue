@@ -1,12 +1,14 @@
 <script setup lang="ts">
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import { useAtelierStore } from '@/stores/atelier'
 import { useMode } from '@/composables/useMode'
+import { useInsumos } from '@/composables/useInsumos'
+import * as comprasApi from '@/services/api/compras-insumos'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps<{
@@ -19,10 +21,12 @@ const emit = defineEmits<{
 
 const atelier = useAtelierStore()
 const { isMock } = useMode()
+const insumosApi = useInsumos()
+const guardando = ref(false)
 
 const proveedorSeleccionado = ref<string>('Todos los Proveedores')
 const proveedores = computed(() => {
-  const set = new Set((isMock.value ? atelier.insumos : [] as any[]).map((i) => i.proveedor).filter(Boolean))
+  const set = new Set(itemsPedido.value.map((i) => i.proveedor).filter(Boolean))
   return ['Todos los Proveedores', ...Array.from(set)]
 })
 
@@ -40,28 +44,47 @@ interface ItemCompra {
 
 const itemsPedido = ref<ItemCompra[]>([])
 
-function inicializarItems() {
-  itemsPedido.value = (isMock.value ? atelier.insumos : [] as any[])
-    .filter((i) => i.stock_actual <= i.stock_minimo * 1.5)
-    .map((i) => ({
-      id: i.id,
-      codigo: i.codigo,
-      nombre: i.nombre,
-      proveedor: i.proveedor,
-      stock_actual: i.stock_actual,
-      stock_minimo: i.stock_minimo,
-      unidad_medida: i.unidad_medida,
-      costo_unitario: i.costo_unitario,
-      cantidad_pedir: Math.max(10, Math.ceil(i.stock_minimo * 2 - i.stock_actual)),
-    }))
+async function inicializarItems() {
+  if (isMock.value) {
+    itemsPedido.value = (atelier.insumos as any[])
+      .filter((i) => i.stock_actual <= i.stock_minimo * 1.5)
+      .map((i) => ({
+        id: i.id,
+        codigo: i.codigo,
+        nombre: i.nombre,
+        proveedor: i.proveedor,
+        stock_actual: i.stock_actual,
+        stock_minimo: i.stock_minimo,
+        unidad_medida: i.unidad_medida,
+        costo_unitario: i.costo_unitario,
+        cantidad_pedir: Math.max(10, Math.ceil(i.stock_minimo * 2 - i.stock_actual)),
+      }))
+    return
+  }
+  try {
+    const r = await insumosApi.list({ limit: 100 })
+    itemsPedido.value = ((r as any).items ?? [])
+      .filter((i: any) => Number(i.stock_actual ?? 0) <= Number(i.stock_minimo ?? 0) * 1.5)
+      .map((i: any) => ({
+        id: i.id,
+        codigo: i.codigo || `INS-${i.id}`,
+        nombre: i.nombre,
+        // InsumoRead no trae proveedor: se muestra la categoría.
+        proveedor: (i as any).proveedor ?? i.nombre_categoria ?? '—',
+        stock_actual: Number(i.stock_actual ?? 0),
+        stock_minimo: Number(i.stock_minimo ?? 0),
+        unidad_medida: i.unidad_medida,
+        costo_unitario: Number(i.costo_promedio_actual ?? 0),
+        cantidad_pedir: Math.max(10, Math.ceil(Number(i.stock_minimo ?? 0) * 2 - Number(i.stock_actual ?? 0))),
+      }))
+  } catch { itemsPedido.value = [] }
 }
 
 // Initialize whenever modal opens
-import { watch } from 'vue'
 watch(
   () => props.visible,
   (val) => {
-    if (val) inicializarItems()
+    if (val) void inicializarItems()
   }
 )
 
@@ -80,21 +103,56 @@ function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
 }
 
-function abastecerInventario() {
-  itemsFiltrados.value.forEach((item) => {
-    const insumo = (isMock.value ? atelier.insumos : [] as any[]).find((i) => i.id === item.id)
-    if (insumo) {
-      insumo.stock_actual += item.cantidad_pedir
-      insumo.valor_total = insumo.stock_actual * insumo.costo_unitario
-    }
-  })
+async function abastecerInventario() {
+  if (isMock.value) {
+    itemsFiltrados.value.forEach((item) => {
+      const insumo = (atelier.insumos as any[]).find((i) => i.id === item.id)
+      if (insumo) {
+        insumo.stock_actual += item.cantidad_pedir
+        insumo.valor_total = insumo.stock_actual * insumo.costo_unitario
+      }
+    })
 
-  showToast(
-    'success',
-    'Orden de Compra Procesada',
-    `Se abastecieron ${itemsFiltrados.value.length} insumos por un total de ${formatCOP(totalPresupuesto.value)}.`
-  )
-  emit('update:visible', false)
+    showToast(
+      'success',
+      'Orden de Compra Procesada',
+      `Se abastecieron ${itemsFiltrados.value.length} insumos por un total de ${formatCOP(totalPresupuesto.value)}.`
+    )
+    emit('update:visible', false)
+    return
+  }
+  const filas = itemsFiltrados.value.filter((item) => Number(item.cantidad_pedir) > 0)
+  if (!filas.length) {
+    showToast('warn', 'Sin cantidades', 'Indicá al menos una cantidad a pedir mayor a 0.')
+    return
+  }
+  guardando.value = true
+  let ok = 0
+  let ultimoError = ''
+  for (const item of filas) {
+    try {
+      await comprasApi.createCompraInsumo({
+        insumo_id: item.id,
+        cantidad_comprada: Number(item.cantidad_pedir),
+        precio_unitario_compra: Number(item.costo_unitario) || 0,
+      })
+      ok++
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+      ultimoError = typeof detail === 'string' ? detail : 'Error al registrar compra'
+    }
+  }
+  guardando.value = false
+  if (ok > 0) {
+    showToast(
+      'success',
+      'Orden de Compra Procesada',
+      `Se abastecieron ${ok}/${filas.length} insumos por un total de ${formatCOP(totalPresupuesto.value)}.${ok < filas.length ? ` Último error: ${ultimoError}` : ''}`
+    )
+    emit('update:visible', false)
+  } else {
+    showToast('error', 'No se pudo abastecer', ultimoError || 'Revisá los datos e intentá de nuevo.')
+  }
 }
 </script>
 
@@ -195,6 +253,7 @@ function abastecerInventario() {
           icon="pi pi-check-circle"
           size="small"
           class="p-button-warning text-xs font-semibold"
+          :loading="guardando"
           @click="abastecerInventario"
         />
       </div>
