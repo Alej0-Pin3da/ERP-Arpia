@@ -55,10 +55,21 @@ const recetasDisplay = computed(() => isMock.value ? (atelier as any).recetas : 
   precio_venta_sugerido: Number(p.precio_venta_sugerido ?? 0),
 })))
 
+const normEstado = (e: unknown) => String(e ?? '').toLowerCase()
+// MOCK usa etapas en mayúsculas (ENTREGADO/COSTURA...), REAL el enum del
+// backend (completado/en_produccion...): se normaliza para que los
+// contadores no queden en 0 en ningún modo.
+const esCompletado = (e: unknown) => ['entregado', 'completado', 'listo'].includes(normEstado(e))
+const esEnProceso = (e: unknown) =>
+  ['pendiente', 'en_produccion', 'corte', 'costura', 'confeccion', 'prueba', 'acabados', 'calidad'].includes(normEstado(e))
+
 const metricas = computed(() => {
-  const pedidosCompletados = pedidosSrc.value.filter((p: any) => p.estado === 'entregado').length
-  const pedidosEnProceso = pedidosSrc.value.filter((p: any) => ['corte', 'confeccion', 'prueba'].includes(p.estado)).length
-  const stockPrendas = prendasSrc.value.filter((p: any) => !p.vendida).length
+  const pedidosCompletados = pedidosSrc.value.filter((p: any) => esCompletado(p.estado)).length
+  const pedidosEnProceso = pedidosSrc.value.filter((p: any) => esEnProceso(p.estado)).length
+  // PrendaRead no trae `vendida`; en REAL el stock es estado === 'disponible'.
+  const stockPrendas = isMock.value
+    ? prendasSrc.value.filter((p: any) => p.vendida !== true).length
+    : prendasSrc.value.filter((p: any) => p.estado === 'disponible').length
   const insumosAlertas = isMock.value ? atelier.insumosCriticos.length : insumosAlertasReal.value
 
   return {
