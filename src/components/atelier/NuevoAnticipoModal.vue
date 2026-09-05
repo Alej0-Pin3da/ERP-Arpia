@@ -11,6 +11,7 @@ import { useAtelierStore, type AnticipoSocia } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
 import { useMode } from '@/composables/useMode'
 import { useFinanzas } from '@/composables/useFinanzas'
+import { useSocios } from '@/composables/useSocios'
 
 const props = defineProps<{
   visible: boolean
@@ -25,11 +26,16 @@ const emit = defineEmits<{
 const atelier = useAtelierStore()
 const { isMock } = useMode()
 const finanzasApi = useFinanzas()
+const sociosApi = useSocios()
 
 const isEditing = computed(() => !!props.anticipoEditar)
 
+// En REAL la API solo permite transicionar el estado; el resto de campos
+// se deshabilitan al editar para no descartar ediciones en silencio.
+const soloLecturaReal = computed(() => !isMock.value && isEditing.value)
+
 // Form fields
-const sociaId = ref(2)
+const sociaId = ref<number | null>(2)
 const fecha = ref(new Date().toISOString().split('T')[0])
 const monto = ref(300000)
 const concepto = ref('')
@@ -38,9 +44,19 @@ const estado = ref<AnticipoSocia['estado']>('PENDIENTE_DESCUENTO')
 const comprobante = ref('')
 const observaciones = ref('')
 
+const sociasReal = ref<any[]>([])
+
+async function cargarSocias() {
+  if (isMock.value) return
+  try {
+    const r = await sociosApi.list({ limit: 100 })
+    sociasReal.value = (r.items as any) ?? []
+  } catch { sociasReal.value = [] }
+}
+
 const sociasOptions = computed(() => {
-  return (isMock.value ? atelier.socias : [] as any[]).map((s) => ({
-    label: `${s.nombre} (${s.rol})`,
+  return (isMock.value ? atelier.socias : sociasReal.value as any[]).map((s) => ({
+    label: `${s.nombre} (${s.rol || 'Socia'})`,
     value: s.id,
   }))
 })
@@ -70,9 +86,9 @@ function initForm() {
     comprobante.value = a.comprobante || ''
     observaciones.value = a.observaciones || ''
   } else {
-    // Default to first non-fondo socia
-    const soc = (isMock.value ? atelier.socias : [] as any[]).find((s) => !s.es_fondo_taller)
-    sociaId.value = soc ? soc.id : 2
+    // Default to first non-fondo socia (sin id fantasma en REAL)
+    const soc = (isMock.value ? atelier.socias : sociasReal.value as any[]).find((s) => !s.es_fondo_taller)
+    sociaId.value = soc ? soc.id : (isMock.value ? 2 : null)
     fecha.value = new Date().toISOString().split('T')[0]
     monto.value = 350000
     concepto.value = 'Adelanto a cuenta de utilidades mensuales'
@@ -86,10 +102,16 @@ function initForm() {
 watch(
   () => props.visible,
   (val) => {
-    if (val) initForm()
+    if (val) {
+      void cargarSocias()
+      initForm()
+    }
   },
   { immediate: true },
 )
+watch(isMock, () => {
+  if (props.visible) void cargarSocias()
+})
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
@@ -137,6 +159,10 @@ async function guardar() {
   }
 
   // Real API
+  if (sociaId.value == null) {
+    showToast('warn', 'Socia requerida', 'Elegí la socia beneficiaria del anticipo.')
+    return
+  }
   const apiPayload = {
     socia_id: sociaId.value,
     monto: Number(monto.value) || 0,
@@ -189,15 +215,22 @@ async function guardar() {
             :options="sociasOptions"
             option-label="label"
             option-value="value"
+            placeholder="Seleccionar socia..."
             class="w-full text-xs"
+            :disabled="soloLecturaReal"
           />
+        </div>
+
+        <div v-if="soloLecturaReal" class="sm:col-span-2 bg-sky-950/20 border border-sky-500/20 rounded-xl p-3 text-xs text-sky-200/90 flex items-start gap-2">
+          <i class="pi pi-info-circle text-sky-400 text-base flex-shrink-0 mt-0.5" />
+          <span>En modo REAL la API solo permite <strong>cambiar el estado</strong> del anticipo; monto, concepto y demás datos no son editables.</span>
         </div>
 
         <div>
           <label class="block text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-1">
             Fecha de Entrega
           </label>
-          <InputText v-model="fecha" type="date" class="w-full text-xs font-mono" />
+          <InputText v-model="fecha" type="date" class="w-full text-xs font-mono" :disabled="soloLecturaReal" />
         </div>
 
         <div>
@@ -211,6 +244,7 @@ async function guardar() {
             locale="es-CO"
             :min="1000"
             class="w-full text-xs font-mono"
+            :disabled="soloLecturaReal"
           />
         </div>
       </div>
@@ -224,6 +258,7 @@ async function guardar() {
             v-model="concepto"
             class="w-full text-xs"
             placeholder="Ej: Adelanto compra de telas en Medellín, honorarios modelos..."
+            :disabled="soloLecturaReal"
           />
         </div>
 
@@ -238,6 +273,7 @@ async function guardar() {
               option-label="label"
               option-value="value"
               class="w-full text-xs"
+              :disabled="soloLecturaReal"
             />
           </div>
 
@@ -245,7 +281,7 @@ async function guardar() {
             <label class="block text-[10px] text-stone-400 uppercase font-bold tracking-wider mb-1">
               Comprobante / N° Transacción
             </label>
-            <InputText v-model="comprobante" class="w-full text-xs font-mono" placeholder="NEQ-99120" />
+            <InputText v-model="comprobante" class="w-full text-xs font-mono" placeholder="NEQ-99120" :disabled="soloLecturaReal" />
           </div>
         </div>
 
