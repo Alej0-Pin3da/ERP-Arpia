@@ -37,8 +37,9 @@ watch(isMock, () => { void cargarDevolucionesReales() })
 const devolucionesDisplay = computed(() => isMock.value ? devoluciones.value : (devolucionesReal.value.length ? devolucionesReal.value.map((d: any, idx: number) => ({
   id: d.id,
   codigo: `GAR-${d.id}`,
-  prenda: `Venta #${d.venta_id}`,
-  cliente: `Cliente ${d.venta_id}`,
+  // Nombres reales resueltos por el backend (sin inventar "Cliente N").
+  prenda: d.prenda_nombre || `Venta #${d.venta_id}`,
+  cliente: d.cliente_nombre || '—',
   motivo: d.motivo || 'Ajuste Atelier',
   tipo: d.tipo || 'Garantía',
   estado: d.estado || 'draft',

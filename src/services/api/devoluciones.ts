@@ -5,6 +5,9 @@ export interface DevolucionRead {
   venta_id: number
   motivo?: string | null
   estado?: string | null
+  // Referencia de venta resuelta por el backend (mapper _devolucion_to_read).
+  cliente_nombre?: string | null
+  prenda_nombre?: string | null
 }
 
 export interface DevolucionItemCreate {
