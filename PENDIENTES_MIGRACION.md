@@ -44,7 +44,16 @@ Fecha: 2026-08-09
 ### 3.3 ARPIA.xlsx
 - **NO se sube** (está en `.gitignore` — son datos del negocio, correcto que no vayan al repo).
 
-### 3.4 Backups
+### 3.4 Backfill F8 hidratacion-datos-faltantes (2026-09-06, script + tests <= 400 lines, single PR)
+
+- Script: `backend/migrate/backfill_precios_costos.py` (`--dry-run` default, `--apply` per-entity tx + audit JSON en `backend/migrate/reports/backfill_*.json`, gitignored). Migracion `0028_backfill_provenance` (`origen_precio`/`origen_costo` NULL=`pipeline`, `backfill`=hidratado). `loaders.py` intacto (solo lectura).
+- Precios canonicos csv (`csv/ARPIA - VENTAS.csv`): Caja Saca Las Garras 295000, Set Aelo 80000, Blusa ML 90000, Totebag 45000, Corset Garras 95000 (moda; 60500/80750 divergen + WARN), Falda Emily 80000. Set Ocipete queda en 0: sus 2 filas csv son DESC 25% (precio con descuento, nunca lista) + WARN. Celeno locked 75000.
+- Costos: receta E (valor metro) + CAJAS costo; `Compras_Insumos` nunca se siembra (conteo intacto, sin contaminar WAC). Proveedores: insert-only de INVERSION Provedor (~25 nombres; 86 filas sin proveedor no generan master; `proveedor_id` NULL salvo match exacto — no hay columna legacy de proveedor para wirear).
+- Drift memo (verificado 2026-09-06): workbook 15 nombres distintos (VENTAS A + CAJAS prendas + DESCUENTOS B) vs catalogo 14 (`PRODUCTOS_CATALOGO`) vs live 15 (14 + `Accesorio TEST`, residuo de tests, no se toca). Genericos (`bustier`/`corset`), empaque (`caja`/`vela`/`papel`/`envio`), `noche y dia`/`despertar` son componentes/ghosts: deferred, no se resucitan. Bralete/Hypatia/Despertar x2 quedan en 0 con WARN (sin fuente canonica — EXM-2, no se infiere).
+- Anomalia preexistente (no tocada): precios live no-cero mezclan origenes (ej. `Corset Artemisia` 75000 sin fuente en workbook); el script los preserva (`non-zero pipeline value preserved`).
+- Cierra: 6 precios con fuente canonica hidratables, 35 insumos con costo 0 y stock > 0 identificados, `maestros_proveedores` bootstrap. Abierto/manual: Bralete, Hypatia, 2 Despertar (precio manual del negocio si aplica).
+
+### 3.5 Backups
 - Backup pre-migración: `C:\Users\AstarotH\AppData\Local\Temp\opencode\arpia_pre_migracion_20260809_084851.dump`
 - Backup pre-recarga: `C:\Users\AstarotH\AppData\Local\Temp\opencode\arpia_pre_recarga_20260809_100139.dump`
 - (están en temp local, no en el repo)

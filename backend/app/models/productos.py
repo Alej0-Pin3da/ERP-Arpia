@@ -38,6 +38,7 @@ class Producto(Base):
     precio_venta_sugerido: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
+    origen_precio: Mapped[str | None] = mapped_column(String(20), nullable=True, default=None)
     # Cabecera extendida 0020 — all nullable for backward compat
     codigo: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
     categoria: Mapped[str | None] = mapped_column(String(100), nullable=True)

@@ -1174,3 +1174,9 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Fix:** headline bindeado a `porcentajeAprovechamiento` real con etiqueta por tramo.
 - Verificación: `npm run build` OK.
 
+### [2026-09-06] - Backfill F8 hidratacion-datos-faltantes (precios/costos/proveedores)
+
+- **Script (`backend/migrate/backfill_precios_costos.py`)**: `plan_*` puros (csv canonico, CAJAS/VENTAS corroboran, DESCUENTOS solo valida, Celeno 75000 locked) + `aplicar_*` con 1 tx por entidad, snapshot pre-run y audit JSON en `reports/backfill_*.json`; `--dry-run` default (0 escrituras, exit 1 en ERROR). EXM-2/D5: `#`/descuento/sin-fecha a WARN+skip, nunca inferir/now(). `loaders.py` intacto.
+- **Migracion `0028_backfill_provenance`** (head unico, sobre `0027`): `Productos.origen_precio` / `Insumos.origen_costo` VARCHAR(20) NULL; modelos actualizados. Sin siembra de `Compras_Insumos` (WAC intacto); proveedores insert-only (`maestros_proveedores`, `proveedor_id` NULL salvo match exacto).
+- **Tests (`backend/tests/test_backfill_precios_costos.py`)**: 5 passed (csv-wins, descuento/#VALUE!/sin-fecha skip, Celeno lock, normalizacion proveedores, dry-run/apply/idempotencia + FK NULL-safe). Core en verde: WAC/BOM/costos/catalogo/proveedores/productos/insumos 145 passed. `PENDIENTES_MIGRACION.md` 3.4 con drift memo (workbook 15 vs catalogo 14 vs live 15).
+

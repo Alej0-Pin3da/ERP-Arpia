@@ -39,6 +39,7 @@ class Insumo(Base):
     costo_promedio_actual: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
+    origen_costo: Mapped[str | None] = mapped_column(String(20), nullable=True, default=None)
     codigo: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     descripcion: Mapped[str | None] = mapped_column(String, nullable=True)
     tipo: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
