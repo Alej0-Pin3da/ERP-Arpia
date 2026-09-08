@@ -5,8 +5,10 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
 import { useAtelierStore, type InsumoAtelier } from '@/stores/atelier'
+import { useAuthStore } from '@/stores/auth'
 import { useInsumos } from '@/composables/useInsumos'
 import NuevoInsumoModal from '@/components/atelier/NuevoInsumoModal.vue'
+import EditarInsumoModal from '@/components/atelier/EditarInsumoModal.vue'
 import CompraInsumoModal from '@/components/atelier/CompraInsumoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
 import OrdenCompraProveedorModal from '@/components/atelier/OrdenCompraProveedorModal.vue'
@@ -14,6 +16,8 @@ import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
+const auth = useAuthStore()
+const isAdmin = computed(() => auth.role === 'admin')
 const { isMock, list: listInsumosApi } = useInsumos()
 const insumosService = useInsumos()
 
@@ -22,7 +26,36 @@ const tipoFiltro = ref<'Todos' | 'Directo' | 'Indirecto'>('Todos')
 const categoriaFiltro = ref<string>('Todas')
 const soloBajoStock = ref(false)
 
+// Single-column sorting (PrimeVue DataTable single-sort UX: asc -> desc -> none).
+// One active column at a time; combined headers sort by primary field with secondary tiebreak.
+type SortField = 'nombre' | 'tipo' | 'ubicacion' | 'stock' | 'costo' | 'valor'
+const sortField = ref<SortField | null>(null)
+const sortOrder = ref<1 | -1>(1)
+
+function toggleSort(field: SortField) {
+  if (sortField.value !== field) {
+    sortField.value = field
+    sortOrder.value = 1
+  } else if (sortOrder.value === 1) {
+    sortOrder.value = -1
+  } else {
+    sortField.value = null
+    sortOrder.value = 1
+  }
+}
+
+function getAriaSort(field: SortField): 'none' | 'ascending' | 'descending' {
+  if (sortField.value !== field) return 'none'
+  return sortOrder.value === 1 ? 'ascending' : 'descending'
+}
+
+function sortIndicator(field: SortField): string {
+  if (sortField.value !== field) return ''
+  return sortOrder.value === 1 ? '▲' : '▼'
+}
+
 const showNuevoModal = ref(false)
+const showEditarModal = ref(false)
 const showCompraModal = ref(false)
 const showSugerirModal = ref(false)
 const showOrdenProveedorModal = ref(false)
@@ -67,7 +100,7 @@ const categoriasDisponibles = computed(() => {
 })
 
 const insumosFiltrados = computed(() => {
-  return insumosList.value.filter((item) => {
+  const filtered = insumosList.value.filter((item) => {
     // Search
     const q = search.value.trim().toLowerCase()
     const matchesSearch =
@@ -88,6 +121,52 @@ const insumosFiltrados = computed(() => {
 
     return matchesSearch && matchesTipo && matchesCat && matchesBajo
   })
+
+  // Single-column sort applied after filtering (stable: original index breaks ties).
+  if (!sortField.value) return filtered
+  const order = sortOrder.value
+  const text = (v: unknown) => String(v ?? '').toLocaleLowerCase('es')
+  const compareText = (a: string, b: string) =>
+    a.localeCompare(b, 'es', { sensitivity: 'base', numeric: true })
+  const field = sortField.value
+  return filtered
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      let cmp = 0
+      switch (field) {
+        case 'nombre':
+          cmp =
+            compareText(text(a.item.nombre), text(b.item.nombre)) ||
+            compareText(text(a.item.codigo), text(b.item.codigo))
+          break
+        case 'tipo':
+          // Primary tipo, secondary categoria (combined "Tipo & Categoría" header).
+          cmp =
+            compareText(text(a.item.tipo), text(b.item.tipo)) ||
+            compareText(text(a.item.categoria), text(b.item.categoria))
+          break
+        case 'ubicacion':
+          // Primary ubicacion, secondary proveedor (combined "Ubicación / Proveedor" header).
+          cmp =
+            compareText(text(a.item.ubicacion), text(b.item.ubicacion)) ||
+            compareText(text(a.item.proveedor), text(b.item.proveedor))
+          break
+        case 'stock':
+          cmp = (Number(a.item.stock_actual) || 0) - (Number(b.item.stock_actual) || 0)
+          break
+        case 'costo':
+          cmp = (Number(a.item.costo_unitario) || 0) - (Number(b.item.costo_unitario) || 0)
+          break
+        case 'valor':
+          cmp =
+            (Number(a.item.stock_actual) || 0) * (Number(a.item.costo_unitario) || 0) -
+            (Number(b.item.stock_actual) || 0) * (Number(b.item.costo_unitario) || 0)
+          break
+      }
+      if (cmp !== 0) return cmp * order
+      return a.index - b.index
+    })
+    .map((entry) => entry.item)
 })
 
 const directosCount = computed(() => insumosList.value.filter((i) => i.tipo === 'Directo').length)
@@ -102,6 +181,11 @@ function formatCOP(val: number) {
 function abrirCompra(item: InsumoAtelier) {
   insumoSeleccionado.value = item
   showCompraModal.value = true
+}
+
+function abrirEditar(item: InsumoAtelier) {
+  insumoSeleccionado.value = item
+  showEditarModal.value = true
 }
 
 async function ajustar(item: InsumoAtelier, delta: number) {
@@ -313,14 +397,74 @@ function solicitarEliminar(item: InsumoAtelier) {
         <table class="w-full text-left text-xs border-collapse">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 bg-stone-950/60 uppercase tracking-wider font-semibold">
-              <th class="py-3 px-3.5">Código / Insumo</th>
-              <th class="py-3 px-3.5">Tipo & Categoría</th>
-              <th class="py-3 px-3.5">Ubicación / Proveedor</th>
-              <th class="py-3 px-3.5">Nivel de Stock</th>
-              <th class="py-3 px-3.5 text-right">Costo Unitario</th>
-              <th class="py-3 px-3.5 text-right">Valor Total</th>
-              <th class="py-3 px-3.5 text-center">Ajuste Rápido</th>
-              <th class="py-3 px-3.5 text-right">Acciones</th>
+              <th scope="col" class="py-3 px-3.5" :aria-sort="getAriaSort('nombre')">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 uppercase tracking-wider font-semibold hover:text-amber-300 transition select-none"
+                  title="Ordenar por código / insumo"
+                  @click="toggleSort('nombre')"
+                >
+                  Código / Insumo
+                  <span aria-hidden="true" class="text-[10px] text-amber-400">{{ sortIndicator('nombre') }}</span>
+                </button>
+              </th>
+              <th scope="col" class="py-3 px-3.5" :aria-sort="getAriaSort('tipo')">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 uppercase tracking-wider font-semibold hover:text-amber-300 transition select-none"
+                  title="Ordenar por tipo y categoría"
+                  @click="toggleSort('tipo')"
+                >
+                  Tipo &amp; Categoría
+                  <span aria-hidden="true" class="text-[10px] text-amber-400">{{ sortIndicator('tipo') }}</span>
+                </button>
+              </th>
+              <th scope="col" class="py-3 px-3.5" :aria-sort="getAriaSort('ubicacion')">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 uppercase tracking-wider font-semibold hover:text-amber-300 transition select-none"
+                  title="Ordenar por ubicación y proveedor"
+                  @click="toggleSort('ubicacion')"
+                >
+                  Ubicación / Proveedor
+                  <span aria-hidden="true" class="text-[10px] text-amber-400">{{ sortIndicator('ubicacion') }}</span>
+                </button>
+              </th>
+              <th scope="col" class="py-3 px-3.5" :aria-sort="getAriaSort('stock')">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 uppercase tracking-wider font-semibold hover:text-amber-300 transition select-none"
+                  title="Ordenar por nivel de stock"
+                  @click="toggleSort('stock')"
+                >
+                  Nivel de Stock
+                  <span aria-hidden="true" class="text-[10px] text-amber-400">{{ sortIndicator('stock') }}</span>
+                </button>
+              </th>
+              <th scope="col" class="py-3 px-3.5 text-right" :aria-sort="getAriaSort('costo')">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 uppercase tracking-wider font-semibold hover:text-amber-300 transition select-none"
+                  title="Ordenar por costo unitario"
+                  @click="toggleSort('costo')"
+                >
+                  Costo Unitario
+                  <span aria-hidden="true" class="text-[10px] text-amber-400">{{ sortIndicator('costo') }}</span>
+                </button>
+              </th>
+              <th scope="col" class="py-3 px-3.5 text-right" :aria-sort="getAriaSort('valor')">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 uppercase tracking-wider font-semibold hover:text-amber-300 transition select-none"
+                  title="Ordenar por valor total"
+                  @click="toggleSort('valor')"
+                >
+                  Valor Total
+                  <span aria-hidden="true" class="text-[10px] text-amber-400">{{ sortIndicator('valor') }}</span>
+                </button>
+              </th>
+              <th scope="col" class="py-3 px-3.5 text-center">Ajuste Rápido</th>
+              <th scope="col" class="py-3 px-3.5 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-stone-800/50 text-stone-200">
@@ -409,6 +553,16 @@ function solicitarEliminar(item: InsumoAtelier) {
               <td class="py-3 px-3.5 text-right">
                 <div class="flex items-center justify-end gap-1.5">
                   <Button
+                    v-if="isAdmin"
+                    label="Editar"
+                    icon="pi pi-pencil"
+                    size="small"
+                    severity="secondary"
+                    outlined
+                    class="text-[11px] py-1 px-2 font-semibold"
+                    @click="abrirEditar(it)"
+                  />
+                  <Button
                     label="+ Compra"
                     icon="pi pi-plus"
                     size="small"
@@ -435,6 +589,7 @@ function solicitarEliminar(item: InsumoAtelier) {
 
     <!-- Modals -->
     <NuevoInsumoModal v-model:visible="showNuevoModal" @insumo-creado="cargarInsumosReales" />
+    <EditarInsumoModal v-model:visible="showEditarModal" :insumo="insumoSeleccionado" @insumo-actualizado="cargarInsumosReales" />
     <CompraInsumoModal v-model:visible="showCompraModal" :insumo="insumoSeleccionado" @compra-registrada="cargarInsumosReales" />
     <SugerirOrdenModal v-model:visible="showSugerirModal" @update:visible="(v: boolean) => { if (!v) void cargarInsumosReales() }" />
     <OrdenCompraProveedorModal v-model:visible="showOrdenProveedorModal" @update:visible="(v: boolean) => { if (!v) void cargarInsumosReales() }" />
