@@ -491,12 +491,23 @@ def _leer_materiales(libro: LibroMigracion, report) -> dict[str, str]:
         # nombre=B cantidad=D ('11 mts'); HERRAJES nombre=F cantidad=H (numero).
         # D/H son cantidades, NUNCA nombres de insumo (antes se leia A/D y la
         # cantidad '9,5 mts' de D entraba como material falso).
+        # Owner-confirmed (2026-09-08): every '*' leading-name row in OCT25 is
+        # unreal data (ghost insumos purged in 0029) -> excluded, never in universe.
         for fila in filas_de("INVENTARIO OCT25"):
             for col_nombre in ("B", "F"):
                 valor = fila.get(col_nombre)
                 if not isinstance(valor, str):
                     continue
                 nombre = normalizar_nombre(valor)
+                if nombre.startswith("*"):
+                    if report:
+                        report.warn(
+                            "INVENTARIO OCT25",
+                            None,
+                            col_nombre,
+                            f"{nombre}: '*' ghost row (unreal data); excluded from universe",
+                        )
+                    continue
                 if not _es_material_valido(nombre):
                     continue
                 nombres.setdefault(clave_normalizada(nombre), nombre)

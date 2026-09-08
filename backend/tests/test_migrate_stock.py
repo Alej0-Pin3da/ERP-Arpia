@@ -306,7 +306,11 @@ def test_aplicar_stock_alias_tira_brasier_blanca(db, tmp_path):
     assert db.query(Insumo).filter(Insumo.nombre == "Tira de brasier blanca").count() == 0
 
 
-def test_aplicar_stock_alias_argollas_medianas_estrella(db, tmp_path):
+def test_plan_stock_asterisco_fantasma_excluido(db, tmp_path):
+    """Owner-confirmed (2026-09-08): '*' leading-name rows in INVENTARIO OCT25
+    are unreal data (ghost insumos purged in 0029). plan_stock must exclude
+    them with WARN: empty plan, nothing applied, the canonical insumo keeps
+    stock 0, and no '*' insumo is ever created."""
     from migrate.catalog import upsert_insumo
     from migrate.stock import aplicar_stock, plan_stock
 
@@ -315,17 +319,18 @@ def test_aplicar_stock_alias_argollas_medianas_estrella(db, tmp_path):
     canonico.stock_actual = Decimal("0")  # reset: may persist from a prior run
     db.commit()
 
-    path = tmp_path / "alias-argollas.xlsx"
+    path = tmp_path / "ghost-estrella.xlsx"
     _mini_workbook_una_fila(path, 6, " * Argollas Medianas ", 8, 120)
     with LibroMigracion(path) as libro:
         plan = plan_stock(libro)
+    assert plan.stock == []
     res = aplicar_stock(db, plan)
     db.commit()
 
-    assert res["seteados"] == 1
-    assert res["omitidos"] == 0
+    assert res["seteados"] == 0
     db.refresh(canonico)
-    assert canonico.stock_actual == Decimal("120")
+    assert canonico.stock_actual == Decimal("0")  # ghost stock never applied
+    assert db.query(Insumo).filter(Insumo.nombre.like("*%")).count() == 0
 
 
 def test_aplicar_stock_alias_varilla_copa_talla_34(db, tmp_path):

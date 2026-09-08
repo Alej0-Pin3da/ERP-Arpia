@@ -68,9 +68,6 @@ ALIASES_STOCK_A_CATALOGO: dict[str, str] = {
     "mallatex negra": "mallatex negro",
     "variila plastica cortada 18cms": "varilla plastica cortada 18 cm",
     "argollas grandes": "Argolla numero 10 mm",
-    "* argollas medianas": "Argolla numero 8 mm",
-    "* ochos grandes": "herrajes en forma 8 / G",
-    "* gancho g grandes": "herrajes en forma 8 / G",
     "elastico plano negro": "Framilon elastico plano 20 mts",
     "elastico plano blanco": "Elastico Panty blanco 10 mts",
     "varilla copa brasier talla 30": "ARCO METALICO 2001 30",
@@ -78,13 +75,10 @@ ALIASES_STOCK_A_CATALOGO: dict[str, str] = {
     "varilla copa brasier talla 34": "ARCO METALICO 2001 34",
     "varilla copa brasier talla 36": "ARCO METALICO 2001 36",
     # Insumos nuevos creados en el catalogo con el nombre canonico (categoría
-    # y unidad segun el material): la hoja OCT25 los trae con `*` inicial,
-    # tilde o espaciado distinto al nombre canonico del catalogo.
-    "* argollas pequenas": "Argollas pequeñas",
-    "* ochos medianos": "Ochos medianos",
-    "* ochos pequenos": "Ochos pequeños",
-    "* gancho g medianos": "Gancho G medianos",
-    "* ganchos g pequenos": "Ganchos G pequeños",
+    # y unidad segun el material): la hoja OCT25 los trae con tilde o
+    # espaciado distinto al nombre canonico del catalogo. ('*'-prefixed OCT25
+    # rows are unreal ghost data, excluded in plan_stock below, so no '*'
+    # alias keys exist here by design.)
     "elastico de contorno de 1 cm blanco": "Elastico de Contorno de 1 cm blanco",
     "sesgo de 2cm blanco": "Sesgo de 2 cm blanco",
 }
@@ -170,6 +164,17 @@ def plan_stock(libro, report=None) -> StockPlan:
             if not isinstance(valor, str):
                 continue
             nombre = normalizar_nombre(valor)
+            # Owner-confirmed (2026-09-08): '*' leading-name rows are unreal
+            # ghost data (purged in 0029) -> excluded with WARN, never planned.
+            if nombre.startswith("*"):
+                if report:
+                    report.warn(
+                        hoja,
+                        fila_idx,
+                        col_nombre,
+                        f"{nombre}: '*' ghost row (unreal data); excluded from stock plan",
+                    )
+                continue
             if not _es_material_valido(nombre):
                 continue  # 'GANANCIA', 'TOTAL HERR', '4.0' ... junk rows
             unidad_obj = _unidad_de_insumo(nombre)

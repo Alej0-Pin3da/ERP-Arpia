@@ -485,8 +485,18 @@ def test_oct25_layout_real_entra_al_universo_f1():
         "Ref 100 24 cm tul bordado negro",
         "Ref 159 24 cm tul bordado rojo pastel",
     ]
-    herrajes = [
+    herrajes_reales = [
         "Argollas grandes",
+        "Varilla copa brasier talla 30",
+        "Varilla copa brasier talla 32",
+        "Varilla copa brasier talla 36",
+        "Varilla copa brasier talla 34",
+        "Variila plastica cortada 18cms",
+    ]
+    # Owner-confirmed (2026-09-08): every '*' leading-name row in OCT25 is
+    # unreal data (ghost insumos purged in 0029) -> MUST stay out of the F1
+    # universe, or the next migrate would resurrect them.
+    fantasmas_asterisco = [
         "* Argollas Medianas",
         "* Argollas Pequenas",
         "* Ochos Grandes",
@@ -495,20 +505,48 @@ def test_oct25_layout_real_entra_al_universo_f1():
         "* Gancho G grandes",
         "* Gancho G Medianos",
         "* Ganchos G Pequenos",
-        "Varilla copa brasier talla 30",
-        "Varilla copa brasier talla 32",
-        "Varilla copa brasier talla 36",
-        "Varilla copa brasier talla 34",
-        "Variila plastica cortada 18cms",
     ]
     with LibroMigracion(REAL_XLSX) as libro:
         universo = _leer_materiales(libro, None)
     claves = set(universo)
-    for nombre in materiales_b + herrajes:
+    for nombre in materiales_b + herrajes_reales:
         assert clave_normalizada(nombre) in claves, f"material OCT25 ausente: {nombre}"
+    for nombre in fantasmas_asterisco:
+        assert clave_normalizada(nombre) not in claves, f"ghost OCT25 resucitado: {nombre}"
     # Cantidades de D (9,5 mts / 11 mts) nunca son nombres de insumo.
     assert clave_normalizada("9,5 mts") not in claves
     assert clave_normalizada("11 mts") not in claves
+
+
+def test_oct25_asterisco_fantasma_excluido_del_universo(tmp_path):
+    """Owner-confirmed (2026-09-08): '*' leading-name rows in INVENTARIO OCT25
+    are unreal data. _leer_materiales must exclude them from the F1 universe
+    (with WARN), while real names in the same blocks still enter."""
+    import openpyxl
+
+    from migrate.catalog import _leer_materiales, clave_normalizada
+    from migrate.loaders import LibroMigracion
+
+    path = tmp_path / "oct25-ghost.xlsx"
+    wb = openpyxl.Workbook()
+    oct = wb.active
+    oct.title = "INVENTARIO OCT25"
+    # OCT25 bounds are R9..29; MATERIAL nombre=B cantidad=D, HERRAJES nombre=F.
+    oct.cell(row=9, column=2, value="Tela Real Test Fantasma")
+    oct.cell(row=9, column=4, value="11 mts")
+    oct.cell(row=10, column=2, value="* Argollas Medianas")
+    oct.cell(row=10, column=4, value="122")
+    oct.cell(row=11, column=6, value="* Ochos Grandes")
+    oct.cell(row=11, column=8, value="100")
+    wb.save(path)
+
+    with LibroMigracion(path) as libro:
+        universo = _leer_materiales(libro, None)
+    claves = set(universo)
+    assert clave_normalizada("Tela Real Test Fantasma") in claves
+    assert clave_normalizada("* Argollas Medianas") not in claves
+    assert clave_normalizada("* Ochos Grandes") not in claves
+    assert not any(c.startswith("*") for c in claves)
 
 
 def test_aplicar_plan_transaccional_y_cleanup(db):
