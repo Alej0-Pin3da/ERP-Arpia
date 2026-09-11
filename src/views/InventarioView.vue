@@ -391,9 +391,9 @@ function solicitarEliminar(item: InsumoAtelier) {
       </div>
     </div>
 
-    <!-- Data Table -->
+    <!-- Data Table (desktop) + Cards (mobile) -->
     <div class="bg-stone-900/80 border border-stone-800 rounded-2xl overflow-hidden shadow-xl">
-      <div class="overflow-x-auto">
+      <div class="hidden overflow-x-auto md:block">
         <table class="w-full min-w-[900px] text-left text-xs border-collapse">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 bg-stone-950/60 uppercase tracking-wider font-semibold">
@@ -584,6 +584,50 @@ function solicitarEliminar(item: InsumoAtelier) {
             </tr>
           </tbody>
         </table>
+      </div>
+      <!-- Mobile cards: same insumosFiltrados so search/filter/sort still apply. No horizontal scroll. -->
+      <div class="space-y-3 p-4 md:hidden max-w-full min-w-0">
+        <div class="flex flex-wrap gap-1.5">
+          <span class="w-full text-xs uppercase tracking-wider text-stone-500 font-bold">Ordenar:</span>
+          <button type="button" class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition min-h-[40px]" :class="sortField === 'nombre' ? 'bg-amber-500 text-stone-950 border-amber-500' : 'bg-stone-950 text-stone-300 border-stone-800'" @click="toggleSort('nombre')">Insumo {{ sortIndicator('nombre') }}</button>
+          <button type="button" class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition min-h-[40px]" :class="sortField === 'stock' ? 'bg-amber-500 text-stone-950 border-amber-500' : 'bg-stone-950 text-stone-300 border-stone-800'" @click="toggleSort('stock')">Stock {{ sortIndicator('stock') }}</button>
+          <button type="button" class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition min-h-[40px]" :class="sortField === 'valor' ? 'bg-amber-500 text-stone-950 border-amber-500' : 'bg-stone-950 text-stone-300 border-stone-800'" @click="toggleSort('valor')">Valor {{ sortIndicator('valor') }}</button>
+        </div>
+        <div v-if="!insumosFiltrados.length" class="text-center py-8 text-sm text-stone-500">Sin insumos con los filtros actuales.</div>
+        <div v-for="it in insumosFiltrados" :key="it.id" class="bg-stone-950/70 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+          <div class="flex items-start justify-between gap-2 min-w-0">
+            <div class="font-bold text-sm text-stone-100 min-w-0">{{ it.nombre }}</div>
+            <span class="text-xs font-mono font-semibold text-amber-400 shrink-0">{{ it.codigo }}</span>
+          </div>
+          <div class="text-sm text-stone-300 truncate">{{ it.descripcion }}</div>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="px-2 py-0.5 rounded text-xs font-bold" :class="it.tipo === 'Directo' ? 'bg-amber-950/60 text-amber-300 border border-amber-500/30' : 'bg-stone-800 text-stone-300 border border-stone-700'">{{ it.tipo }}</span>
+            <span class="text-xs uppercase tracking-wider text-stone-400">{{ it.categoria }}</span>
+          </div>
+          <div class="text-sm text-stone-300">{{ it.ubicacion }} <span class="text-stone-500">· {{ it.proveedor }}</span></div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs uppercase tracking-wider text-stone-400">Stock</span>
+            <span class="font-mono font-bold text-sm" :class="it.stock_actual <= it.stock_minimo ? 'text-red-400' : 'text-stone-100'">{{ it.stock_actual }} {{ it.unidad_medida }}</span>
+          </div>
+          <div class="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
+            <div class="h-full rounded-full" :class="it.stock_actual <= it.stock_minimo ? 'bg-red-500' : 'bg-emerald-400'" :style="{ width: `${Math.min(100, (it.stock_actual / (it.stock_minimo * 2)) * 100)}%` }" />
+          </div>
+          <div v-if="it.stock_actual <= it.stock_minimo" class="text-xs text-red-400 font-bold">⚠️ REPONER (mín {{ it.stock_minimo }} {{ it.unidad_medida }})</div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-stone-400">{{ formatCOP(it.costo_unitario) }} / {{ it.unidad_medida }}</span>
+            <span class="font-mono font-bold text-amber-300">{{ formatCOP(it.stock_actual * it.costo_unitario) }}</span>
+          </div>
+          <div class="flex items-center gap-2 pt-1">
+            <span class="text-xs uppercase tracking-wider text-stone-400">Ajuste</span>
+            <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-stone-200 font-bold" title="Restar 1" @click="ajustar(it, -1)">−</button>
+            <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-stone-200 font-bold" title="Sumar 1" @click="ajustar(it, 1)">+</button>
+          </div>
+          <div class="flex gap-2 pt-1">
+            <button v-if="isAdmin" type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" @click="abrirEditar(it)">Editar</button>
+            <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-amber-500 text-stone-950 text-sm font-bold" @click="abrirCompra(it)">+ Compra</button>
+            <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg border border-stone-700 text-stone-400" title="Eliminar Insumo" @click="solicitarEliminar(it)"><i class="pi pi-trash text-xs" /></button>
+          </div>
+        </div>
       </div>
     </div>
 

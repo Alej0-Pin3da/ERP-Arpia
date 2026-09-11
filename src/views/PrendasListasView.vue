@@ -230,8 +230,8 @@ async function onPrendaIngresada() {
           </div>
         </div>
 
-        <!-- Variants Sub-Table -->
-        <div class="overflow-x-auto">
+        <!-- Variants Sub-Table (desktop) + Cards (mobile) -->
+        <div class="hidden overflow-x-auto md:block">
           <table class="w-full min-w-[760px] text-left text-xs border-collapse">
             <thead>
               <tr class="border-b border-stone-800/80 text-stone-400 bg-stone-900/40 uppercase tracking-wider font-semibold">
@@ -287,6 +287,35 @@ async function onPrendaIngresada() {
               </tr>
             </tbody>
           </table>
+        </div>
+        <!-- Mobile variant cards: same p.variantes. No horizontal scroll. -->
+        <div class="space-y-3 p-4 md:hidden max-w-full min-w-0">
+          <div v-for="v in p.variantes" :key="v.id" class="bg-stone-950/70 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+            <div class="flex items-start justify-between gap-2 min-w-0">
+              <div class="min-w-0">
+                <div class="font-bold text-sm text-amber-300">Talla {{ v.talla }}</div>
+                <div class="text-sm text-stone-300">{{ v.color }}</div>
+              </div>
+              <span class="font-mono text-xs text-stone-400 shrink-0">{{ v.sku }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Físico</span>
+              <span class="font-mono font-bold text-stone-100">{{ v.stock_fisico }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Reservado</span>
+              <span class="font-mono text-amber-400">{{ v.reservado }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Disponible</span>
+              <span class="font-mono font-bold text-emerald-400">{{ v.disponible }}</span>
+            </div>
+            <div class="flex gap-2 pt-1">
+              <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" title="Ver Etiqueta de esta Talla" @click="verEtiqueta(p, v)">Etiqueta QR</button>
+              <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-stone-200 font-bold disabled:opacity-40" :disabled="!isMock" title="Quitar 1 unidad" @click="ajustarStock(p.id, v.id, -1)">−1</button>
+              <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-amber-400 font-bold disabled:opacity-40" :disabled="!isMock" title="Agregar 1 unidad" @click="ajustarStock(p.id, v.id, 1)">+1</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

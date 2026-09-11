@@ -642,7 +642,8 @@ function exportarMatriz() {
             <span v-if="isMock">Sin insumos en esta ficha (mock).</span>
             <span v-else>Sin renglones BOM. Agregá insumos arriba para calcular el costo.</span>
           </div>
-          <div v-else class="overflow-x-auto max-h-72 overflow-y-auto">
+          <template v-else>
+          <div class="hidden overflow-x-auto max-h-72 overflow-y-auto sm:block">
             <table class="w-full min-w-[760px] text-left text-xs border-collapse">
               <thead><tr class="border-b border-stone-800 text-stone-400 bg-stone-950/40">
                 <th class="py-2.5 px-3 font-semibold sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Insumo / Material</th><th class="py-2.5 px-3 font-semibold whitespace-nowrap">Tipo</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Consumo Unit.</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Merma %</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Costo Unit.</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Subtotal</th><th v-if="!isMock" class="py-2.5 px-3"></th>
@@ -680,6 +681,48 @@ function exportarMatriz() {
               </tr></tfoot>
             </table>
           </div>
+          <!-- Mobile BOM cards: same displayItems with same editors. No horizontal scroll. -->
+          <div class="space-y-3 sm:hidden max-w-full min-w-0">
+            <div v-for="it in displayItems" :key="(it as any).id" class="border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+              <div class="flex items-start justify-between gap-2 min-w-0">
+                <div class="font-bold text-sm text-stone-100 min-w-0">{{ (it as any).nombre }}</div>
+                <span class="px-2 py-0.5 rounded text-xs font-bold shrink-0" :class="(it as any).tipo === 'Directo' ? 'bg-amber-950/60 text-amber-300 border border-amber-500/30' : 'bg-stone-800 text-stone-400'">{{ (it as any).tipo }}</span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-xs uppercase tracking-wider text-stone-400">Consumo</span>
+                <span v-if="editingBomId !== (it as any).bomId" class="font-mono text-stone-200">{{ (it as any).consumo_unitario }} {{ (it as any).unidad }}</span>
+                <input v-else v-model.number="editBomCantidad" type="number" step="0.1" min="0.01" class="w-24 bg-stone-950 border border-amber-500/30 rounded px-1 py-1 text-right font-mono text-sm text-amber-300" />
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-xs uppercase tracking-wider text-stone-400">Merma</span>
+                <span v-if="editingBomId !== (it as any).bomId" class="font-mono text-stone-400">{{ (it as any).merma_pct }}%</span>
+                <span v-else class="flex items-center gap-1"><input v-model.number="editBomDesperdicio" type="number" min="0" max="100" class="w-20 bg-stone-950 border border-amber-500/30 rounded px-1 py-1 text-right font-mono text-sm text-amber-300" />%</span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-xs uppercase tracking-wider text-stone-400">Costo unit.</span>
+                <span class="font-mono text-stone-200">{{ formatCOP((it as any).costo_unitario) }}</span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-xs uppercase tracking-wider text-stone-400">Subtotal</span>
+                <span class="font-mono font-bold text-amber-300">{{ formatCOP((it as any).subtotal) }}</span>
+              </div>
+              <div v-if="!isMock" class="flex gap-2 pt-1">
+                <template v-if="editingBomId !== (it as any).bomId">
+                  <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" @click="startEditBom(bomReal.find(b => b.id === (it as any).bomId)!)">Editar</button>
+                  <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg border border-rose-800 text-rose-400" title="Eliminar renglón" @click="eliminarInsumo((it as any).bomId ?? (it as any).id)"><i class="pi pi-trash text-xs" /></button>
+                </template>
+                <template v-else>
+                  <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 text-sm font-semibold" @click="guardarEditBom(bomReal.find(b => b.id === (it as any).bomId)!)">Guardar</button>
+                  <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" @click="cancelEditBom()">Cancelar</button>
+                </template>
+              </div>
+            </div>
+            <div class="flex items-center justify-between rounded-xl bg-stone-950/70 border border-stone-800 p-3 text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Total insumos</span>
+              <span class="font-mono font-bold text-amber-400">{{ formatCOP(isMock ? receta.costo_insumos : totalInsumosReal) }}</span>
+            </div>
+          </div>
+          </template>
         </div>
 
         <div v-if="!isMock" class="border border-stone-800 rounded-xl overflow-hidden bg-stone-900/50">
@@ -751,7 +794,7 @@ function exportarMatriz() {
           <Button label="Exportar Planilla" icon="pi pi-file-excel" size="small" severity="warning" outlined @click="exportarMatriz" />
         </div>
         <div class="border border-stone-800 rounded-xl overflow-hidden bg-stone-950/80">
-          <div class="overflow-x-auto max-h-72 overflow-y-auto">
+          <div class="hidden overflow-x-auto max-h-72 overflow-y-auto sm:block">
           <table class="w-full min-w-[760px] text-left text-xs border-collapse font-mono">
             <thead><tr class="bg-stone-900 border-b border-stone-800 text-stone-400 font-sans"><th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Componente</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Ancho (m)</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Alto (m)</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Cant. Cms</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Valor Metro</th><th class="py-2.5 px-3 text-right text-amber-400 whitespace-nowrap">Valor Total</th></tr></thead>
             <tbody class="divide-y divide-stone-800/50 text-stone-200">
@@ -766,6 +809,25 @@ function exportarMatriz() {
               <tr v-if="!displayItems.length"><td colspan="6" class="py-6 text-center text-stone-500">Sin insumos para matriz</td></tr>
             </tbody>
           </table>
+          </div>
+          <!-- Mobile matrix cards: same displayItems. No horizontal scroll. -->
+          <div class="space-y-3 p-3 sm:hidden max-w-full min-w-0">
+            <div v-if="!displayItems.length" class="text-center py-6 text-sm text-stone-500">Sin insumos para matriz</div>
+            <div v-for="it in displayItems" :key="(it as any).id" class="border border-stone-800 rounded-2xl p-4 space-y-1 min-w-0">
+              <div class="font-bold text-sm text-stone-100">{{ (it as any).nombre }}</div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-xs uppercase tracking-wider text-stone-400">Medidas</span>
+                <span class="font-mono text-stone-300">{{ ((it as any).ancho || 0.24).toFixed(2) }} × {{ ((it as any).alto || 0.85).toFixed(2) }} m</span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-xs uppercase tracking-wider text-stone-400">Consumo</span>
+                <span class="font-mono text-stone-300">{{ Math.round(((it as any).consumo_unitario || 1) * 100) }} cm</span>
+              </div>
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-xs uppercase tracking-wider text-stone-400">Valor total</span>
+                <span class="font-mono font-bold text-amber-300">{{ formatCOP((it as any).subtotal) }}</span>
+              </div>
+            </div>
           </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">

@@ -197,7 +197,7 @@ async function submitCreate() {
     </div>
 
     <div class="rounded-2xl border border-stone-800 bg-stone-900/40 p-6 space-y-4 overflow-hidden">
-      <div class="overflow-x-auto">
+      <div class="hidden overflow-x-auto md:block">
       <table class="w-full min-w-[760px] text-xs text-left border-collapse">
         <thead>
           <tr class="border-b border-stone-800 text-stone-400 font-mono">
@@ -243,6 +243,24 @@ async function submitCreate() {
           </tr>
         </tbody>
       </table>
+      </div>
+      <!-- Mobile cards: same devolucionesDisplay. No horizontal scroll. -->
+      <div class="space-y-3 md:hidden max-w-full min-w-0">
+        <div v-if="!devolucionesDisplay.length" class="text-center py-8 text-sm text-stone-500">Sin garantías registradas en modo {{ isMock ? 'MOCK' : 'REAL' }}.</div>
+        <div v-for="d in devolucionesDisplay" :key="d.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+          <div class="flex items-start justify-between gap-2 min-w-0">
+            <div class="font-bold text-sm text-stone-100 min-w-0">{{ d.prenda }}</div>
+            <span class="font-mono font-bold text-xs text-amber-400 shrink-0">{{ d.codigo }}</span>
+          </div>
+          <div class="text-sm text-stone-300">Cliente: {{ d.cliente }}</div>
+          <div class="text-sm text-stone-400">{{ d.motivo }} ({{ d.tipo }})</div>
+          <div>
+            <span class="inline-block px-2.5 py-1 rounded bg-amber-950/80 text-amber-300 border border-amber-500/30 text-xs">{{ ({ draft: 'Borrador', confirmed: 'Confirmada', cancelled: 'Anulada', reversed: 'Revertida' } as Record<string, string>)[d.estado] ?? d.estado }}</span>
+          </div>
+          <div v-if="d.estado === 'draft'">
+            <button type="button" class="w-full min-h-[40px] rounded-lg border border-rose-800 text-rose-400 text-sm font-semibold" @click="solicitarEliminarDevolucion(d)">Eliminar borrador</button>
+          </div>
+        </div>
       </div>
     </div>
 

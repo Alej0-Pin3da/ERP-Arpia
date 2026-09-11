@@ -1087,7 +1087,7 @@ function formatoCOP(val: number) {
         </div>
 
         <div class="bg-stone-900/40 border border-stone-800 rounded-xl overflow-hidden shadow-lg">
-          <div class="overflow-x-auto">
+          <div class="hidden overflow-x-auto md:block">
             <table class="w-full min-w-[760px] text-left text-xs font-mono">
               <thead class="bg-stone-950/80 text-stone-400 uppercase tracking-wider border-b border-stone-800">
                 <tr>
@@ -1137,6 +1137,26 @@ function formatoCOP(val: number) {
                 </tr>
               </tbody>
             </table>
+          </div>
+          <!-- Mobile cards: same tallasList. No horizontal scroll. -->
+          <div class="space-y-3 p-4 md:hidden max-w-full min-w-0">
+            <div v-for="t in tallasList" :key="t.id" class="bg-stone-950/70 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                <div class="font-bold text-sm text-amber-400">Talla {{ t.talla }}</div>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-sm">
+                <div><div class="text-xs uppercase tracking-wider text-stone-400">Busto</div><div class="font-mono text-stone-100">{{ t.busto }}</div></div>
+                <div><div class="text-xs uppercase tracking-wider text-stone-400">Cintura</div><div class="font-mono text-stone-100">{{ t.cintura }}</div></div>
+                <div><div class="text-xs uppercase tracking-wider text-stone-400">Cadera</div><div class="font-mono text-stone-100">{{ t.cadera }}</div></div>
+              </div>
+              <div class="text-sm text-emerald-400">{{ t.reduccion_corset }}</div>
+              <div class="text-sm text-stone-400">{{ t.descripcion }}</div>
+              <div class="flex gap-2 pt-1">
+                <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" @click="abrirEditarTalla(t)">Editar</button>
+                <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg border border-stone-700 text-stone-500" title="Eliminar Talla" @click="solicitarEliminar('talla', t.id, `Talla ${t.talla}`)">✕</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

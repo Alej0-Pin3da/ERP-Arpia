@@ -185,8 +185,8 @@ async function abastecerInventario() {
         </div>
       </div>
 
-      <!-- Materials List -->
-      <div class="overflow-x-auto border border-stone-800 rounded-xl bg-stone-950/60 max-h-72 overflow-y-auto">
+      <!-- Materials List (desktop) + Cards (mobile) -->
+      <div class="hidden overflow-x-auto border border-stone-800 rounded-xl bg-stone-950/60 max-h-72 overflow-y-auto sm:block">
         <table class="w-full min-w-[760px] text-xs text-left border-collapse">
           <thead>
             <tr class="border-b border-stone-800 bg-stone-900/80 text-stone-400 font-mono uppercase text-[11px] sticky top-0 z-10">
@@ -223,6 +223,25 @@ async function abastecerInventario() {
             </tr>
           </tbody>
         </table>
+      </div>
+      <!-- Mobile cards: same itemsFiltrados with same quantity editor. No horizontal scroll. -->
+      <div class="space-y-3 sm:hidden max-w-full min-w-0">
+        <div v-for="item in itemsFiltrados" :key="item.id" class="border border-stone-800 rounded-2xl bg-stone-950/60 p-4 space-y-2 min-w-0">
+          <div class="flex items-start justify-between gap-2 min-w-0">
+            <div class="font-bold text-sm text-stone-100 min-w-0">{{ item.nombre }}</div>
+            <span class="font-mono font-bold text-xs text-amber-400 shrink-0">{{ item.codigo }}</span>
+          </div>
+          <div class="text-sm text-stone-400">{{ item.proveedor }}</div>
+          <div class="text-sm" :class="item.stock_actual <= item.stock_minimo ? 'text-red-400 font-bold' : 'text-amber-300'">{{ item.stock_actual }} {{ item.unidad_medida }} <span class="text-xs text-stone-500 font-normal">mín: {{ item.stock_minimo }}</span></div>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs uppercase tracking-wider text-stone-400">A pedir</span>
+            <InputNumber v-model="item.cantidad_pedir" :min="1" :suffix="` ${item.unidad_medida}`" class="w-36 text-sm" />
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-xs uppercase tracking-wider text-stone-400">Subtotal</span>
+            <span class="font-mono font-bold text-stone-100">{{ formatCOP(item.cantidad_pedir * item.costo_unitario) }}</span>
+          </div>
+        </div>
       </div>
 
       <!-- Financial Total Bar -->

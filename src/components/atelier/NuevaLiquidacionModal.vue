@@ -369,7 +369,7 @@ async function guardar() {
           </div>
         </div>
 
-        <div class="overflow-x-auto">
+        <div class="hidden overflow-x-auto sm:block">
           <table class="w-full text-xs text-left border-collapse font-mono">
             <thead>
               <tr class="border-b border-stone-800 text-stone-400 text-[10px] uppercase">
@@ -423,6 +423,31 @@ async function guardar() {
               </tr>
             </tbody>
           </table>
+        </div>
+        <!-- Mobile cards: same distribucionLocal with same editors. No horizontal scroll. -->
+        <div class="space-y-3 p-3 sm:hidden max-w-full min-w-0">
+          <div v-for="d in distribucionLocal" :key="d.socia_id" class="border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+            <div class="flex items-start justify-between gap-2 min-w-0">
+              <div class="min-w-0">
+                <div class="font-bold text-sm text-stone-100">{{ d.nombre_socia }}</div>
+                <div class="text-xs text-stone-500">{{ d.rol_socia }}</div>
+              </div>
+              <span class="font-mono font-bold text-sm text-amber-400 shrink-0">{{ d.porcentaje }}%</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Cuota bruta</span>
+              <span class="font-mono font-bold text-stone-200">{{ formatCOP(d.monto_bruto) }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Anticipos</span>
+              <InputNumber v-model="d.deduccion_anticipos" mode="currency" currency="COP" locale="es-CO" :min="0" class="w-36 text-sm font-mono text-rose-400" @update:model-value="d.monto_neto_pagar = Math.max(0, d.monto_bruto - d.deduccion_anticipos)" />
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Neto a transferir</span>
+              <span class="font-mono font-bold text-emerald-400">{{ formatCOP(d.monto_neto_pagar) }}</span>
+            </div>
+            <Dropdown v-model="d.estado_pago" :options="[{ label: 'Pendiente', value: 'PENDIENTE' }, { label: 'Pagado', value: 'PAGADO' }, { label: 'Retenido', value: 'RETENIDO' }]" option-label="label" option-value="value" class="w-full text-sm" />
+          </div>
         </div>
       </div>
 

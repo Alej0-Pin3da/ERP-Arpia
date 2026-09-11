@@ -375,7 +375,7 @@ function getEstadoBadgeClass(estado: string) {
             <span class="text-xs text-stone-400">{{ pedidosTabla.length }} órdenes</span>
           </div>
 
-          <div class="overflow-x-auto">
+          <div class="hidden overflow-x-auto md:block">
             <table class="w-full min-w-[640px] text-left text-xs border-collapse">
               <thead>
                 <tr class="border-b border-stone-800 text-stone-400 bg-stone-950/40">
@@ -407,6 +407,21 @@ function getEstadoBadgeClass(estado: string) {
                 </tr>
               </tbody>
             </table>
+          </div>
+          <!-- Mobile cards: same pedidosTabla. No horizontal scroll. -->
+          <div class="space-y-3 p-4 md:hidden max-w-full min-w-0">
+            <div v-for="p in pedidosTabla.slice(0, 6)" :key="p.id" class="bg-stone-950/70 border border-stone-800 rounded-2xl p-4 space-y-1 min-w-0">
+              <div class="flex items-start justify-between gap-2 min-w-0">
+                <div class="font-mono font-bold text-sm text-amber-300 min-w-0">{{ p.codigo }}</div>
+                <span :class="['px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider shrink-0', getEstadoBadgeClass(p.estado)]">{{ p.estado }}</span>
+              </div>
+              <div class="font-bold text-sm text-stone-100">{{ p.prenda_nombre }}</div>
+              <div class="text-sm text-stone-400">{{ p.cliente_nombre }}</div>
+              <div v-if="isMock" class="flex items-center justify-between text-sm pt-1 border-t border-stone-800">
+                <span class="font-mono text-stone-300">{{ formatCOP(p.precio_venta) }}</span>
+                <span class="font-mono font-bold text-emerald-400">{{ formatCOP(p.utilidad_neta) }} ({{ p.margen_pct }}%)</span>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -82,7 +82,7 @@ async function generarOrden() {
       </div>
 
       <div class="border border-stone-800 rounded-xl overflow-hidden bg-stone-900/50">
-        <div class="overflow-x-auto max-h-72 overflow-y-auto">
+        <div class="hidden overflow-x-auto max-h-72 overflow-y-auto sm:block">
         <table class="w-full min-w-[640px] text-left text-xs border-collapse">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 bg-stone-950/50">
@@ -110,6 +110,25 @@ async function generarOrden() {
             </tr>
           </tbody>
         </table>
+        </div>
+        <!-- Mobile cards: same criticos. No horizontal scroll. -->
+        <div class="space-y-3 p-3 sm:hidden max-w-full min-w-0">
+          <div v-for="it in criticos" :key="it.id" class="border border-stone-800 rounded-2xl p-4 space-y-1 min-w-0">
+            <div class="font-bold text-sm text-stone-100">{{ it.nombre }}</div>
+            <div class="text-xs text-stone-400">{{ it.proveedor ?? it.nombre_categoria ?? '—' }}</div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Stock</span>
+              <span class="font-mono font-bold text-red-400">{{ it.stock_actual }} {{ it.unidad_medida }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Sugerido</span>
+              <span class="font-mono font-bold text-amber-300">+{{ (it.stock_minimo * 2 - it.stock_actual).toFixed(1) }} {{ it.unidad_medida }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Total est.</span>
+              <span class="font-mono font-bold text-stone-100">${{ Math.round((it.stock_minimo * 2 - it.stock_actual) * Number(it.costo_unitario ?? it.costo_promedio_actual ?? 0)).toLocaleString('es-CO') }}</span>
+            </div>
+          </div>
         </div>
       </div>
 

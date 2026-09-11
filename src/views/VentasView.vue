@@ -459,7 +459,8 @@ function exportarCSV() {
         />
       </div>
 
-      <div v-else class="overflow-x-auto">
+      <template v-else>
+      <div class="hidden overflow-x-auto md:block">
         <table class="w-full min-w-[900px] text-xs text-left border-collapse font-mono">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 text-[11px] uppercase tracking-wider">
@@ -600,6 +601,39 @@ function exportarCSV() {
           </tbody>
         </table>
       </div>
+      <!-- Mobile cards: same ventasFiltradas so search/filter/sort still apply. No horizontal scroll. -->
+      <div class="space-y-3 md:hidden max-w-full min-w-0">
+        <div v-for="v in ventasFiltradas" :key="v.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+          <div class="flex items-start justify-between gap-2 min-w-0">
+            <div class="font-bold text-sm text-stone-100 min-w-0">{{ v.cliente_nombre }}</div>
+            <span class="font-mono font-bold text-xs text-amber-400 shrink-0">{{ v.codigo }}</span>
+          </div>
+          <div class="text-xs text-stone-500">{{ v.fecha }} · {{ v.canal }} · {{ v.metodo_pago }}</div>
+          <div class="space-y-1">
+            <div v-for="it in v.items" :key="it.id" class="text-sm text-stone-200">
+              <span class="font-bold font-mono text-amber-400 mr-1">{{ it.cantidad }}x</span>{{ it.nombre_prenda }}
+              <span class="ml-1 text-xs font-mono text-stone-400 bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">{{ it.talla }}</span>
+            </div>
+          </div>
+          <div v-if="v.observaciones" class="text-sm text-stone-400 italic">💬 {{ v.observaciones }}</div>
+          <div class="flex items-center justify-between text-sm pt-1 border-t border-stone-800">
+            <span class="text-xs uppercase tracking-wider text-stone-400">Total</span>
+            <span class="font-mono font-bold text-amber-300">{{ formatCOP(v.total_venta) }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-xs uppercase tracking-wider text-stone-400">Utilidad ({{ v.margen_pct }}%)</span>
+            <span class="font-mono font-bold text-emerald-400">{{ formatCOP(v.ganancia_neta) }}</span>
+          </div>
+          <div v-if="v.descuento_valor > 0" class="text-sm text-rose-400 font-bold">Descuento −{{ formatCOP(v.descuento_valor) }} ({{ v.descuento_porcentaje }}%)</div>
+          <span class="inline-block px-2.5 py-1 rounded-full text-xs font-bold border" :class="v.estado === 'COMPLETADA' ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/30' : v.estado === 'PENDIENTE' ? 'bg-amber-950/80 text-amber-300 border-amber-500/30' : 'bg-rose-950/80 text-rose-300 border-rose-500/30'">{{ v.estado }}</span>
+          <div class="flex gap-2 pt-1">
+            <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" @click="abrirDetalle(v)">Ver recibo</button>
+            <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" @click="abrirEditarVenta(v)">Editar</button>
+            <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg border border-rose-800 text-rose-400" title="Eliminar Venta" @click="solicitarEliminarVenta(v)"><i class="pi pi-trash text-xs" /></button>
+          </div>
+        </div>
+      </div>
+      </template>
     </div>
 
     <!-- Modals -->

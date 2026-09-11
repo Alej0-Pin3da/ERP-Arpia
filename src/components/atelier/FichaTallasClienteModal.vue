@@ -261,7 +261,7 @@ function enviarGuiaWhatsApp() {
         </div>
 
         <div class="rounded-xl border border-stone-800 overflow-hidden">
-          <div class="overflow-x-auto max-h-72 overflow-y-auto">
+          <div class="hidden overflow-x-auto max-h-72 overflow-y-auto sm:block">
           <table class="w-full min-w-[640px] text-left border-collapse text-xs font-mono">
             <thead>
               <tr class="bg-stone-950 text-stone-400 uppercase text-[10px] border-b border-stone-800">
@@ -291,9 +291,23 @@ function enviarGuiaWhatsApp() {
                 <td class="py-2 px-3 text-center whitespace-nowrap">{{ r.cintura }}</td>
                 <td class="py-2 px-3 text-center whitespace-nowrap">{{ r.cadera }}</td>
                 <td class="py-2 px-3 text-[11px] font-sans text-stone-400 min-w-[180px]">{{ r.tipo }}</td>
-              </tr>
+                </tr>
             </tbody>
           </table>
+          </div>
+          <!-- Mobile cards: same tablaTallasEstandar. No horizontal scroll. -->
+          <div class="space-y-3 p-3 sm:hidden max-w-full min-w-0">
+            <div v-for="r in tablaTallasEstandar" :key="r.talla" class="border rounded-2xl p-4 space-y-1 min-w-0" :class="tallaSeleccionada === r.talla ? 'border-amber-500/50 bg-amber-500/10' : 'border-stone-800'">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded font-mono font-bold text-sm" :class="tallaSeleccionada === r.talla ? 'bg-amber-400 text-stone-950' : 'bg-stone-800 text-stone-300'">{{ r.talla }}</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-sm">
+                <div><div class="text-xs uppercase tracking-wider text-stone-400">Busto</div><div class="font-mono text-stone-100">{{ r.busto }}</div></div>
+                <div><div class="text-xs uppercase tracking-wider text-stone-400">Cintura</div><div class="font-mono text-stone-100">{{ r.cintura }}</div></div>
+                <div><div class="text-xs uppercase tracking-wider text-stone-400">Cadera</div><div class="font-mono text-stone-100">{{ r.cadera }}</div></div>
+              </div>
+              <div class="text-sm text-stone-400">{{ r.tipo }}</div>
+            </div>
           </div>
         </div>
       </div>

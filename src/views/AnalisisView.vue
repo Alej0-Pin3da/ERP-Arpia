@@ -122,7 +122,7 @@ function formatCOP(v: number): string {
         Rentabilidad por Ficha Técnica / Receta BOM
       </h2>
 
-      <div class="overflow-x-auto">
+      <div class="hidden overflow-x-auto md:block">
         <table class="w-full min-w-[640px] text-xs text-left border-collapse">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 font-mono">
@@ -151,6 +151,29 @@ function formatCOP(v: number): string {
             </tr>
           </tbody>
         </table>
+      </div>
+      <!-- Mobile cards: same recetasDisplay. No horizontal scroll. -->
+      <div class="space-y-3 md:hidden max-w-full min-w-0">
+        <div v-if="!recetasDisplay.length" class="text-center py-8 text-sm text-stone-500">Sin recetas para analizar en modo {{ isMock ? 'MOCK' : 'REAL' }}.</div>
+        <div v-for="r in recetasDisplay" :key="r.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+          <div class="font-bold text-sm text-stone-100">{{ r.nombre }}</div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-xs uppercase tracking-wider text-stone-400">Costo insumos</span>
+            <span class="font-mono text-stone-300">{{ formatCOP(Number(r.costo_estimado_materiales ?? 0)) }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-xs uppercase tracking-wider text-stone-400">Confección</span>
+            <span class="text-stone-300">{{ r.tiempo_estimado_confeccion_horas }}h</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-xs uppercase tracking-wider text-stone-400">Precio sugerido</span>
+            <span class="font-mono font-bold text-amber-300">{{ formatCOP(Number(r.precio_venta_sugerido ?? 0)) }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-xs uppercase tracking-wider text-stone-400">Margen bruto</span>
+            <span class="font-mono font-bold text-emerald-400">{{ formatCOP(Number(r.precio_venta_sugerido ?? 0) - Number(r.costo_estimado_materiales ?? 0)) }} ({{ Number(r.precio_venta_sugerido ?? 0) > 0 ? Math.round(((Number(r.precio_venta_sugerido ?? 0) - Number(r.costo_estimado_materiales ?? 0)) / Number(r.precio_venta_sugerido ?? 0)) * 100) : 0 }}%)</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>

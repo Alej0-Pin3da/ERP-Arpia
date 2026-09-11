@@ -157,7 +157,7 @@ function compartirWhatsApp() {
           Prendas Confeccionadas & Artículos
         </div>
 
-        <div class="overflow-x-auto max-h-72 overflow-y-auto">
+        <div class="hidden overflow-x-auto max-h-72 overflow-y-auto sm:block">
         <table class="w-full min-w-[640px] text-xs text-left border-collapse font-mono">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 text-[11px]">
@@ -184,6 +184,20 @@ function compartirWhatsApp() {
             </tr>
           </tbody>
         </table>
+        </div>
+        <!-- Mobile cards: same venta.items. No horizontal scroll. -->
+        <div class="space-y-3 sm:hidden max-w-full min-w-0">
+          <div v-for="it in venta.items" :key="it.id" class="border border-stone-800 rounded-2xl p-4 space-y-1 min-w-0">
+            <div class="flex items-start justify-between gap-2 min-w-0">
+              <div class="font-bold text-sm text-stone-100 min-w-0">{{ it.nombre_prenda }}</div>
+              <span class="px-2 py-0.5 rounded bg-stone-800 text-amber-300 border border-stone-700 text-xs shrink-0">{{ it.talla }}</span>
+            </div>
+            <div class="text-sm text-stone-400">{{ it.color }} · Cant. {{ it.cantidad }}</div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-stone-400">{{ formatCOP(it.precio_unitario) }} c/u</span>
+              <span class="font-mono font-bold text-amber-400">{{ formatCOP(it.subtotal) }}</span>
+            </div>
+          </div>
         </div>
       </div>
 

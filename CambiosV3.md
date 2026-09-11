@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-11] - Híbrido responsive: tabla desktop + cards mobile sin scroll lateral (ruta delegada directa)
+
+- **Feedback:** el patrón scroll + sticky seguía exigiendo desplazamiento lateral y texto `xs` demasiado chico en mobile.
+- **Patrón híbrido:** tabla existente en `hidden md:block` (`hidden sm:block` en modales) + cards en `md:hidden` (`sm:hidden` en modales) con mismo `v-for`/computed y mismos handlers, sin duplicar lógica. Cards `rounded-2xl p-4` con título `text-sm` bold + código ámbar mono, secundarios `text-sm`, labels `text-xs uppercase`, dinero `font-mono text-sm bold`, botones `min-h-[40px]`. Sin `overflow-x-auto` ni `min-w` en mobile.
+- **Alcance:** 23 tablas en 11 vistas + 7 modales (Inventario, Ventas, Finanzas x3, Auditoría x3, Omisiones, Devoluciones, Análisis, Dashboard, Producción, Maestros, PrendasListas + DetalleVenta, DetallePedido, NuevaLiquidación, SugerirOrden, OrdenCompra, FichaTécnica BOM+matriz, FichaTallas).
+- Verificación: `npm run build` OK (410 módulos). Documentado sin tocar backend.
+
 ### [2026-09-11] - Responsive tablas: scroll horizontal + sticky primera columna en 11 vistas + 5 modales (ruta delegada directa)
 
 - **Problema:** tablas nativas `<table>` sin lógica responsive; 3 vistas + 4 modales sin wrapper `overflow-x-auto` rompían el layout a 360-640px, el resto solo scrolleaba perdiendo contexto de fila.

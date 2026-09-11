@@ -696,9 +696,9 @@ function imprimirBalance() {
         </div>
       </div>
 
-      <!-- Liquidaciones Table -->
+      <!-- Liquidaciones Table (desktop) + Cards (mobile) -->
       <div class="rounded-2xl border border-stone-800 bg-stone-900/40 backdrop-blur-sm overflow-hidden">
-        <div class="overflow-x-auto">
+        <div class="hidden overflow-x-auto md:block">
           <table class="w-full min-w-[900px] text-xs text-left border-collapse">
             <thead>
               <tr class="bg-stone-950/90 border-b border-stone-800 text-[10px] font-mono uppercase text-stone-400">
@@ -810,6 +810,47 @@ function imprimirBalance() {
               </tr>
             </tbody>
           </table>
+        </div>
+        <!-- Mobile cards: same liquidacionesFiltradas. No horizontal scroll. -->
+        <div class="space-y-3 p-4 md:hidden max-w-full min-w-0">
+          <div v-if="liquidacionesFiltradas.length === 0" class="text-center py-8 text-sm text-stone-500">No se encontraron liquidaciones de socias con los filtros actuales.</div>
+          <div v-for="l in liquidacionesFiltradas" :key="l.id" class="bg-stone-950/70 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+            <div class="flex items-start justify-between gap-2 min-w-0">
+              <div class="min-w-0">
+                <div class="font-bold text-sm text-amber-300">{{ l.codigo }}</div>
+                <div class="text-sm text-stone-200">{{ l.periodo }}</div>
+                <div class="text-xs text-stone-500">Cierre: {{ l.fecha_cierre }}</div>
+              </div>
+              <button type="button" class="px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider shrink-0 min-h-[40px]" :class="{ 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30': l.estado === 'PAGADA', 'bg-amber-500/20 text-amber-300 border border-amber-500/30': l.estado === 'APROBADA', 'bg-stone-800 text-stone-400 border border-stone-700': l.estado === 'BORRADOR' }" @click="cambiarEstadoLiq(l, l.estado === 'PAGADA' ? 'BORRADOR' : l.estado === 'BORRADOR' ? 'APROBADA' : 'PAGADA')">{{ l.estado }}</button>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Ventas brutas</span>
+              <span class="font-mono font-bold text-stone-100">{{ formatCOP(l.total_ventas_brutas) }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Costos / gastos</span>
+              <span class="font-mono text-stone-400">−{{ formatCOP(l.costo_taller_insumos) }} / −{{ formatCOP(l.gastos_operativos) }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Utilidad neta</span>
+              <span class="font-mono font-bold text-emerald-400">{{ formatCOP(l.utilidad_neta_total) }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Fondo taller (40%)</span>
+              <span class="font-mono font-bold text-amber-300">{{ formatCOP(l.fondo_reinversion_monto) }}</span>
+            </div>
+            <div class="space-y-1 border-t border-stone-800 pt-2">
+              <div v-for="(s, i) in sociasReparto" :key="(s as any).id" class="flex items-center justify-between text-sm">
+                <span class="text-stone-300">{{ (s as any).nombre }} ({{ porcentajeSociaReparto(i, 30) }}%)</span>
+                <span class="font-mono font-semibold text-stone-100">{{ formatCOP(itemDistribucion(l, (s as any).id)?.monto_neto_pagar || 0) }}</span>
+              </div>
+            </div>
+            <div class="flex gap-2 pt-1">
+              <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-amber-300 text-sm font-semibold" @click="abrirDetalleLiquidacion(l)">Ver acta</button>
+              <button v-if="isMock" type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" @click="abrirEditarLiquidacion(l)">Editar</button>
+              <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg border border-rose-800 text-rose-400" title="Eliminar Liquidación" @click="solicitarEliminarLiquidacion(l)"><i class="pi pi-trash text-xs" /></button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -950,9 +991,9 @@ function imprimirBalance() {
         />
       </div>
 
-      <!-- Anticipos Table -->
+      <!-- Anticipos Table (desktop) + Cards (mobile) -->
       <div class="rounded-2xl border border-stone-800 bg-stone-900/40 backdrop-blur-sm overflow-hidden">
-        <div class="overflow-x-auto">
+        <div class="hidden overflow-x-auto md:block">
           <table class="w-full min-w-[760px] text-xs text-left border-collapse font-mono">
             <thead>
               <tr class="bg-stone-950/90 border-b border-stone-800 text-[10px] uppercase text-stone-400">
@@ -1046,6 +1087,29 @@ function imprimirBalance() {
             </tbody>
           </table>
         </div>
+        <!-- Mobile cards: same anticiposFiltrados. No horizontal scroll. -->
+        <div class="space-y-3 p-4 md:hidden max-w-full min-w-0">
+          <div v-if="anticiposFiltrados.length === 0" class="text-center py-8 text-sm text-stone-500">No hay registros de anticipos que coincidan.</div>
+          <div v-for="a in anticiposFiltrados" :key="a.id" class="bg-stone-950/70 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+            <div class="flex items-start justify-between gap-2 min-w-0">
+              <div class="font-bold text-sm text-stone-100 min-w-0">{{ a.nombre_socia }}</div>
+              <span class="text-xs text-stone-500 shrink-0">{{ a.fecha }}</span>
+            </div>
+            <div class="text-sm text-stone-300">{{ a.concepto }}</div>
+            <div v-if="a.observaciones" class="text-sm text-stone-500 italic">{{ a.observaciones }}</div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Monto</span>
+              <span class="font-mono font-bold text-rose-400">{{ formatCOP(a.monto) }}</span>
+            </div>
+            <div class="text-sm text-stone-300">{{ a.metodo_desembolso }}<span v-if="a.comprobante" class="ml-1 font-mono text-xs text-amber-400/90">Ref: {{ a.comprobante }}</span></div>
+            <span class="inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider" :class="{ 'bg-amber-500/20 text-amber-300 border border-amber-500/30': a.estado === 'PENDIENTE_DESCUENTO', 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30': a.estado === 'DESCONTADO', 'bg-rose-950 text-rose-400 border border-rose-800': a.estado === 'ANULADO' }">{{ a.estado === 'PENDIENTE_DESCUENTO' ? '⏳ Pendiente Descuento' : (a.estado === 'DESCONTADO' ? '✅ Descontado' : 'Anulado') }}</span>
+            <div class="flex gap-2 pt-1">
+              <button v-if="a.estado === 'PENDIENTE_DESCUENTO'" type="button" class="flex-1 min-h-[40px] rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800 text-sm font-semibold" @click="marcarAnticipoDescontado(a)">Marcar descontado</button>
+              <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" @click="abrirEditarAnticipo(a)">Editar</button>
+              <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg border border-rose-800 text-rose-400" title="Eliminar Anticipo" @click="solicitarEliminarAnticipo(a)"><i class="pi pi-trash text-xs" /></button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1101,7 +1165,7 @@ function imprimirBalance() {
       </div>
 
       <div v-else class="rounded-2xl border border-stone-800 bg-stone-900/40 backdrop-blur-sm overflow-hidden">
-        <div class="overflow-x-auto">
+        <div class="hidden overflow-x-auto md:block">
           <table class="w-full min-w-[640px] text-xs text-left border-collapse font-mono">
             <thead>
               <tr class="bg-stone-950/90 border-b border-stone-800 text-[10px] uppercase text-stone-400">
@@ -1133,6 +1197,21 @@ function imprimirBalance() {
               </tr>
             </tbody>
           </table>
+        </div>
+        <!-- Mobile cards: same movimientosFiltrados. No horizontal scroll. -->
+        <div class="space-y-3 p-4 md:hidden max-w-full min-w-0">
+          <div v-if="!movimientosFiltrados.length" class="text-center py-8 text-sm text-stone-500">Sin movimientos con los filtros actuales.</div>
+          <div v-for="m in movimientosFiltrados" :key="m.id" class="bg-stone-950/70 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+            <div class="flex items-start justify-between gap-2 min-w-0">
+              <div class="font-bold text-sm text-amber-300 min-w-0">{{ m.tipo }}</div>
+              <span class="text-xs text-stone-500 shrink-0">{{ m.fecha }}</span>
+            </div>
+            <div class="text-sm text-stone-300">{{ m.descripcion }}</div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border" :class="m.estado === 'confirmed' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : m.estado === 'draft' ? 'bg-stone-800 text-stone-400 border-stone-700' : 'bg-rose-950 text-rose-400 border-rose-800'">{{ m.estado }}</span>
+              <span class="font-mono font-bold text-stone-100">{{ formatCOP(Number(m.monto ?? 0)) }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

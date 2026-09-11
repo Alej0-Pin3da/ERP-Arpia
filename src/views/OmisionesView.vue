@@ -72,7 +72,7 @@ async function marcarResuelta(o: { id: number }) {
     </div>
 
     <div class="rounded-2xl border border-stone-800 bg-stone-900/40 p-6 space-y-4 overflow-hidden">
-      <div class="overflow-x-auto">
+      <div class="hidden overflow-x-auto md:block">
       <table class="w-full min-w-[640px] text-xs text-left border-collapse">
         <thead>
           <tr class="border-b border-stone-800 text-stone-400 font-mono">
@@ -117,6 +117,25 @@ async function marcarResuelta(o: { id: number }) {
           </tr>
         </tbody>
       </table>
+      </div>
+      <!-- Mobile cards: same omisionesDisplay. No horizontal scroll. -->
+      <div class="space-y-3 md:hidden max-w-full min-w-0">
+        <div v-if="!omisionesDisplay.length" class="text-center py-8 text-sm text-stone-500">Sin omisiones registradas en modo {{ isMock ? 'MOCK' : 'REAL' }}.</div>
+        <div v-for="o in omisionesDisplay" :key="o.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+          <div class="flex items-start justify-between gap-2 min-w-0">
+            <div class="font-bold text-sm text-amber-300 min-w-0">{{ o.usuario }}</div>
+            <span class="text-xs text-stone-500 shrink-0">{{ o.fecha }}</span>
+          </div>
+          <div class="text-sm text-stone-300">{{ o.evento }}</div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-xs uppercase tracking-wider text-stone-400">Impacto</span>
+            <span class="font-mono font-semibold text-stone-200">{{ o.impacto }}</span>
+          </div>
+          <div>
+            <span v-if="(o as any).resuelta" class="inline-block px-2.5 py-1 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 text-xs">Resuelta</span>
+            <Button v-else label="Resolver" icon="pi pi-check" size="small" text class="text-emerald-400 text-sm min-h-[40px]" :loading="resolviendoId === o.id" @click="marcarResuelta(o)" />
+          </div>
+        </div>
       </div>
     </div>
   </div>

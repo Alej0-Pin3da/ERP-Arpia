@@ -354,9 +354,9 @@ function abrirWhatsApp(p: PedidoProduccion) {
       </div>
     </div>
 
-    <!-- Table View -->
+    <!-- Table View (desktop) + Cards (mobile) -->
     <div v-else class="bg-stone-900/80 border border-stone-800 rounded-2xl overflow-hidden shadow-xl">
-      <div class="overflow-x-auto">
+      <div class="hidden overflow-x-auto md:block">
         <table class="w-full min-w-[760px] text-left text-xs border-collapse">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 bg-stone-950/60 uppercase tracking-wider font-semibold">
@@ -407,6 +407,29 @@ function abrirWhatsApp(p: PedidoProduccion) {
             </tr>
           </tbody>
         </table>
+      </div>
+      <!-- Mobile cards: same pedidosFiltrados. No horizontal scroll. -->
+      <div class="space-y-3 p-4 md:hidden max-w-full min-w-0">
+        <div v-if="!pedidosFiltrados.length" class="text-center py-8 text-sm text-stone-500">Sin pedidos con los filtros actuales.</div>
+        <div v-for="p in pedidosFiltrados" :key="p.id" class="bg-stone-950/70 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+          <div class="flex items-start justify-between gap-2 min-w-0">
+            <div class="min-w-0">
+              <div class="font-mono font-bold text-sm text-amber-300">{{ p.codigo }}</div>
+              <div class="text-xs text-stone-500">{{ p.fecha }}</div>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-950/60 text-amber-300 border border-amber-500/30 shrink-0">{{ etapaBadge(p) }}</span>
+          </div>
+          <div class="font-bold text-sm text-stone-100">{{ p.prenda_nombre }}</div>
+          <div class="text-sm text-stone-300">{{ p.cliente_nombre }}</div>
+          <div v-if="isMock" class="flex items-center justify-between text-sm">
+            <span class="font-mono text-stone-300">{{ formatCOP(p.precio_venta) }}</span>
+            <span class="font-mono font-bold text-emerald-400">{{ formatCOP(p.utilidad_neta) }}</span>
+          </div>
+          <div class="flex gap-2 pt-1">
+            <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-amber-500 text-stone-950 text-sm font-bold disabled:opacity-30" :disabled="transicionandoId === p.id || esTerminal(p)" @click="avanzarEstado(p)">Avanzar Fase</button>
+            <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-emerald-400" title="WhatsApp" @click="abrirWhatsApp(p)"><i class="pi pi-whatsapp text-xs" /></button>
+          </div>
+        </div>
       </div>
     </div>
 

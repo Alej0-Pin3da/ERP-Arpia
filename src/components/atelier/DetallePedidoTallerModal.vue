@@ -137,7 +137,7 @@ function generarReciboAnticipo() {
         <div class="text-xs font-mono font-bold text-stone-300 uppercase">
           Tiempos Reales por Fase de Modistería
         </div>
-        <div class="overflow-x-auto border border-stone-800 rounded-xl bg-stone-950/60">
+        <div class="hidden overflow-x-auto border border-stone-800 rounded-xl bg-stone-950/60 sm:block">
           <table class="w-full text-xs text-left border-collapse">
             <thead>
               <tr class="border-b border-stone-800 bg-stone-900/80 text-stone-400 font-mono text-[11px]">
@@ -165,6 +165,20 @@ function generarReciboAnticipo() {
               </tr>
             </tbody>
           </table>
+        </div>
+        <!-- Mobile cards: same fasesTaller. No horizontal scroll. -->
+        <div class="space-y-3 sm:hidden max-w-full min-w-0">
+          <div v-for="f in fasesTaller" :key="f.id" class="border border-stone-800 rounded-2xl bg-stone-950/60 p-4 space-y-1 min-w-0">
+            <div class="flex items-start justify-between gap-2 min-w-0">
+              <div class="font-bold text-sm text-stone-100 min-w-0">{{ f.fase }}</div>
+              <span class="px-2 py-0.5 rounded text-xs font-bold shrink-0" :class="f.completado ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30' : 'bg-stone-900 text-stone-400 border border-stone-800'">{{ f.completado ? 'Completado' : 'En Curso' }}</span>
+            </div>
+            <div class="text-sm text-stone-400">{{ f.modista }}</div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-500">Estimado {{ f.estimadoMin }} min</span>
+              <span class="font-mono font-bold text-amber-300">{{ f.realMin > 0 ? `${f.realMin} min` : '-' }}</span>
+            </div>
+          </div>
         </div>
       </div>
 

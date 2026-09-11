@@ -129,7 +129,8 @@ watch(isMock, () => { void cargarReales() })
         Cargando auditoría fiscal…
       </div>
 
-      <div v-else-if="activeTab === 'precios'" class="overflow-x-auto">
+      <template v-else-if="activeTab === 'precios'">
+      <div class="hidden overflow-x-auto md:block">
       <table class="w-full min-w-[640px] text-xs text-left border-collapse">
         <thead>
           <tr class="border-b border-stone-800 text-stone-400 font-mono">
@@ -158,8 +159,26 @@ watch(isMock, () => { void cargarReales() })
         </tbody>
       </table>
       </div>
+      <!-- Mobile cards: same precios. No horizontal scroll. -->
+      <div class="space-y-3 md:hidden max-w-full min-w-0">
+        <div v-if="!precios.length" class="text-center py-8 text-sm text-stone-500">Sin versiones de precio registradas.</div>
+        <div v-for="p in precios" :key="p.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-1 min-w-0">
+          <div class="flex items-start justify-between gap-2 min-w-0">
+            <div class="font-bold text-sm text-amber-300">Producto #{{ p.producto_id }}</div>
+            <span class="text-xs font-mono text-stone-500 shrink-0">ID {{ p.id }}</span>
+          </div>
+          <div class="text-sm text-stone-300">Variante: {{ p.variante_id ?? '—' }}</div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-xs uppercase tracking-wider text-stone-400">Precio</span>
+            <span class="font-mono font-bold text-stone-100">${{ p.precio }}</span>
+          </div>
+          <div class="text-xs text-stone-500">Vigente desde {{ p.fecha_desde }}</div>
+        </div>
+      </div>
+      </template>
 
-      <div v-else-if="activeTab === 'costos'" class="overflow-x-auto">
+      <template v-else-if="activeTab === 'costos'">
+      <div class="hidden overflow-x-auto md:block">
       <table class="w-full min-w-[640px] text-xs text-left border-collapse">
         <thead>
           <tr class="border-b border-stone-800 text-stone-400 font-mono">
@@ -186,8 +205,25 @@ watch(isMock, () => { void cargarReales() })
         </tbody>
       </table>
       </div>
+      <!-- Mobile cards: same costos. No horizontal scroll. -->
+      <div class="space-y-3 md:hidden max-w-full min-w-0">
+        <div v-if="!costos.length" class="text-center py-8 text-sm text-stone-500">Sin versiones de costo registradas.</div>
+        <div v-for="c in costos" :key="c.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-1 min-w-0">
+          <div class="flex items-start justify-between gap-2 min-w-0">
+            <div class="font-bold text-sm text-amber-300">Producto #{{ c.producto_id }}</div>
+            <span class="text-xs font-mono text-stone-500 shrink-0">ID {{ c.id }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-xs uppercase tracking-wider text-stone-400">Costo</span>
+            <span class="font-mono font-bold text-stone-100">${{ c.costo }}</span>
+          </div>
+          <div class="text-xs text-stone-500">Vigente desde {{ c.fecha_desde }}</div>
+        </div>
+      </div>
+      </template>
 
-      <div v-else class="overflow-x-auto">
+      <template v-else>
+      <div class="hidden overflow-x-auto md:block">
       <table class="w-full min-w-[640px] text-xs text-left border-collapse">
         <thead>
           <tr class="border-b border-stone-800 text-stone-400 font-mono">
@@ -212,6 +248,18 @@ watch(isMock, () => { void cargarReales() })
         </tbody>
       </table>
       </div>
+      <!-- Mobile cards: same cierres. No horizontal scroll. -->
+      <div class="space-y-3 md:hidden max-w-full min-w-0">
+        <div v-if="!cierres.length" class="text-center py-8 text-sm text-stone-500">Sin cierres mensuales registrados.</div>
+        <div v-for="s in cierres" :key="s.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-1 min-w-0">
+          <div class="flex items-start justify-between gap-2 min-w-0">
+            <div class="font-bold text-sm text-amber-300">{{ s.periodo }}</div>
+            <span class="text-xs font-mono text-stone-500 shrink-0">ID {{ s.id }}</span>
+          </div>
+          <div class="text-sm text-stone-300">Estado: {{ s.estado ?? 'cerrado' }}</div>
+        </div>
+      </div>
+      </template>
     </div>
   </div>
 </template>
