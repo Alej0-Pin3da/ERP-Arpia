@@ -122,11 +122,15 @@
 
 html {
   height: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  max-width: 100%;
+  overflow-x: clip;
   background-color: var(--arpia-dark-bg);
   background-image: var(--arpia-bg-gradient);
   background-attachment: fixed;

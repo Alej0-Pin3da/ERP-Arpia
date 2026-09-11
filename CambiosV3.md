@@ -3,6 +3,12 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-11] - Fix corte derecho global: grid blowout + header + overflow-x clip (ruta delegada directa)
+
+- **Causa:** `grid-template-columns: 268px 1fr` (`1fr` = `minmax(auto,1fr)`) sin `min-width:0` en header/main/wrapper + header flex sin shrink + sin contención `overflow-x` a nivel página → cualquier hijo ancho estiraba el viewport a 360px en todas las vistas.
+- **Fix shell:** grid a `minmax(0,1fr)`, `min-width:0`/`max-width:100%` en header/main/wrapper, `overflow-x:clip` en main/wrapper y `html/body` (preserva sticky), header con truncate/breadcrumbs ellipsis, en mobile padding `1rem`, gap `.5rem`, labels de logout/rol compactados con `aria-label`. Toast con `max-w-[calc(100vw-3rem)]`.
+- Verificación: `npm run build` OK (410 módulos). Sin tocar tablas/cards ni backend.
+
 ### [2026-09-11] - Híbrido responsive: tabla desktop + cards mobile sin scroll lateral (ruta delegada directa)
 
 - **Feedback:** el patrón scroll + sticky seguía exigiendo desplazamiento lateral y texto `xs` demasiado chico en mobile.

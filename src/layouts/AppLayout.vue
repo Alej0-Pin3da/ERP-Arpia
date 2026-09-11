@@ -192,12 +192,13 @@ function closeSidebar(): void {
         <ApiModeBadge />
 
         <div class="app-layout__user">
-          <Tag class="app-layout__role" severity="secondary">{{ rolLabel }}</Tag>
+          <Tag class="app-layout__role" severity="secondary" :aria-label="rolLabel">{{ rolLabel }}</Tag>
         </div>
 
         <Button
           class="app-layout__logout"
           label="Salir"
+          aria-label="Salir"
           icon="pi pi-sign-out"
           severity="danger"
           outlined
@@ -223,7 +224,7 @@ function closeSidebar(): void {
 <style scoped>
 .app-layout {
   display: grid;
-  grid-template-columns: 268px 1fr;
+  grid-template-columns: 268px minmax(0, 1fr);
   grid-template-rows: 64px 1fr;
   grid-template-areas:
     'aside header'
@@ -355,6 +356,9 @@ function closeSidebar(): void {
 /* Header */
 .app-layout__header {
   grid-area: header;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -371,6 +375,9 @@ function closeSidebar(): void {
   display: flex;
   align-items: center;
   gap: 1rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .breadcrumbs-block {
@@ -378,6 +385,10 @@ function closeSidebar(): void {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .breadcrumb-root {
@@ -398,12 +409,18 @@ function closeSidebar(): void {
   font-weight: 700;
   color: var(--arpia-text-primary);
   letter-spacing: -0.01em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-right {
   display: flex;
   align-items: center;
   gap: 1rem;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .system-status-chip {
@@ -463,20 +480,25 @@ function closeSidebar(): void {
 /* Main Area */
 .app-layout__main {
   grid-area: main;
+  min-width: 0;
+  max-width: 100%;
   overflow-y: auto;
+  overflow-x: clip;
   padding: 1.5rem 1.75rem 2.5rem;
   background-color: transparent;
 }
 
 .main-content-wrapper {
-  max-width: 1440px;
+  max-width: min(1440px, 100%);
+  min-width: 0;
   margin: 0 auto;
+  overflow-x: clip;
 }
 
 /* Responsive Mobile Rules */
 @media (max-width: 992px) {
   .app-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       'header'
       'main';
@@ -511,6 +533,29 @@ function closeSidebar(): void {
   .app-layout__menu-toggle {
     display: inline-flex;
     color: var(--arpia-primary);
+  }
+
+  .app-layout__header {
+    padding: 0 1rem;
+  }
+
+  .header-right {
+    gap: 0.5rem;
+  }
+
+  .app-layout__logout .p-button-label {
+    display: none;
+  }
+
+  .app-layout__role {
+    font-size: 0 !important;
+    gap: 0 !important;
+    padding: 0.25rem 0.5rem !important;
+  }
+
+  .app-layout__role .p-tag-icon,
+  .app-layout__role svg {
+    font-size: 0.75rem;
   }
 
   .system-status-chip {

@@ -59,7 +59,7 @@ function getBorderClass(sev: string) {
     <!-- Atelier Floating Toasts -->
     <div
       v-if="activeToasts.length"
-      class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full"
+      class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-[calc(100vw-3rem)] sm:max-w-sm"
     >
       <transition-group
         enter-active-class="transition duration-300 ease-out transform"
