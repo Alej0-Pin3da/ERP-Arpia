@@ -394,10 +394,10 @@ function solicitarEliminar(item: InsumoAtelier) {
     <!-- Data Table -->
     <div class="bg-stone-900/80 border border-stone-800 rounded-2xl overflow-hidden shadow-xl">
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs border-collapse">
+        <table class="w-full min-w-[900px] text-left text-xs border-collapse">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 bg-stone-950/60 uppercase tracking-wider font-semibold">
-              <th scope="col" class="py-3 px-3.5" :aria-sort="getAriaSort('nombre')">
+              <th scope="col" class="py-3 px-3.5 sticky left-0 z-10 bg-stone-950/95" :aria-sort="getAriaSort('nombre')">
                 <button
                   type="button"
                   class="inline-flex items-center gap-1 uppercase tracking-wider font-semibold hover:text-amber-300 transition select-none"
@@ -441,7 +441,7 @@ function solicitarEliminar(item: InsumoAtelier) {
                   <span aria-hidden="true" class="text-[10px] text-amber-400">{{ sortIndicator('stock') }}</span>
                 </button>
               </th>
-              <th scope="col" class="py-3 px-3.5 text-right" :aria-sort="getAriaSort('costo')">
+              <th scope="col" class="py-3 px-3.5 text-right whitespace-nowrap" :aria-sort="getAriaSort('costo')">
                 <button
                   type="button"
                   class="inline-flex items-center gap-1 uppercase tracking-wider font-semibold hover:text-amber-300 transition select-none"
@@ -452,7 +452,7 @@ function solicitarEliminar(item: InsumoAtelier) {
                   <span aria-hidden="true" class="text-[10px] text-amber-400">{{ sortIndicator('costo') }}</span>
                 </button>
               </th>
-              <th scope="col" class="py-3 px-3.5 text-right" :aria-sort="getAriaSort('valor')">
+              <th scope="col" class="py-3 px-3.5 text-right whitespace-nowrap" :aria-sort="getAriaSort('valor')">
                 <button
                   type="button"
                   class="inline-flex items-center gap-1 uppercase tracking-wider font-semibold hover:text-amber-300 transition select-none"
@@ -463,14 +463,14 @@ function solicitarEliminar(item: InsumoAtelier) {
                   <span aria-hidden="true" class="text-[10px] text-amber-400">{{ sortIndicator('valor') }}</span>
                 </button>
               </th>
-              <th scope="col" class="py-3 px-3.5 text-center">Ajuste Rápido</th>
-              <th scope="col" class="py-3 px-3.5 text-right">Acciones</th>
+              <th scope="col" class="py-3 px-3.5 text-center whitespace-nowrap">Ajuste Rápido</th>
+              <th scope="col" class="py-3 px-3.5 text-right whitespace-nowrap">Acciones</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-stone-800/50 text-stone-200">
             <tr v-for="it in insumosFiltrados" :key="it.id" class="hover:bg-stone-800/30">
               <!-- Code & Title -->
-              <td class="py-3 px-3.5 max-w-xs">
+              <td class="py-3 px-3.5 max-w-xs sticky left-0 z-10 bg-stone-900/95">
                 <div class="font-bold text-stone-100 text-xs">{{ it.nombre }}</div>
                 <div class="font-mono text-[11px] text-amber-400 font-semibold">{{ it.codigo }}</div>
                 <div class="text-[11px] text-stone-400 truncate mt-0.5">{{ it.descripcion }}</div>
@@ -517,12 +517,12 @@ function solicitarEliminar(item: InsumoAtelier) {
               </td>
 
               <!-- Unit Cost -->
-              <td class="py-3 px-3.5 text-right font-mono">
+              <td class="py-3 px-3.5 text-right font-mono whitespace-nowrap">
                 {{ formatCOP(it.costo_unitario) }} / {{ it.unidad_medida }}
               </td>
 
               <!-- Total Value -->
-              <td class="py-3 px-3.5 text-right font-mono font-bold text-amber-300">
+              <td class="py-3 px-3.5 text-right font-mono font-bold text-amber-300 whitespace-nowrap">
                 {{ formatCOP(it.stock_actual * it.costo_unitario) }}
               </td>
 

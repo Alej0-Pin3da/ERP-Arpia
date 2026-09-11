@@ -123,14 +123,14 @@ function formatCOP(v: number): string {
       </h2>
 
       <div class="overflow-x-auto">
-        <table class="w-full text-xs text-left border-collapse">
+        <table class="w-full min-w-[640px] text-xs text-left border-collapse">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 font-mono">
-              <th class="py-2.5 px-3">Prenda / Receta</th>
-              <th class="py-2.5 px-3">Costo Insumos</th>
-              <th class="py-2.5 px-3">Horas Confección</th>
-              <th class="py-2.5 px-3">Precio Sugerido</th>
-              <th class="py-2.5 px-3">Margen Bruto</th>
+              <th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Prenda / Receta</th>
+              <th class="py-2.5 px-3 text-right whitespace-nowrap">Costo Insumos</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Horas Confección</th>
+              <th class="py-2.5 px-3 text-right whitespace-nowrap">Precio Sugerido</th>
+              <th class="py-2.5 px-3 text-right whitespace-nowrap">Margen Bruto</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-stone-800/60 font-mono">
@@ -138,11 +138,11 @@ function formatCOP(v: number): string {
                   <td colspan="5" class="py-8 text-center text-stone-500">Sin recetas para analizar en modo {{ isMock ? 'MOCK' : 'REAL' }}.</td>
                 </tr>
             <tr v-for="r in recetasDisplay" :key="r.id" class="hover:bg-stone-900/50">
-              <td class="py-3 px-3 font-serif text-sm font-semibold text-stone-200">{{ r.nombre }}</td>
-              <td class="py-3 px-3 text-stone-300">{{ formatCOP(Number(r.costo_estimado_materiales ?? 0)) }}</td>
-              <td class="py-3 px-3 text-stone-400">{{ r.tiempo_estimado_confeccion_horas }}h</td>
-              <td class="py-3 px-3 text-amber-300 font-bold">{{ formatCOP(Number(r.precio_venta_sugerido ?? 0)) }}</td>
-              <td class="py-3 px-3 text-emerald-400 font-bold">
+              <td class="py-3 px-3 font-serif text-sm font-semibold text-stone-200 sticky left-0 z-10 bg-stone-900/95 min-w-[180px]">{{ r.nombre }}</td>
+              <td class="py-3 px-3 text-stone-300 text-right whitespace-nowrap">{{ formatCOP(Number(r.costo_estimado_materiales ?? 0)) }}</td>
+              <td class="py-3 px-3 text-stone-400 whitespace-nowrap">{{ r.tiempo_estimado_confeccion_horas }}h</td>
+              <td class="py-3 px-3 text-amber-300 font-bold text-right whitespace-nowrap">{{ formatCOP(Number(r.precio_venta_sugerido ?? 0)) }}</td>
+              <td class="py-3 px-3 text-emerald-400 font-bold text-right whitespace-nowrap">
                 {{ formatCOP(Number(r.precio_venta_sugerido ?? 0) - Number(r.costo_estimado_materiales ?? 0)) }}
                 <span class="text-[10px] opacity-75">
                   ({{ Number(r.precio_venta_sugerido ?? 0) > 0 ? Math.round(((Number(r.precio_venta_sugerido ?? 0) - Number(r.costo_estimado_materiales ?? 0)) / Number(r.precio_venta_sugerido ?? 0)) * 100) : 0 }}%)

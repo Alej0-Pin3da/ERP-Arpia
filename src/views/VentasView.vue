@@ -460,17 +460,17 @@ function exportarCSV() {
       </div>
 
       <div v-else class="overflow-x-auto">
-        <table class="w-full text-xs text-left border-collapse font-mono">
+        <table class="w-full min-w-[900px] text-xs text-left border-collapse font-mono">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 text-[11px] uppercase tracking-wider">
-              <th class="py-3 px-3">Venta / Fecha</th>
+              <th class="py-3 px-3 sticky left-0 z-10 bg-stone-950/95">Venta / Fecha</th>
               <th class="py-3 px-3">Cliente & Canal</th>
-              <th class="py-3 px-3">Prendas / Artículos</th>
-              <th class="py-3 px-3 text-right">Descuento</th>
-              <th class="py-3 px-3 text-right">Total Venta</th>
-              <th class="py-3 px-3 text-right">Utilidad Neta</th>
-              <th class="py-3 px-3 text-center">Estado</th>
-              <th class="py-3 px-3 text-right">Acciones</th>
+              <th class="py-3 px-3 min-w-[180px]">Prendas / Artículos</th>
+              <th class="py-3 px-3 text-right whitespace-nowrap">Descuento</th>
+              <th class="py-3 px-3 text-right whitespace-nowrap">Total Venta</th>
+              <th class="py-3 px-3 text-right whitespace-nowrap">Utilidad Neta</th>
+              <th class="py-3 px-3 text-center whitespace-nowrap">Estado</th>
+              <th class="py-3 px-3 text-right whitespace-nowrap">Acciones</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-stone-800/60">
@@ -480,7 +480,7 @@ function exportarCSV() {
               class="hover:bg-stone-800/40 transition group"
             >
               <!-- Code & Date -->
-              <td class="py-3.5 px-3">
+              <td class="py-3.5 px-3 sticky left-0 z-10 bg-stone-900/95">
                 <div class="flex items-center gap-2">
                   <span class="font-bold text-amber-400 tracking-wide text-xs">
                     {{ v.codigo }}
@@ -527,7 +527,7 @@ function exportarCSV() {
               </td>
 
               <!-- Discount -->
-              <td class="py-3.5 px-3 text-right">
+              <td class="py-3.5 px-3 text-right whitespace-nowrap">
                 <div v-if="v.descuento_valor > 0" class="text-rose-400 font-bold">
                   -{{ formatCOP(v.descuento_valor) }}
                   <div class="text-[10px] text-rose-500">({{ v.descuento_porcentaje }}%)</div>
@@ -536,7 +536,7 @@ function exportarCSV() {
               </td>
 
               <!-- Total Venta -->
-              <td class="py-3.5 px-3 text-right">
+              <td class="py-3.5 px-3 text-right whitespace-nowrap">
                 <div class="text-base font-bold text-amber-300">
                   {{ formatCOP(v.total_venta) }}
                 </div>
@@ -546,7 +546,7 @@ function exportarCSV() {
               </td>
 
               <!-- Net Utility & Margin -->
-              <td class="py-3.5 px-3 text-right">
+              <td class="py-3.5 px-3 text-right whitespace-nowrap">
                 <div class="text-sm font-bold text-emerald-400">
                   {{ formatCOP(v.ganancia_neta) }}
                 </div>
@@ -556,7 +556,7 @@ function exportarCSV() {
               </td>
 
               <!-- State Tag & Quick Change -->
-              <td class="py-3.5 px-3 text-center">
+              <td class="py-3.5 px-3 text-center whitespace-nowrap">
                 <span
                   class="px-2.5 py-1 rounded-full text-[10px] font-bold border inline-block"
                   :class="v.estado === 'COMPLETADA' ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/30' : v.estado === 'PENDIENTE' ? 'bg-amber-950/80 text-amber-300 border-amber-500/30' : 'bg-rose-950/80 text-rose-300 border-rose-500/30'"
@@ -566,7 +566,7 @@ function exportarCSV() {
               </td>
 
               <!-- Action Buttons (View Receipt, Edit, Delete) -->
-              <td class="py-3.5 px-3 text-right">
+              <td class="py-3.5 px-3 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-1">
                   <!-- View Receipt -->
                   <Button

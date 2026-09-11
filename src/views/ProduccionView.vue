@@ -357,34 +357,34 @@ function abrirWhatsApp(p: PedidoProduccion) {
     <!-- Table View -->
     <div v-else class="bg-stone-900/80 border border-stone-800 rounded-2xl overflow-hidden shadow-xl">
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs border-collapse">
+        <table class="w-full min-w-[760px] text-left text-xs border-collapse">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 bg-stone-950/60 uppercase tracking-wider font-semibold">
-              <th class="py-3 px-4">Código / Fecha</th>
+              <th class="py-3 px-4 sticky left-0 z-10 bg-stone-950/95">Código / Fecha</th>
               <th class="py-3 px-4">Cliente</th>
-              <th class="py-3 px-4">Prenda / Modelo</th>
-              <th class="py-3 px-4 text-center">Fase de Producción</th>
-              <th v-if="isMock" class="py-3 px-4 text-right">Precio Venta</th>
-              <th v-if="isMock" class="py-3 px-4 text-right">Utilidad Neta</th>
-              <th class="py-3 px-4 text-right">Acciones</th>
+              <th class="py-3 px-4 min-w-[180px]">Prenda / Modelo</th>
+              <th class="py-3 px-4 text-center whitespace-nowrap">Fase de Producción</th>
+              <th v-if="isMock" class="py-3 px-4 text-right whitespace-nowrap">Precio Venta</th>
+              <th v-if="isMock" class="py-3 px-4 text-right whitespace-nowrap">Utilidad Neta</th>
+              <th class="py-3 px-4 text-right whitespace-nowrap">Acciones</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-stone-800/50 text-stone-200">
             <tr v-for="p in pedidosFiltrados" :key="p.id" class="hover:bg-stone-800/30">
-              <td class="py-3 px-4">
+              <td class="py-3 px-4 sticky left-0 z-10 bg-stone-900/95">
                 <div class="font-mono font-bold text-amber-300">{{ p.codigo }}</div>
                 <div class="text-[11px] text-stone-400">{{ p.fecha }}</div>
               </td>
               <td class="py-3 px-4 font-medium text-stone-100">{{ p.cliente_nombre }}</td>
               <td class="py-3 px-4">{{ p.prenda_nombre }}</td>
-              <td class="py-3 px-4 text-center">
+              <td class="py-3 px-4 text-center whitespace-nowrap">
                 <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-950/60 text-amber-300 border border-amber-500/30">
                   {{ etapaBadge(p) }}
                 </span>
               </td>
-              <td v-if="isMock" class="py-3 px-4 text-right font-mono">{{ formatCOP(p.precio_venta) }}</td>
-              <td v-if="isMock" class="py-3 px-4 text-right font-mono font-bold text-emerald-400">{{ formatCOP(p.utilidad_neta) }}</td>
-              <td class="py-3 px-4 text-right">
+              <td v-if="isMock" class="py-3 px-4 text-right font-mono whitespace-nowrap">{{ formatCOP(p.precio_venta) }}</td>
+              <td v-if="isMock" class="py-3 px-4 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">{{ formatCOP(p.utilidad_neta) }}</td>
+              <td class="py-3 px-4 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-2">
                   <button
                     type="button"

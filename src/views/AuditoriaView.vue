@@ -129,14 +129,15 @@ watch(isMock, () => { void cargarReales() })
         Cargando auditoría fiscal…
       </div>
 
-      <table v-else-if="activeTab === 'precios'" class="w-full text-xs text-left border-collapse">
+      <div v-else-if="activeTab === 'precios'" class="overflow-x-auto">
+      <table class="w-full min-w-[640px] text-xs text-left border-collapse">
         <thead>
           <tr class="border-b border-stone-800 text-stone-400 font-mono">
-            <th class="py-2.5 px-3">ID</th>
+            <th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95">ID</th>
             <th class="py-2.5 px-3">Producto</th>
             <th class="py-2.5 px-3">Variante</th>
-            <th class="py-2.5 px-3 text-right">Precio</th>
-            <th class="py-2.5 px-3">Vigente desde</th>
+            <th class="py-2.5 px-3 text-right whitespace-nowrap">Precio</th>
+            <th class="py-2.5 px-3 whitespace-nowrap">Vigente desde</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-stone-800/60 font-mono">
@@ -148,22 +149,24 @@ watch(isMock, () => { void cargarReales() })
             </td>
           </tr>
           <tr v-for="p in precios" :key="p.id">
-            <td class="py-3 px-3 text-stone-500">{{ p.id }}</td>
-            <td class="py-3 px-3 text-amber-300 font-bold">#{{ p.producto_id }}</td>
-            <td class="py-3 px-3 text-stone-400">{{ p.variante_id ?? '—' }}</td>
-            <td class="py-3 px-3 text-right text-stone-300 font-semibold">${{ p.precio }}</td>
-            <td class="py-3 px-3 text-stone-400">{{ p.fecha_desde }}</td>
+            <td class="py-3 px-3 text-stone-500 sticky left-0 z-10 bg-stone-900/95 whitespace-nowrap">{{ p.id }}</td>
+            <td class="py-3 px-3 text-amber-300 font-bold whitespace-nowrap">#{{ p.producto_id }}</td>
+            <td class="py-3 px-3 text-stone-400 whitespace-nowrap">{{ p.variante_id ?? '—' }}</td>
+            <td class="py-3 px-3 text-right text-stone-300 font-semibold whitespace-nowrap">${{ p.precio }}</td>
+            <td class="py-3 px-3 text-stone-400 whitespace-nowrap">{{ p.fecha_desde }}</td>
           </tr>
         </tbody>
       </table>
+      </div>
 
-      <table v-else-if="activeTab === 'costos'" class="w-full text-xs text-left border-collapse">
+      <div v-else-if="activeTab === 'costos'" class="overflow-x-auto">
+      <table class="w-full min-w-[640px] text-xs text-left border-collapse">
         <thead>
           <tr class="border-b border-stone-800 text-stone-400 font-mono">
-            <th class="py-2.5 px-3">ID</th>
+            <th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95">ID</th>
             <th class="py-2.5 px-3">Producto</th>
-            <th class="py-2.5 px-3 text-right">Costo</th>
-            <th class="py-2.5 px-3">Vigente desde</th>
+            <th class="py-2.5 px-3 text-right whitespace-nowrap">Costo</th>
+            <th class="py-2.5 px-3 whitespace-nowrap">Vigente desde</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-stone-800/60 font-mono">
@@ -175,20 +178,22 @@ watch(isMock, () => { void cargarReales() })
             </td>
           </tr>
           <tr v-for="c in costos" :key="c.id">
-            <td class="py-3 px-3 text-stone-500">{{ c.id }}</td>
-            <td class="py-3 px-3 text-amber-300 font-bold">#{{ c.producto_id }}</td>
-            <td class="py-3 px-3 text-right text-stone-300 font-semibold">${{ c.costo }}</td>
-            <td class="py-3 px-3 text-stone-400">{{ c.fecha_desde }}</td>
+            <td class="py-3 px-3 text-stone-500 sticky left-0 z-10 bg-stone-900/95 whitespace-nowrap">{{ c.id }}</td>
+            <td class="py-3 px-3 text-amber-300 font-bold whitespace-nowrap">#{{ c.producto_id }}</td>
+            <td class="py-3 px-3 text-right text-stone-300 font-semibold whitespace-nowrap">${{ c.costo }}</td>
+            <td class="py-3 px-3 text-stone-400 whitespace-nowrap">{{ c.fecha_desde }}</td>
           </tr>
         </tbody>
       </table>
+      </div>
 
-      <table v-else class="w-full text-xs text-left border-collapse">
+      <div v-else class="overflow-x-auto">
+      <table class="w-full min-w-[640px] text-xs text-left border-collapse">
         <thead>
           <tr class="border-b border-stone-800 text-stone-400 font-mono">
-            <th class="py-2.5 px-3">ID</th>
+            <th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95">ID</th>
             <th class="py-2.5 px-3">Período</th>
-            <th class="py-2.5 px-3">Estado</th>
+            <th class="py-2.5 px-3 whitespace-nowrap">Estado</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-stone-800/60 font-mono">
@@ -200,12 +205,13 @@ watch(isMock, () => { void cargarReales() })
             </td>
           </tr>
           <tr v-for="s in cierres" :key="s.id">
-            <td class="py-3 px-3 text-stone-500">{{ s.id }}</td>
-            <td class="py-3 px-3 text-amber-300 font-bold">{{ s.periodo }}</td>
-            <td class="py-3 px-3 text-stone-300">{{ s.estado ?? 'cerrado' }}</td>
+            <td class="py-3 px-3 text-stone-500 sticky left-0 z-10 bg-stone-900/95 whitespace-nowrap">{{ s.id }}</td>
+            <td class="py-3 px-3 text-amber-300 font-bold whitespace-nowrap">{{ s.periodo }}</td>
+            <td class="py-3 px-3 text-stone-300 whitespace-nowrap">{{ s.estado ?? 'cerrado' }}</td>
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   </div>
 </template>

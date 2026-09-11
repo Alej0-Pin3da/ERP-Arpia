@@ -71,15 +71,16 @@ async function marcarResuelta(o: { id: number }) {
       </p>
     </div>
 
-    <div class="rounded-2xl border border-stone-800 bg-stone-900/40 p-6 space-y-4">
-      <table class="w-full text-xs text-left border-collapse">
+    <div class="rounded-2xl border border-stone-800 bg-stone-900/40 p-6 space-y-4 overflow-hidden">
+      <div class="overflow-x-auto">
+      <table class="w-full min-w-[640px] text-xs text-left border-collapse">
         <thead>
           <tr class="border-b border-stone-800 text-stone-400 font-mono">
-            <th class="py-2.5 px-3">Fecha</th>
-            <th class="py-2.5 px-3">Responsable</th>
-            <th class="py-2.5 px-3">Detalle del Evento</th>
-            <th class="py-2.5 px-3 text-right">Impacto</th>
-            <th class="py-2.5 px-3 text-center">Estado</th>
+            <th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95 whitespace-nowrap">Fecha</th>
+            <th class="py-2.5 px-3 whitespace-nowrap">Responsable</th>
+            <th class="py-2.5 px-3 min-w-[180px]">Detalle del Evento</th>
+            <th class="py-2.5 px-3 text-right whitespace-nowrap">Impacto</th>
+            <th class="py-2.5 px-3 text-center whitespace-nowrap">Estado</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-stone-800/60 font-mono">
@@ -91,11 +92,11 @@ async function marcarResuelta(o: { id: number }) {
                 </td>
               </tr>
           <tr v-for="o in omisionesDisplay" :key="o.id">
-            <td class="py-3 px-3 text-stone-400">{{ o.fecha }}</td>
-            <td class="py-3 px-3 text-amber-300 font-bold">{{ o.usuario }}</td>
-            <td class="py-3 px-3 text-stone-300">{{ o.evento }}</td>
-            <td class="py-3 px-3 text-right text-stone-400 font-semibold">{{ o.impacto }}</td>
-            <td class="py-3 px-3 text-center">
+            <td class="py-3 px-3 text-stone-400 sticky left-0 z-10 bg-stone-900/95 whitespace-nowrap">{{ o.fecha }}</td>
+            <td class="py-3 px-3 text-amber-300 font-bold whitespace-nowrap">{{ o.usuario }}</td>
+            <td class="py-3 px-3 text-stone-300 min-w-[180px]">{{ o.evento }}</td>
+            <td class="py-3 px-3 text-right text-stone-400 font-semibold whitespace-nowrap">{{ o.impacto }}</td>
+            <td class="py-3 px-3 text-center whitespace-nowrap">
               <span
                 v-if="(o as any).resuelta"
                 class="px-2.5 py-1 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 text-[10px]"
@@ -116,6 +117,7 @@ async function marcarResuelta(o: { id: number }) {
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   </div>
 </template>

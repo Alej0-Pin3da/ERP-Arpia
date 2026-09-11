@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-11] - Responsive tablas: scroll horizontal + sticky primera columna en 11 vistas + 5 modales (ruta delegada directa)
+
+- **Problema:** tablas nativas `<table>` sin lógica responsive; 3 vistas + 4 modales sin wrapper `overflow-x-auto` rompían el layout a 360-640px, el resto solo scrolleaba perdiendo contexto de fila.
+- **Patrón unificado:** wrapper `rounded-2xl border overflow-hidden > overflow-x-auto`, tabla con `min-w-[640px]` (≤5 col) / `min-w-[760px]` (6-7 col) / `min-w-[900px]` (8+ col, Ventas/Inventario/Finanzas), primera columna `sticky left-0 z-10` con fondo stone opaco para mantener el identificador ámbar visible, `whitespace-nowrap` solo en dinero/estado/acciones, descripciones con `min-w-[180px]`. Sin columnas ocultas ni cards duplicadas, sin migrar a DataTable, kanban intacto.
+- **Archivos:** Ventas, Inventario, Finanzas (3 tablas), Auditoría (3), Análisis, Dashboard, Omisiones, Producción (solo vista tabla), Maestros, Devoluciones, PrendasListas + modales DetalleVenta, SugerirOrden, FichaTécnica (BOM+matriz), FichaTallas, OrdenCompraProveedor.
+- Verificación: `npm run build` OK (410 módulos). Sin tocar backend ni lógica.
+
 ### [2026-09-08] - Fix overlap campos numéricos + scrollbar horizontal en modales de insumo (ruta delegada directa)
 
 - **Causa raíz:** el trío numérico (`Stock Actual/Stock Inicial`, `Stock Mínimo (Alerta)`, `Costo Unitario ($)`) usaba `grid sm:grid-cols-3` sin `min-w-0` en las celdas (los grid items con `min-width: auto` no encogen y el contenido empuja), y `class="w-full"` en `<InputNumber>` solo dimensiona el wrapper `.p-inputnumber` — el `<input>` interno de PrimeVue 4.5.5 conserva su ancho intrínseco (peor con formato moneda COP `$ 18.800`). En un diálogo de 640px con padding de 1.5rem cada columna queda en ~180px y los inputs se solapan; el desborde generaba el scrollbar horizontal.

@@ -232,27 +232,27 @@ async function onPrendaIngresada() {
 
         <!-- Variants Sub-Table -->
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs border-collapse">
+          <table class="w-full min-w-[760px] text-left text-xs border-collapse">
             <thead>
               <tr class="border-b border-stone-800/80 text-stone-400 bg-stone-900/40 uppercase tracking-wider font-semibold">
-                <th class="py-2.5 px-4">Talla</th>
+                <th class="py-2.5 px-4 sticky left-0 z-10 bg-stone-950/95">Talla</th>
                 <th class="py-2.5 px-4">Color / Variante</th>
-                <th class="py-2.5 px-4">SKU</th>
-                <th class="py-2.5 px-4 text-center">Stock Físico</th>
-                <th class="py-2.5 px-4 text-center">Reservado</th>
-                <th class="py-2.5 px-4 text-center">Disponible</th>
-                <th class="py-2.5 px-4 text-right">Acciones</th>
+                <th class="py-2.5 px-4 whitespace-nowrap">SKU</th>
+                <th class="py-2.5 px-4 text-center whitespace-nowrap">Stock Físico</th>
+                <th class="py-2.5 px-4 text-center whitespace-nowrap">Reservado</th>
+                <th class="py-2.5 px-4 text-center whitespace-nowrap">Disponible</th>
+                <th class="py-2.5 px-4 text-right whitespace-nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-stone-800/50 text-stone-200 font-mono">
               <tr v-for="v in p.variantes" :key="v.id" class="hover:bg-stone-800/30">
-                <td class="py-2.5 px-4 font-bold text-amber-300 font-sans">{{ v.talla }}</td>
-                <td class="py-2.5 px-4 font-sans text-stone-300">{{ v.color }}</td>
-                <td class="py-2.5 px-4 text-stone-400">{{ v.sku }}</td>
-                <td class="py-2.5 px-4 text-center font-bold text-stone-100">{{ v.stock_fisico }}</td>
-                <td class="py-2.5 px-4 text-center text-amber-400">{{ v.reservado }}</td>
-                <td class="py-2.5 px-4 text-center font-bold text-emerald-400">{{ v.disponible }}</td>
-                <td class="py-2.5 px-4 text-right font-sans">
+                <td class="py-2.5 px-4 font-bold text-amber-300 font-sans sticky left-0 z-10 bg-stone-900/95 whitespace-nowrap">{{ v.talla }}</td>
+                <td class="py-2.5 px-4 font-sans text-stone-300 min-w-[180px]">{{ v.color }}</td>
+                <td class="py-2.5 px-4 text-stone-400 whitespace-nowrap">{{ v.sku }}</td>
+                <td class="py-2.5 px-4 text-center font-bold text-stone-100 whitespace-nowrap">{{ v.stock_fisico }}</td>
+                <td class="py-2.5 px-4 text-center text-amber-400 whitespace-nowrap">{{ v.reservado }}</td>
+                <td class="py-2.5 px-4 text-center font-bold text-emerald-400 whitespace-nowrap">{{ v.disponible }}</td>
+                <td class="py-2.5 px-4 text-right font-sans whitespace-nowrap">
                   <div class="inline-flex items-center gap-1.5">
                     <button
                       type="button"

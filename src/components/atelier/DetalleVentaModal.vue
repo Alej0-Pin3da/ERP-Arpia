@@ -157,32 +157,34 @@ function compartirWhatsApp() {
           Prendas Confeccionadas & Artículos
         </div>
 
-        <table class="w-full text-xs text-left border-collapse font-mono">
+        <div class="overflow-x-auto max-h-72 overflow-y-auto">
+        <table class="w-full min-w-[640px] text-xs text-left border-collapse font-mono">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 text-[11px]">
-              <th class="py-2.5 px-4 font-normal">Descripción</th>
-              <th class="py-2.5 px-3 font-normal text-center">Talla</th>
-              <th class="py-2.5 px-3 font-normal text-center">Color</th>
-              <th class="py-2.5 px-3 font-normal text-right">Cant.</th>
-              <th class="py-2.5 px-3 font-normal text-right">Precio Unit.</th>
-              <th class="py-2.5 px-4 font-normal text-right">Subtotal</th>
+              <th class="py-2.5 px-4 font-normal sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Descripción</th>
+              <th class="py-2.5 px-3 font-normal text-center whitespace-nowrap">Talla</th>
+              <th class="py-2.5 px-3 font-normal text-center whitespace-nowrap">Color</th>
+              <th class="py-2.5 px-3 font-normal text-right whitespace-nowrap">Cant.</th>
+              <th class="py-2.5 px-3 font-normal text-right whitespace-nowrap">Precio Unit.</th>
+              <th class="py-2.5 px-4 font-normal text-right whitespace-nowrap">Subtotal</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-stone-800/60">
             <tr v-for="it in venta.items" :key="it.id" class="hover:bg-stone-800/30">
-              <td class="py-3 px-4 font-serif font-semibold text-stone-100">{{ it.nombre_prenda }}</td>
-              <td class="py-3 px-3 text-center">
+              <td class="py-3 px-4 font-serif font-semibold text-stone-100 sticky left-0 z-10 bg-stone-900/95 min-w-[180px]">{{ it.nombre_prenda }}</td>
+              <td class="py-3 px-3 text-center whitespace-nowrap">
                 <span class="px-2 py-0.5 rounded bg-stone-800 text-amber-300 border border-stone-700 text-[10px]">
                   {{ it.talla }}
                 </span>
               </td>
-              <td class="py-3 px-3 text-center text-stone-300 text-[11px]">{{ it.color }}</td>
-              <td class="py-3 px-3 text-right font-bold text-stone-200">{{ it.cantidad }}</td>
-              <td class="py-3 px-3 text-right text-stone-300">{{ formatCOP(it.precio_unitario) }}</td>
-              <td class="py-3 px-4 text-right font-bold text-amber-400">{{ formatCOP(it.subtotal) }}</td>
+              <td class="py-3 px-3 text-center text-stone-300 text-[11px] whitespace-nowrap">{{ it.color }}</td>
+              <td class="py-3 px-3 text-right font-bold text-stone-200 whitespace-nowrap">{{ it.cantidad }}</td>
+              <td class="py-3 px-3 text-right text-stone-300 whitespace-nowrap">{{ formatCOP(it.precio_unitario) }}</td>
+              <td class="py-3 px-4 text-right font-bold text-amber-400 whitespace-nowrap">{{ formatCOP(it.subtotal) }}</td>
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
 
       <!-- Financial Totals & Partner Breakdown -->

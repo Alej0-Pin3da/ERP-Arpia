@@ -261,14 +261,15 @@ function enviarGuiaWhatsApp() {
         </div>
 
         <div class="rounded-xl border border-stone-800 overflow-hidden">
-          <table class="w-full text-left border-collapse text-xs font-mono">
+          <div class="overflow-x-auto max-h-72 overflow-y-auto">
+          <table class="w-full min-w-[640px] text-left border-collapse text-xs font-mono">
             <thead>
               <tr class="bg-stone-950 text-stone-400 uppercase text-[10px] border-b border-stone-800">
-                <th class="py-2 px-3">Talla</th>
-                <th class="py-2 px-3 text-center">Busto (cm)</th>
-                <th class="py-2 px-3 text-center">Cintura (cm)</th>
-                <th class="py-2 px-3 text-center">Cadera (cm)</th>
-                <th class="py-2 px-3">Descripción de Silueta</th>
+                <th class="py-2 px-3 sticky left-0 z-10 bg-stone-950/95">Talla</th>
+                <th class="py-2 px-3 text-center whitespace-nowrap">Busto (cm)</th>
+                <th class="py-2 px-3 text-center whitespace-nowrap">Cintura (cm)</th>
+                <th class="py-2 px-3 text-center whitespace-nowrap">Cadera (cm)</th>
+                <th class="py-2 px-3 min-w-[180px]">Descripción de Silueta</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-stone-800/60">
@@ -278,7 +279,7 @@ function enviarGuiaWhatsApp() {
                 class="hover:bg-stone-800/30 transition-colors"
                 :class="tallaSeleccionada === r.talla ? 'bg-amber-500/10 text-amber-300 font-bold' : 'text-stone-300'"
               >
-                <td class="py-2 px-3">
+                <td class="py-2 px-3 sticky left-0 z-10 bg-stone-900/95 whitespace-nowrap">
                   <span
                     class="px-2 py-0.5 rounded font-mono font-bold"
                     :class="tallaSeleccionada === r.talla ? 'bg-amber-400 text-stone-950' : 'bg-stone-800 text-stone-300'"
@@ -286,13 +287,14 @@ function enviarGuiaWhatsApp() {
                     {{ r.talla }}
                   </span>
                 </td>
-                <td class="py-2 px-3 text-center">{{ r.busto }}</td>
-                <td class="py-2 px-3 text-center">{{ r.cintura }}</td>
-                <td class="py-2 px-3 text-center">{{ r.cadera }}</td>
-                <td class="py-2 px-3 text-[11px] font-sans text-stone-400">{{ r.tipo }}</td>
+                <td class="py-2 px-3 text-center whitespace-nowrap">{{ r.busto }}</td>
+                <td class="py-2 px-3 text-center whitespace-nowrap">{{ r.cintura }}</td>
+                <td class="py-2 px-3 text-center whitespace-nowrap">{{ r.cadera }}</td>
+                <td class="py-2 px-3 text-[11px] font-sans text-stone-400 min-w-[180px]">{{ r.tipo }}</td>
               </tr>
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 

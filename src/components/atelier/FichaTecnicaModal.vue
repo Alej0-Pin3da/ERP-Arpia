@@ -642,25 +642,25 @@ function exportarMatriz() {
             <span v-if="isMock">Sin insumos en esta ficha (mock).</span>
             <span v-else>Sin renglones BOM. Agregá insumos arriba para calcular el costo.</span>
           </div>
-          <div v-else class="overflow-x-auto">
-            <table class="w-full text-left text-xs border-collapse">
+          <div v-else class="overflow-x-auto max-h-72 overflow-y-auto">
+            <table class="w-full min-w-[760px] text-left text-xs border-collapse">
               <thead><tr class="border-b border-stone-800 text-stone-400 bg-stone-950/40">
-                <th class="py-2.5 px-3 font-semibold">Insumo / Material</th><th class="py-2.5 px-3 font-semibold">Tipo</th><th class="py-2.5 px-3 font-semibold text-right">Consumo Unit.</th><th class="py-2.5 px-3 font-semibold text-right">Merma %</th><th class="py-2.5 px-3 font-semibold text-right">Costo Unit.</th><th class="py-2.5 px-3 font-semibold text-right">Subtotal</th><th v-if="!isMock" class="py-2.5 px-3"></th>
+                <th class="py-2.5 px-3 font-semibold sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Insumo / Material</th><th class="py-2.5 px-3 font-semibold whitespace-nowrap">Tipo</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Consumo Unit.</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Merma %</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Costo Unit.</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Subtotal</th><th v-if="!isMock" class="py-2.5 px-3"></th>
               </tr></thead>
               <tbody class="divide-y divide-stone-800/50 text-stone-200">
                 <tr v-for="it in displayItems" :key="(it as any).id" class="hover:bg-stone-800/30" :class="editingBomId === (it as any).bomId ? 'bg-amber-950/20' : ''">
-                  <td class="py-2.5 px-3 font-medium text-stone-100">{{ (it as any).nombre }}</td>
-                  <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="(it as any).tipo === 'Directo' ? 'bg-amber-950/60 text-amber-300 border border-amber-500/30' : 'bg-stone-800 text-stone-400'">{{ (it as any).tipo }}</span></td>
-                  <td class="py-2.5 px-3 text-right font-mono">
+                  <td class="py-2.5 px-3 font-medium text-stone-100 sticky left-0 z-10 bg-stone-900/95 min-w-[180px]">{{ (it as any).nombre }}</td>
+                  <td class="py-2.5 px-3 whitespace-nowrap"><span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="(it as any).tipo === 'Directo' ? 'bg-amber-950/60 text-amber-300 border border-amber-500/30' : 'bg-stone-800 text-stone-400'">{{ (it as any).tipo }}</span></td>
+                  <td class="py-2.5 px-3 text-right font-mono whitespace-nowrap">
                     <span v-if="editingBomId !== (it as any).bomId">{{ (it as any).consumo_unitario }} {{ (it as any).unidad }}</span>
                     <input v-else v-model.number="editBomCantidad" type="number" step="0.1" min="0.01" class="w-20 bg-stone-950 border border-amber-500/30 rounded px-1 py-0.5 text-right font-mono text-amber-300" />
                   </td>
-                  <td class="py-2.5 px-3 text-right font-mono">
+                  <td class="py-2.5 px-3 text-right font-mono whitespace-nowrap">
                     <span v-if="editingBomId !== (it as any).bomId" class="text-stone-400">{{ (it as any).merma_pct }}%</span>
                     <span v-else class="flex items-center justify-end gap-1"><input v-model.number="editBomDesperdicio" type="number" min="0" max="100" class="w-16 bg-stone-950 border border-amber-500/30 rounded px-1 py-0.5 text-right font-mono text-amber-300" />%</span>
                   </td>
-                  <td class="py-2.5 px-3 text-right font-mono">{{ formatCOP((it as any).costo_unitario) }}</td>
-                  <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">{{ formatCOP((it as any).subtotal) }}</td>
+                  <td class="py-2.5 px-3 text-right font-mono whitespace-nowrap">{{ formatCOP((it as any).costo_unitario) }}</td>
+                  <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300 whitespace-nowrap">{{ formatCOP((it as any).subtotal) }}</td>
                   <td v-if="!isMock" class="py-2.5 px-3 text-right whitespace-nowrap">
                     <template v-if="editingBomId !== (it as any).bomId">
                       <button type="button" class="text-stone-500 hover:text-amber-400 p-1" title="Editar cantidad/desperdicio" @click="startEditBom(bomReal.find(b => b.id === (it as any).bomId)!)"><i class="pi pi-pencil text-xs" /></button>
@@ -751,20 +751,22 @@ function exportarMatriz() {
           <Button label="Exportar Planilla" icon="pi pi-file-excel" size="small" severity="warning" outlined @click="exportarMatriz" />
         </div>
         <div class="border border-stone-800 rounded-xl overflow-hidden bg-stone-950/80">
-          <table class="w-full text-left text-xs border-collapse font-mono">
-            <thead><tr class="bg-stone-900 border-b border-stone-800 text-stone-400 font-sans"><th class="py-2.5 px-3">Componente</th><th class="py-2.5 px-3 text-right">Ancho (m)</th><th class="py-2.5 px-3 text-right">Alto (m)</th><th class="py-2.5 px-3 text-right">Cant. Cms</th><th class="py-2.5 px-3 text-right">Valor Metro</th><th class="py-2.5 px-3 text-right text-amber-400">Valor Total</th></tr></thead>
+          <div class="overflow-x-auto max-h-72 overflow-y-auto">
+          <table class="w-full min-w-[760px] text-left text-xs border-collapse font-mono">
+            <thead><tr class="bg-stone-900 border-b border-stone-800 text-stone-400 font-sans"><th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Componente</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Ancho (m)</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Alto (m)</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Cant. Cms</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Valor Metro</th><th class="py-2.5 px-3 text-right text-amber-400 whitespace-nowrap">Valor Total</th></tr></thead>
             <tbody class="divide-y divide-stone-800/50 text-stone-200">
               <tr v-for="it in displayItems" :key="(it as any).id" class="hover:bg-stone-900/40 font-mono">
-                <td class="py-2 px-3 font-sans text-stone-100">{{ (it as any).nombre }}</td>
-                <td class="py-2 px-3 text-right text-stone-400">{{ ((it as any).ancho || 0.24).toFixed(2) }}</td>
-                <td class="py-2 px-3 text-right text-stone-400">{{ ((it as any).alto || 0.85).toFixed(2) }}</td>
-                <td class="py-2 px-3 text-right text-stone-300">{{ Math.round(((it as any).consumo_unitario || 1) * 100) }} cm</td>
-                <td class="py-2 px-3 text-right">{{ formatCOP((it as any).costo_unitario) }}</td>
-                <td class="py-2 px-3 text-right font-bold text-amber-300">{{ formatCOP((it as any).subtotal) }}</td>
+                <td class="py-2 px-3 font-sans text-stone-100 sticky left-0 z-10 bg-stone-900/95 min-w-[180px]">{{ (it as any).nombre }}</td>
+                <td class="py-2 px-3 text-right text-stone-400 whitespace-nowrap">{{ ((it as any).ancho || 0.24).toFixed(2) }}</td>
+                <td class="py-2 px-3 text-right text-stone-400 whitespace-nowrap">{{ ((it as any).alto || 0.85).toFixed(2) }}</td>
+                <td class="py-2 px-3 text-right text-stone-300 whitespace-nowrap">{{ Math.round(((it as any).consumo_unitario || 1) * 100) }} cm</td>
+                <td class="py-2 px-3 text-right whitespace-nowrap">{{ formatCOP((it as any).costo_unitario) }}</td>
+                <td class="py-2 px-3 text-right font-bold text-amber-300 whitespace-nowrap">{{ formatCOP((it as any).subtotal) }}</td>
               </tr>
               <tr v-if="!displayItems.length"><td colspan="6" class="py-6 text-center text-stone-500">Sin insumos para matriz</td></tr>
             </tbody>
           </table>
+          </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div class="bg-stone-900/90 border border-stone-800 rounded-xl p-3 text-center"><div class="text-[11px] uppercase font-bold text-stone-400">Costo Total Confección</div><div class="text-base font-mono font-bold text-stone-200 mt-1">{{ formatCOP(costoTotalCalculado) }}</div></div>

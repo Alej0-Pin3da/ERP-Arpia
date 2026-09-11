@@ -376,34 +376,34 @@ function getEstadoBadgeClass(estado: string) {
           </div>
 
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs border-collapse">
+            <table class="w-full min-w-[640px] text-left text-xs border-collapse">
               <thead>
                 <tr class="border-b border-stone-800 text-stone-400 bg-stone-950/40">
-                  <th class="py-2.5 px-3">Código / Cliente</th>
-                  <th class="py-2.5 px-3">Prenda Solicitada</th>
-                  <th class="py-2.5 px-3 text-center">Estado</th>
-                  <th class="py-2.5 px-3 text-right" v-if="isMock">Venta</th>
-                  <th class="py-2.5 px-3 text-right" v-if="isMock">Utilidad</th>
-                  <th class="py-2.5 px-3 text-right" v-if="isMock">Margen</th>
+                  <th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95">Código / Cliente</th>
+                  <th class="py-2.5 px-3 min-w-[180px]">Prenda Solicitada</th>
+                  <th class="py-2.5 px-3 text-center whitespace-nowrap">Estado</th>
+                  <th class="py-2.5 px-3 text-right whitespace-nowrap" v-if="isMock">Venta</th>
+                  <th class="py-2.5 px-3 text-right whitespace-nowrap" v-if="isMock">Utilidad</th>
+                  <th class="py-2.5 px-3 text-right whitespace-nowrap" v-if="isMock">Margen</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-stone-800/50 text-stone-200">
                 <tr v-for="p in pedidosTabla.slice(0, 6)" :key="p.id" class="hover:bg-stone-800/30">
-                  <td class="py-2.5 px-3">
+                  <td class="py-2.5 px-3 sticky left-0 z-10 bg-stone-900/95">
                     <div class="font-mono font-bold text-amber-300">{{ p.codigo }}</div>
                     <div class="text-[11px] text-stone-400 truncate max-w-[130px]">{{ p.cliente_nombre }}</div>
                   </td>
-                  <td class="py-2.5 px-3 font-medium text-stone-100 max-w-[180px] truncate">
+                  <td class="py-2.5 px-3 font-medium text-stone-100 max-w-[180px] truncate min-w-[180px]">
                     {{ p.prenda_nombre }}
                   </td>
-                  <td class="py-2.5 px-3 text-center">
+                  <td class="py-2.5 px-3 text-center whitespace-nowrap">
                     <span :class="['px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider', getEstadoBadgeClass(p.estado)]">
                       {{ p.estado }}
                     </span>
                   </td>
-                  <td v-if="isMock" class="py-2.5 px-3 text-right font-mono">{{ formatCOP(p.precio_venta) }}</td>
-                  <td v-if="isMock" class="py-2.5 px-3 text-right font-mono font-bold text-emerald-400">{{ formatCOP(p.utilidad_neta) }}</td>
-                  <td v-if="isMock" class="py-2.5 px-3 text-right font-mono text-stone-300">{{ p.margen_pct }}%</td>
+                  <td v-if="isMock" class="py-2.5 px-3 text-right font-mono whitespace-nowrap">{{ formatCOP(p.precio_venta) }}</td>
+                  <td v-if="isMock" class="py-2.5 px-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">{{ formatCOP(p.utilidad_neta) }}</td>
+                  <td v-if="isMock" class="py-2.5 px-3 text-right font-mono text-stone-300 whitespace-nowrap">{{ p.margen_pct }}%</td>
                 </tr>
               </tbody>
             </table>

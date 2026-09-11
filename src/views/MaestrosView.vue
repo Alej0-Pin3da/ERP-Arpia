@@ -1088,16 +1088,16 @@ function formatoCOP(val: number) {
 
         <div class="bg-stone-900/40 border border-stone-800 rounded-xl overflow-hidden shadow-lg">
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs font-mono">
+            <table class="w-full min-w-[760px] text-left text-xs font-mono">
               <thead class="bg-stone-950/80 text-stone-400 uppercase tracking-wider border-b border-stone-800">
                 <tr>
-                  <th class="py-3 px-4">Talla</th>
-                  <th class="py-3 px-4">Contorno Busto</th>
-                  <th class="py-3 px-4">Contorno Cintura</th>
-                  <th class="py-3 px-4">Contorno Cadera</th>
-                  <th class="py-3 px-4">Reducción Corset</th>
-                  <th class="py-3 px-4">Descripción de Silueta</th>
-                  <th class="py-3 px-4 text-right">Acciones</th>
+                  <th class="py-3 px-4 sticky left-0 z-10 bg-stone-950/95">Talla</th>
+                  <th class="py-3 px-4 text-center whitespace-nowrap">Contorno Busto</th>
+                  <th class="py-3 px-4 text-center whitespace-nowrap">Contorno Cintura</th>
+                  <th class="py-3 px-4 text-center whitespace-nowrap">Contorno Cadera</th>
+                  <th class="py-3 px-4 whitespace-nowrap">Reducción Corset</th>
+                  <th class="py-3 px-4 min-w-[180px]">Descripción de Silueta</th>
+                  <th class="py-3 px-4 text-right whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-stone-800/60 text-stone-200">
@@ -1106,16 +1106,16 @@ function formatoCOP(val: number) {
                   :key="t.id"
                   class="hover:bg-stone-800/30 transition-colors"
                 >
-                  <td class="py-3.5 px-4 font-bold text-amber-400 flex items-center gap-2">
+                  <td class="py-3.5 px-4 font-bold text-amber-400 flex items-center gap-2 sticky left-0 z-10 bg-stone-900/95">
                     <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                     <span>{{ t.talla }}</span>
                   </td>
-                  <td class="py-3.5 px-4">{{ t.busto }}</td>
-                  <td class="py-3.5 px-4">{{ t.cintura }}</td>
-                  <td class="py-3.5 px-4">{{ t.cadera }}</td>
-                  <td class="py-3.5 px-4 text-emerald-400">{{ t.reduccion_corset }}</td>
-                  <td class="py-3.5 px-4 text-stone-400">{{ t.descripcion }}</td>
-                  <td class="py-3.5 px-4 text-right">
+                  <td class="py-3.5 px-4 whitespace-nowrap">{{ t.busto }}</td>
+                  <td class="py-3.5 px-4 whitespace-nowrap">{{ t.cintura }}</td>
+                  <td class="py-3.5 px-4 whitespace-nowrap">{{ t.cadera }}</td>
+                  <td class="py-3.5 px-4 text-emerald-400 whitespace-nowrap">{{ t.reduccion_corset }}</td>
+                  <td class="py-3.5 px-4 text-stone-400 min-w-[180px]">{{ t.descripcion }}</td>
+                  <td class="py-3.5 px-4 text-right whitespace-nowrap">
                     <div class="flex items-center justify-end gap-2">
                       <button
                         :id="`btn-editar-talla-${t.id}`"

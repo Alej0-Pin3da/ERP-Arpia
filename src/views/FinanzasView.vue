@@ -699,17 +699,17 @@ function imprimirBalance() {
       <!-- Liquidaciones Table -->
       <div class="rounded-2xl border border-stone-800 bg-stone-900/40 backdrop-blur-sm overflow-hidden">
         <div class="overflow-x-auto">
-          <table class="w-full text-xs text-left border-collapse">
+          <table class="w-full min-w-[900px] text-xs text-left border-collapse">
             <thead>
               <tr class="bg-stone-950/90 border-b border-stone-800 text-[10px] font-mono uppercase text-stone-400">
-                <th class="py-3 px-4">Código & Periodo</th>
-                <th class="py-3 px-3 text-right">Ventas Brutas</th>
-                <th class="py-3 px-3 text-right">Costos / Gastos</th>
-                <th class="py-3 px-3 text-right">Utilidad Neta</th>
-                <th class="py-3 px-3 text-center">Fondo Taller (40%)</th>
-                <th v-for="(s, i) in sociasReparto" :key="(s as any).id" class="py-3 px-3 text-center">{{ (s as any).nombre }} ({{ porcentajeSociaReparto(i, 30) }}%)</th>
-                <th class="py-3 px-3 text-center">Estado</th>
-                <th class="py-3 px-4 text-center">Acciones</th>
+                <th class="py-3 px-4 sticky left-0 z-10 bg-stone-950/95">Código & Periodo</th>
+                <th class="py-3 px-3 text-right whitespace-nowrap">Ventas Brutas</th>
+                <th class="py-3 px-3 text-right whitespace-nowrap">Costos / Gastos</th>
+                <th class="py-3 px-3 text-right whitespace-nowrap">Utilidad Neta</th>
+                <th class="py-3 px-3 text-center whitespace-nowrap">Fondo Taller (40%)</th>
+                <th v-for="(s, i) in sociasReparto" :key="(s as any).id" class="py-3 px-3 text-center whitespace-nowrap">{{ (s as any).nombre }} ({{ porcentajeSociaReparto(i, 30) }}%)</th>
+                <th class="py-3 px-3 text-center whitespace-nowrap">Estado</th>
+                <th class="py-3 px-4 text-center whitespace-nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-stone-800/60 font-mono">
@@ -718,22 +718,22 @@ function imprimirBalance() {
                 :key="l.id"
                 class="hover:bg-stone-800/30 transition-colors"
               >
-                <td class="py-3.5 px-4">
+                <td class="py-3.5 px-4 sticky left-0 z-10 bg-stone-900/95">
                   <div class="font-bold text-amber-300 font-serif text-sm">{{ l.codigo }}</div>
                   <div class="text-stone-200 text-xs font-sans mt-0.5">{{ l.periodo }}</div>
                   <div class="text-[10px] text-stone-500">Cierre: {{ l.fecha_cierre }}</div>
                 </td>
 
-                <td class="py-3.5 px-3 text-right font-bold text-stone-100">
+                <td class="py-3.5 px-3 text-right font-bold text-stone-100 whitespace-nowrap">
                   {{ formatCOP(l.total_ventas_brutas) }}
                 </td>
 
-                <td class="py-3.5 px-3 text-right text-stone-400 text-[11px]">
+                <td class="py-3.5 px-3 text-right text-stone-400 text-[11px] whitespace-nowrap">
                   <div>-{{ formatCOP(l.costo_taller_insumos) }} ins.</div>
                   <div>-{{ formatCOP(l.gastos_operativos) }} gast.</div>
                 </td>
 
-                <td class="py-3.5 px-3 text-right font-bold text-emerald-400 text-sm">
+                <td class="py-3.5 px-3 text-right font-bold text-emerald-400 text-sm whitespace-nowrap">
                   {{ formatCOP(l.utilidad_neta_total) }}
                 </td>
 
@@ -953,32 +953,32 @@ function imprimirBalance() {
       <!-- Anticipos Table -->
       <div class="rounded-2xl border border-stone-800 bg-stone-900/40 backdrop-blur-sm overflow-hidden">
         <div class="overflow-x-auto">
-          <table class="w-full text-xs text-left border-collapse font-mono">
+          <table class="w-full min-w-[760px] text-xs text-left border-collapse font-mono">
             <thead>
               <tr class="bg-stone-950/90 border-b border-stone-800 text-[10px] uppercase text-stone-400">
-                <th class="py-3 px-4">Fecha & Socia</th>
-                <th class="py-3 px-4">Concepto / Motivo</th>
-                <th class="py-3 px-3 text-right">Monto Anticipo</th>
-                <th class="py-3 px-3">Método & Comprobante</th>
-                <th class="py-3 px-3 text-center">Estado</th>
-                <th class="py-3 px-4 text-center">Acciones</th>
+                <th class="py-3 px-4 sticky left-0 z-10 bg-stone-950/95">Fecha & Socia</th>
+                <th class="py-3 px-4 min-w-[180px]">Concepto / Motivo</th>
+                <th class="py-3 px-3 text-right whitespace-nowrap">Monto Anticipo</th>
+                <th class="py-3 px-3 whitespace-nowrap">Método & Comprobante</th>
+                <th class="py-3 px-3 text-center whitespace-nowrap">Estado</th>
+                <th class="py-3 px-4 text-center whitespace-nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-stone-800/60">
               <tr v-for="a in anticiposFiltrados" :key="a.id" class="hover:bg-stone-800/30">
-                <td class="py-3.5 px-4">
+                <td class="py-3.5 px-4 sticky left-0 z-10 bg-stone-900/95">
                   <div class="font-serif font-bold text-stone-100 text-xs">{{ a.nombre_socia }}</div>
                   <div class="text-[10px] text-stone-400">Fecha: {{ a.fecha }}</div>
                 </td>
 
-                <td class="py-3.5 px-4 font-sans text-stone-300">
+                <td class="py-3.5 px-4 font-sans text-stone-300 min-w-[180px]">
                   <div>{{ a.concepto }}</div>
                   <div v-if="a.observaciones" class="text-[10px] text-stone-500 italic mt-0.5">
                     {{ a.observaciones }}
                   </div>
                 </td>
 
-                <td class="py-3.5 px-3 text-right font-bold text-rose-400 text-sm">
+                <td class="py-3.5 px-3 text-right font-bold text-rose-400 text-sm whitespace-nowrap">
                   {{ formatCOP(a.monto) }}
                 </td>
 
@@ -989,7 +989,7 @@ function imprimirBalance() {
                   </div>
                 </td>
 
-                <td class="py-3.5 px-3 text-center">
+                <td class="py-3.5 px-3 text-center whitespace-nowrap">
                   <span
                     class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
                     :class="{
@@ -1002,7 +1002,7 @@ function imprimirBalance() {
                   </span>
                 </td>
 
-                <td class="py-3.5 px-4 text-center">
+                <td class="py-3.5 px-4 text-center whitespace-nowrap">
                   <div class="flex items-center justify-center gap-1">
                     <Button
                       v-if="a.estado === 'PENDIENTE_DESCUENTO'"
@@ -1102,23 +1102,23 @@ function imprimirBalance() {
 
       <div v-else class="rounded-2xl border border-stone-800 bg-stone-900/40 backdrop-blur-sm overflow-hidden">
         <div class="overflow-x-auto">
-          <table class="w-full text-xs text-left border-collapse font-mono">
+          <table class="w-full min-w-[640px] text-xs text-left border-collapse font-mono">
             <thead>
               <tr class="bg-stone-950/90 border-b border-stone-800 text-[10px] uppercase text-stone-400">
-                <th class="py-3 px-4">Fecha</th>
-                <th class="py-3 px-4">Tipo</th>
-                <th class="py-3 px-4">Descripción</th>
-                <th class="py-3 px-3 text-right">Monto</th>
-                <th class="py-3 px-3 text-center">Estado</th>
+                <th class="py-3 px-4 sticky left-0 z-10 bg-stone-950/95 whitespace-nowrap">Fecha</th>
+                <th class="py-3 px-4 whitespace-nowrap">Tipo</th>
+                <th class="py-3 px-4 min-w-[180px]">Descripción</th>
+                <th class="py-3 px-3 text-right whitespace-nowrap">Monto</th>
+                <th class="py-3 px-3 text-center whitespace-nowrap">Estado</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-stone-800/60">
               <tr v-for="m in movimientosFiltrados" :key="m.id" class="hover:bg-stone-800/30">
-                <td class="py-3 px-4 text-stone-300">{{ m.fecha }}</td>
-                <td class="py-3 px-4 text-amber-300 font-bold">{{ m.tipo }}</td>
-                <td class="py-3 px-4 text-stone-300">{{ m.descripcion }}</td>
-                <td class="py-3 px-3 text-right font-bold text-stone-100">{{ formatCOP(Number(m.monto ?? 0)) }}</td>
-                <td class="py-3 px-3 text-center">
+                <td class="py-3 px-4 text-stone-300 sticky left-0 z-10 bg-stone-900/95 whitespace-nowrap">{{ m.fecha }}</td>
+                <td class="py-3 px-4 text-amber-300 font-bold whitespace-nowrap">{{ m.tipo }}</td>
+                <td class="py-3 px-4 text-stone-300 min-w-[180px]">{{ m.descripcion }}</td>
+                <td class="py-3 px-3 text-right font-bold text-stone-100 whitespace-nowrap">{{ formatCOP(Number(m.monto ?? 0)) }}</td>
+                <td class="py-3 px-3 text-center whitespace-nowrap">
                   <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border"
                     :class="m.estado === 'confirmed' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : m.estado === 'draft' ? 'bg-stone-800 text-stone-400 border-stone-700' : 'bg-rose-950 text-rose-400 border-rose-800'">
                     {{ m.estado }}

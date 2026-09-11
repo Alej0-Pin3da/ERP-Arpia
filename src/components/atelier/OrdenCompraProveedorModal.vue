@@ -187,23 +187,23 @@ async function abastecerInventario() {
 
       <!-- Materials List -->
       <div class="overflow-x-auto border border-stone-800 rounded-xl bg-stone-950/60 max-h-72 overflow-y-auto">
-        <table class="w-full text-xs text-left border-collapse">
+        <table class="w-full min-w-[760px] text-xs text-left border-collapse">
           <thead>
             <tr class="border-b border-stone-800 bg-stone-900/80 text-stone-400 font-mono uppercase text-[11px] sticky top-0 z-10">
-              <th class="py-2.5 px-3">Código</th>
-              <th class="py-2.5 px-3">Insumo Textil</th>
-              <th class="py-2.5 px-3">Proveedor</th>
-              <th class="py-2.5 px-3">Stock Actual</th>
-              <th class="py-2.5 px-3">Cant. a Pedir</th>
-              <th class="py-2.5 px-3 text-right">Subtotal</th>
+              <th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95 whitespace-nowrap">Código</th>
+              <th class="py-2.5 px-3 min-w-[180px]">Insumo Textil</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Proveedor</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Stock Actual</th>
+              <th class="py-2.5 px-3 whitespace-nowrap">Cant. a Pedir</th>
+              <th class="py-2.5 px-3 text-right whitespace-nowrap">Subtotal</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-stone-800/60 font-mono">
             <tr v-for="item in itemsFiltrados" :key="item.id" class="hover:bg-stone-900/40">
-              <td class="py-2.5 px-3 text-amber-400 font-bold">{{ item.codigo }}</td>
-              <td class="py-2.5 px-3 text-stone-200 font-sans font-medium">{{ item.nombre }}</td>
-              <td class="py-2.5 px-3 text-stone-400">{{ item.proveedor }}</td>
-              <td class="py-2.5 px-3">
+              <td class="py-2.5 px-3 text-amber-400 font-bold sticky left-0 z-10 bg-stone-900/95 whitespace-nowrap">{{ item.codigo }}</td>
+              <td class="py-2.5 px-3 text-stone-200 font-sans font-medium min-w-[180px]">{{ item.nombre }}</td>
+              <td class="py-2.5 px-3 text-stone-400 whitespace-nowrap">{{ item.proveedor }}</td>
+              <td class="py-2.5 px-3 whitespace-nowrap">
                 <span :class="item.stock_actual <= item.stock_minimo ? 'text-red-400 font-bold' : 'text-amber-300'">
                   {{ item.stock_actual }} {{ item.unidad_medida }}
                 </span>
@@ -217,7 +217,7 @@ async function abastecerInventario() {
                   class="w-full text-xs"
                 />
               </td>
-              <td class="py-2.5 px-3 text-right text-stone-200 font-bold">
+              <td class="py-2.5 px-3 text-right text-stone-200 font-bold whitespace-nowrap">
                 {{ formatCOP(item.cantidad_pedir * item.costo_unitario) }}
               </td>
             </tr>

@@ -82,33 +82,35 @@ async function generarOrden() {
       </div>
 
       <div class="border border-stone-800 rounded-xl overflow-hidden bg-stone-900/50">
-        <table class="w-full text-left text-xs border-collapse">
+        <div class="overflow-x-auto max-h-72 overflow-y-auto">
+        <table class="w-full min-w-[640px] text-left text-xs border-collapse">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 bg-stone-950/50">
-              <th class="py-2.5 px-3">Insumo / Proveedor</th>
-              <th class="py-2.5 px-3 text-right">Stock Actual</th>
-              <th class="py-2.5 px-3 text-right">Mínimo</th>
-              <th class="py-2.5 px-3 text-right">Sugerido</th>
-              <th class="py-2.5 px-3 text-right">Total Est.</th>
+              <th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Insumo / Proveedor</th>
+              <th class="py-2.5 px-3 text-right whitespace-nowrap">Stock Actual</th>
+              <th class="py-2.5 px-3 text-right whitespace-nowrap">Mínimo</th>
+              <th class="py-2.5 px-3 text-right whitespace-nowrap">Sugerido</th>
+              <th class="py-2.5 px-3 text-right whitespace-nowrap">Total Est.</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-stone-800/50 text-stone-200">
             <tr v-for="it in criticos" :key="it.id" class="hover:bg-stone-800/30">
-              <td class="py-2.5 px-3">
+              <td class="py-2.5 px-3 sticky left-0 z-10 bg-stone-900/95 min-w-[180px]">
                 <div class="font-medium text-stone-100">{{ it.nombre }}</div>
                 <div class="text-[11px] text-stone-400">{{ it.proveedor ?? it.nombre_categoria ?? '—' }}</div>
               </td>
-              <td class="py-2.5 px-3 text-right font-mono text-red-400 font-bold">{{ it.stock_actual }} {{ it.unidad_medida }}</td>
-              <td class="py-2.5 px-3 text-right font-mono text-stone-400">{{ it.stock_minimo }} {{ it.unidad_medida }}</td>
-              <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300">
+              <td class="py-2.5 px-3 text-right font-mono text-red-400 font-bold whitespace-nowrap">{{ it.stock_actual }} {{ it.unidad_medida }}</td>
+              <td class="py-2.5 px-3 text-right font-mono text-stone-400 whitespace-nowrap">{{ it.stock_minimo }} {{ it.unidad_medida }}</td>
+              <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300 whitespace-nowrap">
                 +{{ (it.stock_minimo * 2 - it.stock_actual).toFixed(1) }} {{ it.unidad_medida }}
               </td>
-              <td class="py-2.5 px-3 text-right font-mono font-bold">
+              <td class="py-2.5 px-3 text-right font-mono font-bold whitespace-nowrap">
                 ${{ Math.round((it.stock_minimo * 2 - it.stock_actual) * Number(it.costo_unitario ?? it.costo_promedio_actual ?? 0)).toLocaleString('es-CO') }}
               </td>
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
 
       <div class="flex justify-between items-center bg-stone-950/80 border border-stone-800 rounded-xl p-3 text-xs">
