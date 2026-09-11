@@ -152,15 +152,17 @@ function guardar() {
     modal
     header="🧵 Registrar Nuevo Insumo / Materia Prima"
     :style="{ width: '90vw', maxWidth: '640px' }"
+    :breakpoints="{ '640px': '95vw' }"
+    :content-style="{ overflowX: 'hidden', maxWidth: '100%' }"
     @update:visible="(v) => emit('update:visible', v)"
   >
-    <div class="space-y-4 pt-1">
+    <div class="min-w-0 max-w-full space-y-4 overflow-x-hidden pt-1">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
+        <div class="min-w-0">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Código Referencia</label>
           <InputText v-model="codigo" placeholder="Ej: TEL-TUL-200" class="w-full font-mono" />
         </div>
-        <div>
+        <div class="min-w-0">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Tipo de Insumo</label>
           <Dropdown v-model="tipo" :options="tiposOptions" option-label="label" option-value="value" class="w-full" />
         </div>
@@ -172,43 +174,43 @@ function guardar() {
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div v-if="isMock">
+        <div v-if="isMock" class="min-w-0">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Categoría</label>
           <Dropdown v-model="categoria" :options="categoriasOptions" class="w-full" />
         </div>
-        <div v-else>
+        <div v-else class="min-w-0">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Categoría *</label>
           <Dropdown v-model="categoriaId" :options="categoriasRealOptions" option-label="label" option-value="value" placeholder="Seleccionar categoría..." class="w-full" />
         </div>
-        <div>
+        <div class="min-w-0">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Unidad de Medida</label>
           <Dropdown v-model="unidadMedida" :options="unidadesOptions" option-label="label" option-value="value" class="w-full" />
         </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
+        <div class="min-w-0">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Ubicación en Taller</label>
           <InputText v-model="ubicacion" placeholder="Ej: Estante Telas Atenea A1" class="w-full" />
         </div>
-        <div v-if="isMock">
+        <div v-if="isMock" class="min-w-0">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Proveedor Habitual</label>
           <InputText v-model="proveedor" placeholder="Ej: Atenea Bordados y Encajes" class="w-full" />
         </div>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Stock Inicial</label>
-          <InputNumber v-model="stockActual" :min="0" :max-fraction-digits="2" class="w-full" />
+        <div class="min-w-0">
+          <label title="Stock Inicial" class="block truncate text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Stock Inicial</label>
+          <InputNumber v-model="stockActual" :min="0" :max-fraction-digits="2" class="w-full" input-class="w-full" />
         </div>
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Stock Mínimo (Alerta)</label>
-          <InputNumber v-model="stockMinimo" :min="0" :max-fraction-digits="2" class="w-full" />
+        <div class="min-w-0">
+          <label title="Stock Mínimo (Alerta)" class="block truncate text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Stock Mínimo (Alerta)</label>
+          <InputNumber v-model="stockMinimo" :min="0" :max-fraction-digits="2" class="w-full" input-class="w-full" />
         </div>
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Costo Unitario ($)</label>
-          <InputNumber v-model="costoUnitario" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full" />
+        <div class="min-w-0">
+          <label title="Costo Unitario ($)" class="block truncate text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Costo Unitario ($)</label>
+          <InputNumber v-model="costoUnitario" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full" input-class="w-full" />
         </div>
       </div>
 

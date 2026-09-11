@@ -3,6 +3,12 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-08] - Fix overlap campos numéricos + scrollbar horizontal en modales de insumo (ruta delegada directa)
+
+- **Causa raíz:** el trío numérico (`Stock Actual/Stock Inicial`, `Stock Mínimo (Alerta)`, `Costo Unitario ($)`) usaba `grid sm:grid-cols-3` sin `min-w-0` en las celdas (los grid items con `min-width: auto` no encogen y el contenido empuja), y `class="w-full"` en `<InputNumber>` solo dimensiona el wrapper `.p-inputnumber` — el `<input>` interno de PrimeVue 4.5.5 conserva su ancho intrínseco (peor con formato moneda COP `$ 18.800`). En un diálogo de 640px con padding de 1.5rem cada columna queda en ~180px y los inputs se solapan; el desborde generaba el scrollbar horizontal.
+- **`src/components/atelier/EditarInsumoModal.vue` + `src/components/atelier/NuevoInsumoModal.vue` (mismo fix en ambos, layout compartido):** celdas del trío y de los grids de 2 columnas con `min-w-0`; `input-class="w-full"` en los tres `InputNumber` (prop nativo v4, pasa la clase al `<input>` interno); labels del trío con `truncate` + `title` (texto español intacto, tooltip con el nombre completo); wrapper del contenido con `min-w-0 max-w-full overflow-x-hidden`; `Dialog` con `:breakpoints="{ '640px': '95vw' }"` y `:content-style="{ overflowX: 'hidden', maxWidth: '100%' }"`. Estilo stone/amber, validación, payloads y lógica modal intactos; código/comentarios en inglés, labels UI en español.
+- Verificación: `npm run build` OK (410 módulos, ~3.4s). Sin tocar backend, mapping ni lógica de modales. Sin commit/push.
+
 ---
 
 ### [2026-08-23] — V3.0.0: Módulo Integral de Catálogos & Parámetros Maestros (Full CRUD)
