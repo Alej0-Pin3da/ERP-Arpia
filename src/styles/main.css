@@ -535,3 +535,63 @@ h1, h2, h3, h4, h5, h6 {
   flex-wrap: wrap;
 }
 
+/* ---------------------------------------------------------------------
+   ResponsiveTable shared pattern — pilot (InventarioView, VentasView).
+   Single source for the desktop <table> + mobile cards duplication.
+   Migration path for the remaining 9 views + 7 modals: wrap the existing
+   desktop table block in <ResponsiveTable min-width="900"><template
+   #desktop> and move the mobile md:hidden block into <template #mobile>
+   (dropping only the visibility classes, which now live in the component).
+   Keep all sorting, filters and handlers as-is. Do NOT restyle inner cells
+   during migration — adopt .card-mobile / .card-title only when the view is
+   ready for a visual pass.
+ * ------------------------------------------------------------------- */
+.table-scroll {
+  overflow-x: auto;
+}
+
+/* Fallback min-width for desktop tables; pilot views keep their explicit
+   min-w-[...] class so desktop rendering is pixel-identical. */
+.table-scroll > table {
+  min-width: var(--rt-min-width, 900px);
+}
+
+/* Sticky first column (position only — keep the bg-* class inline per view
+   so the sticky cell stays opaque over scrolled content). */
+.th-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+}
+
+/* Mobile cards container: stacks cards, never scrolls sideways. */
+.rt-mobile {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.rt-mobile > * + * {
+  margin-top: 0.75rem;
+}
+
+/* Opt-in card primitives for future migrations (visual pass only). */
+.card-mobile {
+  min-width: 0;
+  border: 1px solid var(--arpia-border);
+  border-radius: var(--arpia-radius-xl);
+  background: rgba(12, 12, 14, 0.7);
+  padding: 1rem;
+}
+
+.card-mobile > * + * {
+  margin-top: 0.5rem;
+}
+
+.card-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--arpia-text-primary);
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+

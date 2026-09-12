@@ -7,6 +7,7 @@ import Dialog from 'primevue/dialog'
 import { useAtelierStore, type VentaAtelier } from '@/stores/atelier'
 import NuevaVentaModal from '@/components/atelier/NuevaVentaModal.vue'
 import DetalleVentaModal from '@/components/atelier/DetalleVentaModal.vue'
+import ResponsiveTable from '@/components/ResponsiveTable.vue'
 import { showToast } from '@/utils/toast'
 import { useMode } from '@/composables/useMode'
 import { useVentas } from '@/composables/useVentas'
@@ -460,11 +461,12 @@ function exportarCSV() {
       </div>
 
       <template v-else>
-      <div class="hidden overflow-x-auto md:block">
-        <table class="w-full min-w-[900px] text-xs text-left border-collapse font-mono">
+      <ResponsiveTable min-width="900">
+        <template #desktop>
+          <table class="w-full min-w-[900px] text-xs text-left border-collapse font-mono">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 text-[11px] uppercase tracking-wider">
-              <th class="py-3 px-3 sticky left-0 z-10 bg-stone-950/95">Venta / Fecha</th>
+              <th class="py-3 px-3 th-sticky bg-stone-950/95">Venta / Fecha</th>
               <th class="py-3 px-3">Cliente & Canal</th>
               <th class="py-3 px-3 min-w-[180px]">Prendas / Artículos</th>
               <th class="py-3 px-3 text-right whitespace-nowrap">Descuento</th>
@@ -481,7 +483,7 @@ function exportarCSV() {
               class="hover:bg-stone-800/40 transition group"
             >
               <!-- Code & Date -->
-              <td class="py-3.5 px-3 sticky left-0 z-10 bg-stone-900/95">
+              <td class="py-3.5 px-3 th-sticky bg-stone-900/95">
                 <div class="flex items-center gap-2">
                   <span class="font-bold text-amber-400 tracking-wide text-xs">
                     {{ v.codigo }}
@@ -600,9 +602,10 @@ function exportarCSV() {
             </tr>
           </tbody>
         </table>
-      </div>
-      <!-- Mobile cards: same ventasFiltradas so search/filter/sort still apply. No horizontal scroll. -->
-      <div class="space-y-3 md:hidden max-w-full min-w-0">
+        </template>
+        <!-- Mobile cards: same ventasFiltradas so search/filter/sort still apply. No horizontal scroll. -->
+        <template #mobile>
+          <div class="space-y-3 max-w-full min-w-0">
         <div v-for="v in ventasFiltradas" :key="v.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
           <div class="flex items-start justify-between gap-2 min-w-0">
             <div class="font-bold text-sm text-stone-100 min-w-0">{{ v.cliente_nombre }}</div>
@@ -632,7 +635,9 @@ function exportarCSV() {
             <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg border border-rose-800 text-rose-400" title="Eliminar Venta" @click="solicitarEliminarVenta(v)"><i class="pi pi-trash text-xs" /></button>
           </div>
         </div>
-      </div>
+          </div>
+        </template>
+      </ResponsiveTable>
       </template>
     </div>
 

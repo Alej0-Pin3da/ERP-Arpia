@@ -3,6 +3,12 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-12] - Patrón compartido ResponsiveTable + CSS utilities, piloto Inventario/Ventas (ruta delegada directa)
+
+- **Deuda:** 23 tablas duplicadas desktop + cards (cambio futuro x2). Nuevo `src/components/ResponsiveTable.vue` (slots `#desktop`/`#mobile`, prop `minWidth`) + utilidades `.table-scroll`/`.th-sticky`/`.rt-mobile` en `main.css`.
+- **Piloto:** Inventario y Ventas migrados verbatim (sorting, filtros y handlers intactos). Resto (9 vistas + 7 modales) con guía de migración en el componente, uno por cambio.
+- Verificación: `npm run build` OK.
+
 ### [2026-09-12] - Higiene repo: ignora .idea/, CSV VALQUI y DDL.sql (ruta directa)
 
 - **Problema:** `git status` con ruido — `.idea/` parcialmente ignorado (lista frágil por archivo), CSV de trabajo y dump local `DDL.sql` (43KB, lo canónico es alembic) como untracked.

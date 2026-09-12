@@ -13,6 +13,7 @@ import CompraInsumoModal from '@/components/atelier/CompraInsumoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
 import OrdenCompraProveedorModal from '@/components/atelier/OrdenCompraProveedorModal.vue'
 import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
+import ResponsiveTable from '@/components/ResponsiveTable.vue'
 import { showToast } from '@/utils/toast'
 
 const atelier = useAtelierStore()
@@ -393,11 +394,12 @@ function solicitarEliminar(item: InsumoAtelier) {
 
     <!-- Data Table (desktop) + Cards (mobile) -->
     <div class="bg-stone-900/80 border border-stone-800 rounded-2xl overflow-hidden shadow-xl">
-      <div class="hidden overflow-x-auto md:block">
-        <table class="w-full min-w-[900px] text-left text-xs border-collapse">
+      <ResponsiveTable min-width="900">
+        <template #desktop>
+          <table class="w-full min-w-[900px] text-left text-xs border-collapse">
           <thead>
             <tr class="border-b border-stone-800 text-stone-400 bg-stone-950/60 uppercase tracking-wider font-semibold">
-              <th scope="col" class="py-3 px-3.5 sticky left-0 z-10 bg-stone-950/95" :aria-sort="getAriaSort('nombre')">
+              <th scope="col" class="py-3 px-3.5 th-sticky bg-stone-950/95" :aria-sort="getAriaSort('nombre')">
                 <button
                   type="button"
                   class="inline-flex items-center gap-1 uppercase tracking-wider font-semibold hover:text-amber-300 transition select-none"
@@ -470,7 +472,7 @@ function solicitarEliminar(item: InsumoAtelier) {
           <tbody class="divide-y divide-stone-800/50 text-stone-200">
             <tr v-for="it in insumosFiltrados" :key="it.id" class="hover:bg-stone-800/30">
               <!-- Code & Title -->
-              <td class="py-3 px-3.5 max-w-xs sticky left-0 z-10 bg-stone-900/95">
+              <td class="py-3 px-3.5 max-w-xs th-sticky bg-stone-900/95">
                 <div class="font-bold text-stone-100 text-xs">{{ it.nombre }}</div>
                 <div class="font-mono text-[11px] text-amber-400 font-semibold">{{ it.codigo }}</div>
                 <div class="text-[11px] text-stone-400 truncate mt-0.5">{{ it.descripcion }}</div>
@@ -583,10 +585,11 @@ function solicitarEliminar(item: InsumoAtelier) {
               </td>
             </tr>
           </tbody>
-        </table>
-      </div>
-      <!-- Mobile cards: same insumosFiltrados so search/filter/sort still apply. No horizontal scroll. -->
-      <div class="space-y-3 p-4 md:hidden max-w-full min-w-0">
+          </table>
+        </template>
+        <!-- Mobile cards: same insumosFiltrados so search/filter/sort still apply. No horizontal scroll. -->
+        <template #mobile>
+          <div class="space-y-3 p-4 max-w-full min-w-0">
         <div class="flex flex-wrap gap-1.5">
           <span class="w-full text-xs uppercase tracking-wider text-stone-500 font-bold">Ordenar:</span>
           <button type="button" class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition min-h-[40px]" :class="sortField === 'nombre' ? 'bg-amber-500 text-stone-950 border-amber-500' : 'bg-stone-950 text-stone-300 border-stone-800'" @click="toggleSort('nombre')">Insumo {{ sortIndicator('nombre') }}</button>
@@ -628,7 +631,9 @@ function solicitarEliminar(item: InsumoAtelier) {
             <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg border border-stone-700 text-stone-400" title="Eliminar Insumo" @click="solicitarEliminar(it)"><i class="pi pi-trash text-xs" /></button>
           </div>
         </div>
-      </div>
+          </div>
+        </template>
+      </ResponsiveTable>
     </div>
 
     <!-- Modals -->
