@@ -3,6 +3,11 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-12] - Higiene repo: ignora .idea/, CSV VALQUI y DDL.sql (ruta directa)
+
+- **Problema:** `git status` con ruido — `.idea/` parcialmente ignorado (lista frágil por archivo), CSV de trabajo y dump local `DDL.sql` (43KB, lo canónico es alembic) como untracked.
+- **Fix:** `.gitignore` con `.idea/` completo, `ARPIA - INVERSION VALQUI (1).csv` + `*.csv`, `DDL.sql`. Status limpio.
+
 ### [2026-09-11] - Fix corte derecho global: grid blowout + header + overflow-x clip (ruta delegada directa)
 
 - **Causa:** `grid-template-columns: 268px 1fr` (`1fr` = `minmax(auto,1fr)`) sin `min-width:0` en header/main/wrapper + header flex sin shrink + sin contención `overflow-x` a nivel página → cualquier hijo ancho estiraba el viewport a 360px en todas las vistas.

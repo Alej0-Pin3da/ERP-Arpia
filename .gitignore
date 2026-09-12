@@ -19,18 +19,19 @@ dist/
 # Docker
 postgres_data/
 
+# IDE local (WebStorm/PyCharm)
+.idea/
+
 # Datos de negocio locales (hoja de cálculo de trabajo, no código)
 ARPIA.xlsx
+ARPIA - INVERSION VALQUI (1).csv
+*.csv
+# Dump local de DB (lo canónico son las migraciones alembic, no el dump)
+DDL.sql
 # Reportes generados por el pipeline de migración
 backend/migrate/reports/
 # CodeGraph local index (machine-local, regenerable)
 .codegraph/
-.idea/.gitignore
-.idea/ERP-Arpia.iml
-.idea/modules.xml
-.idea/prettier.xml
-.idea/vcs.xml
-.idea/inspectionProfiles/profiles_settings.xml
 
 # Logs efímeros de verify/build (no commitear)
 backend_tests*.txt
