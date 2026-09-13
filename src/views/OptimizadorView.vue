@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useInsumos } from '@/composables/useInsumos'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
-import { useAtelierStore } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 
 interface PrendaTendido {
@@ -16,19 +14,15 @@ interface PrendaTendido {
   metros_unitario: number
 }
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const insumosApi = useInsumos()
-const insumosReal = ref<any[]>([])
-async function cargarInsumosOptimizador() {
-  if (isMock.value) return
+const insumos = ref<any[]>([])
+async function cargarInsumos() {
   try {
     const r = await insumosApi.list({ limit: 100 })
-    insumosReal.value = (r as any).items ?? []
-  } catch { insumosReal.value = [] }
+    insumos.value = (r as any).items ?? []
+  } catch { insumos.value = [] }
 }
-onMounted(() => { void cargarInsumosOptimizador() })
-watch(isMock, () => { void cargarInsumosOptimizador() })
+onMounted(() => { void cargarInsumos() })
 
 const telaSeleccionadaId = ref<number | null>(8) // Default Lino Vértigo
 const anchoTela = ref<number>(1.5)
@@ -43,11 +37,10 @@ const prendas = ref<PrendaTendido[]>([
 const optimizando = ref(false)
 const optimizado = ref(false)
 
-const insumosDisplay = computed(() => isMock.value ? atelier.insumos : insumosReal.value as any[])
 const telasOptions = computed(() => {
   return [
     { label: '-- Seleccionar tela del inventario --', value: null },
-    ...insumosDisplay.value
+    ...insumos.value
       .filter((i) => i.unidad_medida === 'm')
       .map((i) => ({
         label: `${i.nombre} (${i.stock_actual} m disponibles)`,
@@ -58,7 +51,7 @@ const telasOptions = computed(() => {
 
 function onTelaChange() {
   if (telaSeleccionadaId.value) {
-    const item = insumosDisplay.value.find((i: any) => i.id === telaSeleccionadaId.value)
+    const item = insumos.value.find((i: any) => i.id === telaSeleccionadaId.value)
     if (item) {
       largoTotalDisponible.value = item.stock_actual
     }

@@ -8,27 +8,21 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Slider from 'primevue/slider'
-import { useAtelierStore } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 
 const router = useRouter()
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const productosApi = useProductos()
 const bomApi = useBom()
-const productosRealCot = ref<any[]>([])
-const costoRealCot = ref<number | null>(null)
+const productos = ref<any[]>([])
+const costoReal = ref<number | null>(null)
 const loadingCostoReal = ref(false)
-async function cargarProductosCotizador() {
-  if (isMock.value) return
+async function cargarProductos() {
   try {
     const r = await productosApi.list({ limit: 100 })
-    productosRealCot.value = (r.items as any) ?? []
-  } catch { productosRealCot.value = [] }
+    productos.value = (r.items as any) ?? []
+  } catch { productos.value = [] }
 }
-onMounted(() => { void cargarProductosCotizador() })
-watch(isMock, () => { void cargarProductosCotizador() })
+onMounted(() => { void cargarProductos() })
 
 const recetaSeleccionada = ref<number | null>(null)
 const nombrePrenda = ref('Bustier Estructurado en Tul y Satén')
@@ -54,26 +48,26 @@ const margenPct = ref<number>(60)
 const recetasOptions = computed(() => {
   return [
     { label: '-- Cargar desde Receta BOM --', value: null },
-    ...(isMock.value ? atelier.recetas : productosRealCot.value).map((r) => ({
+    ...(productos.value).map((r) => ({
       label: `${r.nombre} (${r.codigo ?? `PRD-${r.id}`})`,
       value: r.id,
     })),
   ]
 })
 
-async function cargarCostoRealCot() {
-  if (isMock.value || !recetaSeleccionada.value) { costoRealCot.value = null; return }
+async function cargarCostoReal() {
+  if (!recetaSeleccionada.value) { costoReal.value = null; return }
   loadingCostoReal.value = true
   try {
     const c = await bomApi.getCosto(recetaSeleccionada.value) as { total?: number | string }
-    costoRealCot.value = Number(c.total ?? 0)
-  } catch { costoRealCot.value = null }
+    costoReal.value = Number(c.total ?? 0)
+  } catch { costoReal.value = null }
   finally { loadingCostoReal.value = false }
 }
 
 function onRecetaChange() {
   if (recetaSeleccionada.value) {
-    const r = (isMock.value ? atelier.recetas : productosRealCot.value).find((x) => x.id === recetaSeleccionada.value)
+    const r = (productos.value).find((x) => x.id === recetaSeleccionada.value)
     if (r) {
       nombrePrenda.value = r.nombre
       // P0-5: la API manda Numeric como string ("83000.0000") y nulls; normalizar
@@ -91,20 +85,20 @@ function onRecetaChange() {
   }
 }
 
-watch(recetaSeleccionada, () => { void cargarCostoRealCot() })
+watch(recetaSeleccionada, () => { void cargarCostoReal() })
 
 function usarCostoReal() {
-  if (costoRealCot.value == null) return
+  if (costoReal.value == null) return
   // Distribuye el costo real entre los campos manuales de forma proporcional al cálculo actual
   const totalManual = costoTotalConfeccion.value
   if (totalManual > 0) {
-    const ratio = costoRealCot.value / totalManual
+    const ratio = costoReal.value / totalManual
     // Ajusta CIF para que el total manual iguale al real (lo más simple y reversible)
-    const diff = costoRealCot.value - totalManual
+    const diff = costoReal.value - totalManual
     costoCif.value = Math.max(0, costoCif.value + diff)
-    showToast('success', 'Costo real aplicado', `CIF ajustado en ${diff > 0 ? '+' : ''}${Math.round(diff).toLocaleString('es-CO')} para igualar $${Math.round(costoRealCot.value).toLocaleString('es-CO')}`)
+    showToast('success', 'Costo real aplicado', `CIF ajustado en ${diff > 0 ? '+' : ''}${Math.round(diff).toLocaleString('es-CO')} para igualar $${Math.round(costoReal.value).toLocaleString('es-CO')}`)
   } else {
-    costoCif.value = costoRealCot.value
+    costoCif.value = costoReal.value
   }
 }
 
@@ -316,15 +310,15 @@ function copiarPresupuestoWhatsApp() {
               <span class="font-mono text-emerald-400">{{ formatCOP(costoTotalConfeccion) }}</span>
             </div>
 
-              <div v-if="!isMock && recetaSeleccionada" class="flex justify-between py-1.5 text-xs bg-amber-950/20 border border-amber-500/20 rounded-lg px-2">
+              <div v-if="recetaSeleccionada" class="flex justify-between py-1.5 text-xs bg-amber-950/20 border border-amber-500/20 rounded-lg px-2">
                 <span class="text-amber-300 flex items-center gap-1"><i class="pi pi-database text-[10px]" /> Costo real BOM (DB):</span>
-                <span class="font-mono font-bold" :class="loadingCostoReal ? 'text-stone-400' : 'text-amber-300'">{{ loadingCostoReal ? 'Cargando...' : (costoRealCot !== null ? formatCOP(costoRealCot!) : 'Sin BOM') }}</span>
+                <span class="font-mono font-bold" :class="loadingCostoReal ? 'text-stone-400' : 'text-amber-300'">{{ loadingCostoReal ? 'Cargando...' : (costoReal !== null ? formatCOP(costoReal!) : 'Sin BOM') }}</span>
               </div>
-              <div v-if="!isMock && costoRealCot !== null" class="flex justify-end">
+              <div v-if="costoReal !== null" class="flex justify-end">
                 <button type="button" class="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/30" @click="usarCostoReal">Usar costo real</button>
               </div>
-              <div v-if="!isMock && costoRealCot !== null && Math.abs(costoRealCot - costoTotalConfeccion) > 100" class="text-[11px] text-center" :class="costoRealCot > costoTotalConfeccion ? 'text-amber-400' : 'text-emerald-400'">
-                {{ costoRealCot > costoTotalConfeccion ? '▲' : '▼' }} Diferencia {{ formatCOP(Math.abs(costoRealCot - costoTotalConfeccion)) }} vs cálculo manual
+              <div v-if="costoReal !== null && Math.abs(costoReal - costoTotalConfeccion) > 100" class="text-[11px] text-center" :class="costoReal > costoTotalConfeccion ? 'text-amber-400' : 'text-emerald-400'">
+                {{ costoReal > costoTotalConfeccion ? '▲' : '▼' }} Diferencia {{ formatCOP(Math.abs(costoReal - costoTotalConfeccion)) }} vs cálculo manual
               </div>
           </div>
 

@@ -1,13 +1,11 @@
 <script setup lang="ts">
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
-import { useAtelierStore } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { useProductos } from '@/composables/useProductos'
 import { usePrendas } from '@/composables/usePrendas'
 import { client } from '@/api/client'
@@ -22,14 +20,11 @@ const emit = defineEmits<{
   (e: 'prenda-ingresada'): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const productosApi = useProductos()
 const prendasApi = usePrendas()
 
 const productoId = ref<number | null>(null)
 const varianteId = ref<number | null>(null)
-const tallaMock = ref<string>('Sin talla')
 const cantidad = ref<number>(1)
 const costoReal = ref<number>(0)
 const precioVenta = ref<number>(0)
@@ -37,21 +32,19 @@ const estado = ref<string>('disponible')
 const ubicacion = ref<string>('Showroom')
 const guardando = ref(false)
 
-const productosReal = ref<any[]>([])
-const variantesReal = ref<{ id: number; nombre_variante: string }[]>([])
+const productos = ref<any[]>([])
+const variantes = ref<{ id: number; nombre_variante: string }[]>([])
 
 async function cargarProductos() {
-  if (isMock.value) return
   try {
     const r = await productosApi.list({ limit: 100 })
-    productosReal.value = (r.items as any) ?? []
-  } catch { productosReal.value = [] }
+    productos.value = (r.items as any) ?? []
+  } catch { productos.value = [] }
 }
 onMounted(() => { void cargarProductos() })
-watch(isMock, () => { void cargarProductos() })
 
 const productosOptions = computed(() => {
-  const src = isMock.value ? (atelier as any).recetas : productosReal.value
+  const src = productos.value
   return (src as any[]).map((p) => ({
     label: `${p.nombre} (${p.codigo ?? `PRD-${p.id}`})`,
     value: p.id,
@@ -60,7 +53,7 @@ const productosOptions = computed(() => {
 
 const variantesOptions = computed(() => [
   { label: 'Sin talla (genérica)', value: null },
-  ...variantesReal.value.map((v) => ({ label: v.nombre_variante, value: v.id })),
+  ...variantes.value.map((v) => ({ label: v.nombre_variante, value: v.id })),
 ])
 
 const estadosOptions = [
@@ -70,13 +63,11 @@ const estadosOptions = [
   { label: 'Defectuosa', value: 'defectuosa' },
 ]
 
-const tallasMockOptions = ['Sin talla', 'XXS', 'XS', 'S', 'M', 'L', 'XL'].map((t) => ({ label: t, value: t }))
-
 async function onProductoChange() {
   varianteId.value = null
-  variantesReal.value = []
+  variantes.value = []
   if (productoId.value == null) return
-  const src = isMock.value ? (atelier as any).recetas : productosReal.value
+  const src = productos.value
   const p = (src as any[]).find((x) => x.id === productoId.value)
   if (p) {
     const pv = Number(p.precio_venta_sugerido ?? p.precio_venta ?? 0)
@@ -84,18 +75,15 @@ async function onProductoChange() {
     const ct = Number(p.costo_total_unitario ?? p.costos_operativos_fijos ?? p.costo_insumos ?? 0)
     if (Number.isFinite(ct) && ct > 0) costoReal.value = Math.round(ct)
   }
-  if (!isMock.value) {
-    try {
-      const { data } = await client.get<{ id: number; nombre_variante: string }[]>(`/productos/${productoId.value}/variantes`)
-      variantesReal.value = data ?? []
-    } catch { variantesReal.value = [] }
-  }
+  try {
+    const { data } = await client.get<{ id: number; nombre_variante: string }[]>(`/productos/${productoId.value}/variantes`)
+    variantes.value = data ?? []
+  } catch { variantes.value = [] }
 }
 
 function resetForm() {
   productoId.value = null
   varianteId.value = null
-  tallaMock.value = 'Sin talla'
   cantidad.value = 1
   costoReal.value = 0
   precioVenta.value = 0
@@ -113,8 +101,8 @@ async function guardar() {
   try {
     for (let i = 0; i < n; i++) {
       await prendasApi.create({
-        variante_id: isMock.value ? null : varianteId.value,
-        talla: isMock.value ? (tallaMock.value === 'Sin talla' ? null : tallaMock.value) : undefined,
+        variante_id: varianteId.value,
+        talla: undefined,
         estado: estado.value,
         ubicacion: ubicacion.value.trim() || null,
         costo_real: Number(costoReal.value) || 0,
@@ -156,7 +144,7 @@ async function guardar() {
         />
       </div>
 
-      <div v-if="!isMock">
+      <div>
         <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Variante / Talla</label>
         <Dropdown
           v-model="varianteId"
@@ -164,16 +152,6 @@ async function guardar() {
           option-label="label"
           option-value="value"
           placeholder="Sin talla (genérica)"
-          class="w-full"
-        />
-      </div>
-      <div v-else>
-        <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Talla</label>
-        <Dropdown
-          v-model="tallaMock"
-          :options="tallasMockOptions"
-          option-label="label"
-          option-value="value"
           class="w-full"
         />
       </div>

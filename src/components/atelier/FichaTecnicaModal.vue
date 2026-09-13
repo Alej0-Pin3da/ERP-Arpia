@@ -5,27 +5,44 @@ import Button from 'primevue/button'
 import Dropdown from 'primevue/dropdown'
 import InputNumber from 'primevue/inputnumber'
 import Tag from 'primevue/tag'
-import type { RecetaBOM } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 import * as bomApi from '@/services/api/bom'
 import * as insumosApi from '@/services/api/insumos'
 import * as productosApi from '@/services/api/productos'
 import * as maestrosApi from '@/services/api/maestros'
 
+/** Minimal receta shape this modal reads (REAL display object from the caller). */
+export interface RecetaFicha {
+  id: number
+  nombre: string
+  codigo?: string
+  linea?: string
+  categoria?: string
+  descripcion?: string
+  tiempo_confeccion_min?: number
+  mano_obra?: number
+  cif_energia?: number
+  precio_venta?: number
+  precio_venta_sugerido?: number
+  costo_insumos?: number
+  costo_total_unitario?: number
+  markup_pct?: number
+  recomendaciones_taller?: string
+  items?: unknown[]
+  fases?: unknown[]
+}
+
 const props = defineProps<{
   visible: boolean
-  receta: RecetaBOM | null
+  receta: RecetaFicha | null
   startEditing?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'editar', receta: RecetaBOM): void
-  (e: 'guardado', receta: RecetaBOM): void
+  (e: 'editar', receta: RecetaFicha): void
+  (e: 'guardado', receta: RecetaFicha): void
 }>()
-
-const { isMock } = useMode()
 const activeTab = ref<'ficha' | 'matriz' | 'historial'>('ficha')
 const isEditing = ref(false)
 const saving = ref(false)
@@ -66,7 +83,6 @@ const newComboProductoId = ref<number | null>(null)
 const newComboCantidad = ref<number>(1)
 
 async function cargarProductosOptions() {
-  if (isMock.value) return
   try {
     const r = await productosApi.listProductos({ limit: 100 })
     productosOptions.value = (r.items ?? []).map((p) => ({
@@ -77,7 +93,7 @@ async function cargarProductosOptions() {
 }
 
 async function cargarCombos() {
-  if (isMock.value || !props.receta || !recetaId.value) {
+  if (!props.receta || !recetaId.value) {
     combosReal.value = []
     return
   }
@@ -133,7 +149,6 @@ async function eliminarCombo(lineaId: number) {
 const recetaId = computed(() => (props.receta as unknown as { id: number })?.id)
 
 async function cargarInsumosOptions() {
-  if (isMock.value) return
   try {
     const r = await insumosApi.listInsumos({ limit: 100 })
         insumosOptions.value = r.items.map((i) => ({
@@ -148,7 +163,6 @@ async function cargarInsumosOptions() {
 }
 
 async function cargarMargenMeta() {
-  if (isMock.value) return
   try {
     const p = await maestrosApi.getParametros()
     margenMetaGlobal.value = Number(p.margen_meta_global_pct ?? 35)
@@ -156,7 +170,7 @@ async function cargarMargenMeta() {
 }
 
 async function cargarBom() {
-  if (isMock.value || !props.receta || !recetaId.value) {
+  if (!props.receta || !recetaId.value) {
     bomReal.value = []
     costoReal.value = null
     return
@@ -177,8 +191,8 @@ async function cargarBom() {
 async function enterEdit() {
   if (!props.receta) return
   let r = props.receta as unknown as Record<string, unknown>
-  // In REAL, fetch fresh product to ensure precio_venta_sugerido and all cabecera fields are up-to-date (DB is source of truth)
-  if (!isMock.value && recetaId.value) {
+  // Fetch fresh product to ensure precio_venta_sugerido and all cabecera fields are up-to-date (DB is source of truth)
+  if (recetaId.value) {
     try {
       const fresh = await productosApi.getProducto(recetaId.value)
       r = { ...r, ...fresh } as unknown as Record<string, unknown>
@@ -271,7 +285,7 @@ async function guardarEdicion() {
     isEditing.value = false
     snapshot.value = null
     precioOverride.value = false
-    const mapped = { ...props.receta, ...payload, id: updated.id, codigo: (updated as unknown as Record<string,unknown>).codigo ?? editCodigo.value, precio_venta: editPrecio.value } as unknown as RecetaBOM
+    const mapped = { ...props.receta, ...payload, id: updated.id, codigo: (updated as unknown as Record<string,unknown>).codigo ?? editCodigo.value, precio_venta: editPrecio.value } as unknown as RecetaFicha
     emit('guardado', mapped)
     await cargarBom()
   } catch (e: unknown) {
@@ -325,7 +339,7 @@ const selectedInsumo = computed(() => {
     })
 
     const displayItems = computed(() => {
-  if (isMock.value || !props.receta) return props.receta?.items ?? []
+  if (!props.receta) return props.receta?.items ?? []
   return bomReal.value.map((b) => {
     const ins = insumosMap.value.get(b.insumo_id)
     const cantidad = Number(b.cantidad_requerida ?? 0)
@@ -357,7 +371,7 @@ const totalInsumosReal = computed(() => {
 })
 
 const costoTotalCalculado = computed(() => {
-  if (isMock.value || !props.receta) return props.receta?.costo_total_unitario ?? 0
+  if (!props.receta) return props.receta?.costo_total_unitario ?? 0
   const insumos = Number(totalInsumosReal.value ?? 0) || Number(props.receta.costo_insumos ?? 0)
   const mano = Number(isEditing.value ? editMano.value : props.receta.mano_obra ?? 0)
   const cif = Number(isEditing.value ? editCif.value : props.receta.cif_energia ?? 0)
@@ -382,7 +396,7 @@ const precioSugeridoAuto = computed(() => {
 })
 
 const precioOverrideInfo = computed(() => {
-  if (isMock.value || !props.receta) return false
+  if (!props.receta) return false
   const stored = Number(props.receta.precio_venta ?? 0)
   const auto = Number(precioSugeridoAuto.value ?? 0)
   return stored > 0 && auto > 0 && Math.abs(stored - auto) > 1
@@ -390,14 +404,14 @@ const precioOverrideInfo = computed(() => {
 
 const precioMostrado = computed(() => {
   if (isEditing.value) return Number(editPrecio.value ?? 0)
-  if (isMock.value || !props.receta) return Number(props.receta?.precio_venta ?? 0)
+  if (!props.receta) return Number(props.receta?.precio_venta ?? 0)
   const stored = Number(props.receta?.precio_venta ?? 0)
   if (stored > 0) return stored
   return Number(precioSugeridoAuto.value ?? 0)
 })
 
 const markupMostrado = computed(() => {
-  if (isMock.value || !props.receta) return Number(props.receta?.markup_pct ?? 0)
+  if (!props.receta) return Number(props.receta?.markup_pct ?? 0)
   if (isEditing.value) {
     return precioOverride.value ? Number(markupCalculado.value ?? 0) : Number(margenMetaGlobal.value ?? 35)
   }
@@ -422,7 +436,7 @@ const isDirty = computed(() => {
 })
 
 const semaforo = computed(() => {
-  if (isMock.value || !props.receta) return null
+  if (!props.receta) return null
   const real = Number(markupCalculado.value ?? 0)
   const meta = Number(margenMetaGlobal.value ?? 35)
   const precio = Number(precioMostrado.value ?? 0)
@@ -443,7 +457,7 @@ const semaforo = computed(() => {
     const historialCostos = ref<any[]>([])
     const loadingHistorial = ref(false)
     async function cargarHistorial() {
-      if (isMock.value || !recetaId.value) { historial.value = []; historialCostos.value = []; return }
+      if (!recetaId.value) { historial.value = []; historialCostos.value = []; return }
       loadingHistorial.value = true
       try {
         const { client } = await import('@/api/client')
@@ -563,9 +577,9 @@ function exportarMatriz() {
         <div class="flex items-center gap-2">
           <Tag severity="warning" class="font-bold tracking-wider text-xs uppercase">{{ isEditing ? editLinea || receta.linea : receta.linea }}</Tag>
               <span v-if="isDirty" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">• sin guardar</span>
-              <span v-if="!isMock && semaforo" class="px-2 py-0.5 rounded-full text-[10px] font-bold border" :class="semaforo.color === 'emerald' ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30' : semaforo.color === 'amber' ? 'bg-amber-950/40 text-amber-300 border-amber-500/30' : semaforo.color === 'red' ? 'bg-red-950/40 text-red-300 border-red-500/30' : 'bg-sky-950/40 text-sky-300 border-sky-500/30'">{{ semaforo.label }} {{ semaforo.diffPct > 0 ? '+' : '' }}{{ semaforo.diffPct }}%</span>
+              <span v-if="semaforo" class="px-2 py-0.5 rounded-full text-[10px] font-bold border" :class="semaforo.color === 'emerald' ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30' : semaforo.color === 'amber' ? 'bg-amber-950/40 text-amber-300 border-amber-500/30' : semaforo.color === 'red' ? 'bg-red-950/40 text-red-300 border-red-500/30' : 'bg-sky-950/40 text-sky-300 border-sky-500/30'">{{ semaforo.label }} {{ semaforo.diffPct > 0 ? '+' : '' }}{{ semaforo.diffPct }}%</span>
           <span class="text-xs text-stone-400 font-medium">Ficha Técnica Oficial de Taller • Arpía Atelier</span>
-          <span v-if="!isMock" class="px-2 py-0.5 rounded-full text-[10px] font-bold border" :class="loadingBom ? 'bg-amber-950/40 text-amber-300 border-amber-500/30' : 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'">{{ loadingBom ? 'Cargando BOM...' : `BOM: ${bomReal.length} renglones` }}</span>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border" :class="loadingBom ? 'bg-amber-950/40 text-amber-300 border-amber-500/30' : 'bg-emerald-950/40 text-emerald-300 border-emerald-500/30'">{{ loadingBom ? 'Cargando BOM...' : `BOM: ${bomReal.length} renglones` }}</span>
         </div>
         <div class="flex items-center gap-2">
           <div class="inline-flex bg-stone-900 rounded-lg p-0.5 border border-stone-800">
@@ -605,7 +619,7 @@ function exportarMatriz() {
           <textarea v-model="editDescripcion" rows="2" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-xs text-stone-300" placeholder="Detalles de patronaje..." />
         </div>
 
-        <div v-if="!isMock" class="border border-amber-500/30 bg-amber-950/10 rounded-xl p-3 space-y-3">
+        <div class="border border-amber-500/30 bg-amber-950/10 rounded-xl p-3 space-y-3">
           <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 m-0 flex items-center gap-2"><i class="pi pi-plus" /> Agregar insumo al BOM</h4>
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div class="sm:col-span-2">
@@ -639,14 +653,13 @@ function exportarMatriz() {
           </div>
           <div v-if="!displayItems.length" class="p-8 text-center text-sm text-stone-400">
             <i class="pi pi-inbox text-2xl mb-2 block" />
-            <span v-if="isMock">Sin insumos en esta ficha (mock).</span>
-            <span v-else>Sin renglones BOM. Agregá insumos arriba para calcular el costo.</span>
+            <span>Sin renglones BOM. Agregá insumos arriba para calcular el costo.</span>
           </div>
           <template v-else>
           <div class="hidden overflow-x-auto max-h-72 overflow-y-auto sm:block">
             <table class="w-full min-w-[760px] text-left text-xs border-collapse">
               <thead><tr class="border-b border-stone-800 text-stone-400 bg-stone-950/40">
-                <th class="py-2.5 px-3 font-semibold sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Insumo / Material</th><th class="py-2.5 px-3 font-semibold whitespace-nowrap">Tipo</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Consumo Unit.</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Merma %</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Costo Unit.</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Subtotal</th><th v-if="!isMock" class="py-2.5 px-3"></th>
+                <th class="py-2.5 px-3 font-semibold sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Insumo / Material</th><th class="py-2.5 px-3 font-semibold whitespace-nowrap">Tipo</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Consumo Unit.</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Merma %</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Costo Unit.</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Subtotal</th><th class="py-2.5 px-3"></th>
               </tr></thead>
               <tbody class="divide-y divide-stone-800/50 text-stone-200">
                 <tr v-for="it in displayItems" :key="(it as any).id" class="hover:bg-stone-800/30" :class="editingBomId === (it as any).bomId ? 'bg-amber-950/20' : ''">
@@ -662,7 +675,7 @@ function exportarMatriz() {
                   </td>
                   <td class="py-2.5 px-3 text-right font-mono whitespace-nowrap">{{ formatCOP((it as any).costo_unitario) }}</td>
                   <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300 whitespace-nowrap">{{ formatCOP((it as any).subtotal) }}</td>
-                  <td v-if="!isMock" class="py-2.5 px-3 text-right whitespace-nowrap">
+                  <td class="py-2.5 px-3 text-right whitespace-nowrap">
                     <template v-if="editingBomId !== (it as any).bomId">
                       <button type="button" class="text-stone-500 hover:text-amber-400 p-1" title="Editar cantidad/desperdicio" @click="startEditBom(bomReal.find(b => b.id === (it as any).bomId)!)"><i class="pi pi-pencil text-xs" /></button>
                       <button type="button" class="text-stone-500 hover:text-red-400 p-1" title="Eliminar renglón" @click="eliminarInsumo((it as any).bomId ?? (it as any).id)"><i class="pi pi-trash text-xs" /></button>
@@ -676,8 +689,8 @@ function exportarMatriz() {
               </tbody>
               <tfoot><tr class="bg-stone-950/70 border-t border-stone-800 font-bold">
                 <td colspan="5" class="py-2.5 px-3 text-stone-300 text-right uppercase text-[11px]">Total Insumos y Materiales:</td>
-                <td class="py-2.5 px-3 text-right font-mono text-amber-400">{{ formatCOP(isMock ? receta.costo_insumos : totalInsumosReal) }}</td>
-                <td v-if="!isMock"></td>
+                <td class="py-2.5 px-3 text-right font-mono text-amber-400">{{ formatCOP(totalInsumosReal) }}</td>
+                <td></td>
               </tr></tfoot>
             </table>
           </div>
@@ -706,7 +719,7 @@ function exportarMatriz() {
                 <span class="text-xs uppercase tracking-wider text-stone-400">Subtotal</span>
                 <span class="font-mono font-bold text-amber-300">{{ formatCOP((it as any).subtotal) }}</span>
               </div>
-              <div v-if="!isMock" class="flex gap-2 pt-1">
+              <div class="flex gap-2 pt-1">
                 <template v-if="editingBomId !== (it as any).bomId">
                   <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" @click="startEditBom(bomReal.find(b => b.id === (it as any).bomId)!)">Editar</button>
                   <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg border border-rose-800 text-rose-400" title="Eliminar renglón" @click="eliminarInsumo((it as any).bomId ?? (it as any).id)"><i class="pi pi-trash text-xs" /></button>
@@ -719,13 +732,13 @@ function exportarMatriz() {
             </div>
             <div class="flex items-center justify-between rounded-xl bg-stone-950/70 border border-stone-800 p-3 text-sm">
               <span class="text-xs uppercase tracking-wider text-stone-400">Total insumos</span>
-              <span class="font-mono font-bold text-amber-400">{{ formatCOP(isMock ? receta.costo_insumos : totalInsumosReal) }}</span>
+              <span class="font-mono font-bold text-amber-400">{{ formatCOP(totalInsumosReal) }}</span>
             </div>
           </div>
           </template>
         </div>
 
-        <div v-if="!isMock" class="border border-stone-800 rounded-xl overflow-hidden bg-stone-900/50">
+        <div class="border border-stone-800 rounded-xl overflow-hidden bg-stone-900/50">
           <div class="p-3 bg-stone-900/80 border-b border-stone-800 flex items-center justify-between">
             <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 m-0">Combos (BOM productos)</h4>
             <span class="text-xs text-stone-400">{{ loadingCombos ? 'Cargando...' : `${combosReal.length} productos` }}</span>
@@ -769,11 +782,11 @@ function exportarMatriz() {
           <div class="border border-stone-800 rounded-xl p-4 bg-stone-900/50 space-y-3">
             <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 m-0 flex items-center gap-2"><i class="pi pi-dollar" /> Costeo & Fijación de Precio Sugerido</h4>
             <div class="space-y-2 text-xs divide-y divide-stone-800/60">
-              <div class="flex justify-between py-1 text-stone-300"><span>(+) Costo Insumos Directos / Indirectos</span><span class="font-mono font-semibold">{{ formatCOP(isMock ? receta.costo_insumos : totalInsumosReal) }}</span></div>
+              <div class="flex justify-between py-1 text-stone-300"><span>(+) Costo Insumos Directos / Indirectos</span><span class="font-mono font-semibold">{{ formatCOP(totalInsumosReal) }}</span></div>
               <div class="flex justify-between py-1 text-stone-300"><span>(+) Mano de Obra ({{ isEditing ? editTiempo : receta.tiempo_confeccion_min }} min)</span><span v-if="!isEditing" class="font-mono font-semibold">{{ formatCOP(receta.mano_obra) }}</span><input v-else v-model.number="editMano" type="number" class="w-24 bg-stone-950 border border-stone-700 rounded px-2 py-1 text-right font-mono text-stone-200" /></div>
               <div class="flex justify-between py-1 text-stone-300"><span>(+) Costos CIF / Energía Eléctrica</span><span v-if="!isEditing" class="font-mono font-semibold">{{ formatCOP(receta.cif_energia) }}</span><input v-else v-model.number="editCif" type="number" class="w-24 bg-stone-950 border border-stone-700 rounded px-2 py-1 text-right font-mono text-stone-200" /></div>
               <div class="flex justify-between py-1.5 font-bold text-stone-100 bg-stone-950/40 px-2 rounded"><span>(=) Costo Unitario de Confección</span><span class="font-mono text-emerald-400">{{ formatCOP(costoTotalCalculado) }}</span></div>
-              <div class="flex justify-between py-2 items-center gap-2"><div><div class="font-bold text-amber-400 text-sm">PRECIO VENTA</div><div class="text-[10px] text-stone-400">Margen real: {{ markupCalculado }}% <span class="text-stone-500">| Meta: {{ isMock ? receta.markup_pct : margenMetaGlobal }}%</span></div><div v-if="!isMock && !isEditing && precioSugeridoAuto > 0" class="text-[10px] text-amber-400/70">Sugerido ({{ margenMetaGlobal }}%): {{ formatCOP(precioSugeridoAuto) }}</div><div v-else-if="!isMock && isEditing" class="text-[10px] text-amber-400/70">Sugerido: {{ formatCOP(precioSugeridoAuto) }} <span v-if="precioOverride" class="text-stone-500">| editado</span></div></div><div v-if="!isEditing" class="font-mono text-lg font-extrabold text-amber-300">{{ formatCOP(precioMostrado) }}</div><div v-else class="flex items-center gap-1"><input v-model.number="editPrecio" type="number" @input="precioOverride = true" class="w-32 bg-stone-950 border rounded px-2 py-1.5 text-right font-mono text-lg font-extrabold" :class="precioOverride ? 'border-stone-600 text-stone-100' : 'border-amber-500/30 text-amber-300'" /><button v-if="precioOverride && precioSugeridoAuto > 0" type="button" class="text-[10px] px-2 py-1 rounded bg-stone-800 text-stone-400 hover:text-amber-300 whitespace-nowrap" title="Volver al precio sugerido" @click="resetPrecio()">&#8634; auto</button></div></div>
+              <div class="flex justify-between py-2 items-center gap-2"><div><div class="font-bold text-amber-400 text-sm">PRECIO VENTA</div><div class="text-[10px] text-stone-400">Margen real: {{ markupCalculado }}% <span class="text-stone-500">| Meta: {{ margenMetaGlobal }}%</span></div><div v-if="!isEditing && precioSugeridoAuto > 0" class="text-[10px] text-amber-400/70">Sugerido ({{ margenMetaGlobal }}%): {{ formatCOP(precioSugeridoAuto) }}</div><div v-else-if="isEditing" class="text-[10px] text-amber-400/70">Sugerido: {{ formatCOP(precioSugeridoAuto) }} <span v-if="precioOverride" class="text-stone-500">| editado</span></div></div><div v-if="!isEditing" class="font-mono text-lg font-extrabold text-amber-300">{{ formatCOP(precioMostrado) }}</div><div v-else class="flex items-center gap-1"><input v-model.number="editPrecio" type="number" @input="precioOverride = true" class="w-32 bg-stone-950 border rounded px-2 py-1.5 text-right font-mono text-lg font-extrabold" :class="precioOverride ? 'border-stone-600 text-stone-100' : 'border-amber-500/30 text-amber-300'" /><button v-if="precioOverride && precioSugeridoAuto > 0" type="button" class="text-[10px] px-2 py-1 rounded bg-stone-800 text-stone-400 hover:text-amber-300 whitespace-nowrap" title="Volver al precio sugerido" @click="resetPrecio()">&#8634; auto</button></div></div>
             </div>
           </div>
         </div>
@@ -838,10 +851,7 @@ function exportarMatriz() {
       </div>
 
       <div v-else-if="activeTab === 'historial'" class="space-y-4 animate-fade-in">
-        <div v-if="isMock" class="p-8 text-center text-xs text-stone-500 border border-stone-800 rounded-xl">
-          Historial fiscal disponible solo en modo REAL (<code>GET /api/v1/audit-fiscal/*</code>).
-        </div>
-        <div v-else-if="loadingHistorial" class="p-8 text-center text-xs text-amber-300 border border-amber-500/30 rounded-xl">
+        <div v-if="loadingHistorial" class="p-8 text-center text-xs text-amber-300 border border-amber-500/30 rounded-xl">
           Cargando historial...
         </div>
         <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">

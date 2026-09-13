@@ -1,10 +1,8 @@
 <script setup lang="ts">
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, no-empty */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
-import { useAtelierStore } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { useInsumos } from '@/composables/useInsumos'
 import { useProduccion } from '@/composables/useProduccion'
 import { useVentas } from '@/composables/useVentas'
@@ -14,45 +12,38 @@ import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
 
 const router = useRouter()
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const insumosApi = useInsumos()
 const produccionApi = useProduccion()
 const ventasApi = useVentas()
 const analiticosApi = useAnaliticos()
-const insumosReal = ref<any[]>([])
-const pedidosReal = ref<any[]>([])
-const ventasReal = ref<any[]>([])
-// P2-1: resumen del backend en modo REAL con fallback al cómputo local si falla.
-const resumenReal = ref<any | null>(null)
-async function cargarDashboardReales() {
-  if (isMock.value) return
+const insumos = ref<any[]>([])
+const pedidos = ref<any[]>([])
+const ventas = ref<any[]>([])
+// Resumen del backend con fallback al cómputo local si falla.
+const resumen = ref<any | null>(null)
+async function cargarDashboard() {
   try {
     const [ir, pr, vr] = await Promise.all([
       insumosApi.list({ limit: 100 }),
       produccionApi.list({ limit: 100 }),
       ventasApi.list({ limit: 100 }),
     ])
-    insumosReal.value = (ir as any).items ?? []
-    pedidosReal.value = (pr as any).items ?? []
-    ventasReal.value = (vr as any).items ?? []
+    insumos.value = (ir as any).items ?? []
+    pedidos.value = (pr as any).items ?? []
+    ventas.value = (vr as any).items ?? []
   } catch {}
   try {
-    resumenReal.value = await analiticosApi.getResumen()
-  } catch { resumenReal.value = null }
+    resumen.value = await analiticosApi.getResumen()
+  } catch { resumen.value = null }
 }
-onMounted(() => { void cargarDashboardReales() })
-watch(isMock, () => { void cargarDashboardReales() })
+onMounted(() => { void cargarDashboard() })
 
-const insumosCriticosReal = computed(() => (insumosReal.value as any[]).filter((i: any) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)))
-const insumosCriticosDisplay = computed(() => isMock.value ? atelier.insumosCriticos : insumosCriticosReal.value)
-const pedidosDisplay = computed(() => isMock.value ? atelier.pedidos : (pedidosReal.value as any[]))
-// P0-2: en REAL la API (PedidoProduccionRead) no trae codigo/cliente_nombre/
+const insumosCriticos = computed(() => (insumos.value as any[]).filter((i: any) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)))
+// En REAL la API (PedidoProduccionRead) no trae codigo/cliente_nombre/
 // prenda_nombre ni montos; se normaliza como en ProduccionView para no
 // renderizar celdas vacías ni $NaN (Numeric serializa como string).
 const pedidosTabla = computed(() => {
-  if (isMock.value) return pedidosDisplay.value
-  return (pedidosReal.value as any[]).map((p: any) => {
+  return (pedidos.value as any[]).map((p: any) => {
     const rawEstado = String(p.estado ?? '')
     return {
       ...p,
@@ -66,30 +57,27 @@ const pedidosTabla = computed(() => {
     }
   })
 })
-const ventasDisplay = computed(() => isMock.value ? atelier.ventas : (ventasReal.value as any[]))
 
 const ventasMensuales = ref<any[]>([])
-// P2-1: en REAL se prefiere el agregado del backend (snapshot, excluye anuladas);
-// si el endpoint falla, se usa el cómputo local sobre ventasReal.
-const totalVentasReal = computed(() => {
-  if (isMock.value) return (atelier as any).totalVentas
-  if (resumenReal.value != null) return Number(resumenReal.value.ventas_total ?? 0)
-  return (ventasReal.value as any[]).reduce((acc: number, v: any) => acc + Number(v.total_venta ?? v.total ?? 0), 0)
+// En REAL se prefiere el agregado del backend (snapshot, excluye anuladas);
+// si el endpoint falla, se usa el cómputo local sobre ventas.
+const totalVentas = computed(() => {
+  if (resumen.value != null) return Number(resumen.value.ventas_total ?? 0)
+  return (ventas.value as any[]).reduce((acc: number, v: any) => acc + Number(v.total_venta ?? v.total ?? 0), 0)
 })
-const totalUtilidadReal = computed(() => {
-  if (isMock.value) return (atelier as any).totalUtilidad
-  if (resumenReal.value != null) return Number(resumenReal.value.margen_total ?? 0)
-  return (ventasReal.value as any[]).reduce((acc: number, v: any) => acc + Number(v.ganancia_neta ?? v.utilidad_neta ?? 0), 0)
+const totalUtilidad = computed(() => {
+  if (resumen.value != null) return Number(resumen.value.margen_total ?? 0)
+  return (ventas.value as any[]).reduce((acc: number, v: any) => acc + Number(v.ganancia_neta ?? v.utilidad_neta ?? 0), 0)
 })
-const rentabilidadReal = computed(()=> isMock.value ? atelier.rentabilidadPromedio : (() => { const v = ventasReal.value as any[]; if (!v.length) return 0; const total = v.reduce((a,c)=>a+Number(c.total_venta??0),0); const gan = v.reduce((a,c)=>a+Number(c.ganancia_neta??0),0); return total ? Math.round((gan/total)*100) : 0 })())
-const pedidosDisplayActivos = computed(() => pedidosDisplay.value.filter((p: any) => p.estado !== 'ENTREGADO' && p.estado !== 'entregado').length)
-const pipelineCountsReal = computed(() => {
+const rentabilidad = computed(()=> (() => { const v = ventas.value as any[]; if (!v.length) return 0; const total = v.reduce((a,c)=>a+Number(c.total_venta??0),0); const gan = v.reduce((a,c)=>a+Number(c.ganancia_neta??0),0); return total ? Math.round((gan/total)*100) : 0 })())
+const pedidosActivos = computed(() => pedidos.value.filter((p: any) => p.estado !== 'ENTREGADO' && p.estado !== 'entregado').length)
+const pipelineCounts = computed(() => {
   const counts: Record<string, number> = { COTIZADO:0, RESERVADO:0, CORTE:0, COSTURA:0, ACABADOS:0, CALIDAD:0, LISTO:0, ENTREGADO:0 }
-  ;(pedidosReal.value as any[]).forEach((p: any) => { const k = String(p.estado||'').toUpperCase(); if (k in counts) counts[k]++ })
+  ;(pedidos.value as any[]).forEach((p: any) => { const k = String(p.estado||'').toUpperCase(); if (k in counts) counts[k]++ })
   return counts
 })
-const distribucionReal = computed(() => {
-  const total = totalUtilidadReal.value
+const distribucion = computed(() => {
+  const total = totalUtilidad.value
   return { total, reversion40: Math.round(total*0.4), margara30: Math.round(total*0.3), valqui30: Math.round(total*0.3) }
 })
 
@@ -177,16 +165,16 @@ function getEstadoBadgeClass(estado: string) {
             <span class="text-emerald-400 font-semibold text-[11px]">+2.4%</span>
           </div>
           <div class="text-2xl sm:text-3xl font-extrabold text-stone-100 mt-2 font-mono">
-            {{ (isMock ? atelier.rentabilidadPromedio : rentabilidadReal) }}%
+            {{ rentabilidad }}%
           </div>
           <!-- Progress bar -->
           <div class="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden mt-3">
-            <div class="bg-gradient-to-r from-amber-500 to-emerald-400 h-full rounded-full" :style="{ width: `${isMock ? atelier.rentabilidadPromedio : rentabilidadReal}%` }" />
+            <div class="bg-gradient-to-r from-amber-500 to-emerald-400 h-full rounded-full" :style="{ width: `${rentabilidad}%` }" />
           </div>
         </div>
         <div class="text-xs text-stone-400 mt-3 pt-2 border-t border-stone-800/80 flex items-center justify-between">
           <span>Utilidad neta:</span>
-          <strong class="text-emerald-400 font-mono font-bold">{{ formatCOP(isMock ? atelier.totalUtilidad : totalUtilidadReal) }}</strong>
+          <strong class="text-emerald-400 font-mono font-bold">{{ formatCOP(totalUtilidad) }}</strong>
         </div>
       </div>
 
@@ -198,12 +186,12 @@ function getEstadoBadgeClass(estado: string) {
             <i class="pi pi-clock text-amber-400" />
           </div>
           <div class="text-2xl sm:text-3xl font-extrabold text-stone-100 mt-2 font-mono">
-            {{ pedidosDisplayActivos }}
+            {{ pedidosActivos }}
           </div>
         </div>
         <div class="text-xs text-stone-400 mt-3 pt-2 border-t border-stone-800/80 flex items-center justify-between">
           <span>En confección:</span>
-          <span class="text-amber-300 font-semibold">{{ pedidosDisplayActivos }} prenda(s) en taller</span>
+          <span class="text-amber-300 font-semibold">{{ pedidosActivos }} prenda(s) en taller</span>
         </div>
       </div>
 
@@ -215,12 +203,12 @@ function getEstadoBadgeClass(estado: string) {
             <i class="pi pi-chart-line text-emerald-400" />
           </div>
           <div class="text-2xl sm:text-3xl font-extrabold text-stone-100 mt-2 font-mono">
-            {{ formatCOP(isMock ? atelier.totalVentas : totalVentasReal) }}
+            {{ formatCOP(totalVentas) }}
           </div>
         </div>
         <div class="text-xs text-stone-400 mt-3 pt-2 border-t border-stone-800/80 flex items-center justify-between">
           <span>Total órdenes:</span>
-          <span class="text-stone-200 font-semibold">{{ pedidosDisplay.length }} pedidos registrados</span>
+          <span class="text-stone-200 font-semibold">{{ pedidos.length }} pedidos registrados</span>
         </div>
       </div>
 
@@ -232,7 +220,7 @@ function getEstadoBadgeClass(estado: string) {
             <i class="pi pi-exclamation-circle text-red-400" />
           </div>
           <div class="text-2xl sm:text-3xl font-extrabold text-red-400 mt-2 font-mono">
-            {{ insumosCriticosDisplay.length }}
+            {{ insumosCriticos.length }}
           </div>
         </div>
         <div class="text-xs text-stone-400 mt-3 pt-2 border-t border-stone-800/80">
@@ -264,40 +252,40 @@ function getEstadoBadgeClass(estado: string) {
         </button>
       </div>
 
-      <div v-if="!pedidosDisplay.length" class="text-center py-4 text-xs text-stone-500 bg-stone-900/40 border border-stone-800 rounded-xl">Sin pedidos en modo {{ isMock ? 'MOCK' : 'REAL' }} — creá uno en <code>/produccion</code> o <code>GET /api/v1/pedidos-produccion</code>.</div>
+      <div v-if="!pedidos.length" class="text-center py-4 text-xs text-stone-500 bg-stone-900/40 border border-stone-800 rounded-xl">Sin pedidos — creá uno en <code>/produccion</code>.</div>
           <!-- 8-Stage Pipeline Strip -->
           <div v-else class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
         <div class="bg-stone-950/60 border border-stone-800 rounded-xl p-2.5 text-center">
           <div class="text-[11px] text-stone-400 font-medium truncate">1. Cotizado</div>
-          <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ isMock ? atelier.pipelineCounts.COTIZADO : pipelineCountsReal.COTIZADO }}</div>
+          <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ pipelineCounts.COTIZADO }}</div>
         </div>
         <div class="bg-stone-950/60 border border-stone-800 rounded-xl p-2.5 text-center">
           <div class="text-[11px] text-stone-400 font-medium truncate">2. Reservado</div>
-          <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ isMock ? atelier.pipelineCounts.RESERVADO : pipelineCountsReal.RESERVADO }}</div>
+          <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ pipelineCounts.RESERVADO }}</div>
         </div>
         <div class="bg-stone-950/60 border border-stone-800 rounded-xl p-2.5 text-center">
           <div class="text-[11px] text-stone-400 font-medium truncate">3. Corte</div>
-          <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ isMock ? atelier.pipelineCounts.CORTE : pipelineCountsReal.CORTE }}</div>
+          <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ pipelineCounts.CORTE }}</div>
         </div>
         <div class="bg-amber-950/40 border border-amber-500/40 rounded-xl p-2.5 text-center shadow-inner">
           <div class="text-[11px] text-amber-300 font-bold truncate">4. Costura</div>
-          <div class="text-base font-bold font-mono text-amber-400 mt-0.5">{{ isMock ? atelier.pipelineCounts.COSTURA : pipelineCountsReal.COSTURA }}</div>
+          <div class="text-base font-bold font-mono text-amber-400 mt-0.5">{{ pipelineCounts.COSTURA }}</div>
         </div>
         <div class="bg-stone-950/60 border border-stone-800 rounded-xl p-2.5 text-center">
           <div class="text-[11px] text-stone-400 font-medium truncate">5. Acabados</div>
-          <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ isMock ? atelier.pipelineCounts.ACABADOS : pipelineCountsReal.ACABADOS }}</div>
+          <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ pipelineCounts.ACABADOS }}</div>
         </div>
         <div class="bg-stone-950/60 border border-stone-800 rounded-xl p-2.5 text-center">
           <div class="text-[11px] text-stone-400 font-medium truncate">6. Calidad</div>
-          <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ isMock ? atelier.pipelineCounts.CALIDAD : pipelineCountsReal.CALIDAD }}</div>
+          <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ pipelineCounts.CALIDAD }}</div>
         </div>
         <div class="bg-stone-950/60 border border-stone-800 rounded-xl p-2.5 text-center">
           <div class="text-[11px] text-stone-400 font-medium truncate">7. Listo</div>
-          <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ isMock ? atelier.pipelineCounts.LISTO : pipelineCountsReal.LISTO }}</div>
+          <div class="text-base font-bold font-mono text-stone-300 mt-0.5">{{ pipelineCounts.LISTO }}</div>
         </div>
         <div class="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-2.5 text-center">
           <div class="text-[11px] text-emerald-300 font-bold truncate">8. Entregado</div>
-          <div class="text-base font-bold font-mono text-emerald-400 mt-0.5">{{ isMock ? atelier.pipelineCounts.ENTREGADO : pipelineCountsReal.ENTREGADO }}</div>
+          <div class="text-base font-bold font-mono text-emerald-400 mt-0.5">{{ pipelineCounts.ENTREGADO }}</div>
         </div>
       </div>
     </div>
@@ -314,7 +302,7 @@ function getEstadoBadgeClass(estado: string) {
           </span>
         </div>
         <div class="text-xs text-stone-300">
-          Total Utilidad Taller: <strong class="text-emerald-400 font-mono text-sm">{{ formatCOP(isMock ? atelier.distribucionSocias.total : distribucionReal.total) }}</strong>
+          Total Utilidad Taller: <strong class="text-emerald-400 font-mono text-sm">{{ formatCOP(distribucion.total) }}</strong>
         </div>
       </div>
 
@@ -326,7 +314,7 @@ function getEstadoBadgeClass(estado: string) {
             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-stone-800 text-stone-300">40%</span>
           </div>
           <div class="text-xl font-bold font-mono text-amber-400">
-            {{ formatCOP(isMock ? atelier.distribucionSocias.reversion40 : distribucionReal.reversion40) }}
+            {{ formatCOP(distribucion.reversion40) }}
           </div>
           <p class="text-[11px] text-stone-400 m-0 leading-tight">
             Destinado a compra de insumos, telas Atenea, agujas y mantenimiento de máquinas Singer.
@@ -340,7 +328,7 @@ function getEstadoBadgeClass(estado: string) {
             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-stone-800 text-stone-300">30%</span>
           </div>
           <div class="text-xl font-bold font-mono text-emerald-400">
-            {{ formatCOP(isMock ? atelier.distribucionSocias.margara30 : distribucionReal.margara30) }}
+            {{ formatCOP(distribucion.margara30) }}
           </div>
           <p class="text-[11px] text-stone-400 m-0 leading-tight">
             Liquidación de utilidades por confección y corte directo de corsetería.
@@ -354,7 +342,7 @@ function getEstadoBadgeClass(estado: string) {
             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-stone-800 text-stone-300">30%</span>
           </div>
           <div class="text-xl font-bold font-mono text-emerald-400">
-            {{ formatCOP(isMock ? atelier.distribucionSocias.valqui30 : distribucionReal.valqui30) }}
+            {{ formatCOP(distribucion.valqui30) }}
           </div>
           <p class="text-[11px] text-stone-400 m-0 leading-tight">
             Liquidación de utilidades por patronaje, diseño y gestión del atelier.
@@ -382,9 +370,6 @@ function getEstadoBadgeClass(estado: string) {
                   <th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95">Código / Cliente</th>
                   <th class="py-2.5 px-3 min-w-[180px]">Prenda Solicitada</th>
                   <th class="py-2.5 px-3 text-center whitespace-nowrap">Estado</th>
-                  <th class="py-2.5 px-3 text-right whitespace-nowrap" v-if="isMock">Venta</th>
-                  <th class="py-2.5 px-3 text-right whitespace-nowrap" v-if="isMock">Utilidad</th>
-                  <th class="py-2.5 px-3 text-right whitespace-nowrap" v-if="isMock">Margen</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-stone-800/50 text-stone-200">
@@ -401,9 +386,6 @@ function getEstadoBadgeClass(estado: string) {
                       {{ p.estado }}
                     </span>
                   </td>
-                  <td v-if="isMock" class="py-2.5 px-3 text-right font-mono whitespace-nowrap">{{ formatCOP(p.precio_venta) }}</td>
-                  <td v-if="isMock" class="py-2.5 px-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">{{ formatCOP(p.utilidad_neta) }}</td>
-                  <td v-if="isMock" class="py-2.5 px-3 text-right font-mono text-stone-300 whitespace-nowrap">{{ p.margen_pct }}%</td>
                 </tr>
               </tbody>
             </table>
@@ -417,10 +399,6 @@ function getEstadoBadgeClass(estado: string) {
               </div>
               <div class="font-bold text-sm text-stone-100">{{ p.prenda_nombre }}</div>
               <div class="text-sm text-stone-400">{{ p.cliente_nombre }}</div>
-              <div v-if="isMock" class="flex items-center justify-between text-sm pt-1 border-t border-stone-800">
-                <span class="font-mono text-stone-300">{{ formatCOP(p.precio_venta) }}</span>
-                <span class="font-mono font-bold text-emerald-400">{{ formatCOP(p.utilidad_neta) }} ({{ p.margen_pct }}%)</span>
-              </div>
             </div>
           </div>
         </div>
@@ -443,11 +421,11 @@ function getEstadoBadgeClass(estado: string) {
         <div class="bg-stone-900/80 border border-red-500/30 rounded-2xl p-4 shadow-lg space-y-3">
           <div class="flex items-center justify-between">
             <h4 class="text-xs font-bold uppercase tracking-wider text-red-400 m-0 flex items-center gap-2">
-              <i class="pi pi-exclamation-triangle" /> Stock Bajo Crítico ({{ insumosCriticosDisplay.length }} alertas)
+              <i class="pi pi-exclamation-triangle" /> Stock Bajo Crítico ({{ insumosCriticos.length }} alertas)
             </h4>
           </div>
 
-          <div v-for="it in insumosCriticosDisplay" :key="it.id" class="bg-stone-950/70 border border-stone-800 rounded-xl p-3 space-y-2">
+          <div v-for="it in insumosCriticos" :key="it.id" class="bg-stone-950/70 border border-stone-800 rounded-xl p-3 space-y-2">
             <div class="flex justify-between items-start">
               <div>
                 <div class="font-bold text-stone-200 text-xs">{{ it.nombre }}</div>

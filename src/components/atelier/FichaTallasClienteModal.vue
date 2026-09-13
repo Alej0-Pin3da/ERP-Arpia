@@ -4,24 +4,21 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
-import { type ClienteCRM, useAtelierStore } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
+import { type ClienteRead, type ClienteUpdatePayload } from '@/services/api/clientes'
 import { useClientes } from '@/composables/useClientes'
 import { toTallaCode, fromTallaCode } from '@/utils/tallas'
 import { showToast } from '@/utils/toast'
 
 const props = defineProps<{
   visible: boolean
-  cliente: ClienteCRM | null
+  cliente: ClienteRead | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'guardar', clienteActualizado: Partial<ClienteCRM>): void
+  (e: 'guardar', clienteActualizado: Partial<ClienteUpdatePayload>): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const clientesApi = useClientes()
 const guardando = ref(false)
 
@@ -88,20 +85,13 @@ async function guardarFicha() {
     emit('update:visible', false)
     return
   }
-  const updated: Partial<ClienteCRM> = {
+  const updated: Partial<ClienteUpdatePayload> = {
     talla_habitual: tallaSeleccionada.value,
     talla_superior: tallaSuperior.value,
     talla_inferior: tallaInferior.value,
     categoria_preferida: categoriaPreferida.value,
     tipo_producto_frecuente: esClientaSinTalla.value ? 'PRODUCTOS_SIN_TALLA' : 'PRENDAS_TALLAS',
     notas: notasCalce.value.trim(),
-  }
-  if (isMock.value) {
-    atelier.actualizarCliente(props.cliente.id, updated)
-    showToast('success', 'Ficha de Talla Actualizada', `Talla guardada como ${tallaSeleccionada.value} para ${props.cliente.nombre}.`)
-    emit('guardar', updated)
-    emit('update:visible', false)
-    return
   }
   guardando.value = true
   try {

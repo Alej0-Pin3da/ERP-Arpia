@@ -2,12 +2,20 @@
 import { ref, computed } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
-import { type PedidoProduccion } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
+
+/** Minimal pedido shape this modal reads (REAL display object from the caller). */
+export interface PedidoTallerDetalle {
+  codigo: string
+  cliente_nombre: string
+  prenda_nombre: string
+  estado: string
+  precio_venta?: number
+}
 
 const props = defineProps<{
   visible: boolean
-  pedido: PedidoProduccion | null
+  pedido: PedidoTallerDetalle | null
 }>()
 
 const emit = defineEmits<{

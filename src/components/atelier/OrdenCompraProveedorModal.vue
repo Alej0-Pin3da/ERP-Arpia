@@ -5,8 +5,6 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
-import { useAtelierStore } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { useInsumos } from '@/composables/useInsumos'
 import * as comprasApi from '@/services/api/compras-insumos'
 import { showToast } from '@/utils/toast'
@@ -19,8 +17,6 @@ const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const insumosApi = useInsumos()
 const guardando = ref(false)
 
@@ -45,22 +41,6 @@ interface ItemCompra {
 const itemsPedido = ref<ItemCompra[]>([])
 
 async function inicializarItems() {
-  if (isMock.value) {
-    itemsPedido.value = (atelier.insumos as any[])
-      .filter((i) => i.stock_actual <= i.stock_minimo * 1.5)
-      .map((i) => ({
-        id: i.id,
-        codigo: i.codigo,
-        nombre: i.nombre,
-        proveedor: i.proveedor,
-        stock_actual: i.stock_actual,
-        stock_minimo: i.stock_minimo,
-        unidad_medida: i.unidad_medida,
-        costo_unitario: i.costo_unitario,
-        cantidad_pedir: Math.max(10, Math.ceil(i.stock_minimo * 2 - i.stock_actual)),
-      }))
-    return
-  }
   try {
     const r = await insumosApi.list({ limit: 100 })
     itemsPedido.value = ((r as any).items ?? [])
@@ -104,23 +84,6 @@ function formatCOP(val: number) {
 }
 
 async function abastecerInventario() {
-  if (isMock.value) {
-    itemsFiltrados.value.forEach((item) => {
-      const insumo = (atelier.insumos as any[]).find((i) => i.id === item.id)
-      if (insumo) {
-        insumo.stock_actual += item.cantidad_pedir
-        insumo.valor_total = insumo.stock_actual * insumo.costo_unitario
-      }
-    })
-
-    showToast(
-      'success',
-      'Orden de Compra Procesada',
-      `Se abastecieron ${itemsFiltrados.value.length} insumos por un total de ${formatCOP(totalPresupuesto.value)}.`
-    )
-    emit('update:visible', false)
-    return
-  }
   const filas = itemsFiltrados.value.filter((item) => Number(item.cantidad_pedir) > 0)
   if (!filas.length) {
     showToast('warn', 'Sin cantidades', 'Indicá al menos una cantidad a pedir mayor a 0.')

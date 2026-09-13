@@ -8,23 +8,37 @@ import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
-import { useAtelierStore, type SociaAtelier } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
-import { useMode } from '@/composables/useMode'
 import { useSocios } from '@/composables/useSocios'
+import type { SociaRead } from '@/services/api/socios'
+
+/** Minimal socia shape this modal edits (REAL display object from the caller). */
+export interface SociaEditar {
+  id: number
+  nombre: string
+  rol: string
+  porcentaje: number
+  es_fondo_taller: boolean
+  telefono?: string
+  email?: string
+  banco?: string
+  tipo_cuenta?: string
+  numero_cuenta?: string
+  titular_cuenta?: string
+  activo: boolean
+  notas?: string
+}
 
 const props = defineProps<{
   visible: boolean
-  sociaEditar?: SociaAtelier | null
+  sociaEditar?: SociaEditar | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'guardada', socia: SociaAtelier): void
+  (e: 'guardada', socia: SociaRead): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const sociosApi = useSocios()
 
 const isEditing = computed(() => !!props.sociaEditar)
@@ -45,10 +59,18 @@ const notas = ref('')
 
 const guardando = ref(false)
 
+// Socias activas para la validación de la suma de cuotas (display aid).
+const socias = ref<any[]>([])
+async function cargarSocias() {
+  try {
+    const r = await sociosApi.list({ limit: 100 })
+    socias.value = (r.items as any) ?? []
+  } catch { socias.value = [] }
+}
+
 const sumaPorcentajesActuales = computed(() => {
-  const sociasSrc = isMock.value ? atelier.socias : [] as any[]
-  const otros = sociasSrc.filter((s) => s.activo && (!props.sociaEditar || s.id !== props.sociaEditar.id))
-  const sumOtros = otros.reduce((acc, s) => acc + s.porcentaje, 0)
+  const otros = socias.value.filter((s) => (s.activo !== false) && (!props.sociaEditar || s.id !== props.sociaEditar.id))
+  const sumOtros = otros.reduce((acc, s) => acc + Number(s.porcentaje_participacion ?? s.porcentaje ?? 0), 0)
   return sumOtros + (porcentaje.value || 0)
 })
 
@@ -75,8 +97,8 @@ function initForm() {
     telefono.value = s.telefono || ''
     email.value = s.email || ''
     banco.value = s.banco || 'Bancolombia'
-    // En REAL el backend solo acepta el Literal: se normaliza al cargarlo.
-    tipoCuenta.value = isMock.value ? (s.tipo_cuenta || 'Ahorros') : toTipoLiteral(s.tipo_cuenta)
+    // El backend solo acepta el Literal: se normaliza al cargarlo.
+    tipoCuenta.value = toTipoLiteral(s.tipo_cuenta)
     numeroCuenta.value = s.numero_cuenta || ''
     titularCuenta.value = s.titular_cuenta || s.nombre
     activo.value = s.activo
@@ -89,7 +111,7 @@ function initForm() {
     telefono.value = ''
     email.value = ''
     banco.value = 'Bancolombia'
-    tipoCuenta.value = isMock.value ? 'Ahorros' : 'AHORROS'
+    tipoCuenta.value = 'AHORROS'
     numeroCuenta.value = ''
     titularCuenta.value = ''
     activo.value = true
@@ -100,7 +122,10 @@ function initForm() {
 watch(
   () => props.visible,
   (val) => {
-    if (val) initForm()
+    if (val) {
+      void cargarSocias()
+      initForm()
+    }
   },
   { immediate: true },
 )
@@ -112,40 +137,10 @@ async function guardar() {
     return
   }
 
-  // isMock ? atelier shape (porcentaje) : API shape (porcentaje_participacion + Literal tipo_cuenta)
-  // En REAL el dropdown ya entrega el Literal; esto es red de seguridad.
+  // API shape (porcentaje_participacion + Literal tipo_cuenta).
+  // El dropdown ya entrega el Literal; esto es red de seguridad.
   const rawTipo = toTipoLiteral(tipoCuenta.value)
   const tipoCuentaLiteral = rawTipo as 'AHORROS' | 'CORRIENTE' | 'OTRA'
-
-  if (isMock.value) {
-    const payload: Partial<SociaAtelier> = {
-      nombre: nombre.value.trim(),
-      rol: rol.value.trim() || 'Socia Colaboradora',
-      porcentaje: Number(porcentaje.value) || 0,
-      es_fondo_taller: esFondoTaller.value,
-      telefono: telefono.value.trim(),
-      email: email.value.trim(),
-      banco: banco.value.trim(),
-      tipo_cuenta: tipoCuenta.value.trim(),
-      numero_cuenta: numeroCuenta.value.trim(),
-      titular_cuenta: titularCuenta.value.trim() || nombre.value.trim(),
-      activo: activo.value,
-      notas: notas.value.trim(),
-    }
-    if (isEditing.value && props.sociaEditar) {
-      const act = atelier.actualizarSocia(props.sociaEditar.id, payload)
-      if (act) {
-        showToast('success', 'Socia Actualizada', `Perfil de ${act.nombre} actualizado correctamente.`)
-        emit('guardada', act)
-      }
-    } else {
-      const nueva = atelier.crearSocia(payload)
-      showToast('success', 'Socia Registrada', `${nueva.nombre} ha sido añadida con ${nueva.porcentaje}% de participación.`)
-      emit('guardada', nueva)
-    }
-    emit('update:visible', false)
-    return
-  }
 
   // Real API
   const apiPayload = {
@@ -166,12 +161,12 @@ async function guardar() {
   try {
     if (isEditing.value && props.sociaEditar) {
       const updated = await sociosApi.update(props.sociaEditar.id, apiPayload)
-      showToast('success', 'Socia Actualizada', `Perfil de ${(updated as SociaAtelier).nombre ?? apiPayload.nombre} actualizado.`)
-      emit('guardada', updated as unknown as SociaAtelier)
+      showToast('success', 'Socia Actualizada', `Perfil de ${updated?.nombre ?? apiPayload.nombre} actualizado.`)
+      if (updated) emit('guardada', updated)
     } else {
       const created = await sociosApi.create(apiPayload)
-      showToast('success', 'Socia Registrada', `${(created as SociaAtelier).nombre ?? apiPayload.nombre} registrada con ${apiPayload.porcentaje_participacion}%.`)
-      emit('guardada', created as unknown as SociaAtelier)
+      showToast('success', 'Socia Registrada', `${created.nombre ?? apiPayload.nombre} registrada con ${apiPayload.porcentaje_participacion}%.`)
+      emit('guardada', created)
     }
     emit('update:visible', false)
   } catch (e: unknown) {
@@ -248,8 +243,7 @@ async function guardar() {
             <label class="block text-[10px] text-stone-400 uppercase font-bold tracking-wider mb-1">
               Tipo de Cuenta
             </label>
-            <Dropdown v-if="!isMock" v-model="tipoCuenta" :options="tiposCuentaOptions" option-label="label" option-value="value" class="w-full text-xs" />
-            <InputText v-else v-model="tipoCuenta" class="w-full text-xs" placeholder="Ahorros / Corriente / Digital" />
+            <Dropdown v-model="tipoCuenta" :options="tiposCuentaOptions" option-label="label" option-value="value" class="w-full text-xs" />
           </div>
 
           <div>

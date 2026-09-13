@@ -3,39 +3,66 @@
 import { computed, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
-import { type VentaAtelier, useAtelierStore } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { useClientes } from '@/composables/useClientes'
+
+/** Minimal venta shape this modal reads (REAL display object from the caller). */
+export interface VentaDetalleItem {
+  id: number
+  cantidad: number
+  nombre_prenda: string
+  talla: string
+  color: string
+  precio_unitario: number
+  subtotal: number
+}
+export interface VentaDetalle {
+  id: number
+  codigo: string
+  cliente_id: number | null
+  cliente_nombre: string
+  fecha: string
+  canal: string
+  metodo_pago: string
+  estado: string
+  items: VentaDetalleItem[]
+  subtotal: number
+  descuento_porcentaje: number
+  descuento_valor: number
+  total_venta: number
+  costo_total: number
+  ganancia_neta: number
+  margen_pct: number
+  reinversion_40?: number
+  margarita_30?: number
+  valqui_30?: number
+  observaciones?: string
+}
 
 const props = defineProps<{
   visible: boolean
-  venta: VentaAtelier | null
+  venta: VentaDetalle | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'editar', venta: VentaAtelier): void
+  (e: 'editar', venta: VentaDetalle): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const clientesApi = useClientes()
-const clienteReal = ref<any>(null)
+const cliente = ref<any>(null)
 
 async function cargarCliente() {
-  clienteReal.value = null
-  if (isMock.value || !props.venta?.cliente_id) return
+  cliente.value = null
+  if (!props.venta?.cliente_id) return
   try {
-    clienteReal.value = await clientesApi.get(props.venta.cliente_id)
-  } catch { clienteReal.value = null }
+    cliente.value = await clientesApi.get(props.venta.cliente_id)
+  } catch { cliente.value = null }
 }
 watch(() => props.venta, () => { void cargarCliente() }, { immediate: true })
-watch(isMock, () => { void cargarCliente() })
 
 const clienteVinculado = computed(() => {
   if (!props.venta?.cliente_id) return null
-  if (!isMock.value) return clienteReal.value
-  return atelier.clientes.find((c) => c.id === props.venta?.cliente_id) || null
+  return cliente.value
 })
 
 const telefonoLimpio = computed(() => String(clienteVinculado.value?.telefono || '').replace(/\D/g, ''))

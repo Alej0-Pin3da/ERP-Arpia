@@ -5,24 +5,21 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
-import { useAtelierStore, type ClienteCRM } from '@/stores/atelier'
+import { type ClienteRead } from '@/services/api/clientes'
 import { showToast } from '@/utils/toast'
-import { useMode } from '@/composables/useMode'
 import { useClientes } from '@/composables/useClientes'
 import { toTallaCode } from '@/utils/tallas'
 
 const props = defineProps<{
   visible: boolean
-  clienteEditar?: ClienteCRM | null
+  clienteEditar?: ClienteRead | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'cliente-guardado', cliente: ClienteCRM): void
+  (e: 'cliente-guardado', cliente: ClienteRead): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const clientesApi = useClientes()
 
 const guardando = ref(false)
@@ -115,36 +112,6 @@ async function guardar() {
   const esSinTalla = tallaHabitual.value.includes('Sin Talla') || categoriaPreferida.value.includes('Tote Bags')
   const tipoFrecuente = esSinTalla ? 'PRODUCTOS_SIN_TALLA' : 'PRENDAS_TALLAS'
 
-  if (isMock.value) {
-    const payload: Partial<ClienteCRM> = {
-      nombre: nombre.value.trim(),
-      tipo: tipo.value,
-      telefono: telefono.value.trim(),
-      email: email.value.trim(),
-      ciudad: ciudad.value.trim(),
-      direccion: direccion.value.trim(),
-      talla_habitual: tallaHabitual.value,
-      talla_superior: tallaSuperior.value,
-      talla_inferior: tallaInferior.value,
-      categoria_preferida: categoriaPreferida.value,
-      tipo_producto_frecuente: tipoFrecuente,
-      notas: notas.value.trim(),
-    }
-    if (props.clienteEditar) {
-      if (!isMock.value) { showToast('info','Modo REAL','Usá PATCH /clientes/:id'); return }
-      if (!isMock.value) { showToast('info','Modo REAL','Use Clientes API'); return }
-      atelier.actualizarCliente(props.clienteEditar.id, payload)
-      showToast('success', 'Clienta Actualizada', `${nombre.value} actualizada correctamente.`)
-    } else {
-      if (!isMock.value) { showToast('info','Modo REAL','Usá POST /clientes'); return }
-      if (!isMock.value) { showToast('info','Modo REAL','Use Clientes API'); return }
-      const c = atelier.crearCliente(payload)
-      showToast('success', 'Clienta Registrada', `${c.nombre} registrada en el CRM con talla ${tallaHabitual.value}.`)
-    }
-    emit('update:visible', false)
-    return
-  }
-
   const apiPayload = {
     nombre: nombre.value.trim(),
     tipo: tipo.value,
@@ -163,11 +130,13 @@ async function guardar() {
   guardando.value = true
   try {
     if (props.clienteEditar) {
-      await clientesApi.update(props.clienteEditar.id, apiPayload)
+      const updated = await clientesApi.update(props.clienteEditar.id, apiPayload)
       showToast('success', 'Clienta Actualizada', `${nombre.value} actualizada.`)
+      if (updated) emit('cliente-guardado', updated)
     } else {
-      await clientesApi.create(apiPayload)
+      const created = await clientesApi.create(apiPayload)
       showToast('success', 'Clienta Registrada', `${nombre.value} registrada en BD.`)
+      emit('cliente-guardado', created)
     }
     emit('update:visible', false)
   } catch (e: unknown) {

@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 import * as auditoriaApi from '@/services/api/auditoria'
 import type { PrecioVersionRead, CostoVersionRead, CierreMensualRead } from '@/services/api/auditoria'
-
-const { isMock } = useMode()
 
 type Tab = 'precios' | 'costos' | 'cierres'
 const activeTab = ref<Tab>('precios')
@@ -38,8 +35,7 @@ function productoIdParam(): { producto_id?: number } {
   return Number.isInteger(n) && n > 0 ? { producto_id: n } : {}
 }
 
-async function cargarReales() {
-  if (isMock.value) return
+async function cargarAuditoria() {
   loading.value = true
   try {
     const params = productoIdParam()
@@ -62,16 +58,15 @@ async function cargarReales() {
 }
 
 function aplicarFiltro() {
-  void cargarReales()
+  void cargarAuditoria()
 }
 
 function limpiarFiltro() {
   filtroProductoId.value = ''
-  void cargarReales()
+  void cargarAuditoria()
 }
 
-onMounted(() => { void cargarReales() })
-watch(isMock, () => { void cargarReales() })
+onMounted(() => { void cargarAuditoria() })
 </script>
 
 <template>
@@ -85,18 +80,7 @@ watch(isMock, () => { void cargarReales() })
       </p>
     </div>
 
-    <div v-if="isMock" class="rounded-2xl border border-stone-800 bg-stone-900/40 p-6">
-      <div class="py-8 text-center text-stone-500">
-        <i class="pi pi-inbox text-2xl mb-2 block" />
-        Sin datos de auditoría en modo MOCK.
-        <span class="block text-[11px] mt-1">
-          Cambiá a modo REAL para leer <code>GET /api/v1/audit-fiscal/precio-versions</code>,
-          <code>/costo-versions</code> y <code>/cierres</code>. Esta vista no modifica datos del atelier.
-        </span>
-      </div>
-    </div>
-
-    <div v-else class="rounded-2xl border border-stone-800 bg-stone-900/40 p-6 space-y-4">
+    <div class="rounded-2xl border border-stone-800 bg-stone-900/40 p-6 space-y-4">
       <div class="flex flex-wrap items-center gap-2">
         <button
           v-for="t in tabs"

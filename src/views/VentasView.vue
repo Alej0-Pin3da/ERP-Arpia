@@ -1,25 +1,58 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
 import Dialog from 'primevue/dialog'
-import { useAtelierStore, type VentaAtelier } from '@/stores/atelier'
 import NuevaVentaModal from '@/components/atelier/NuevaVentaModal.vue'
 import DetalleVentaModal from '@/components/atelier/DetalleVentaModal.vue'
 import ResponsiveTable from '@/components/ResponsiveTable.vue'
 import { showToast } from '@/utils/toast'
-import { useMode } from '@/composables/useMode'
 import { useVentas } from '@/composables/useVentas'
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const ventasApi = useVentas()
 
-const ventasReal = ref<VentaAtelier[]>([])
+/** REAL display shape: backend VentaRead normalized for this view. */
+interface VentaItemDisplay {
+  id: number
+  producto_id: number | null | undefined
+  nombre_prenda: string
+  talla: string
+  color: string
+  cantidad: number
+  precio_unitario: number
+  costo_unitario: number
+  subtotal: number
+  costo_subtotal: number
+}
+interface VentaDisplay {
+  id: number
+  codigo: string
+  cliente_id: number | null
+  cliente_nombre: string
+  fecha: string
+  canal: string
+  metodo_pago: string
+  estado: string
+  items: VentaItemDisplay[]
+  subtotal: number
+  descuento_porcentaje: number
+  descuento_valor: number
+  total_venta: number
+  costo_total: number
+  ganancia_neta: number
+  margen_pct: number
+  reinversion_40: number
+  margarita_30: number
+  valqui_30: number
+  observaciones?: string
+  descontar_inventario?: boolean
+}
+
+const ventas = ref<VentaDisplay[]>([])
 const cargandoVentas = ref(false)
 
-function normalizeVenta(raw: Record<string, unknown>): VentaAtelier {
+function normalizeVenta(raw: Record<string, unknown>): VentaDisplay {
   return {
     id: raw.id as number,
     codigo: (raw.codigo as string) ?? `VEN-${raw.id}`,
@@ -28,7 +61,7 @@ function normalizeVenta(raw: Record<string, unknown>): VentaAtelier {
     fecha: (raw.fecha as string) ?? new Date().toISOString().split('T')[0],
     canal: (raw.canal_venta as string) ?? (raw.canal as string) ?? 'web',
     metodo_pago: (raw.metodo_pago as string) ?? 'efectivo',
-    estado: (raw.estado as VentaAtelier['estado']) ?? 'COMPLETADA',
+    estado: (raw.estado as string) ?? 'COMPLETADA',
     items: (raw.detalles as unknown[] ?? raw.items as unknown[] ?? []).map((it: unknown) => {
       const d = it as Record<string, unknown>
       return {
@@ -69,23 +102,20 @@ function normalizeVenta(raw: Record<string, unknown>): VentaAtelier {
   }
 }
 
-async function cargarVentasReales() {
-  if (isMock.value) return
+async function cargarVentas() {
   cargandoVentas.value = true
   try {
     const res = await ventasApi.list({ limit: 100, offset: 0 })
-    ventasReal.value = (res.items as unknown as Record<string, unknown>[]).map(normalizeVenta)
+    ventas.value = (res.items as unknown as Record<string, unknown>[]).map(normalizeVenta)
   } catch {
-    // fallback to atelier
+    // keep previous state
   } finally {
     cargandoVentas.value = false
   }
 }
 
-onMounted(() => void cargarVentasReales())
-watch(isMock, () => void cargarVentasReales())
+onMounted(() => void cargarVentas())
 
-const ventasList = computed<VentaAtelier[]>(() => (isMock.value ? (atelier.ventas as unknown as VentaAtelier[]) : ventasReal.value))
 void cargandoVentas
 
 // Search & Filter state
@@ -99,11 +129,11 @@ const showNuevaVentaModal = ref(false)
 const showDetalleModal = ref(false)
 const showDeleteConfirmModal = ref(false)
 
-const ventaSeleccionadaEditar = ref<VentaAtelier | null>(null)
-const ventaSeleccionadaDetalle = ref<VentaAtelier | null>(null)
-const ventaAEliminar = ref<VentaAtelier | null>(null)
+const ventaSeleccionadaEditar = ref<VentaDisplay | null>(null)
+const ventaSeleccionadaDetalle = ref<VentaDisplay | null>(null)
+const ventaAEliminar = ref<VentaDisplay | null>(null)
 
-watch(showNuevaVentaModal, (v) => { if (!v && !isMock.value) void cargarVentasReales() })
+watch(showNuevaVentaModal, (v) => { if (!v) void cargarVentas() })
 
 const canalesFilterOptions = [
   { label: 'Todos los Canales', value: 'TODOS' },
@@ -135,7 +165,7 @@ function formatCOP(val: number) {
 }
 
 const ventasFiltradas = computed(() => {
-  let list = [...ventasList.value]
+  let list = [...ventas.value]
 
   // Filter by text search
   if (search.value.trim()) {
@@ -199,22 +229,22 @@ function abrirNuevaVenta() {
   showNuevaVentaModal.value = true
 }
 
-function abrirEditarVenta(v: VentaAtelier) {
+function abrirEditarVenta(v: VentaDisplay) {
   ventaSeleccionadaEditar.value = v
   showNuevaVentaModal.value = true
 }
 
-function abrirDetalle(v: VentaAtelier) {
+function abrirDetalle(v: VentaDisplay) {
   ventaSeleccionadaDetalle.value = v
   showDetalleModal.value = true
 }
 
-function abrirEditarDesdeDetalle(v: VentaAtelier) {
+function abrirEditarDesdeDetalle(v: VentaDisplay) {
   showDetalleModal.value = false
   abrirEditarVenta(v)
 }
 
-function solicitarEliminarVenta(v: VentaAtelier) {
+function solicitarEliminarVenta(v: VentaDisplay) {
   ventaAEliminar.value = v
   showDeleteConfirmModal.value = true
 }
@@ -223,18 +253,13 @@ async function confirmarEliminar() {
   if (ventaAEliminar.value) {
     const cod = ventaAEliminar.value.codigo
     const id = ventaAEliminar.value.id
-    if (isMock.value) {
-      const ok = atelier.eliminarVenta(id)
-      if (ok) showToast('info', 'Venta Eliminada', `La venta ${cod} ha sido removida del registro.`)
-    } else {
-      try {
-        await ventasApi.anular(id)
-        await cargarVentasReales()
-        showToast('info', 'Venta Anulada', `La venta ${cod} ha sido anulada.`)
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Error al anular venta'
-        showToast('error', 'Error', String(msg))
-      }
+    try {
+      await ventasApi.anular(id)
+      await cargarVentas()
+      showToast('info', 'Venta Anulada', `La venta ${cod} ha sido anulada.`)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error al anular venta'
+      showToast('error', 'Error', String(msg))
     }
   }
   showDeleteConfirmModal.value = false
@@ -263,7 +288,7 @@ function exportarCSV() {
     'Observaciones',
   ]
 
-  const rows = ventasList.value.map((v) => [
+  const rows = ventas.value.map((v) => [
     `"${v.codigo}"`,
     `"${v.fecha}"`,
     `"${v.cliente_nombre}"`,
@@ -306,10 +331,10 @@ function exportarCSV() {
             <span>Registro de Ventas Realizadas</span>
           </h1>
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/30 uppercase tracking-wider font-mono">
-            {{ ventasList.length }} Ventas Totales
+            {{ ventas.length }} Ventas Totales
           </span>
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 font-mono">
-            {{ formatCOP(ventasList.reduce((a, v) => a + v.total_venta, 0)) }}
+            {{ formatCOP(ventas.reduce((a, v) => a + v.total_venta, 0)) }}
           </span>
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">

@@ -2,13 +2,23 @@
 import { computed } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
-import { type PrendaConfeccionada, type PrendaVariante } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
+
+/** Minimal shapes this modal reads (REAL display objects from the caller). */
+export interface EtiquetaPrenda {
+  codigo: string
+  nombre: string
+  precio_venta: number
+}
+export interface EtiquetaVariante {
+  talla: string
+  sku?: string
+}
 
 const props = defineProps<{
   visible: boolean
-  prenda: PrendaConfeccionada | null
-  variante: PrendaVariante | null
+  prenda: EtiquetaPrenda | null
+  variante: EtiquetaVariante | null
 }>()
 
 const emit = defineEmits<{

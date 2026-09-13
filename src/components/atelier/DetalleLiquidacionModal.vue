@@ -3,32 +3,57 @@ import { ref } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import { useAtelierStore, type LiquidacionSocias, type LiquidacionSociaItem } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
+
+/** Minimal liquidación shape this modal reads (REAL display object from the caller). */
+export interface LiquidacionDetalleItem {
+  socia_id: number
+  nombre_socia: string
+  rol_socia?: string
+  porcentaje: number
+  monto_bruto: number
+  deduccion_anticipos: number
+  monto_neto_pagar: number
+  estado_pago: string
+  fecha_pago?: string
+  comprobante_transferencia?: string
+  banco_destino?: string
+}
+export interface LiquidacionDetalle {
+  id: number
+  codigo: string
+  periodo: string
+  fecha_cierre: string
+  total_ventas_brutas: number
+  costo_taller_insumos: number
+  gastos_operativos: number
+  utilidad_neta_total: number
+  fondo_reinversion_monto: number
+  utilidad_repartible: number
+  estado: string
+  distribucion: LiquidacionDetalleItem[]
+  observaciones?: string
+}
 
 const props = defineProps<{
   visible: boolean
-  liquidacion: LiquidacionSocias | null
+  liquidacion: LiquidacionDetalle | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'editar', liq: LiquidacionSocias): void
+  (e: 'editar', liq: LiquidacionDetalle): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
-
 const modalPagoVisible = ref(false)
-const sociaPagoSeleccionada = ref<LiquidacionSociaItem | null>(null)
+const sociaPagoSeleccionada = ref<LiquidacionDetalleItem | null>(null)
 const comprobanteInput = ref('')
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
 }
 
-function abrirRegistroPago(item: LiquidacionSociaItem) {
+function abrirRegistroPago(item: LiquidacionDetalleItem) {
   sociaPagoSeleccionada.value = item
   comprobanteInput.value = item.comprobante_transferencia || `TR-${Date.now().toString().slice(-6)}`
   modalPagoVisible.value = true
@@ -37,25 +62,9 @@ function abrirRegistroPago(item: LiquidacionSociaItem) {
 function confirmarPagoSocia() {
   if (!props.liquidacion || !sociaPagoSeleccionada.value) return
 
-  if (!isMock.value) {
-    // La API no tiene endpoint de pago por socia (solo transición de la
-    // liquidación completa): no se finge un éxito que no se persistió.
-    showToast('info', 'Modo REAL', 'El pago por socia se gestiona con la transición de la liquidación en Finanzas.')
-    modalPagoVisible.value = false
-    return
-  }
-  atelier.marcarPagoSociaItem(
-    props.liquidacion.id,
-    sociaPagoSeleccionada.value.socia_id,
-    comprobanteInput.value.trim()
-  )
-
-  showToast(
-    'success',
-    'Pago Registrado',
-    `Se marcó como PAGADO el monto de ${formatCOP(sociaPagoSeleccionada.value.monto_neto_pagar)} para ${sociaPagoSeleccionada.value.nombre_socia}.`
-  )
-
+  // La API no tiene endpoint de pago por socia (solo transición de la
+  // liquidación completa): no se finge un éxito que no se persistió.
+  showToast('info', 'Modo REAL', 'El pago por socia se gestiona con la transición de la liquidación en Finanzas.')
   modalPagoVisible.value = false
 }
 
@@ -282,15 +291,6 @@ function compartirWhatsApp() {
 
     <template #footer>
       <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-stone-800">
-        <Button
-          v-if="isMock"
-          label="Editar Liquidación"
-          icon="pi pi-pencil"
-          size="small"
-          class="p-button-outlined p-button-secondary text-xs"
-          @click="liquidacion && emit('editar', liquidacion)"
-        />
-
         <div class="flex items-center gap-2">
           <Button
             label="Compartir WhatsApp"

@@ -1,40 +1,23 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
-import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 import { useDevoluciones } from '@/composables/useDevoluciones'
 import type { DevolucionCreatePayload } from '@/services/api/devoluciones'
 
-const { isMock } = useMode()
 const devolucionesApi = useDevoluciones()
-const devoluciones = ref([
-
-  {
-    id: 1,
-    codigo: 'GAR-001',
-    prenda: 'Corset Nocturna Brocado',
-    cliente: 'Carolina Gómez',
-    motivo: 'Ajuste de varillas laterales por reducción de talle',
-    tipo: 'Ajuste a Medida (Garantía Atelier)',
-    estado: 'confirmed',
-    fecha: '2026-08-19',
-  },
-])
-const devolucionesReal = ref<any[]>([])
-async function cargarDevolucionesReales() {
-  if (isMock.value) return
+const devoluciones = ref<any[]>([])
+async function cargarDevoluciones() {
   try {
     const r = await devolucionesApi.list({ limit: 100 })
-    devolucionesReal.value = (r as any).items ?? []
-  } catch { devolucionesReal.value = [] }
+    devoluciones.value = (r as any).items ?? []
+  } catch { devoluciones.value = [] }
 }
-onMounted(() => { void cargarDevolucionesReales() })
-watch(isMock, () => { void cargarDevolucionesReales() })
-const devolucionesDisplay = computed(() => isMock.value ? devoluciones.value : (devolucionesReal.value.length ? devolucionesReal.value.map((d: any, idx: number) => ({
+onMounted(() => { void cargarDevoluciones() })
+const devolucionesDisplay = computed(() => devoluciones.value.map((d: any) => ({
   id: d.id,
   codigo: `GAR-${d.id}`,
   // Nombres reales resueltos por el backend (sin inventar "Cliente N").
@@ -45,7 +28,7 @@ const devolucionesDisplay = computed(() => isMock.value ? devoluciones.value : (
   estado: d.estado || 'draft',
   // DevolucionRead manda `fecha` (no `creado_en`); se aceptan alias por compat.
   fecha: (d.fecha ?? d.creado_en ?? d.created_at ?? '') as string,
-})) : []))
+})))
 
 // --- Create devolucion (P0-1) ---
 const showCreateDialog = ref(false)
@@ -102,14 +85,9 @@ async function confirmarEliminarDevolucion() {
   const target = devolucionAEliminar.value
   deleting.value = true
   try {
-    if (isMock.value) {
-      devoluciones.value = devoluciones.value.filter((d) => d.id !== target.id)
-      showToast('info', 'Devolución eliminada', `Garantía ${target.codigo} eliminada en modo MOCK.`)
-    } else {
-      await devolucionesApi.remove(target.id)
-      showToast('success', 'Devolución eliminada', `Devolución #${target.id} eliminada.`)
-      await cargarDevolucionesReales()
-    }
+    await devolucionesApi.remove(target.id)
+    showToast('success', 'Devolución eliminada', `Devolución #${target.id} eliminada.`)
+    await cargarDevoluciones()
     devolucionAEliminar.value = null
     showDeleteDialog.value = false
   } catch (e: unknown) {
@@ -147,26 +125,9 @@ async function submitCreate() {
             }))
         : null,
     }
-    if (isMock.value) {
-      const nextId = devoluciones.value.length
-        ? Math.max(...devoluciones.value.map((d) => d.id)) + 1
-        : 1
-      devoluciones.value.unshift({
-        id: nextId,
-        codigo: `GAR-${String(nextId).padStart(3, '0')}`,
-        prenda: `Venta #${payload.venta_id}`,
-        cliente: `Cliente ${payload.venta_id}`,
-        motivo: payload.motivo || 'Ajuste Atelier',
-        tipo: payload.tipo === 'total' ? 'Devolución total' : 'Devolución parcial',
-        estado: 'draft',
-        fecha: new Date().toISOString().split('T')[0],
-      })
-      showToast('success', 'Devolución registrada', `Garantía GAR-${String(nextId).padStart(3, '0')} creada en modo MOCK.`)
-    } else {
-      const created = await devolucionesApi.create(payload) as { id: number }
-      showToast('success', 'Devolución registrada', `Devolución #${created.id} creada para la venta #${payload.venta_id}.`)
-      await cargarDevolucionesReales()
-    }
+    const created = await devolucionesApi.create(payload) as { id: number }
+    showToast('success', 'Devolución registrada', `Devolución #${created.id} creada para la venta #${payload.venta_id}.`)
+    await cargarDevoluciones()
     showCreateDialog.value = false
   } catch (e: unknown) {
     showToast('error', 'Error al registrar', extractDetail(e))
@@ -213,8 +174,8 @@ async function submitCreate() {
           <tr v-if="!devolucionesDisplay.length">
                 <td colspan="6" class="py-8 text-center text-stone-500">
                   <i class="pi pi-inbox text-2xl mb-2 block" />
-                  Sin garantías registradas en modo {{ isMock ? 'MOCK' : 'REAL' }}.
-                  <span v-if="!isMock" class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/devoluciones</code>.</span>
+                  Sin garantías registradas.
+                  <span class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/devoluciones</code>.</span>
                 </td>
               </tr>
           <tr v-for="d in devolucionesDisplay" :key="d.id">
@@ -246,7 +207,7 @@ async function submitCreate() {
       </div>
       <!-- Mobile cards: same devolucionesDisplay. No horizontal scroll. -->
       <div class="space-y-3 md:hidden max-w-full min-w-0">
-        <div v-if="!devolucionesDisplay.length" class="text-center py-8 text-sm text-stone-500">Sin garantías registradas en modo {{ isMock ? 'MOCK' : 'REAL' }}.</div>
+        <div v-if="!devolucionesDisplay.length" class="text-center py-8 text-sm text-stone-500">Sin garantías registradas.</div>
         <div v-for="d in devolucionesDisplay" :key="d.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
           <div class="flex items-start justify-between gap-2 min-w-0">
             <div class="font-bold text-sm text-stone-100 min-w-0">{{ d.prenda }}</div>

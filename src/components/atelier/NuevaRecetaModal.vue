@@ -6,24 +6,39 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
-import { useAtelierStore, type RecetaBOM } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 import * as productosApi from '@/services/api/productos'
 
+/** Emit payload: mapped display shape consumed by ProductosView (REAL data flow). */
+export interface RecetaEmit {
+  id: number
+  codigo: string
+  nombre: string
+  categoria: string
+  linea: string
+  descripcion: string
+  tiempo_confeccion_min: number | null
+  costo_insumos: number | null
+  mano_obra: number
+  cif_energia: number
+  costo_total_unitario: number
+  precio_venta: number
+  markup_pct: number
+  recomendaciones_taller: string
+  items: unknown[]
+  fases: unknown[]
+}
+
 const props = defineProps<{
   visible: boolean
-  receta?: RecetaBOM | null
+  receta?: RecetaEmit | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'receta-creada', receta: RecetaBOM): void
-  (e: 'receta-actualizada', receta: RecetaBOM): void
+  (e: 'receta-creada', receta: RecetaEmit): void
+  (e: 'receta-actualizada', receta: RecetaEmit): void
 }>()
-
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 
 const isEditing = computed(() => !!props.receta)
 
@@ -55,7 +70,6 @@ const categoriasOptions = [
 const lineasOptions = ['Corsetería', 'Prêt-à-Porter', 'Lencería Fina', 'Alta Costura']
 
 async function cargarTipos() {
-  if (isMock.value) return
   try {
     const r = await productosApi.listTiposProducto({ limit: 50 })
     tiposOptions.value = r.items.map((t) => ({ label: t.nombre, value: t.id }))
@@ -116,62 +130,7 @@ async function guardar() {
     return
   }
 
-  // MOCK branch
-  if (isMock.value) {
-    if (isEditing.value && props.receta) {
-      const idx = atelier.recetas.findIndex((x) => x.id === props.receta!.id)
-      if (idx !== -1) {
-        const updated = {
-          ...atelier.recetas[idx],
-          codigo: codigo.value.trim() || atelier.recetas[idx].codigo,
-          nombre: nombre.value.trim(),
-          categoria: categoria.value,
-          linea: linea.value,
-          descripcion: descripcion.value.trim() || 'Ficha técnica de confección en taller.',
-          tiempo_confeccion_min: tiempoConfeccion.value,
-          costo_insumos: costoInsumos.value,
-          mano_obra: manoObra.value,
-          cif_energia: cifEnergia.value,
-          precio_venta: precioVenta.value,
-          costo_total_unitario: costoInsumos.value + manoObra.value + cifEnergia.value,
-          precio_venta_sugerido: precioVenta.value,
-          markup_pct: precioVenta.value ? Math.round(((precioVenta.value - (costoInsumos.value + manoObra.value + cifEnergia.value)) / precioVenta.value) * 100) : 60,
-          recomendaciones_taller: recomendaciones.value.trim() || 'Seguir patrones anatómicos y pruebas de entalle.',
-        }
-        atelier.recetas[idx] = updated as RecetaBOM
-        showToast('success', 'Receta actualizada', `Ficha ${updated.codigo} - ${updated.nombre} actualizada.`)
-        emit('receta-actualizada', updated as RecetaBOM)
-        emit('update:visible', false)
-        return
-      }
-    }
-    const r = atelier.crearReceta({
-      codigo: codigo.value.trim() || `REC-ARP-0${atelier.recetas.length + 1}`,
-      nombre: nombre.value.trim(),
-      categoria: categoria.value,
-      linea: linea.value,
-      descripcion: descripcion.value.trim() || 'Ficha técnica de confección en taller.',
-      tiempo_confeccion_min: tiempoConfeccion.value,
-      costo_insumos: costoInsumos.value,
-      mano_obra: manoObra.value,
-      cif_energia: cifEnergia.value,
-      precio_venta: precioVenta.value,
-      markup_pct: precioVenta.value ? Math.round(((precioVenta.value - (costoInsumos.value + manoObra.value + cifEnergia.value)) / precioVenta.value) * 100) : 60,
-      recomendaciones_taller: recomendaciones.value.trim() || 'Seguir patrones anatómicos y pruebas de entalle.',
-      items: [
-        { id: 1, insumo_id: 1, nombre: 'Tela Principal', tipo: 'Directo', consumo_unitario: 1, unidad: 'm', merma_pct: 4, costo_unitario: costoInsumos.value, subtotal: costoInsumos.value },
-      ],
-    })
-    showToast('success', 'Receta creada', `Ficha ${r.codigo} - ${r.nombre} guardada correctamente.`)
-    emit('receta-creada', r)
-    emit('update:visible', false)
-    nombre.value = ''
-    codigo.value = ''
-    descripcion.value = ''
-    return
-  }
-
-  // REAL branch — POST / PUT /productos
+  // REAL — POST / PUT /productos
   saving.value = true
   try {
     // Ensure tipo_producto_id
@@ -205,8 +164,8 @@ async function guardar() {
     if (isEditing.value && props.receta) {
       const updated = await productosApi.updateProducto(props.receta.id, basePayload)
       showToast('success', 'Producto actualizado', `${updated.nombre} actualizado correctamente.`)
-      // Map to RecetaBOM for emit
-      const mapped: RecetaBOM = {
+      // Map to display shape for emit
+      const mapped: RecetaEmit = {
         id: updated.id,
         codigo: `PRD-${updated.id}`,
         nombre: updated.nombre,
@@ -223,12 +182,12 @@ async function guardar() {
         recomendaciones_taller: recomendaciones.value.trim(),
         items: [],
         fases: [],
-      } as unknown as RecetaBOM
+      }
       emit('receta-actualizada', mapped)
     } else {
       const created = await productosApi.createProducto(basePayload)
       showToast('success', 'Producto creado', `${created.nombre} creado correctamente.`)
-      const mapped: RecetaBOM = {
+      const mapped: RecetaEmit = {
         id: created.id,
         codigo: `PRD-${created.id}`,
         nombre: created.nombre,
@@ -245,7 +204,7 @@ async function guardar() {
         recomendaciones_taller: recomendaciones.value.trim(),
         items: [],
         fases: [],
-      } as unknown as RecetaBOM
+      }
       emit('receta-creada', mapped)
     }
     emit('update:visible', false)
@@ -289,7 +248,7 @@ async function guardar() {
         </div>
       </div>
 
-      <div v-if="!isMock" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Tipo de Producto *</label>
           <Dropdown v-model="tipoProductoId" :options="tiposOptions" optionLabel="label" optionValue="value" placeholder="Seleccionar tipo" class="w-full" />

@@ -1,47 +1,27 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
-import { useMode } from '@/composables/useMode'
 import { useOmisiones } from '@/composables/useOmisiones'
 import { showToast } from '@/utils/toast'
 
-const { isMock } = useMode()
 const omisionesApi = useOmisiones()
-const omisiones = ref<any[]>([
-  {
-    id: 1,
-    fecha: '2026-08-20 14:30',
-    usuario: 'Camila Modista',
-    evento: 'Descuento manual de merma en encaje Chantilly por falla de estiramiento',
-    impacto: '-0.35m Tela',
-  },
-  {
-    id: 2,
-    fecha: '2026-08-18 10:15',
-    usuario: 'Valeria Arpía',
-    evento: 'Ajuste de precio de cotización especial para clienta VIP',
-    impacto: 'Descuento $40.000 COP',
-  },
-])
 
-const omisionesReal = ref<any[]>([])
-async function cargarOmisionesReales() {
-  if (isMock.value) return
+const omisiones = ref<any[]>([])
+async function cargarOmisiones() {
   try {
     const r = await omisionesApi.list({ limit: 100 })
-    omisionesReal.value = (r as any).items ?? []
-  } catch { omisionesReal.value = [] }
+    omisiones.value = (r as any).items ?? []
+  } catch { omisiones.value = [] }
 }
-onMounted(() => { void cargarOmisionesReales() })
-watch(isMock, () => { void cargarOmisionesReales() })
-const omisionesDisplay = computed(() => isMock.value ? omisiones.value : (omisionesReal.value.length ? omisionesReal.value.map((o: any) => ({
+onMounted(() => { void cargarOmisiones() })
+const omisionesDisplay = computed(() => omisiones.value.map((o: any) => ({
   id: o.id,
   fecha: o.creado_en || '',
   usuario: o.hoja || 'Sistema',
   evento: o.mensaje || o.fase || 'Omisión',
   impacto: o.nivel || '',
   resuelta: Boolean(o.resuelta),
-})) : []))
+})))
 
 const resolviendoId = ref<number | null>(null)
 
@@ -50,7 +30,7 @@ async function marcarResuelta(o: { id: number }) {
   try {
     await omisionesApi.resolve(o.id, true)
     showToast('success', 'Omisión resuelta', `Omisión #${o.id} marcada como resuelta.`)
-    await cargarOmisionesReales()
+    await cargarOmisiones()
   } catch (e: unknown) {
     const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
     showToast('error', 'No se pudo resolver', typeof detail === 'string' ? detail : 'Revisá permisos (solo admin) e intentá de nuevo.')
@@ -87,8 +67,8 @@ async function marcarResuelta(o: { id: number }) {
           <tr v-if="!omisionesDisplay.length">
                 <td colspan="5" class="py-8 text-center text-stone-500">
                   <i class="pi pi-inbox text-2xl mb-2 block" />
-                  Sin omisiones registradas en modo {{ isMock ? 'MOCK' : 'REAL' }}.
-                  <span v-if="!isMock" class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/omisiones</code>.</span>
+                  Sin omisiones registradas.
+                  <span class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/omisiones</code>.</span>
                 </td>
               </tr>
           <tr v-for="o in omisionesDisplay" :key="o.id">
@@ -120,7 +100,7 @@ async function marcarResuelta(o: { id: number }) {
       </div>
       <!-- Mobile cards: same omisionesDisplay. No horizontal scroll. -->
       <div class="space-y-3 md:hidden max-w-full min-w-0">
-        <div v-if="!omisionesDisplay.length" class="text-center py-8 text-sm text-stone-500">Sin omisiones registradas en modo {{ isMock ? 'MOCK' : 'REAL' }}.</div>
+        <div v-if="!omisionesDisplay.length" class="text-center py-8 text-sm text-stone-500">Sin omisiones registradas.</div>
         <div v-for="o in omisionesDisplay" :key="o.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
           <div class="flex items-start justify-between gap-2 min-w-0">
             <div class="font-bold text-sm text-amber-300 min-w-0">{{ o.usuario }}</div>

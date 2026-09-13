@@ -9,7 +9,7 @@
  * - Atelier status chip ("Taller Activo • Pereira, Colombia")
  * - Role-aware access and top-bar actions
  */
-import { computed, ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import SidebarMenu from '@/components/layout/SidebarMenu.vue'
@@ -17,31 +17,23 @@ import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
 import NotificacionesModal from '@/components/atelier/NotificacionesModal.vue'
 import ApiModeBadge from '@/components/ApiModeBadge.vue'
 import { useAuthStore } from '@/stores/auth'
-import { useAtelierStore } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { useInsumos } from '@/composables/useInsumos'
-import { installMockGuard } from '@/utils/mockGuard'
 import { roleLabel } from '@/utils/menu'
 import arpiaBrandLogo from '@/assets/arpia-05-1-100x100.png'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 
 const auth = useAuthStore()
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const insumosApi = useInsumos()
-const insumosRealList = ref<any[]>([])
+const insumosList = ref<any[]>([])
 async function cargarAlertasInsumos() {
-  if (isMock.value) return
   try {
     const r = await insumosApi.list({ limit: 100 })
-    insumosRealList.value = (r as any).items ?? []
-  } catch { insumosRealList.value = [] }
+    insumosList.value = (r as any).items ?? []
+  } catch { insumosList.value = [] }
 }
-onMounted(() => { void cargarAlertasInsumos(); installMockGuard() })
-watch(isMock, () => { void cargarAlertasInsumos() })
-const hasAlertasReal = computed(() => (insumosRealList.value as any[]).some((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
-const hasAlertas = computed(() => isMock.value ? !!atelier.insumosCriticos.length : hasAlertasReal.value)
+onMounted(() => { void cargarAlertasInsumos() })
+const hasAlertas = computed(() => (insumosList.value as any[]).some((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
 const router = useRouter()
 const route = useRoute()
 const sidebarOpen = ref(false)

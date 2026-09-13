@@ -1,10 +1,9 @@
 <script setup lang="ts">
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
-import { useAtelierStore, type InsumoAtelier } from '@/stores/atelier'
 import { useAuthStore } from '@/stores/auth'
 import { useInsumos } from '@/composables/useInsumos'
 import NuevoInsumoModal from '@/components/atelier/NuevoInsumoModal.vue'
@@ -16,11 +15,26 @@ import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 import ResponsiveTable from '@/components/ResponsiveTable.vue'
 import { showToast } from '@/utils/toast'
 
-const atelier = useAtelierStore()
 const auth = useAuthStore()
 const isAdmin = computed(() => auth.role === 'admin')
-const { isMock, list: listInsumosApi } = useInsumos()
 const insumosService = useInsumos()
+
+/** REAL display shape: backend InsumoRead normalized for this view. */
+interface InsumoDisplay {
+  id: number
+  codigo: string
+  nombre: string
+  descripcion: string
+  tipo: string
+  categoria: string
+  ubicacion: string
+  proveedor: string
+  stock_actual: number
+  stock_minimo: number
+  unidad_medida: string
+  costo_unitario: number
+  valor_total: number
+}
 
 const search = ref('')
 const tipoFiltro = ref<'Todos' | 'Directo' | 'Indirecto'>('Todos')
@@ -60,14 +74,13 @@ const showEditarModal = ref(false)
 const showCompraModal = ref(false)
 const showSugerirModal = ref(false)
 const showOrdenProveedorModal = ref(false)
-const insumoSeleccionado = ref<InsumoAtelier | null>(null)
-const insumosApi = ref<InsumoAtelier[]>([])
+const insumoSeleccionado = ref<InsumoDisplay | null>(null)
+const insumos = ref<InsumoDisplay[]>([])
 
-async function cargarInsumosReales() {
-  if (isMock.value) return
+async function cargarInsumos() {
   try {
-    const res = await listInsumosApi({ limit: 100 })
-    insumosApi.value = res.items.map((i: any) => ({
+    const res = await insumosService.list({ limit: 100 })
+    insumos.value = res.items.map((i: any) => ({
       id: i.id,
       codigo: i.codigo || `INS-${i.id}`,
       nombre: i.nombre,
@@ -88,20 +101,16 @@ async function cargarInsumosReales() {
 }
 
 onMounted(() => {
-  cargarInsumosReales()
+  cargarInsumos()
 })
 
-watch(isMock, () => void cargarInsumosReales())
-
-const insumosList = computed(() => (isMock.value ? atelier.insumos : insumosApi.value))
-
 const categoriasDisponibles = computed(() => {
-  const cats = new Set(insumosList.value.map((i) => i.categoria))
+  const cats = new Set(insumos.value.map((i) => i.categoria))
   return ['Todas', ...Array.from(cats)]
 })
 
 const insumosFiltrados = computed(() => {
-  const filtered = insumosList.value.filter((item) => {
+  const filtered = insumos.value.filter((item) => {
     // Search
     const q = search.value.trim().toLowerCase()
     const matchesSearch =
@@ -170,34 +179,30 @@ const insumosFiltrados = computed(() => {
     .map((entry) => entry.item)
 })
 
-const directosCount = computed(() => insumosList.value.filter((i) => i.tipo === 'Directo').length)
-const indirectosCount = computed(() => insumosList.value.filter((i) => i.tipo === 'Indirecto').length)
-const insumosCriticosCount = computed(() => insumosList.value.filter((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)).length)
-const valorTotalInventarioReal = computed(() => insumosList.value.reduce((acc: number, i: any) => acc + (Number(i.stock_actual ?? i.stock ?? 0) * Number(i.costo_unitario ?? i.costo ?? 0)), 0))
+const directosCount = computed(() => insumos.value.filter((i) => i.tipo === 'Directo').length)
+const indirectosCount = computed(() => insumos.value.filter((i) => i.tipo === 'Indirecto').length)
+const insumosCriticosCount = computed(() => insumos.value.filter((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)).length)
+const valorTotalInventario = computed(() => insumos.value.reduce((acc: number, i: any) => acc + (Number(i.stock_actual ?? i.stock ?? 0) * Number(i.costo_unitario ?? i.costo ?? 0)), 0))
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
 }
 
-function abrirCompra(item: InsumoAtelier) {
+function abrirCompra(item: InsumoDisplay) {
   insumoSeleccionado.value = item
   showCompraModal.value = true
 }
 
-function abrirEditar(item: InsumoAtelier) {
+function abrirEditar(item: InsumoDisplay) {
   insumoSeleccionado.value = item
   showEditarModal.value = true
 }
 
-async function ajustar(item: InsumoAtelier, delta: number) {
-  if (isMock.value) {
-    atelier.ajustarStockInsumo(item.id, delta)
-    return
-  }
+async function ajustar(item: InsumoDisplay, delta: number) {
   try {
     const nuevoStock = Math.max(0, (item.stock_actual ?? 0) + delta)
     await insumosService.update(item.id, { stock_actual: nuevoStock })
-    await cargarInsumosReales()
+    await cargarInsumos()
     showToast('success', 'Stock actualizado', `${item.nombre} ajustado en ${delta > 0 ? '+' : ''}${delta}.`)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Error al ajustar stock'
@@ -205,20 +210,12 @@ async function ajustar(item: InsumoAtelier, delta: number) {
   }
 }
 
-async function eliminar(item: InsumoAtelier) {
+async function eliminar(item: InsumoDisplay) {
   eliminarEnCurso.value = true
   try {
-    if (isMock.value) {
-      const idx = atelier.insumos.findIndex((i) => i.id === item.id)
-      if (idx !== -1) {
-        atelier.insumos.splice(idx, 1)
-        showToast('info', 'Insumo eliminado', `${item.nombre} ha sido removido del catálogo.`)
-      }
-    } else {
-      await insumosService.remove(item.id)
-      await cargarInsumosReales()
-      showToast('info', 'Insumo eliminado', `${item.nombre} ha sido removido del catálogo.`)
-    }
+    await insumosService.remove(item.id)
+    await cargarInsumos()
+    showToast('info', 'Insumo eliminado', `${item.nombre} ha sido removido del catálogo.`)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Error al eliminar insumo'
     showToast('error', 'Error', String(msg))
@@ -230,10 +227,10 @@ async function eliminar(item: InsumoAtelier) {
 }
 
 const showEliminarDialog = ref(false)
-const insumoAEliminar = ref<InsumoAtelier | null>(null)
+const insumoAEliminar = ref<InsumoDisplay | null>(null)
 const eliminarEnCurso = ref(false)
 
-function solicitarEliminar(item: InsumoAtelier) {
+function solicitarEliminar(item: InsumoDisplay) {
   insumoAEliminar.value = item
   showEliminarDialog.value = true
 }
@@ -249,7 +246,7 @@ function solicitarEliminar(item: InsumoAtelier) {
             Inventario de Materiales e Insumos
           </h1>
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-            {{ insumosList.length }} Insumos Totales
+            {{ insumos.length }} Insumos Totales
           </span>
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">
@@ -292,7 +289,7 @@ function solicitarEliminar(item: InsumoAtelier) {
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Valor Total Inventario</div>
         <div class="text-2xl font-extrabold text-stone-100 mt-2 font-mono">
-          {{ formatCOP(isMock ? atelier.valorTotalInventario : valorTotalInventarioReal) }}
+          {{ formatCOP(valorTotalInventario) }}
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Costo promedio ponderado</div>
       </div>
@@ -637,11 +634,11 @@ function solicitarEliminar(item: InsumoAtelier) {
     </div>
 
     <!-- Modals -->
-    <NuevoInsumoModal v-model:visible="showNuevoModal" @insumo-creado="cargarInsumosReales" />
-    <EditarInsumoModal v-model:visible="showEditarModal" :insumo="insumoSeleccionado" @insumo-actualizado="cargarInsumosReales" />
-    <CompraInsumoModal v-model:visible="showCompraModal" :insumo="insumoSeleccionado" @compra-registrada="cargarInsumosReales" />
-    <SugerirOrdenModal v-model:visible="showSugerirModal" @update:visible="(v: boolean) => { if (!v) void cargarInsumosReales() }" />
-    <OrdenCompraProveedorModal v-model:visible="showOrdenProveedorModal" @update:visible="(v: boolean) => { if (!v) void cargarInsumosReales() }" />
+    <NuevoInsumoModal v-model:visible="showNuevoModal" @insumo-creado="cargarInsumos" />
+    <EditarInsumoModal v-model:visible="showEditarModal" :insumo="insumoSeleccionado" @insumo-actualizado="cargarInsumos" />
+    <CompraInsumoModal v-model:visible="showCompraModal" :insumo="insumoSeleccionado" @compra-registrada="cargarInsumos" />
+    <SugerirOrdenModal v-model:visible="showSugerirModal" @update:visible="(v: boolean) => { if (!v) void cargarInsumos() }" />
+    <OrdenCompraProveedorModal v-model:visible="showOrdenProveedorModal" @update:visible="(v: boolean) => { if (!v) void cargarInsumos() }" />
     <ConfirmActionDialog
       v-model:visible="showEliminarDialog"
       titulo="Eliminar insumo"

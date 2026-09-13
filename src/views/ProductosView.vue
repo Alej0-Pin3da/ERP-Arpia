@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useProductos } from '@/composables/useProductos'
 import { useBom } from '@/composables/useBom'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import { useAtelierStore, type RecetaBOM } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import FichaTecnicaModal from '@/components/atelier/FichaTecnicaModal.vue'
 import DataSourceBadge from '@/components/DataSourceBadge.vue'
 import NuevaRecetaModal from '@/components/atelier/NuevaRecetaModal.vue'
@@ -13,8 +11,6 @@ import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
 import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 import { showToast } from '@/utils/toast'
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const productosApi = useProductos()
 const bomApi = useBom()
 
@@ -25,11 +21,35 @@ const margenMetaGlobal = ref(35)
 const ordenarPor = ref<'nombre'|'precio'|'costo'|'margen'>('nombre')
 const ordenarDir = ref<'asc'|'desc'>('asc')
 
+/** REAL display shape: backend ProductoRead normalized for this view. */
+interface RecetaDisplay {
+  id: number
+  codigo: string
+  nombre: string
+  tipo_producto_id?: number
+  linea: string
+  descripcion: string
+  categoria: string
+  items: unknown[]
+  tiempo_confeccion_min: number
+  costo_insumos: number
+  mano_obra: number
+  cif_energia: number
+  costo_total_unitario: number
+  precio_venta: number
+  precio_venta_sugerido: number
+  costo_estimado_materiales: number
+  tiempo_estimado_confeccion_horas: number
+  markup_pct: number
+  recomendaciones_taller: string
+  fases: unknown[]
+}
+
 const showFichaModal = ref(false)
 const showNuevaModal = ref(false)
 const showIaModal = ref(false)
-const recetaSeleccionada = ref<RecetaBOM | null>(null)
-const recetaEditar = ref<RecetaBOM | null>(null)
+const recetaSeleccionada = ref<RecetaDisplay | null>(null)
+const recetaEditar = ref<RecetaDisplay | null>(null)
 const fichaStartEditing = ref(false)
 
 const categorias = [
@@ -43,10 +63,9 @@ const categorias = [
   'Alta Costura',
 ]
 
-const productosReal = ref<any[]>([])
+const productos = ref<any[]>([])
 const bomCounts = ref<Record<number, number>>({})
 async function cargarMargenMeta() {
-  if (isMock.value) return
   try {
     const { getParametros } = await import('@/services/api/maestros')
     const p = await getParametros()
@@ -54,15 +73,14 @@ async function cargarMargenMeta() {
   } catch { /* keep 35 */ }
 }
 
-async function cargarProductosReales() {
-  if (isMock.value) return
+async function cargarProductos() {
   try {
     const r = await productosApi.list({ limit: 100 })
-    productosReal.value = (r.items as any) ?? []
+    productos.value = (r.items as any) ?? []
     // Cargar conteo BOM real por producto (no bloquea grilla)
     try {
       const counts = await Promise.all(
-        productosReal.value.map(async (p: any) => {
+        productos.value.map(async (p: any) => {
           try {
             const bom = await bomApi.listInsumos(p.id)
             return [p.id, bom.length] as const
@@ -73,11 +91,10 @@ async function cargarProductosReales() {
       counts.forEach(([id, c]) => { map[id] = c })
       bomCounts.value = map
     } catch { /* ignore BOM counts */ }
-  } catch { productosReal.value = [] }
+  } catch { productos.value = [] }
 }
-onMounted(() => { void cargarProductosReales(); void cargarMargenMeta() })
-watch(isMock, () => { void cargarProductosReales(); void cargarMargenMeta() })
-const recetasDisplay = computed(() => isMock.value ? (atelier as any).recetas : productosReal.value.map((p: any) => ({
+onMounted(() => { void cargarProductos(); void cargarMargenMeta() })
+const recetasDisplay = computed(() => productos.value.map((p: any) => ({
   id: p.id,
   codigo: p.codigo ?? `PRD-${p.id}`,
   nombre: p.nombre,
@@ -159,13 +176,13 @@ function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
 }
 
-function abrirFicha(r: RecetaBOM) {
+function abrirFicha(r: RecetaDisplay) {
   recetaSeleccionada.value = r
   fichaStartEditing.value = false
   showFichaModal.value = true
 }
 
-function abrirEditar(r: RecetaBOM) {
+function abrirEditar(r: RecetaDisplay) {
   recetaSeleccionada.value = r
   fichaStartEditing.value = true
   showFichaModal.value = true
@@ -176,7 +193,7 @@ function abrirNueva() {
   showNuevaModal.value = true
 }
 
-function handleFichaEditar(r: RecetaBOM) {
+function handleFichaEditar(r: RecetaDisplay) {
   // legacy: now handled inside Ficha directly, keep for compat
   recetaSeleccionada.value = r
   fichaStartEditing.value = true
@@ -184,28 +201,20 @@ function handleFichaEditar(r: RecetaBOM) {
 }
 
 async function handleRecetaGuardada() {
-  if (!isMock.value) await cargarProductosReales()
+  await cargarProductos()
   recetaEditar.value = null
 }
 async function handleFichaGuardada() {
-  if (!isMock.value) await cargarProductosReales()
+  await cargarProductos()
   fichaStartEditing.value = false
 }
 
-async function eliminarReceta(r: RecetaBOM) {
+async function eliminarReceta(r: RecetaDisplay) {
   eliminarEnCurso.value = true
   try {
-    if (!isMock.value) {
-      await productosApi.remove(r.id)
-      showToast('success','Producto eliminado', `${r.nombre} eliminado correctamente.`)
-      await cargarProductosReales()
-    } else {
-      const idx = atelier.recetas.findIndex((x) => x.id === r.id)
-      if (idx !== -1) {
-        atelier.recetas.splice(idx, 1)
-        showToast('info', 'Receta eliminada', `${r.nombre} ha sido removida del catálogo.`)
-      }
-    }
+    await productosApi.remove(r.id)
+    showToast('success','Producto eliminado', `${r.nombre} eliminado correctamente.`)
+    await cargarProductos()
   } catch (e: any) {
     const detail = e?.response?.data?.detail
     const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ') : (detail ?? e?.message ?? 'Error al eliminar')
@@ -218,10 +227,10 @@ async function eliminarReceta(r: RecetaBOM) {
 }
 
 const showEliminarDialog = ref(false)
-const recetaAEliminar = ref<RecetaBOM | null>(null)
+const recetaAEliminar = ref<RecetaDisplay | null>(null)
 const eliminarEnCurso = ref(false)
 
-function solicitarEliminar(r: RecetaBOM) {
+function solicitarEliminar(r: RecetaDisplay) {
   recetaAEliminar.value = r
   showEliminarDialog.value = true
 }
@@ -239,7 +248,7 @@ function solicitarEliminar(r: RecetaBOM) {
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
             {{ recetasDisplay.length }} Modelos
           </span>
-          <DataSourceBadge :is-mock="isMock" :source="isMock ? 'atelier.recetas (memoria)' : 'GET /api/v1/productos (Postgres)'" :count="recetasDisplay.length" endpoint="/productos" />
+          <DataSourceBadge source="GET /api/v1/productos (Postgres)" :count="recetasDisplay.length" endpoint="/productos" />
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">
           Escandallo de costeo detallado: consumo de insumos directos/indirectos, tiempos de mano de obra y margen sugerido.
@@ -321,8 +330,8 @@ function solicitarEliminar(r: RecetaBOM) {
 
         <div v-if="!recetasFiltradas.length" class="text-center py-12 bg-stone-900/40 border border-stone-800 rounded-2xl">
       <i class="pi pi-inbox text-3xl text-stone-500 mb-3 block" />
-      <p class="text-sm font-bold text-stone-300">Sin modelos registrados en modo {{ isMock ? 'MOCK' : 'REAL' }}</p>
-      <p v-if="!isMock" class="text-xs text-stone-400 mt-1">Los datos vienen de <code>GET /api/v1/productos</code>. Creá un producto desde el backend o volvé a <code>VITE_USE_MOCK=true</code>.</p>
+      <p class="text-sm font-bold text-stone-300">Sin modelos registrados</p>
+      <p class="text-xs text-stone-400 mt-1">Los datos vienen de <code>GET /api/v1/productos</code>. Creá un producto desde el backend.</p>
     </div>
     <!-- Recipe Cards Grid -->
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -353,7 +362,7 @@ function solicitarEliminar(r: RecetaBOM) {
           <!-- Metadata Tags -->
           <div class="flex items-center gap-2 pt-1">
             <span class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono">
-              🧵 {{ isMock ? r.items.length : (bomCounts[r.id] ?? 0) }} Insumos BOM
+              🧵 {{ (bomCounts[r.id] ?? 0) }} Insumos BOM
             </span>
             <span class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono">
               ⏱️ {{ r.tiempo_confeccion_min ?? '—' }}{{ r.tiempo_confeccion_min ? ' min confección' : '' }}

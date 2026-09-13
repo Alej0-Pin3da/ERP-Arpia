@@ -7,39 +7,60 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
-import { useAtelierStore, type VentaAtelier } from '@/stores/atelier'
-import { showToast } from '@/utils/toast'
-import { useMode } from '@/composables/useMode'
 import { useVentas } from '@/composables/useVentas'
 import { useClientes } from '@/composables/useClientes'
 import { client } from '@/api/client'
-import type { CanalVenta, MetodoPago, VentaCreatePayload } from '@/services/api/ventas'
+import type { CanalVenta, MetodoPago, VentaCreatePayload, VentaRead } from '@/services/api/ventas'
 import { updateVenta } from '@/services/api/ventas'
 import { listCanales, listMetodosPago } from '@/services/api/maestros'
 
+/** Minimal venta shape this modal edits (REAL display object from the caller). */
+export interface VentaEditar {
+  id: number
+  codigo: string
+  fecha: string
+  cliente_id: number | null
+  cliente_nombre: string
+  canal: string
+  metodo_pago: string
+  estado: string
+  descuento_porcentaje: number
+  descuento_valor: number
+  observaciones?: string
+  descontar_inventario?: boolean
+  items: {
+    id: number
+    producto_id?: number | null
+    variante_id?: number | null
+    nombre_prenda: string
+    talla: string
+    color: string
+    cantidad: number
+    precio_unitario: number
+    costo_unitario: number
+  }[]
+}
+
 const props = defineProps<{
   visible: boolean
-  ventaEditar?: VentaAtelier | null
+  ventaEditar?: VentaEditar | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'venta-guardada', venta: VentaAtelier): void
+  (e: 'venta-guardada', venta: VentaRead): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const ventasApi = useVentas()
 const clientesApi = useClientes()
 
-const clientesReal = ref<{ id: number; nombre: string; telefono?: string | null; ciudad?: string | null }[]>([])
-const productosReal = ref<{ id: number; nombre: string; precio_venta_sugerido?: number; precio_base?: number }[]>([])
-// P1-6: maestros-driven canal/metodo (con fallback a canónicos si la API falla)
-const canalesReal = ref<{ codigo: string; nombre: string }[]>([])
-const metodosReal = ref<{ codigo: string; nombre: string }[]>([])
+const clientes = ref<{ id: number; nombre: string; telefono?: string | null; ciudad?: string | null }[]>([])
+const productos = ref<{ id: number; nombre: string; precio_venta_sugerido?: number; precio_base?: number }[]>([])
+// Maestros-driven canal/metodo (con fallback a canónicos si la API falla)
+const canales = ref<{ codigo: string; nombre: string }[]>([])
+const metodos = ref<{ codigo: string; nombre: string }[]>([])
 
-async function cargarOpcionesReales() {
-  if (isMock.value) return
+async function cargarOpciones() {
   try {
     const [cliRes, prodRes, canRes, metRes] = await Promise.all([
       clientesApi.list({ limit: 100, offset: 0 }),
@@ -47,23 +68,23 @@ async function cargarOpcionesReales() {
       listCanales({ limit: 100 }).catch(() => ({ items: [], total: 0 })),
       listMetodosPago({ limit: 100 }).catch(() => ({ items: [], total: 0 })),
     ])
-    clientesReal.value = (cliRes.items as unknown as typeof clientesReal.value) ?? []
-    productosReal.value = (prodRes.data.items as unknown as typeof productosReal.value) ?? []
+    clientes.value = (cliRes.items as unknown as typeof clientes.value) ?? []
+    productos.value = (prodRes.data.items as unknown as typeof productos.value) ?? []
     if (canRes.items?.length) {
-      canalesReal.value = canRes.items
+      canales.value = canRes.items
         .filter((c) => c.activo !== false)
         .map((c) => ({ codigo: c.codigo, nombre: c.nombre }))
-      // normaliza etiqueta legacy (mock) a codigo maestro para el submit
+      // normaliza etiqueta legacy a codigo maestro para el submit
       canal.value = canalToCodigo(canal.value)
     }
     if (metRes.items?.length) {
-      metodosReal.value = metRes.items
+      metodos.value = metRes.items
         .filter((m) => m.activo !== false)
         .map((m) => ({ codigo: m.codigo, nombre: m.nombre }))
       metodoPago.value = metodoToCodigo(metodoPago.value)
     }
   } catch {
-    // keep mock fallback silent — will show empty placeholder and fallback producto_id 1
+    // keep silent — will show empty placeholder
   }
 }
 
@@ -77,7 +98,7 @@ const clienteId = ref<number | null>(null)
 const clienteNombreManual = ref('')
 const canal = ref('Showroom Pereira')
 const metodoPago = ref('Transferencia Bancolombia')
-const estado = ref<VentaAtelier['estado']>('COMPLETADA')
+const estado = ref<string>('COMPLETADA')
 const descuentoPct = ref<number>(0)
 const descuentoValManual = ref<number | null>(null)
 const observaciones = ref('')
@@ -116,18 +137,18 @@ const metodosPagoOptionsLegacy = [
   { label: 'Contraentrega', value: 'Contraentrega' },
 ]
 
-// P1-6: en REAL los dropdowns leen de maestros (value = codigo, incluye
-// valores nuevos creados en Maestros); en MOCK o si falla la carga, fallback
+// Los dropdowns leen de maestros (value = codigo, incluye
+// valores nuevos creados en Maestros); si falla la carga, fallback
 // a las etiquetas legacy.
 const canalesOptions = computed(() =>
-  !isMock.value && canalesReal.value.length
-    ? canalesReal.value.map((c) => ({ label: c.nombre, value: c.codigo }))
+  canales.value.length
+    ? canales.value.map((c) => ({ label: c.nombre, value: c.codigo }))
     : canalesOptionsLegacy,
 )
 
 const metodosPagoOptions = computed(() =>
-  !isMock.value && metodosReal.value.length
-    ? metodosReal.value.map((m) => ({ label: m.nombre, value: m.codigo }))
+  metodos.value.length
+    ? metodos.value.map((m) => ({ label: m.nombre, value: m.codigo }))
     : metodosPagoOptionsLegacy,
 )
 
@@ -159,14 +180,14 @@ const metodoToApi: Record<string, MetodoPago> = {
 // usa los mappers; último recurso, feria/efectivo.
 function canalToCodigo(v: string): string {
   if (!v) return 'feria'
-  if (canalesReal.value.some((c) => c.codigo === v)) return v
+  if (canales.value.some((c) => c.codigo === v)) return v
   if ((Object.values(canalToApi) as string[]).includes(v)) return v
   return canalToApi[v] ?? 'feria'
 }
 
 function metodoToCodigo(v: string): string {
   if (!v) return 'efectivo'
-  if (metodosReal.value.some((m) => m.codigo === v)) return v
+  if (metodos.value.some((m) => m.codigo === v)) return v
   if ((Object.values(metodoToApi) as string[]).includes(v)) return v
   return metodoToApi[v] ?? 'efectivo'
 }
@@ -180,7 +201,7 @@ const estadosOptions = [
 const tallasOptions = ['XS', 'S', 'M', 'L', 'XL', 'A Medida', 'Única']
 
 const clientesOptions = computed(() => {
-  const src = isMock.value ? atelier.clientes : clientesReal.value
+  const src = clientes.value
   return (src as { id: number; nombre: string; telefono?: string | null; ciudad?: string | null }[]).map((c) => ({
     label: `${c.nombre} (${(c as unknown as { telefono?: string }).telefono || (c as unknown as { ciudad?: string }).ciudad || 'Cliente'})`,
     value: c.id,
@@ -188,20 +209,13 @@ const clientesOptions = computed(() => {
 })
 
 const catalogoPrendasOptions = computed(() => {
-  if (isMock.value) {
-    return (isMock.value ? atelier.prendasListas : [] as any[]).map((p) => ({
-      label: `${p.nombre} (PVP: $${p.precio_venta.toLocaleString('es-CO')} | Stock: ${p.disponible_total})`,
-      value: p.id,
-      prenda: p,
-    }))
-  }
-  return productosReal.value.map((p) => {
+  return productos.value.map((p) => {
     const pvRaw = (p as unknown as { precio_venta_sugerido?: number | string }).precio_venta_sugerido
     const pv = Number(pvRaw ?? 0)
     return {
       label: Number.isFinite(pv) && pv > 0 ? `${p.nombre} (PVP: $${pv.toLocaleString('es-CO')})` : `${p.nombre} (ID: ${p.id})`,
       value: p.id,
-      prenda: p as unknown as (typeof atelier.prendasListas)[number],
+      prenda: p as unknown as Record<string, unknown>,
     }
   })
 })
@@ -264,8 +278,8 @@ function agregarItemVacio() {
 
 async function seleccionarPrendaCatalogo(it: LocalItem, prendaId: number | null) {
   if (!prendaId) return
-  const src = isMock.value ? atelier.prendasListas : (productosReal.value as unknown as typeof atelier.prendasListas)
-  const p = (src as typeof atelier.prendasListas).find((x) => x.id === prendaId)
+  const src = productos.value as unknown as Record<string, any>[]
+  const p = src.find((x) => x.id === prendaId)
   if (p) {
     it.producto_id = p.id
     it.nombre_prenda = p.nombre
@@ -283,21 +297,19 @@ async function seleccionarPrendaCatalogo(it: LocalItem, prendaId: number | null)
     if ((p as unknown as { variantes?: { talla: string }[] }).variantes?.[0]) {
       it.talla = (p as unknown as { variantes: { talla: string }[] }).variantes[0].talla
     }
-    // In REAL mode, if product has variantes, fetch and pick first variant
-    if (!isMock.value) {
-      try {
-        const vare = await client.get<{ id: number; nombre_variante: string }[]>(`/productos/${prendaId}/variantes`)
-        if (vare.data.length > 0) {
-          it.variante_id = vare.data[0].id
-          // try to map talla from variante nombre (e.g. "S", "M - Rojo")
-          const rawTalla = vare.data[0].nombre_variante?.split(' - ')[0]?.trim()
-          if (rawTalla) it.talla = rawTalla
-        } else {
-          it.variante_id = null
-        }
-      } catch {
+    // If product has variantes, fetch and pick first variant
+    try {
+      const vare = await client.get<{ id: number; nombre_variante: string }[]>(`/productos/${prendaId}/variantes`)
+      if (vare.data.length > 0) {
+        it.variante_id = vare.data[0].id
+        // try to map talla from variante nombre (e.g. "S", "M - Rojo")
+        const rawTalla = vare.data[0].nombre_variante?.split(' - ')[0]?.trim()
+        if (rawTalla) it.talla = rawTalla
+      } else {
         it.variante_id = null
       }
+    } catch {
+      it.variante_id = null
     }
   } else {
     it.producto_id = prendaId
@@ -338,10 +350,8 @@ function initForm() {
       costo_unitario: it.costo_unitario,
     }))
   } else {
-    // New sale default
-    if (!isMock.value) return // real uses server id
-    const nextNum = (atelier.ventas.length ? Math.max(...atelier.ventas.map((v) => v.id)) : 0) + 1
-    codigo.value = `VEN-ARP-${String(nextNum).padStart(3, '0')}`
+    // New sale default (real uses server id)
+    codigo.value = ''
     fecha.value = new Date().toISOString().split('T')[0]
     modoCliente.value = 'existente'
     clienteId.value = null
@@ -358,12 +368,12 @@ function initForm() {
         id: Date.now(),
         producto_id: null,
         variante_id: null,
-        nombre_prenda: 'Corset Estructurado "Garras"',
+        nombre_prenda: '',
         talla: 'S',
         color: 'Negro Satín',
         cantidad: 1,
         precio_unitario: 95000,
-        costo_unitario: 29826,
+        costo_unitario: 25000,
       },
     ]
   }
@@ -374,14 +384,11 @@ watch(
   (val) => {
     if (val) {
       initForm()
-      void cargarOpcionesReales()
+      void cargarOpciones()
     }
   },
   { immediate: true },
 )
-watch(isMock, () => {
-  if (props.visible) void cargarOpcionesReales()
-})
 
 async function guardar() {
   if (guardando.value) return
@@ -401,8 +408,7 @@ async function guardar() {
   let cidFinal: number | null = null
 
   if (modoCliente.value === 'existente' && clienteId.value) {
-    const srcCli = isMock.value ? atelier.clientes : (clientesReal.value as unknown as typeof atelier.clientes)
-    const c = (srcCli as typeof atelier.clientes).find((x) => x.id === clienteId.value)
+    const c = (clientes.value as { id: number; nombre: string }[]).find((x) => x.id === clienteId.value)
     if (c) {
       nombreClienteFinal = c.nombre
       cidFinal = c.id
@@ -414,57 +420,8 @@ async function guardar() {
     nombreClienteFinal = clienteNombreManual.value.trim()
   }
 
-  if (isMock.value) {
-    const payload: Partial<VentaAtelier> = {
-      codigo: codigo.value || `VEN-ARP-${Date.now().toString().slice(-4)}`,
-      cliente_id: cidFinal,
-      cliente_nombre: nombreClienteFinal,
-      fecha: fecha.value,
-      canal: canal.value,
-      metodo_pago: metodoPago.value,
-      estado: estado.value,
-      items: items.value.map((it, idx) => ({
-        id: idx + 1,
-        producto_id: it.producto_id || null,
-        nombre_prenda: it.nombre_prenda,
-        talla: it.talla,
-        color: it.color,
-        cantidad: it.cantidad,
-        precio_unitario: it.precio_unitario,
-        costo_unitario: it.costo_unitario,
-        subtotal: it.cantidad * it.precio_unitario,
-        costo_subtotal: it.cantidad * it.costo_unitario,
-      })),
-      subtotal: subtotalItems.value,
-      descuento_porcentaje: Number(descuentoPct.value) || 0,
-      descuento_valor: valorDescuento.value,
-      total_venta: totalVenta.value,
-      costo_total: costoTotalItems.value,
-      ganancia_neta: gananciaNeta.value,
-      margen_pct: margenPct.value,
-      reinversion_40: distribucion403030.value.reinversion40,
-      margarita_30: distribucion403030.value.margara30,
-      valqui_30: distribucion403030.value.valqui30,
-      observaciones: observaciones.value,
-      descontar_inventario: descontarInventario.value,
-    }
-    if (isEditing.value && props.ventaEditar) {
-      const act = atelier.actualizarVenta(props.ventaEditar.id, payload)
-      if (act) {
-        showToast('success', 'Venta Actualizada', `La venta ${act.codigo} ha sido actualizada con éxito.`)
-        emit('venta-guardada', act)
-      }
-    } else {
-      const nueva = atelier.crearVenta(payload)
-      showToast('success', 'Venta Registrada', `Venta ${nueva.codigo} guardada por ${formatCOP(nueva.total_venta)}.`)
-      emit('venta-guardada', nueva)
-    }
-    emit('update:visible', false)
-    return
-  }
-
-  // Real API — P1-6: valores resueltos a codigo maestro (ver canalToCodigo)
-  // P1-5: producto_id es requerido por el backend; se prohibe el fantasma `?? 1`.
+  // Real API — valores resueltos a codigo maestro (ver canalToCodigo)
+  // producto_id es requerido por el backend; se prohibe el fantasma.
   const sinProducto = items.value.findIndex((it) => it.producto_id == null)
   if (sinProducto !== -1) {
     showToast('warn', 'Producto requerido', `La fila ${sinProducto + 1} ("${items.value[sinProducto].nombre_prenda || 'sin nombre'}") no tiene producto del catálogo. Elegilo del dropdown para vender en modo REAL.`)
@@ -488,11 +445,11 @@ async function guardar() {
     if (isEditing.value && props.ventaEditar) {
       const actualizada = await updateVenta(props.ventaEditar.id, apiPayload)
       showToast('success', 'Venta Actualizada', `Venta ${(actualizada as unknown as Record<string, unknown>).codigo ?? props.ventaEditar.codigo} actualizada en BD.`)
-      emit('venta-guardada', actualizada as unknown as VentaAtelier)
+      emit('venta-guardada', actualizada as unknown as VentaRead)
     } else {
       const creada = await ventasApi.create(apiPayload)
       showToast('success', 'Venta Registrada', `Venta ${(creada as unknown as Record<string, unknown>).codigo ?? 'creada'} guardada en BD.`)
-      emit('venta-guardada', creada as unknown as VentaAtelier)
+      emit('venta-guardada', creada as unknown as VentaRead)
     }
     emit('update:visible', false)
   } catch (e: unknown) {

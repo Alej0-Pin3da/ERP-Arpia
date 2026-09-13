@@ -11,16 +11,29 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
-import { useAtelierStore, type InsumoAtelier } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { useInsumos } from '@/composables/useInsumos'
 import type { InsumoUpdatePayload } from '@/services/api/insumos'
 import { client } from '@/api/client'
 import { showToast } from '@/utils/toast'
 
+/** Minimal insumo shape this modal reads (REAL display object from the caller). */
+export interface InsumoEditarRef {
+  id: number
+  codigo?: string
+  nombre: string
+  descripcion?: string
+  tipo?: 'Directo' | 'Indirecto'
+  categoria?: string
+  ubicacion?: string
+  stock_actual: number
+  stock_minimo: number
+  unidad_medida: string
+  costo_unitario?: number
+}
+
 const props = defineProps<{
   visible: boolean
-  insumo: InsumoAtelier | null
+  insumo: InsumoEditarRef | null
 }>()
 
 const emit = defineEmits<{
@@ -28,8 +41,6 @@ const emit = defineEmits<{
   (e: 'insumo-actualizado'): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const insumosApi = useInsumos()
 
 const codigo = ref('')
@@ -38,7 +49,7 @@ const descripcion = ref('')
 const tipo = ref<'Directo' | 'Indirecto'>('Directo')
 const categoria = ref('')
 const categoriaId = ref<number | null>(null)
-const categoriasReal = ref<{ id: number; nombre: string }[]>([])
+const categorias = ref<{ id: number; nombre: string }[]>([])
 const ubicacion = ref('')
 const stockActual = ref(0)
 const stockMinimo = ref(0)
@@ -47,29 +58,19 @@ const costoUnitario = ref(0)
 const guardando = ref(false)
 
 async function cargarCategorias() {
-  if (isMock.value) return
   try {
     const { data } = await client.get<{ items: { id: number; nombre: string }[] }>('/categorias-insumos', { params: { limit: 100 } })
-    categoriasReal.value = data.items ?? []
-  } catch { categoriasReal.value = [] }
+    categorias.value = data.items ?? []
+  } catch { categorias.value = [] }
 }
 onMounted(() => { void cargarCategorias() })
-watch(isMock, () => { void cargarCategorias() })
 
 const tiposOptions = [
   { label: 'Directo (Telas, Encajes, Forros, Copas)', value: 'Directo' },
   { label: 'Indirecto (Empaques, Hilos, Etiquetas, Cintas)', value: 'Indirecto' },
 ]
 
-const categoriasOptions = [
-  'Telas Principales',
-  'Forros y Entretelas',
-  'Herrajes y Varillas',
-  'Empaques y Avíos',
-  'Elásticos y Sesgos',
-]
-
-const categoriasRealOptions = computed(() => categoriasReal.value.map((c) => ({ label: c.nombre, value: c.id })))
+const categoriasOptions = computed(() => categorias.value.map((c) => ({ label: c.nombre, value: c.id })))
 
 const unidadesOptions = [
   { label: 'Metros (m)', value: 'm' },
@@ -78,7 +79,7 @@ const unidadesOptions = [
   { label: 'Rollos (rll)', value: 'rll' },
 ]
 
-function prefillFromRow(row: InsumoAtelier) {
+function prefillFromRow(row: InsumoEditarRef) {
   codigo.value = row.codigo ?? ''
   nombre.value = row.nombre ?? ''
   descripcion.value = (row as any).descripcion ?? ''
@@ -93,7 +94,6 @@ function prefillFromRow(row: InsumoAtelier) {
 }
 
 async function prefillAuthoritative(id: number) {
-  if (isMock.value) return
   try {
     const full: any = await insumosApi.get(id)
     if (!full || full.id == null) return
@@ -153,19 +153,8 @@ async function guardar() {
       stock_minimo: Number(stockMinimo.value) || 0,
       costo_promedio_actual: Number(costoUnitario.value) || 0,
     }
-    if (!isMock.value && categoriaId.value != null) payload.categoria_id = categoriaId.value
+    if (categoriaId.value != null) payload.categoria_id = categoriaId.value
     await insumosApi.update(props.insumo.id, payload)
-    if (isMock.value) {
-      // Mock rows render costo_unitario/categoria (not the API field names).
-      const idx = atelier.insumos.findIndex((i) => i.id === props.insumo!.id)
-      if (idx !== -1) {
-        atelier.insumos[idx] = {
-          ...atelier.insumos[idx],
-          costo_unitario: Number(costoUnitario.value) || 0,
-          categoria: categoria.value || atelier.insumos[idx].categoria,
-        }
-      }
-    }
     showToast('success', 'Insumo actualizado', `${nombre.value} guardado correctamente.`)
     emit('insumo-actualizado')
     emit('update:visible', false)
@@ -209,13 +198,9 @@ async function guardar() {
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div v-if="isMock" class="min-w-0">
+        <div class="min-w-0">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Categoría</label>
-          <Dropdown v-model="categoria" :options="categoriasOptions" class="w-full" />
-        </div>
-        <div v-else class="min-w-0">
-          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Categoría</label>
-          <Dropdown v-model="categoriaId" :options="categoriasRealOptions" option-label="label" option-value="value" placeholder="Seleccionar categoría..." class="w-full" />
+          <Dropdown v-model="categoriaId" :options="categoriasOptions" option-label="label" option-value="value" placeholder="Seleccionar categoría..." class="w-full" />
         </div>
         <div class="min-w-0">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Unidad de Medida</label>

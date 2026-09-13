@@ -3,9 +3,24 @@ import { ref } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Textarea from 'primevue/textarea'
-import { useAtelierStore, type RecetaBOM } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
+
+/** Suggested-recipe payload emitted to the caller (REAL: caller persists via API). */
+export interface RecetaSugerida {
+  nombre: string
+  categoria: string
+  linea: string
+  descripcion: string
+  tiempo_confeccion_min: number
+  costo_insumos: number
+  mano_obra: number
+  cif_energia: number
+  costo_total_unitario: number
+  precio_venta: number
+  markup_pct: number
+  recomendaciones_taller: string
+  items: { nombre: string; consumo_unitario: number; unidad: string; merma_pct: number; costo_unitario: number; subtotal: number }[]
+}
 
 defineProps<{
   visible: boolean
@@ -13,15 +28,13 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'receta-generada', receta: RecetaBOM): void
+  (e: 'receta-generada', receta: RecetaSugerida): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const prompt = ref('')
 const loading = ref(false)
 const respuesta = ref<string | null>(null)
-const recetaSugerida = ref<RecetaBOM | null>(null)
+const recetaSugerida = ref<RecetaSugerida | null>(null)
 
 const presets = [
   'Costear nuevo Corset en Tul Bordado con 6 varillas y copas forradas',
@@ -68,14 +81,13 @@ async function consultarIA() {
     } else if (q.includes('retazo') || q.includes('desperdicio') || q.includes('lino') || q.includes('corte')) {
       respuesta.value = `✂️ **Estrategia de Optimización Textil de Atelier Arpía**:\n\n1. **Tendido Intercalado**: Al cortar piezas simétricas de bustiers y corsetería, invierte el patrón 180° sobre el orillo para ahorrar entre un 7% y 11% de tela por metro.\n2. **Subproductos Inmediatos**: Los retazos menores a 20x30 cm son ideales para confeccionar *Scrunchies de satén*, *Máscaras de descanso para ojos* o *Mini portacuchillas para máquinas de coser*.\n3. **Cuidado de Hilo**: Cortar al sesgo a 45° solo en piezas que requieran elasticidad natural (copas y sesgos); en cuerpos estructurados, mantén el hilo recto para evitar deformaciones.`
     } else {
-      respuesta.value = `🧵 **Recomendación AtelierPro**: Basado en el balance actual de pedidos y el stock de insumos críticos (${(isMock.value ? atelier.insumosCriticos : []).map(i => i.nombre).join(', ')}), te sugiero programar lotes de corte agrupados por color de hilo para optimizar los tiempos de enhebrado en las máquinas Singer y fileteadoras.`
+      respuesta.value = `🧵 **Recomendación AtelierPro**: Basado en el balance actual de pedidos y el stock de insumos críticos, te sugiero programar lotes de corte agrupados por color de hilo para optimizar los tiempos de enhebrado en las máquinas Singer y fileteadoras.`
     }
   }, 1000)
 }
 
 function aplicarReceta() {
   if (recetaSugerida.value) {
-    if (isMock.value) atelier.crearReceta(recetaSugerida.value)
     showToast('success', 'Receta generada', 'Se ha guardado la nueva receta en el catálogo de fichas BOM.')
     emit('receta-generada', recetaSugerida.value)
     emit('update:visible', false)

@@ -3,14 +3,23 @@ import { ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
-import { useAtelierStore, type InsumoAtelier } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import * as comprasApi from '@/services/api/compras-insumos'
 import { showToast } from '@/utils/toast'
 
+/** Minimal insumo shape this modal reads (REAL display object from the caller). */
+export interface InsumoCompraRef {
+  id: number
+  nombre: string
+  proveedor?: string
+  stock_actual: number
+  stock_minimo: number
+  unidad_medida: string
+  costo_unitario: number
+}
+
 const props = defineProps<{
   visible: boolean
-  insumo: InsumoAtelier | null
+  insumo: InsumoCompraRef | null
 }>()
 
 const emit = defineEmits<{
@@ -18,8 +27,6 @@ const emit = defineEmits<{
   (e: 'compra-registrada'): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const cantidad = ref(10)
 const costoUnitario = ref(0)
 const guardando = ref(false)
@@ -37,12 +44,6 @@ watch(
 
 async function registrar() {
   if (!props.insumo) return
-  if (isMock.value) {
-    atelier.agregarCompraInsumo(props.insumo.id, cantidad.value, costoUnitario.value)
-    showToast('success', 'Compra registrada', `Se sumaron ${cantidad.value} ${props.insumo.unidad_medida} a ${props.insumo.nombre}.`)
-    emit('update:visible', false)
-    return
-  }
   guardando.value = true
   try {
     await comprasApi.createCompraInsumo({

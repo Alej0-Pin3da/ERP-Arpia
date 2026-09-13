@@ -1,14 +1,12 @@
 <script setup lang="ts">
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
-import { useAtelierStore, type InsumoAtelier } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
 import { useInsumos } from '@/composables/useInsumos'
 import { client } from '@/api/client'
 import { showToast } from '@/utils/toast'
@@ -19,22 +17,18 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'insumo-creado', insumo: InsumoAtelier): void
+  (e: 'insumo-creado', insumo: unknown): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const insumosApi = useInsumos()
 
 const codigo = ref('')
 const nombre = ref('')
 const descripcion = ref('')
 const tipo = ref<'Directo' | 'Indirecto'>('Directo')
-const categoria = ref('Telas Principales')
 const categoriaId = ref<number | null>(null)
-const categoriasReal = ref<{ id: number; nombre: string }[]>([])
+const categorias = ref<{ id: number; nombre: string }[]>([])
 const ubicacion = ref('Estante Telas A1')
-const proveedor = ref('Atenea Bordados y Encajes')
 const stockActual = ref(10)
 const stockMinimo = ref(5)
 const unidadMedida = ref('m')
@@ -42,30 +36,20 @@ const costoUnitario = ref(15000)
 const guardando = ref(false)
 
 async function cargarCategorias() {
-  if (isMock.value) return
   try {
     const { data } = await client.get<{ items: { id: number; nombre: string }[] }>('/categorias-insumos', { params: { limit: 100 } })
-    categoriasReal.value = data.items ?? []
-    if (categoriasReal.value.length === 1) categoriaId.value = categoriasReal.value[0].id
-  } catch { categoriasReal.value = [] }
+    categorias.value = data.items ?? []
+    if (categorias.value.length === 1) categoriaId.value = categorias.value[0].id
+  } catch { categorias.value = [] }
 }
 onMounted(() => { void cargarCategorias() })
-watch(isMock, () => { void cargarCategorias() })
 
 const tiposOptions = [
   { label: 'Directo (Telas, Encajes, Forros, Copas)', value: 'Directo' },
   { label: 'Indirecto (Empaques, Hilos, Etiquetas, Cintas)', value: 'Indirecto' },
 ]
 
-const categoriasOptions = [
-  'Telas Principales',
-  'Forros y Entretelas',
-  'Herrajes y Varillas',
-  'Empaques y Avíos',
-  'Elásticos y Sesgos',
-]
-
-const categoriasRealOptions = computed(() => categoriasReal.value.map((c) => ({ label: c.nombre, value: c.id })))
+const categoriasOptions = computed(() => categorias.value.map((c) => ({ label: c.nombre, value: c.id })))
 
 const unidadesOptions = [
   { label: 'Metros (m)', value: 'm' },
@@ -102,7 +86,7 @@ async function guardarReal() {
       costo_promedio_actual: Number(costoUnitario.value) || 0,
     })
     showToast('success', 'Insumo creado', `${(creado as any).nombre ?? nombre.value} registrado en el inventario.`)
-    emit('insumo-creado', creado as unknown as InsumoAtelier)
+    emit('insumo-creado', creado)
     emit('update:visible', false)
     nombre.value = ''
     codigo.value = ''
@@ -120,29 +104,7 @@ function guardar() {
     return
   }
 
-  if (!isMock.value) { void guardarReal(); return }
-  const item = atelier.crearInsumo({
-    codigo: codigo.value.trim() || `TEL-AUTO-${Date.now().toString().slice(-4)}`,
-    nombre: nombre.value.trim(),
-    descripcion: descripcion.value.trim(),
-    tipo: tipo.value,
-    categoria: categoria.value,
-    ubicacion: ubicacion.value.trim(),
-    proveedor: proveedor.value.trim(),
-    stock_actual: stockActual.value,
-    stock_minimo: stockMinimo.value,
-    unidad_medida: unidadMedida.value,
-    costo_unitario: costoUnitario.value,
-  })
-
-  showToast('success', 'Insumo creado', `${item.nombre} registrado en el inventario.`)
-  emit('insumo-creado', item)
-  emit('update:visible', false)
-
-  // Reset
-  nombre.value = ''
-  codigo.value = ''
-  descripcion.value = ''
+  void guardarReal()
 }
 </script>
 
@@ -174,13 +136,9 @@ function guardar() {
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div v-if="isMock" class="min-w-0">
-          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Categoría</label>
-          <Dropdown v-model="categoria" :options="categoriasOptions" class="w-full" />
-        </div>
-        <div v-else class="min-w-0">
+        <div class="min-w-0">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Categoría *</label>
-          <Dropdown v-model="categoriaId" :options="categoriasRealOptions" option-label="label" option-value="value" placeholder="Seleccionar categoría..." class="w-full" />
+          <Dropdown v-model="categoriaId" :options="categoriasOptions" option-label="label" option-value="value" placeholder="Seleccionar categoría..." class="w-full" />
         </div>
         <div class="min-w-0">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Unidad de Medida</label>
@@ -192,10 +150,6 @@ function guardar() {
         <div class="min-w-0">
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Ubicación en Taller</label>
           <InputText v-model="ubicacion" placeholder="Ej: Estante Telas Atenea A1" class="w-full" />
-        </div>
-        <div v-if="isMock" class="min-w-0">
-          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Proveedor Habitual</label>
-          <InputText v-model="proveedor" placeholder="Ej: Atenea Bordados y Encajes" class="w-full" />
         </div>
       </div>
 

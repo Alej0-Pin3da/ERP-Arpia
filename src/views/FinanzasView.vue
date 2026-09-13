@@ -1,40 +1,90 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Dialog from 'primevue/dialog'
 import Slider from 'primevue/slider'
-import {
-  useAtelierStore,
-  type LiquidacionSocias,
-  type SociaAtelier,
-  type AnticipoSocia,
-} from '@/stores/atelier'
 import NuevaLiquidacionModal from '@/components/atelier/NuevaLiquidacionModal.vue'
 import DetalleLiquidacionModal from '@/components/atelier/DetalleLiquidacionModal.vue'
 import GestionSociasModal from '@/components/atelier/GestionSociasModal.vue'
 import NuevoAnticipoModal from '@/components/atelier/NuevoAnticipoModal.vue'
 import { showToast } from '@/utils/toast'
-import { useMode } from '@/composables/useMode'
 import { useSocios } from '@/composables/useSocios'
 import { useFinanzas } from '@/composables/useFinanzas'
 import * as movimientosApi from '@/services/api/movimientos'
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
+/** REAL display shapes: backend payloads normalized for this view. */
+interface SociaDisplay {
+  id: number
+  nombre: string
+  rol: string
+  porcentaje: number
+  es_fondo_taller: boolean
+  telefono?: string
+  email?: string
+  banco?: string
+  tipo_cuenta?: string
+  numero_cuenta?: string
+  titular_cuenta?: string
+  activo: boolean
+  notas?: string
+}
+interface DistribucionDisplay {
+  socia_id: number
+  nombre_socia: string
+  rol_socia: string
+  porcentaje: number
+  monto_bruto: number
+  deduccion_anticipos: number
+  monto_neto_pagar: number
+  estado_pago: string
+  fecha_pago?: string
+  comprobante_transferencia?: string
+  banco_destino?: string
+}
+interface LiquidacionDisplay {
+  id: number
+  codigo: string
+  periodo: string
+  fecha_cierre: string
+  total_ventas_brutas: number
+  costo_taller_insumos: number
+  gastos_operativos: number
+  utilidad_neta_total: number
+  fondo_reinversion_monto: number
+  utilidad_repartible: number
+  estado: string
+  distribucion: DistribucionDisplay[]
+  observaciones?: string
+  created_at: string
+}
+interface AnticipoDisplay {
+  id: number
+  socia_id: number
+  nombre_socia: string
+  fecha: string
+  monto: number
+  concepto: string
+  metodo_desembolso: string
+  estado: string
+  liquidacion_id: number | null
+  comprobante?: string
+  observaciones?: string
+}
+
 const sociosApi = useSocios()
 const finanzasApi = useFinanzas()
 
-// Real-mode state (populated via API when !isMock)
-const sociasReal = ref<SociaAtelier[]>([])
-const liquidacionesReal = ref<LiquidacionSocias[]>([])
-const anticiposReal = ref<AnticipoSocia[]>([])
-const movimientosReal = ref<movimientosApi.MovimientoRead[]>([])
-const cargandoReal = ref(false)
+// REAL state (populated via API)
+const sociasList = ref<SociaDisplay[]>([])
+const liquidacionesList = ref<LiquidacionDisplay[]>([])
+const anticiposList = ref<AnticipoDisplay[]>([])
+const movimientosList = ref<movimientosApi.MovimientoRead[]>([])
+const cargando = ref(false)
 
-function normalizeSocia(raw: Record<string, unknown>): SociaAtelier {
+function normalizeSocia(raw: Record<string, unknown>): SociaDisplay {
   return {
     id: raw.id as number,
     nombre: raw.nombre as string,
@@ -52,7 +102,7 @@ function normalizeSocia(raw: Record<string, unknown>): SociaAtelier {
   }
 }
 
-function normalizeLiquidacion(raw: Record<string, unknown>): LiquidacionSocias {
+function normalizeLiquidacion(raw: Record<string, unknown>): LiquidacionDisplay {
   const dist = (raw.distribucion as unknown[] | undefined) ?? []
   return {
     id: raw.id as number,
@@ -65,7 +115,7 @@ function normalizeLiquidacion(raw: Record<string, unknown>): LiquidacionSocias {
     utilidad_neta_total: Number(raw.utilidad_neta_total ?? 0),
     fondo_reinversion_monto: Number(raw.fondo_reinversion_monto ?? 0),
     utilidad_repartible: Number(raw.utilidad_repartible ?? 0),
-    estado: raw.estado as LiquidacionSocias['estado'],
+    estado: raw.estado as string,
     distribucion: dist.map((d: unknown) => {
       const dd = d as Record<string, unknown>
       return {
@@ -76,7 +126,7 @@ function normalizeLiquidacion(raw: Record<string, unknown>): LiquidacionSocias {
         monto_bruto: Number(dd.monto_bruto ?? 0),
         deduccion_anticipos: Number(dd.deduccion_anticipos ?? 0),
         monto_neto_pagar: Number((dd as Record<string, unknown>).monto_neto ?? dd.monto_neto_pagar ?? 0),
-        estado_pago: (dd.estado_pago as LiquidacionSocias['distribucion'][number]['estado_pago']) ?? 'PENDIENTE',
+        estado_pago: (dd.estado_pago as string) ?? 'PENDIENTE',
         fecha_pago: dd.fecha_pago as string | undefined,
         comprobante_transferencia: dd.comprobante_transferencia as string | undefined,
         banco_destino: dd.banco_destino as string | undefined,
@@ -87,7 +137,7 @@ function normalizeLiquidacion(raw: Record<string, unknown>): LiquidacionSocias {
   }
 }
 
-function normalizeAnticipo(raw: Record<string, unknown>): AnticipoSocia {
+function normalizeAnticipo(raw: Record<string, unknown>): AnticipoDisplay {
   return {
     id: raw.id as number,
     socia_id: raw.socia_id as number,
@@ -96,16 +146,15 @@ function normalizeAnticipo(raw: Record<string, unknown>): AnticipoSocia {
     monto: Number(raw.monto ?? 0),
     concepto: (raw.concepto as string) ?? 'Adelanto',
     metodo_desembolso: (raw.metodo_desembolso as string) ?? 'Transferencia Bancaria',
-    estado: raw.estado as AnticipoSocia['estado'],
+    estado: raw.estado as string,
     liquidacion_id: (raw.liquidacion_id as number | null) ?? null,
     comprobante: raw.comprobante as string | undefined,
     observaciones: raw.observaciones as string | undefined,
   }
 }
 
-async function cargarDatosReales() {
-  if (isMock.value) return
-  cargandoReal.value = true
+async function cargarDatos() {
+  cargando.value = true
   try {
     const [socRes, liqRes, antRes, movRes] = await Promise.all([
       sociosApi.list({ limit: 100, offset: 0 }),
@@ -113,30 +162,22 @@ async function cargarDatosReales() {
       finanzasApi.listAnticipos({ limit: 100, offset: 0 }),
       movimientosApi.listMovimientos({ limit: 100, offset: 0 }).catch(() => ({ items: [], total: 0 })),
     ])
-    sociasReal.value = (socRes.items as unknown as Record<string, unknown>[]).map(normalizeSocia)
-    liquidacionesReal.value = (liqRes.items as unknown as Record<string, unknown>[]).map(normalizeLiquidacion)
-    anticiposReal.value = (antRes.items as unknown as Record<string, unknown>[]).map(normalizeAnticipo)
-    movimientosReal.value = (movRes.items as unknown as movimientosApi.MovimientoRead[]) ?? []
+    sociasList.value = (socRes.items as unknown as Record<string, unknown>[]).map(normalizeSocia)
+    liquidacionesList.value = (liqRes.items as unknown as Record<string, unknown>[]).map(normalizeLiquidacion)
+    anticiposList.value = (antRes.items as unknown as Record<string, unknown>[]).map(normalizeAnticipo)
+    movimientosList.value = (movRes.items as unknown as movimientosApi.MovimientoRead[]) ?? []
   } catch {
-    // keep atelier fallback on error
+    // keep previous state on error
   } finally {
-    cargandoReal.value = false
+    cargando.value = false
   }
 }
 
 onMounted(() => {
-  void cargarDatosReales()
+  void cargarDatos()
 })
 
-watch(isMock, () => {
-  void cargarDatosReales()
-})
-
-// Unified lists — isMock ? atelier : real API
-const sociasList = computed<SociaAtelier[]>(() => (isMock.value ? (atelier.socias as unknown as SociaAtelier[]) : sociasReal.value))
-const liquidacionesList = computed<LiquidacionSocias[]>(() => (isMock.value ? (atelier.liquidaciones as unknown as LiquidacionSocias[]) : liquidacionesReal.value))
-const anticiposList = computed<AnticipoSocia[]>(() => (isMock.value ? (atelier.anticipos as unknown as AnticipoSocia[]) : anticiposReal.value))
-const movimientosList = computed<movimientosApi.MovimientoRead[]>(() => (isMock.value ? [] : movimientosReal.value))
+// Unified lists — REAL API only
 
 // Subtabs
 type TabType = 'liquidaciones' | 'socias' | 'anticipos' | 'movimientos' | 'simulador'
@@ -155,20 +196,20 @@ const showDetalleLiqModal = ref(false)
 const showGestionSociaModal = ref(false)
 const showNuevoAnticipoModal = ref(false)
 
-const liquidacionSeleccionadaEditar = ref<LiquidacionSocias | null>(null)
-const liquidacionSeleccionadaDetalle = ref<LiquidacionSocias | null>(null)
-const sociaSeleccionadaEditar = ref<SociaAtelier | null>(null)
-const anticipoSeleccionadoEditar = ref<AnticipoSocia | null>(null)
+const liquidacionSeleccionadaEditar = ref<LiquidacionDisplay | null>(null)
+const liquidacionSeleccionadaDetalle = ref<LiquidacionDisplay | null>(null)
+const sociaSeleccionadaEditar = ref<SociaDisplay | null>(null)
+const anticipoSeleccionadoEditar = ref<AnticipoDisplay | null>(null)
 
 // Deletion confirmation modals
 const showDeleteLiqModal = ref(false)
-const liquidacionAEliminar = ref<LiquidacionSocias | null>(null)
+const liquidacionAEliminar = ref<LiquidacionDisplay | null>(null)
 
 const showDeleteSociaModal = ref(false)
-const sociaAEliminar = ref<SociaAtelier | null>(null)
+const sociaAEliminar = ref<SociaDisplay | null>(null)
 
 const showDeleteAnticipoModal = ref(false)
-const anticipoAEliminar = ref<AnticipoSocia | null>(null)
+const anticipoAEliminar = ref<AnticipoDisplay | null>(null)
 const descontandoAnticipoId = ref<number | null>(null)
 
 // Break-even simulator parameters
@@ -197,7 +238,7 @@ function formatCOP(val: number): string {
   return `$${Math.round(val).toLocaleString('es-CO')}`
 }
 
-// Filtered liquidaciones (source switches via isMock)
+// Filtered liquidaciones
 const liquidacionesFiltradas = computed(() => {
   let list = [...liquidacionesList.value]
 
@@ -219,7 +260,7 @@ const liquidacionesFiltradas = computed(() => {
   return list
 })
 
-// Filtered anticipos (source switches via isMock)
+// Filtered anticipos
 const anticiposFiltrados = computed(() => {
   let list = [...anticiposList.value]
 
@@ -249,7 +290,6 @@ const movimientosFiltrados = computed(() => {
 })
 
 async function recargarMovimientos() {
-  if (isMock.value) return
   try {
     const r = await movimientosApi.listMovimientos({
       limit: 100,
@@ -257,19 +297,19 @@ async function recargarMovimientos() {
       ...(filterMovTipo.value !== 'TODOS' ? { tipo: filterMovTipo.value as 'Gasto' | 'Inversion' | 'Retiro' } : {}),
       ...(filterMovEstado.value !== 'TODOS' ? { estado: filterMovEstado.value as 'draft' | 'confirmed' | 'cancelled' | 'reversed' } : {}),
     })
-    movimientosReal.value = r.items ?? []
+    movimientosList.value = r.items ?? []
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Error al cargar movimientos'
     showToast('error', 'Error', msg)
   }
 }
 
-// Total % of active socias (real or mock)
+// Total % of active socias
 const sumaPorcentajesSocias = computed(() => {
   return sociasList.value.filter((s) => s.activo).reduce((acc, s) => acc + s.porcentaje, 0)
 })
 
-// KPI aggregates — mirror atelier getters but over the active data source
+// KPI aggregates over the active data source
 const totalHistoricoFacturado = computed(() => liquidacionesList.value.reduce((a, l) => a + l.total_ventas_brutas, 0))
 const totalHistoricoFondo = computed(() => liquidacionesList.value.reduce((a, l) => a + l.fondo_reinversion_monto, 0))
 // Socias de reparto dinámicas (primeras 2 activas no-fondo): en REAL los ids
@@ -293,7 +333,7 @@ function porcentajeSociaReparto(i: number, fallback: number): number {
   const s = sociasReparto.value[i] as any
   return Number(s?.porcentaje ?? s?.porcentaje_participacion ?? fallback) || fallback
 }
-function itemDistribucion(l: LiquidacionSocias, sociaId: number | undefined) {
+function itemDistribucion(l: LiquidacionDisplay, sociaId: number | undefined) {
   if (sociaId == null) return undefined
   return l.distribucion.find((d) => d.socia_id === sociaId)
 }
@@ -301,7 +341,7 @@ const totalAnticiposPendientes = computed(() =>
   anticiposList.value.filter((a) => a.estado === 'PENDIENTE_DESCUENTO').reduce((a, x) => a + x.monto, 0),
 )
 
-// Historical income per socia (real or mock)
+// Historical income per socia
 function getIngresoHistoricoSocia(sociaId: number): number {
   return liquidacionesList.value.reduce((acc, l) => {
     const item = l.distribucion.find((d) => d.socia_id === sociaId)
@@ -321,17 +361,17 @@ function abrirNuevaLiquidacion() {
   showNuevaLiqModal.value = true
 }
 
-function abrirEditarLiquidacion(liq: LiquidacionSocias) {
+function abrirEditarLiquidacion(liq: LiquidacionDisplay) {
   liquidacionSeleccionadaEditar.value = liq
   showNuevaLiqModal.value = true
 }
 
-function abrirDetalleLiquidacion(liq: LiquidacionSocias) {
+function abrirDetalleLiquidacion(liq: LiquidacionDisplay) {
   liquidacionSeleccionadaDetalle.value = liq
   showDetalleLiqModal.value = true
 }
 
-function solicitarEliminarLiquidacion(liq: LiquidacionSocias) {
+function solicitarEliminarLiquidacion(liq: LiquidacionDisplay) {
   liquidacionAEliminar.value = liq
   showDeleteLiqModal.value = true
 }
@@ -340,17 +380,13 @@ async function confirmarEliminarLiquidacion() {
   if (liquidacionAEliminar.value) {
     const cod = liquidacionAEliminar.value.codigo
     const id = liquidacionAEliminar.value.id
-    if (isMock.value) {
-      atelier.eliminarLiquidacion(id)
-    } else {
-      try {
-        await finanzasApi.removeLiquidacion(id)
-        await cargarDatosReales()
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Error al eliminar liquidación'
-        showToast('error', 'Error', msg)
-        return
-      }
+    try {
+      await finanzasApi.removeLiquidacion(id)
+      await cargarDatos()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error al eliminar liquidación'
+      showToast('error', 'Error', msg)
+      return
     }
     showToast('info', 'Liquidación Eliminada', `La liquidación ${cod} ha sido eliminada del historial.`)
     liquidacionAEliminar.value = null
@@ -358,16 +394,11 @@ async function confirmarEliminarLiquidacion() {
   }
 }
 
-async function cambiarEstadoLiq(liq: LiquidacionSocias, nuevoEstado: LiquidacionSocias['estado']) {
-  if (isMock.value) {
-    atelier.cambiarEstadoLiquidacion(liq.id, nuevoEstado)
-    showToast('success', 'Estado Actualizado', `Liquidación ${liq.codigo} marcada como ${nuevoEstado}.`)
-    return
-  }
+async function cambiarEstadoLiq(liq: LiquidacionDisplay, nuevoEstado: 'BORRADOR' | 'APROBADA' | 'PAGADA') {
   try {
     await finanzasApi.transitionLiquidacion(liq.id, { estado: nuevoEstado })
     // Siempre refetch: el parcheo optimista quedaba stale si el shape deriva.
-    await cargarDatosReales()
+    await cargarDatos()
     showToast('success', 'Estado Actualizado', `Liquidación ${liq.codigo} marcada como ${nuevoEstado}.`)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Transición no permitida'
@@ -381,12 +412,12 @@ function abrirNuevaSocia() {
   showGestionSociaModal.value = true
 }
 
-function abrirEditarSocia(soc: SociaAtelier) {
+function abrirEditarSocia(soc: SociaDisplay) {
   sociaSeleccionadaEditar.value = soc
   showGestionSociaModal.value = true
 }
 
-function solicitarEliminarSocia(soc: SociaAtelier) {
+function solicitarEliminarSocia(soc: SociaDisplay) {
   sociaAEliminar.value = soc
   showDeleteSociaModal.value = true
 }
@@ -395,17 +426,13 @@ async function confirmarEliminarSocia() {
   if (sociaAEliminar.value) {
     const nom = sociaAEliminar.value.nombre
     const id = sociaAEliminar.value.id
-    if (isMock.value) {
-      atelier.eliminarSocia(id)
-    } else {
-      try {
-        await sociosApi.remove(id)
-        await cargarDatosReales()
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Error al eliminar socia'
-        showToast('error', 'Error', msg)
-        return
-      }
+    try {
+      await sociosApi.remove(id)
+      await cargarDatos()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error al eliminar socia'
+      showToast('error', 'Error', msg)
+      return
     }
     showToast('info', 'Socia Eliminada', `El registro de ${nom} ha sido removido.`)
     sociaAEliminar.value = null
@@ -413,14 +440,10 @@ async function confirmarEliminarSocia() {
   }
 }
 
-async function toggleActivoSocia(s: SociaAtelier) {
-  if (isMock.value) {
-    atelier.toggleActivoSocia(s.id)
-    return
-  }
+async function toggleActivoSocia(s: SociaDisplay) {
   try {
     await sociosApi.update(s.id, { activo: !s.activo })
-    await cargarDatosReales()
+    await cargarDatos()
     showToast('success', 'Socia Actualizada', `${s.nombre} ${!s.activo ? 'activada' : 'desactivada'}.`)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Error al actualizar socia'
@@ -434,18 +457,13 @@ function abrirNuevoAnticipo() {
   showNuevoAnticipoModal.value = true
 }
 
-function abrirEditarAnticipo(ant: AnticipoSocia) {
+function abrirEditarAnticipo(ant: AnticipoDisplay) {
   anticipoSeleccionadoEditar.value = ant
   showNuevoAnticipoModal.value = true
 }
 
-async function marcarAnticipoDescontado(ant: AnticipoSocia) {
+async function marcarAnticipoDescontado(ant: AnticipoDisplay) {
   if (descontandoAnticipoId.value === ant.id) return
-  if (isMock.value) {
-    atelier.cambiarEstadoAnticipo(ant.id, 'DESCONTADO')
-    showToast('success', 'Anticipo Actualizado', `Anticipo marcado como DESCONTADO.`)
-    return
-  }
   // Camino único: PATCH /anticipos/{id}/descuento exige liquidacion_id.
   // Sin liquidación no hay a qué imputar el descuento — se avisa y no se
   // llama a ningún endpoint (el fallback a transitionAnticipo hacía doble
@@ -457,7 +475,7 @@ async function marcarAnticipoDescontado(ant: AnticipoSocia) {
   descontandoAnticipoId.value = ant.id
   try {
     await finanzasApi.descontarAnticipo(ant.id, ant.liquidacion_id)
-    await cargarDatosReales()
+    await cargarDatos()
     showToast('success', 'Anticipo Actualizado', `Anticipo marcado como DESCONTADO.`)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Error al descontar anticipo'
@@ -467,7 +485,7 @@ async function marcarAnticipoDescontado(ant: AnticipoSocia) {
   }
 }
 
-function solicitarEliminarAnticipo(ant: AnticipoSocia) {
+function solicitarEliminarAnticipo(ant: AnticipoDisplay) {
   anticipoAEliminar.value = ant
   showDeleteAnticipoModal.value = true
 }
@@ -475,17 +493,13 @@ function solicitarEliminarAnticipo(ant: AnticipoSocia) {
 async function confirmarEliminarAnticipo() {
   if (anticipoAEliminar.value) {
     const id = anticipoAEliminar.value.id
-    if (isMock.value) {
-      atelier.eliminarAnticipo(id)
-    } else {
-      try {
-        await finanzasApi.removeAnticipo(id)
-        await cargarDatosReales()
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Error al eliminar anticipo'
-        showToast('error', 'Error', msg)
-        return
-      }
+    try {
+      await finanzasApi.removeAnticipo(id)
+      await cargarDatos()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error al eliminar anticipo'
+      showToast('error', 'Error', msg)
+      return
     }
     showToast('info', 'Anticipo Eliminado', `El anticipo ha sido eliminado.`)
     anticipoAEliminar.value = null
@@ -780,16 +794,6 @@ function imprimirBalance() {
                       @click="abrirDetalleLiquidacion(l)"
                     />
                     <Button
-                      v-if="isMock"
-                      icon="pi pi-pencil"
-                      size="small"
-                      text
-                      rounded
-                      class="p-button-secondary text-stone-300 hover:bg-stone-800"
-                      title="Editar Liquidación (solo MOCK: la API solo permite transición de estado)"
-                      @click="abrirEditarLiquidacion(l)"
-                    />
-                    <Button
                       icon="pi pi-trash"
                       size="small"
                       text
@@ -847,7 +851,6 @@ function imprimirBalance() {
             </div>
             <div class="flex gap-2 pt-1">
               <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-amber-300 text-sm font-semibold" @click="abrirDetalleLiquidacion(l)">Ver acta</button>
-              <button v-if="isMock" type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" @click="abrirEditarLiquidacion(l)">Editar</button>
               <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg border border-rose-800 text-rose-400" title="Eliminar Liquidación" @click="solicitarEliminarLiquidacion(l)"><i class="pi pi-trash text-xs" /></button>
             </div>
           </div>
@@ -1158,13 +1161,7 @@ function imprimirBalance() {
         />
       </div>
 
-      <div v-if="isMock" class="rounded-2xl border border-stone-800 bg-stone-900/40 p-8 text-center">
-        <i class="pi pi-inbox text-2xl mb-2 block text-stone-500" />
-        <p class="text-sm font-bold text-stone-300">Sin movimientos en modo MOCK</p>
-        <p class="text-xs text-stone-400 mt-1">Los movimientos financieros viven en <code>GET /api/v1/finanzas/movimientos</code> (Postgres).</p>
-      </div>
-
-      <div v-else class="rounded-2xl border border-stone-800 bg-stone-900/40 backdrop-blur-sm overflow-hidden">
+      <div class="rounded-2xl border border-stone-800 bg-stone-900/40 backdrop-blur-sm overflow-hidden">
         <div class="hidden overflow-x-auto md:block">
           <table class="w-full min-w-[640px] text-xs text-left border-collapse font-mono">
             <thead>
@@ -1312,7 +1309,7 @@ function imprimirBalance() {
     <NuevaLiquidacionModal
       v-model:visible="showNuevaLiqModal"
       :liquidacion-editar="liquidacionSeleccionadaEditar"
-      @guardada="() => { if (!isMock) void cargarDatosReales() }"
+      @guardada="() => { void cargarDatos() }"
     />
 
     <DetalleLiquidacionModal
@@ -1324,13 +1321,13 @@ function imprimirBalance() {
     <GestionSociasModal
       v-model:visible="showGestionSociaModal"
       :socia-editar="sociaSeleccionadaEditar"
-      @guardada="() => { if (!isMock) void cargarDatosReales() }"
+      @guardada="() => { void cargarDatos() }"
     />
 
     <NuevoAnticipoModal
       v-model:visible="showNuevoAnticipoModal"
       :anticipo-editar="anticipoSeleccionadoEditar"
-      @guardado="() => { if (!isMock) void cargarDatosReales() }"
+      @guardado="() => { void cargarDatos() }"
     />
 
     <!-- Delete Liquidacion Dialog -->

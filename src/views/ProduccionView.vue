@@ -1,42 +1,55 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import { useAtelierStore, type PedidoProduccion, type EstadoPedido } from '@/stores/atelier'
 import { useProduccion } from '@/composables/useProduccion'
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import DetallePedidoTallerModal from '@/components/atelier/DetallePedidoTallerModal.vue'
 import { showToast } from '@/utils/toast'
 
 const router = useRouter()
-const atelier = useAtelierStore()
-const { isMock, list: listPedidosApi } = useProduccion()
 const produccionService = useProduccion()
+
+/** REAL display shape: backend PedidoProduccionRead normalized for this view. */
+interface PedidoDisplay {
+  id: number
+  codigo: string
+  cliente_id: number
+  cliente_nombre: string
+  prenda_nombre: string
+  // Display: etapas del kanban. estadoReal guarda el enum del backend
+  // (pendiente/en_produccion/completado/cancelado) para las transiciones.
+  estado: string
+  estadoReal?: string
+  precio_venta: number
+  costo_produccion: number
+  utilidad_neta: number
+  margen_pct: number
+  fecha: string
+  observaciones?: string
+}
 
 const search = ref('')
 const viewMode = ref<'kanban' | 'tabla'>('kanban')
 const showNuevoPedidoModal = ref(false)
 const showDetallePedidoModal = ref(false)
-const pedidoSeleccionado = ref<PedidoProduccion | null>(null)
-const pedidosApi = ref<(PedidoProduccion & { estadoReal?: string })[]>([])
+const pedidoSeleccionado = ref<PedidoDisplay | null>(null)
+const pedidos = ref<PedidoDisplay[]>([])
 
-async function cargarPedidosReales() {
-  if (isMock.value) return
+async function cargarPedidos() {
   try {
-    const res = await listPedidosApi({ limit: 100 })
-    pedidosApi.value = res.items.map((p: any) => ({
+    const res = await produccionService.list({ limit: 100 })
+    pedidos.value = res.items.map((p: any) => ({
       id: p.id,
       codigo: `ORD-${p.id}`,
       cliente_id: p.cliente_id ?? 0,
       cliente_nombre: p.cliente_nombre || p.nombre_variante || p.nombre_producto || 'Taller Arpía',
       prenda_nombre: p.nombre_producto || `Producto #${p.producto_id}`,
-      // Display: etapas del kanban MOCK. estadoReal guarda el enum del backend
-      // (pendiente/en_produccion/completado/cancelado) para las transiciones.
       estado: p.estado === 'pendiente' ? 'CORTE' : p.estado === 'en_produccion' ? 'COSTURA' : p.estado === 'completado' ? 'LISTO' : 'COTIZADO',
       estadoReal: p.estado,
-      // P0-6: PedidoProduccionRead no trae montos (sin join a productos, fuera de alcance);
-      // se mantienen en 0 y el template los oculta en REAL para no mostrar $0 mentiroso.
+      // PedidoProduccionRead no trae montos (sin join a productos, fuera de alcance);
+      // se mantienen en 0 y el template los oculta para no mostrar $0 mentiroso.
       precio_venta: 0,
       costo_produccion: 0,
       utilidad_neta: 0,
@@ -50,35 +63,30 @@ async function cargarPedidosReales() {
 }
 
 onMounted(() => {
-  cargarPedidosReales()
+  cargarPedidos()
 })
-
-watch(isMock, () => void cargarPedidosReales())
-
-const pedidosList = computed(() => (isMock.value ? atelier.pedidos : pedidosApi.value))
 
 // Anti doble-submit por fila: un doble clic en "Siguiente" saltaba etapas
 // (pendiente→en_produccion→completado de una). Terminal = sin transiciones.
 const transicionandoId = ref<number | null>(null)
-function estadoRealDe(p: PedidoProduccion): string | undefined {
-  return (p as unknown as { estadoReal?: string }).estadoReal
+function estadoRealDe(p: PedidoDisplay): string | undefined {
+  return p.estadoReal
 }
-function esTerminal(p: PedidoProduccion): boolean {
-  if (isMock.value) return false
+function esTerminal(p: PedidoDisplay): boolean {
   const raw = estadoRealDe(p)
   return raw === 'completado' || raw === 'cancelado'
 }
-function etapaBadge(p: PedidoProduccion): string {
-  if (!isMock.value && estadoRealDe(p) === 'cancelado') return 'CANCELADO'
+function etapaBadge(p: PedidoDisplay): string {
+  if (estadoRealDe(p) === 'cancelado') return 'CANCELADO'
   return p.estado
 }
 
-function abrirFichaTaller(p: PedidoProduccion) {
+function abrirFichaTaller(p: PedidoDisplay) {
   pedidoSeleccionado.value = p
   showDetallePedidoModal.value = true
 }
 
-const estados: EstadoPedido[] = [
+const estados: string[] = [
   'COTIZADO',
   'RESERVADO',
   'CORTE',
@@ -95,7 +103,7 @@ function formatCOP(val: number) {
 }
 
 const pedidosFiltrados = computed(() => {
-  return pedidosList.value.filter((p) => {
+  return pedidos.value.filter((p) => {
     const q = search.value.trim().toLowerCase()
     return (
       !q ||
@@ -106,7 +114,7 @@ const pedidosFiltrados = computed(() => {
   })
 })
 
-function getPedidosPorEstado(est: EstadoPedido) {
+function getPedidosPorEstado(est: string) {
   return pedidosFiltrados.value.filter((p) => p.estado === est)
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -117,67 +125,49 @@ const AVANZAR_REAL: Record<string, string> = { pendiente: 'en_produccion', en_pr
 const RETROCEDER_REAL: Record<string, string> = { en_produccion: 'pendiente', completado: 'en_produccion' }
 const ETAPA_DISPLAY: Record<string, string> = { pendiente: 'CORTE', en_produccion: 'COSTURA', completado: 'LISTO', cancelado: 'CANCELADO' }
 
-async function avanzarEstado(pedido: PedidoProduccion) {
-  if (!isMock.value) {
-    if (transicionandoId.value === pedido.id) return
-    const raw = estadoRealDe(pedido)
-    const next = raw ? AVANZAR_REAL[raw] : undefined
-    if (!next) {
-      showToast('info', 'Sin transición', raw === 'cancelado' ? `La orden ${pedido.codigo} está cancelada.` : `La orden ${pedido.codigo} ya está en su etapa final.`)
-      return
-    }
-    transicionandoId.value = pedido.id
-    try {
-      await produccionService.update(pedido.id, { estado: next } as unknown as Record<string, unknown> as never)
-      await cargarPedidosReales()
-      showToast('success', 'Etapa Actualizada', `Orden ${pedido.codigo} avanzada a ${ETAPA_DISPLAY[next] ?? next}.`)
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error al avanzar estado'
-      showToast('error', 'Error', String(msg))
-    } finally {
-      transicionandoId.value = null
-    }
+async function avanzarEstado(pedido: PedidoDisplay) {
+  if (transicionandoId.value === pedido.id) return
+  const raw = estadoRealDe(pedido)
+  const next = raw ? AVANZAR_REAL[raw] : undefined
+  if (!next) {
+    showToast('info', 'Sin transición', raw === 'cancelado' ? `La orden ${pedido.codigo} está cancelada.` : `La orden ${pedido.codigo} ya está en su etapa final.`)
     return
   }
-  const currentIndex = estados.indexOf(pedido.estado)
-  if (currentIndex < estados.length - 1) {
-    const nextState = estados[currentIndex + 1]
-    atelier.cambiarEstadoPedido(pedido.id, nextState)
-    showToast('success', 'Etapa Actualizada', `Orden ${pedido.codigo} avanzada a ${nextState}.`)
+  transicionandoId.value = pedido.id
+  try {
+    await produccionService.update(pedido.id, { estado: next } as unknown as Record<string, unknown> as never)
+    await cargarPedidos()
+    showToast('success', 'Etapa Actualizada', `Orden ${pedido.codigo} avanzada a ${ETAPA_DISPLAY[next] ?? next}.`)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Error al avanzar estado'
+    showToast('error', 'Error', String(msg))
+  } finally {
+    transicionandoId.value = null
   }
 }
 
-async function retrocederEstado(pedido: PedidoProduccion) {
-  if (!isMock.value) {
-    if (transicionandoId.value === pedido.id) return
-    const raw = estadoRealDe(pedido)
-    const prev = raw ? RETROCEDER_REAL[raw] : undefined
-    if (!prev) {
-      showToast('info', 'Sin transición', `La orden ${pedido.codigo} no puede retroceder desde ${ETAPA_DISPLAY[raw ?? ''] ?? raw ?? 'su estado'}.`)
-      return
-    }
-    transicionandoId.value = pedido.id
-    try {
-      await produccionService.update(pedido.id, { estado: prev } as unknown as Record<string, unknown> as never)
-      await cargarPedidosReales()
-      showToast('info', 'Etapa Actualizada', `Orden ${pedido.codigo} movida a ${ETAPA_DISPLAY[prev] ?? prev}.`)
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error al retroceder estado'
-      showToast('error', 'Error', String(msg))
-    } finally {
-      transicionandoId.value = null
-    }
+async function retrocederEstado(pedido: PedidoDisplay) {
+  if (transicionandoId.value === pedido.id) return
+  const raw = estadoRealDe(pedido)
+  const prev = raw ? RETROCEDER_REAL[raw] : undefined
+  if (!prev) {
+    showToast('info', 'Sin transición', `La orden ${pedido.codigo} no puede retroceder desde ${ETAPA_DISPLAY[raw ?? ''] ?? raw ?? 'su estado'}.`)
     return
   }
-  const currentIndex = estados.indexOf(pedido.estado)
-  if (currentIndex > 0) {
-    const prevState = estados[currentIndex - 1]
-    atelier.cambiarEstadoPedido(pedido.id, prevState)
-    showToast('info', 'Etapa Actualizada', `Orden ${pedido.codigo} movida a ${prevState}.`)
+  transicionandoId.value = pedido.id
+  try {
+    await produccionService.update(pedido.id, { estado: prev } as unknown as Record<string, unknown> as never)
+    await cargarPedidos()
+    showToast('info', 'Etapa Actualizada', `Orden ${pedido.codigo} movida a ${ETAPA_DISPLAY[prev] ?? prev}.`)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Error al retroceder estado'
+    showToast('error', 'Error', String(msg))
+  } finally {
+    transicionandoId.value = null
   }
 }
 
-function abrirWhatsApp(p: PedidoProduccion) {
+function abrirWhatsApp(p: PedidoDisplay) {
   const msg = encodeURIComponent(`¡Hola ${p.cliente_nombre}! Te escribimos de Atelier Arpía sobre tu pedido *${p.codigo}* (${p.prenda_nombre}). Estado actual: *${p.estado}*. ✨`)
   window.open(`https://wa.me/573124567890?text=${msg}`, '_blank')
 }
@@ -193,7 +183,7 @@ function abrirWhatsApp(p: PedidoProduccion) {
             Gestión de Pedidos & Producción en Taller
           </h1>
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-            {{ pedidosList.length }} Pedidos Registrados
+            {{ pedidos.length }} Pedidos Registrados
           </span>
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">
@@ -315,11 +305,7 @@ function abrirWhatsApp(p: PedidoProduccion) {
                   {{ p.prenda_nombre }}
                 </div>
 
-                <!-- Price & Profit (solo MOCK: en REAL no hay montos) -->
-                <div v-if="isMock" class="flex justify-between text-[11px] font-mono pt-1">
-                  <span class="text-stone-400">Venta: {{ formatCOP(p.precio_venta) }}</span>
-                  <span class="text-emerald-400 font-bold">Utilidad: {{ formatCOP(p.utilidad_neta) }}</span>
-                </div>
+                <!-- Price & Profit: la API no trae montos, no se muestran -->
 
                 <!-- Stage Movement Buttons -->
                 <div class="flex justify-between items-center pt-2 border-t border-stone-800/60">
@@ -364,8 +350,6 @@ function abrirWhatsApp(p: PedidoProduccion) {
               <th class="py-3 px-4">Cliente</th>
               <th class="py-3 px-4 min-w-[180px]">Prenda / Modelo</th>
               <th class="py-3 px-4 text-center whitespace-nowrap">Fase de Producción</th>
-              <th v-if="isMock" class="py-3 px-4 text-right whitespace-nowrap">Precio Venta</th>
-              <th v-if="isMock" class="py-3 px-4 text-right whitespace-nowrap">Utilidad Neta</th>
               <th class="py-3 px-4 text-right whitespace-nowrap">Acciones</th>
             </tr>
           </thead>
@@ -382,8 +366,6 @@ function abrirWhatsApp(p: PedidoProduccion) {
                   {{ etapaBadge(p) }}
                 </span>
               </td>
-              <td v-if="isMock" class="py-3 px-4 text-right font-mono whitespace-nowrap">{{ formatCOP(p.precio_venta) }}</td>
-              <td v-if="isMock" class="py-3 px-4 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">{{ formatCOP(p.utilidad_neta) }}</td>
               <td class="py-3 px-4 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-2">
                   <button
@@ -421,10 +403,6 @@ function abrirWhatsApp(p: PedidoProduccion) {
           </div>
           <div class="font-bold text-sm text-stone-100">{{ p.prenda_nombre }}</div>
           <div class="text-sm text-stone-300">{{ p.cliente_nombre }}</div>
-          <div v-if="isMock" class="flex items-center justify-between text-sm">
-            <span class="font-mono text-stone-300">{{ formatCOP(p.precio_venta) }}</span>
-            <span class="font-mono font-bold text-emerald-400">{{ formatCOP(p.utilidad_neta) }}</span>
-          </div>
           <div class="flex gap-2 pt-1">
             <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-amber-500 text-stone-950 text-sm font-bold disabled:opacity-30" :disabled="transicionandoId === p.id || esTerminal(p)" @click="avanzarEstado(p)">Avanzar Fase</button>
             <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-emerald-400" title="WhatsApp" @click="abrirWhatsApp(p)"><i class="pi pi-whatsapp text-xs" /></button>
@@ -434,7 +412,7 @@ function abrirWhatsApp(p: PedidoProduccion) {
     </div>
 
     <!-- Modals -->
-    <NuevoPedidoModal v-model:visible="showNuevoPedidoModal" @pedido-creado="cargarPedidosReales" />
+    <NuevoPedidoModal v-model:visible="showNuevoPedidoModal" @pedido-creado="cargarPedidos" />
     <DetallePedidoTallerModal
       v-model:visible="showDetallePedidoModal"
       :pedido="pedidoSeleccionado"

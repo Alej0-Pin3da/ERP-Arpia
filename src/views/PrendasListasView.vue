@@ -1,30 +1,48 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import { useAtelierStore, type PrendaConfeccionada, type PrendaVariante } from '@/stores/atelier'
 import { usePrendas } from '@/composables/usePrendas'
 import EtiquetaPrendaModal from '@/components/atelier/EtiquetaPrendaModal.vue'
 import IngresarPrendaModal from '@/components/atelier/IngresarPrendaModal.vue'
 import { showToast } from '@/utils/toast'
 
-const atelier = useAtelierStore()
-const { isMock, list: listPrendasApi } = usePrendas()
 const prendasService = usePrendas()
 const search = ref('')
 
+/** REAL display shape: backend PrendaRead normalized for this view. */
+interface VarianteDisplay {
+  id: number
+  talla: string
+  color: string
+  sku: string
+  stock_fisico: number
+  reservado: number
+  disponible: number
+}
+interface PrendaDisplay {
+  id: number
+  codigo: string
+  nombre: string
+  categoria: string
+  costo_base: number
+  precio_venta: number
+  fisico_total: number
+  disponible_total: number
+  variantes: VarianteDisplay[]
+}
+
 const showEtiquetaModal = ref(false)
 const showIngresarModal = ref(false)
-const selectedPrenda = ref<PrendaConfeccionada | null>(null)
-const selectedVariante = ref<PrendaVariante | null>(null)
-const prendasApi = ref<PrendaConfeccionada[]>([])
+const selectedPrenda = ref<PrendaDisplay | null>(null)
+const selectedVariante = ref<VarianteDisplay | null>(null)
+const prendas = ref<PrendaDisplay[]>([])
 
-async function cargarPrendasReales() {
-  if (isMock.value) return
+async function cargarPrendas() {
   try {
-    const res = await listPrendasApi({ limit: 100 })
+    const res = await prendasService.list({ limit: 100 })
     // Map PrendaRead items to UI structure if needed
-    prendasApi.value = res.items.map((p: any) => ({
+    prendas.value = res.items.map((p: any) => ({
       id: p.id,
       codigo: `PRD-${p.id}`,
       nombre: p.nombre_producto || `Prenda #${p.id}`,
@@ -52,18 +70,15 @@ async function cargarPrendasReales() {
 }
 
 onMounted(() => {
-  cargarPrendasReales()
+  cargarPrendas()
 })
 
-watch(isMock, () => void cargarPrendasReales())
-
-const prendasList = computed(() => (isMock.value ? atelier.prendasListas : prendasApi.value))
-const stockFisicoDisplay = computed(() => isMock.value ? (atelier as any).prendasStockFisico : prendasApi.value.reduce((acc: number, p: any) => acc + (p.fisico_total ?? 1), 0) || prendasApi.value.length)
-const stockDisponibleDisplay = computed(() => isMock.value ? (atelier as any).prendasStockDisponible : prendasApi.value.reduce((acc: number, p: any) => acc + (p.disponible_total ?? (p.estado === 'disponible' ? 1 : 0)), 0))
-const valorizacionDisplay = computed(() => isMock.value ? (atelier as any).valorizacionPVP : prendasApi.value.reduce((acc: number, p: any) => acc + Number(p.precio_venta ?? 0), 0))
+const stockFisico = computed(() => prendas.value.reduce((acc: number, p: any) => acc + (p.fisico_total ?? 1), 0) || prendas.value.length)
+const stockDisponible = computed(() => prendas.value.reduce((acc: number, p: any) => acc + (p.disponible_total ?? (p.estado === 'disponible' ? 1 : 0)), 0))
+const valorizacion = computed(() => prendas.value.reduce((acc: number, p: any) => acc + Number(p.precio_venta ?? 0), 0))
 
 const prendasFiltradas = computed(() => {
-  return prendasList.value.filter((p) => {
+  return prendas.value.filter((p) => {
     const q = search.value.trim().toLowerCase()
     return (
       !q ||
@@ -79,17 +94,13 @@ function formatCOP(val: number) {
 }
 
 async function ajustarStock(productoId: number, varianteId: number, delta: number) {
-  if (isMock.value) {
-    atelier.ajustarStockPrenda(productoId, varianteId, delta)
-    return
-  }
-  // En REAL no hay endpoint de delta de stock y cada fila es 1 unidad:
+  // No hay endpoint de delta de stock y cada fila es 1 unidad:
   // no se finge un PATCH vacío con éxito (los botones están deshabilitados).
   showToast('info', 'Stock en REAL', 'El stock se mueve con "Ingresar Prenda Confeccionada" (cada fila es 1 unidad).')
-  await cargarPrendasReales()
+  await cargarPrendas()
 }
 
-function verEtiqueta(p: PrendaConfeccionada, v?: PrendaVariante) {
+function verEtiqueta(p: PrendaDisplay, v?: VarianteDisplay) {
   selectedPrenda.value = p
   selectedVariante.value = v || (p.variantes && p.variantes[0]) || null
   showEtiquetaModal.value = true
@@ -100,7 +111,7 @@ function ingresarPrendaModal() {
 }
 
 async function onPrendaIngresada() {
-  await cargarPrendasReales()
+  await cargarPrendas()
 }
 </script>
 
@@ -114,7 +125,7 @@ async function onPrendaIngresada() {
             Inventario de Productos Confeccionados
           </h1>
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-            {{ stockFisicoDisplay }} Prendas en Stock
+            {{ stockFisico }} Prendas en Stock
           </span>
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">
@@ -138,7 +149,7 @@ async function onPrendaIngresada() {
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Prendas Físicas en Perchero</div>
         <div class="text-2xl font-extrabold text-stone-100 mt-2 font-mono">
-          {{ stockFisicoDisplay }} unidades
+          {{ stockFisico }} unidades
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Existencia real en taller</div>
       </div>
@@ -146,7 +157,7 @@ async function onPrendaIngresada() {
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Stock Disponible para Venta</div>
         <div class="text-2xl font-extrabold text-emerald-400 mt-2 font-mono">
-          {{ stockDisponibleDisplay }} unidades
+          {{ stockDisponible }} unidades
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Listos para despacho inmediato</div>
       </div>
@@ -154,7 +165,7 @@ async function onPrendaIngresada() {
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Prendas Reservadas en Pedidos</div>
         <div class="text-2xl font-extrabold text-amber-400 mt-2 font-mono">
-          {{ stockFisicoDisplay - stockDisponibleDisplay }} unidades
+          {{ stockFisico - stockDisponible }} unidades
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Con abono o reserva previa</div>
       </div>
@@ -162,7 +173,7 @@ async function onPrendaIngresada() {
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Valorización a PVP</div>
         <div class="text-2xl font-extrabold text-amber-300 mt-2 font-mono">
-          {{ formatCOP(valorizacionDisplay) }}
+          {{ formatCOP(valorizacion) }}
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Total mercancía a precio venta</div>
       </div>
@@ -266,8 +277,8 @@ async function onPrendaIngresada() {
                       <button
                         type="button"
                         class="px-2 py-0.5 text-stone-400 hover:text-white hover:bg-stone-800 rounded text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
-                        :disabled="!isMock"
-                        :title="isMock ? 'Quitar 1 unidad' : 'En modo REAL el stock se mueve con Ingresar Prenda (cada fila es 1 unidad)'"
+                        disabled
+                        title="El stock se mueve con Ingresar Prenda (cada fila es 1 unidad)"
                         @click="ajustarStock(p.id, v.id, -1)"
                       >
                         -1
@@ -275,8 +286,8 @@ async function onPrendaIngresada() {
                       <button
                         type="button"
                         class="px-2 py-0.5 text-amber-400 hover:text-amber-300 hover:bg-stone-800 rounded text-xs font-bold transition disabled:opacity-40 disabled:cursor-not-allowed"
-                        :disabled="!isMock"
-                        :title="isMock ? 'Agregar 1 unidad' : 'En modo REAL el stock se mueve con Ingresar Prenda (cada fila es 1 unidad)'"
+                        disabled
+                        title="El stock se mueve con Ingresar Prenda (cada fila es 1 unidad)"
                         @click="ajustarStock(p.id, v.id, 1)"
                       >
                         +1
@@ -312,8 +323,8 @@ async function onPrendaIngresada() {
             </div>
             <div class="flex gap-2 pt-1">
               <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" title="Ver Etiqueta de esta Talla" @click="verEtiqueta(p, v)">Etiqueta QR</button>
-              <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-stone-200 font-bold disabled:opacity-40" :disabled="!isMock" title="Quitar 1 unidad" @click="ajustarStock(p.id, v.id, -1)">−1</button>
-              <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-amber-400 font-bold disabled:opacity-40" :disabled="!isMock" title="Agregar 1 unidad" @click="ajustarStock(p.id, v.id, 1)">+1</button>
+              <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-stone-200 font-bold disabled:opacity-40" disabled title="El stock se mueve con Ingresar Prenda (cada fila es 1 unidad)" @click="ajustarStock(p.id, v.id, -1)">−1</button>
+              <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-amber-400 font-bold disabled:opacity-40" disabled title="El stock se mueve con Ingresar Prenda (cada fila es 1 unidad)" @click="ajustarStock(p.id, v.id, 1)">+1</button>
             </div>
           </div>
         </div>

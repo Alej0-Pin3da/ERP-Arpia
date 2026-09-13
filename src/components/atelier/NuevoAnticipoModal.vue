@@ -7,32 +7,42 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
-import { useAtelierStore, type AnticipoSocia } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
-import { useMode } from '@/composables/useMode'
 import { useFinanzas } from '@/composables/useFinanzas'
 import { useSocios } from '@/composables/useSocios'
+import type { AnticipoRead } from '@/services/api/anticipos'
+
+/** Minimal anticipo shape this modal edits (REAL display object from the caller). */
+export interface AnticipoEditar {
+  id: number
+  socia_id: number
+  fecha: string
+  monto: number
+  concepto: string
+  metodo_desembolso: string
+  estado: 'PENDIENTE_DESCUENTO' | 'DESCONTADO' | 'ANULADO'
+  comprobante?: string
+  observaciones?: string
+}
 
 const props = defineProps<{
   visible: boolean
-  anticipoEditar?: AnticipoSocia | null
+  anticipoEditar?: AnticipoEditar | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'guardado', ant: AnticipoSocia): void
+  (e: 'guardado', ant: AnticipoRead): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const finanzasApi = useFinanzas()
 const sociosApi = useSocios()
 
 const isEditing = computed(() => !!props.anticipoEditar)
 
-// En REAL la API solo permite transicionar el estado; el resto de campos
+// La API solo permite transicionar el estado; el resto de campos
 // se deshabilitan al editar para no descartar ediciones en silencio.
-const soloLecturaReal = computed(() => !isMock.value && isEditing.value)
+const soloLecturaReal = computed(() => isEditing.value)
 
 // Form fields
 const sociaId = ref<number | null>(2)
@@ -40,24 +50,23 @@ const fecha = ref(new Date().toISOString().split('T')[0])
 const monto = ref(300000)
 const concepto = ref('')
 const metodoDesembolso = ref('Transferencia Nequi')
-const estado = ref<AnticipoSocia['estado']>('PENDIENTE_DESCUENTO')
+const estado = ref<'PENDIENTE_DESCUENTO' | 'DESCONTADO' | 'ANULADO'>('PENDIENTE_DESCUENTO')
 const comprobante = ref('')
 const observaciones = ref('')
 
 const guardando = ref(false)
 
-const sociasReal = ref<any[]>([])
+const socias = ref<any[]>([])
 
 async function cargarSocias() {
-  if (isMock.value) return
   try {
     const r = await sociosApi.list({ limit: 100 })
-    sociasReal.value = (r.items as any) ?? []
-  } catch { sociasReal.value = [] }
+    socias.value = (r.items as any) ?? []
+  } catch { socias.value = [] }
 }
 
 const sociasOptions = computed(() => {
-  return (isMock.value ? atelier.socias : sociasReal.value as any[]).map((s) => ({
+  return (socias.value as any[]).map((s) => ({
     label: `${s.nombre} (${s.rol || 'Socia'})`,
     value: s.id,
   }))
@@ -88,9 +97,9 @@ function initForm() {
     comprobante.value = a.comprobante || ''
     observaciones.value = a.observaciones || ''
   } else {
-    // Default to first non-fondo socia (sin id fantasma en REAL)
-    const soc = (isMock.value ? atelier.socias : sociasReal.value as any[]).find((s) => !s.es_fondo_taller)
-    sociaId.value = soc ? soc.id : (isMock.value ? 2 : null)
+    // Default to first non-fondo socia
+    const soc = (socias.value as any[]).find((s) => !s.es_fondo_taller)
+    sociaId.value = soc ? soc.id : null
     fecha.value = new Date().toISOString().split('T')[0]
     monto.value = 350000
     concepto.value = 'Adelanto a cuenta de utilidades mensuales'
@@ -111,9 +120,6 @@ watch(
   },
   { immediate: true },
 )
-watch(isMock, () => {
-  if (props.visible) void cargarSocias()
-})
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
@@ -128,36 +134,6 @@ async function guardar() {
 
   if (monto.value <= 0) {
     showToast('warn', 'Monto inválido', 'El monto del anticipo debe ser mayor a 0.')
-    return
-  }
-
-  if (isMock.value) {
-    const soc = (isMock.value ? atelier.socias : [] as any[]).find((s) => s.id === sociaId.value)
-    const payload: Partial<AnticipoSocia> = {
-      socia_id: sociaId.value,
-      nombre_socia: soc?.nombre || 'Socia Atelier',
-      fecha: fecha.value,
-      monto: Number(monto.value) || 0,
-      concepto: concepto.value.trim(),
-      metodo_desembolso: metodoDesembolso.value,
-      estado: estado.value,
-      comprobante: comprobante.value.trim(),
-      observaciones: observaciones.value.trim(),
-    }
-    if (isEditing.value && props.anticipoEditar) {
-      if (!isMock.value) { showToast('info','Modo REAL','Use Finanzas API'); return }
-      const act = atelier.actualizarAnticipo(props.anticipoEditar.id, payload)
-      if (act) {
-        showToast('success', 'Anticipo Actualizado', `Anticipo de ${formatCOP(act.monto)} para ${act.nombre_socia} actualizado.`)
-        emit('guardado', act)
-      }
-    } else {
-      if (!isMock.value) { showToast('info','Modo REAL','Use Finanzas API'); return }
-      const nuevo = atelier.crearAnticipo(payload)
-      showToast('success', 'Anticipo Registrado', `Se registró un anticipo de ${formatCOP(nuevo.monto)} para ${nuevo.nombre_socia}.`)
-      emit('guardado', nuevo)
-    }
-    emit('update:visible', false)
     return
   }
 
@@ -182,16 +158,16 @@ async function guardar() {
       if (estado.value !== props.anticipoEditar.estado) {
         const updated = await finanzasApi.transitionAnticipo(props.anticipoEditar.id, { estado: estado.value })
         showToast('success', 'Anticipo Actualizado', `Anticipo ${estado.value}.`)
-        emit('guardado', updated as unknown as AnticipoSocia)
+        emit('guardado', updated)
       } else {
-        showToast('info', 'Sin cambios', 'No hay cambios de estado para guardar en modo REAL.')
+        showToast('info', 'Sin cambios', 'No hay cambios de estado para guardar.')
       }
       emit('update:visible', false)
       return
     }
     const creado = await finanzasApi.createAnticipo(apiPayload)
     showToast('success', 'Anticipo Registrado', `Anticipo de ${formatCOP(Number((creado as unknown as Record<string, unknown>).monto ?? apiPayload.monto))} registrado en BD.`)
-    emit('guardado', creado as unknown as AnticipoSocia)
+    emit('guardado', creado)
     emit('update:visible', false)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al guardar anticipo'
@@ -229,7 +205,7 @@ async function guardar() {
 
         <div v-if="soloLecturaReal" class="sm:col-span-2 bg-sky-950/20 border border-sky-500/20 rounded-xl p-3 text-xs text-sky-200/90 flex items-start gap-2">
           <i class="pi pi-info-circle text-sky-400 text-base flex-shrink-0 mt-0.5" />
-          <span>En modo REAL la API solo permite <strong>cambiar el estado</strong> del anticipo; monto, concepto y demás datos no son editables.</span>
+          <span>La API solo permite <strong>cambiar el estado</strong> del anticipo; monto, concepto y demás datos no son editables.</span>
         </div>
 
         <div>

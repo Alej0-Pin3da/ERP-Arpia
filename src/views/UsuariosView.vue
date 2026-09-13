@@ -1,25 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
 import { useAuthStore } from '@/stores/auth'
-import { useMode } from '@/composables/useMode'
 import { showToast } from '@/utils/toast'
 import * as usuariosApi from '@/services/api/usuarios'
 
 const auth = useAuthStore()
-const { isMock } = useMode()
 
-// MOCK: lista local mínima (no rompe, sin mutar atelier — no hay colección de usuarios ahí)
-const usuariosMock = ref([
-  { id: 1, nombre: 'Valeria Arpía', email: 'admin@arpia.com.co', rol: 'admin' },
-  { id: 2, nombre: 'Camila Modista', email: 'taller@arpia.com.co', rol: 'operador' },
-  { id: 3, nombre: 'Elena Inversionista', email: 'socia@arpia.com.co', rol: 'consulta' },
-])
-
-const usuariosReal = ref<usuariosApi.UsuarioRead[]>([])
+const usuarios = ref<usuariosApi.UsuarioRead[]>([])
 const cargando = ref(false)
 const search = ref('')
 const filterRol = ref('TODOS')
@@ -36,7 +27,6 @@ const formRolOptions = [
 ]
 
 async function cargarUsuarios() {
-  if (isMock.value) return
   cargando.value = true
   try {
     const r = await usuariosApi.listUsuarios({
@@ -45,18 +35,15 @@ async function cargarUsuarios() {
       ...(search.value.trim() ? { q: search.value.trim() } : {}),
       ...(filterRol.value !== 'TODOS' ? { rol: filterRol.value as 'admin' | 'operador' | 'consulta' } : {}),
     })
-    usuariosReal.value = r.items ?? []
+    usuarios.value = r.items ?? []
   } catch {
-    usuariosReal.value = []
+    usuarios.value = []
   } finally {
     cargando.value = false
   }
 }
 
 onMounted(() => { void cargarUsuarios() })
-watch(isMock, () => { void cargarUsuarios() })
-
-const usuariosDisplay = computed(() => (isMock.value ? usuariosMock.value : usuariosReal.value))
 
 // --- Crear / editar ---
 const showFormDialog = ref(false)
@@ -107,18 +94,7 @@ async function submitForm() {
   }
   saving.value = true
   try {
-    if (isMock.value) {
-      if (isEditing.value && editId.value != null) {
-        const idx = usuariosMock.value.findIndex((u) => u.id === editId.value)
-        if (idx !== -1) {
-          usuariosMock.value[idx] = { id: editId.value, nombre: formNombre.value.trim(), email: formEmail.value.trim(), rol: formRol.value }
-        }
-      } else {
-        const nextId = usuariosMock.value.length ? Math.max(...usuariosMock.value.map((u) => u.id)) + 1 : 1
-        usuariosMock.value.unshift({ id: nextId, nombre: formNombre.value.trim(), email: formEmail.value.trim(), rol: formRol.value })
-      }
-      showToast('success', 'Usuario guardado', 'Guardado en lista local (modo MOCK).')
-    } else if (isEditing.value && editId.value != null) {
+    if (isEditing.value && editId.value != null) {
       const payload: usuariosApi.UsuarioUpdate = { nombre: formNombre.value.trim(), email: formEmail.value.trim(), rol: formRol.value }
       if (formPassword.value) payload.password = formPassword.value
       await usuariosApi.updateUsuario(editId.value, payload)
@@ -149,14 +125,9 @@ function askDelete(u: { id: number; nombre: string }) {
 async function confirmDelete() {
   if (!deleteTarget.value) return
   try {
-    if (isMock.value) {
-      usuariosMock.value = usuariosMock.value.filter((u) => u.id !== deleteTarget.value!.id)
-      showToast('info', 'Usuario eliminado', 'Eliminado de la lista local (modo MOCK).')
-    } else {
-      await usuariosApi.deleteUsuario(deleteTarget.value.id)
-      showToast('info', 'Usuario eliminado', `${deleteTarget.value.nombre} dado de baja.`)
-      await cargarUsuarios()
-    }
+    await usuariosApi.deleteUsuario(deleteTarget.value.id)
+    showToast('info', 'Usuario eliminado', `${deleteTarget.value.nombre} dado de baja.`)
+    await cargarUsuarios()
     showDeleteDialog.value = false
     deleteTarget.value = null
   } catch (e: unknown) {
@@ -181,11 +152,6 @@ async function submitPassword() {
   if (!passTarget.value) return
   if (passNew.value.length < 6) {
     showToast('warn', 'Contraseña inválida', 'La nueva contraseña debe tener al menos 6 caracteres.')
-    return
-  }
-  if (isMock.value) {
-    showToast('success', 'Contraseña actualizada', 'Cambio simulado en modo MOCK.')
-    showPassDialog.value = false
     return
   }
   try {
@@ -248,18 +214,15 @@ function cambiarRol(rol: 'admin' | 'operador' | 'consulta') {
       <Button label="Nuevo usuario" icon="pi pi-plus" size="small" class="p-button-warning text-xs font-semibold" @click="openCreate" />
     </div>
 
-    <div v-if="isMock" class="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 text-xs text-amber-200/90 font-mono">
-      Modo MOCK: lista local mínima. En modo REAL los datos vienen de <code>GET /api/v1/usuarios</code> (solo admin).
-    </div>
-
-    <div v-if="!usuariosDisplay.length" class="text-center py-12 bg-stone-900/40 border border-stone-800 rounded-2xl">
+    <div v-if="!usuarios.length" class="text-center py-12 bg-stone-900/40 border border-stone-800 rounded-2xl">
       <i class="pi pi-inbox text-3xl text-stone-500 mb-3 block" />
-      <p class="text-sm font-bold text-stone-300">Sin usuarios en modo {{ isMock ? 'MOCK' : 'REAL' }}</p>
+      <p class="text-sm font-bold text-stone-300">Sin usuarios registrados</p>
+      <p class="text-xs text-stone-400 mt-1">Los datos vienen de <code>GET /api/v1/usuarios</code> (solo admin).</p>
     </div>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div
-        v-for="u in usuariosDisplay"
+        v-for="u in usuarios"
         :key="u.id"
         class="rounded-xl border border-stone-800 bg-stone-900/40 p-5 flex flex-col justify-between"
       >

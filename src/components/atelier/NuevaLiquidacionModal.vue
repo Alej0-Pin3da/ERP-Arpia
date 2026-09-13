@@ -7,24 +7,47 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
-import { useAtelierStore, type LiquidacionSocias } from '@/stores/atelier'
 import { showToast } from '@/utils/toast'
-import { useMode } from '@/composables/useMode'
 import { useFinanzas } from '@/composables/useFinanzas'
+import { useSocios } from '@/composables/useSocios'
+import { useVentas } from '@/composables/useVentas'
+import type { LiquidacionRead } from '@/services/api/liquidaciones'
+
+/** Minimal liquidación shape this modal edits (REAL display object from the caller). */
+export interface LiquidacionEditarItem {
+  socia_id: number
+  deduccion_anticipos: number
+  estado_pago: string
+  fecha_pago?: string
+  comprobante_transferencia?: string
+  banco_destino?: string
+}
+export interface LiquidacionEditar {
+  id: number
+  codigo: string
+  periodo: string
+  fecha_cierre: string
+  total_ventas_brutas: number
+  costo_taller_insumos: number
+  gastos_operativos: number
+  estado: string
+  observaciones?: string
+  distribucion: LiquidacionEditarItem[]
+}
 
 const props = defineProps<{
   visible: boolean
-  liquidacionEditar?: LiquidacionSocias | null
+  liquidacionEditar?: LiquidacionEditar | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'guardada', liq: LiquidacionSocias): void
+  (e: 'guardada', liq: LiquidacionRead): void
 }>()
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const finanzasApi = useFinanzas()
+const sociosApi = useSocios()
+const ventasApi = useVentas()
 
 const isEditing = computed(() => !!props.liquidacionEditar)
 
@@ -35,7 +58,7 @@ const fechaCierre = ref(new Date().toISOString().split('T')[0])
 const totalVentas = ref(0)
 const costoInsumos = ref(0)
 const gastosOperativos = ref(1500000)
-const estado = ref<LiquidacionSocias['estado']>('BORRADOR')
+const estado = ref<'BORRADOR' | 'APROBADA' | 'PAGADA'>('BORRADOR')
 const observaciones = ref('')
 const guardando = ref(false)
 
@@ -77,14 +100,45 @@ const utilidadRepartibleSocias = computed(() => {
   return utilidadNetaCalculada.value - fondoReinversionCalculado.value
 })
 
+// Socias + anticipos para la vista previa del reparto (el servidor calcula
+// la distribución oficial al crear; esto solo previsualiza).
+const sociasPreview = ref<{ id: number; nombre: string; rol: string; porcentaje: number; banco?: string; numero_cuenta?: string; activo: boolean }[]>([])
+const anticiposPreview = ref<{ socia_id: number; monto: number; estado: string }[]>([])
+
+async function cargarPreview() {
+  try {
+    const [s, a] = await Promise.all([
+      sociosApi.list({ limit: 100 }),
+      finanzasApi.listAnticipos({ limit: 100 }),
+    ])
+    sociasPreview.value = ((s as any).items ?? []).map((x: any) => ({
+      id: x.id,
+      nombre: x.nombre,
+      rol: x.rol ?? 'Socia Atelier',
+      porcentaje: Number(x.porcentaje_participacion ?? x.porcentaje ?? 0),
+      banco: x.banco,
+      numero_cuenta: x.numero_cuenta,
+      activo: x.activo !== false,
+    }))
+    anticiposPreview.value = ((a as any).items ?? []).map((x: any) => ({
+      socia_id: x.socia_id,
+      monto: Number(x.monto ?? 0),
+      estado: x.estado,
+    }))
+  } catch {
+    sociasPreview.value = []
+    anticiposPreview.value = []
+  }
+}
+
 function recalcularDistribucion() {
   const util = utilidadNetaCalculada.value
-  const activas = (isMock.value ? atelier.socias : [] as any[]).filter((s) => s.activo)
+  const activas = sociasPreview.value.filter((s) => s.activo)
 
   distribucionLocal.value = activas.map((s) => {
     const montoBruto = Math.round(util * (s.porcentaje / 100))
     // Get pending anticipos for this socia
-    const antPending = (isMock.value ? atelier.anticipos : [] as any[])
+    const antPending = anticiposPreview.value
       .filter((a) => a.socia_id === s.id && a.estado === 'PENDIENTE_DESCUENTO')
       .reduce((sum, a) => sum + a.monto, 0)
 
@@ -107,15 +161,22 @@ function recalcularDistribucion() {
   })
 }
 
-function cargarDatosVentasReales() {
-  // Pull real total from atelier.ventas completed
-  const completadas = (isMock.value ? atelier.ventas : [] as any[]).filter((v) => v.estado === 'COMPLETADA')
-  const vTotal = completadas.reduce((acc, v) => acc + v.total_venta, 0)
-  const cTotal = completadas.reduce((acc, v) => acc + v.costo_total, 0)
+async function cargarTotalesVentas() {
+  // Pull totals from completed ventas (server data)
+  try {
+    const r = await ventasApi.list({ limit: 100 })
+    const completadas = ((r as any).items ?? []).filter((v: any) => String(v.estado ?? '').toUpperCase() === 'COMPLETADA')
+    const vTotal = completadas.reduce((acc: number, v: any) => acc + Number(v.total_venta ?? 0), 0)
+    const cTotal = completadas.reduce((acc: number, v: any) => acc + Number(v.costo_total ?? 0), 0)
 
-  totalVentas.value = vTotal > 0 ? vTotal : 23500000
-  costoInsumos.value = cTotal > 0 ? cTotal : 6800000
-  gastosOperativos.value = 1800000
+    totalVentas.value = vTotal > 0 ? vTotal : 23500000
+    costoInsumos.value = cTotal > 0 ? cTotal : 6800000
+    gastosOperativos.value = 1800000
+  } catch {
+    totalVentas.value = 23500000
+    costoInsumos.value = 6800000
+    gastosOperativos.value = 1800000
+  }
   recalcularDistribucion()
 
   showToast('info', 'Valores Importados', `Se importaron ${formatCOP(totalVentas.value)} en ventas completadas del taller.`)
@@ -130,16 +191,16 @@ function initForm() {
     totalVentas.value = l.total_ventas_brutas
     costoInsumos.value = l.costo_taller_insumos
     gastosOperativos.value = l.gastos_operativos
-    estado.value = l.estado
+    estado.value = (l.estado as 'BORRADOR' | 'APROBADA' | 'PAGADA') ?? 'BORRADOR'
     observaciones.value = l.observaciones || ''
     distribucionLocal.value = l.distribucion.map((d) => ({ ...d }))
   } else {
-    const nextNum = isMock.value ? (atelier.liquidaciones.length ? Math.max(...atelier.liquidaciones.map((l) => l.id)) : 0) + 1 : 1
+    const nextNum = 1
     codigo.value = `LIQ-${new Date().getFullYear()}-${String(nextNum).padStart(2, '0')}`
     // El backend exige periodo de 1..20 chars: default corto YYYY-MM.
     periodo.value = new Date().toISOString().slice(0, 7)
     fechaCierre.value = new Date().toISOString().split('T')[0]
-    totalVentas.value = isMock.value ? (atelier.totalVentasRealizadas || 24800000) : totalVentas.value || 0
+    totalVentas.value = totalVentas.value || 0
     costoInsumos.value = 7200000
     gastosOperativos.value = 1800000
     estado.value = 'BORRADOR'
@@ -151,7 +212,9 @@ function initForm() {
 watch(
   () => props.visible,
   (val) => {
-    if (val) initForm()
+    if (val) {
+      void cargarPreview().then(() => initForm())
+    }
   },
   { immediate: true },
 )
@@ -172,48 +235,6 @@ async function guardar() {
     return
   }
 
-  if (isMock.value) {
-    const payload: Partial<LiquidacionSocias> = {
-      codigo: codigo.value || `LIQ-${Date.now().toString().slice(-4)}`,
-      periodo: periodo.value.trim(),
-      fecha_cierre: fechaCierre.value,
-      total_ventas_brutas: totalVentas.value,
-      costo_taller_insumos: costoInsumos.value,
-      gastos_operativos: gastosOperativos.value,
-      utilidad_neta_total: utilidadNetaCalculada.value,
-      fondo_reinversion_monto: fondoReinversionCalculado.value,
-      utilidad_repartible: utilidadRepartibleSocias.value,
-      estado: estado.value,
-      distribucion: distribucionLocal.value.map((d) => ({
-        socia_id: d.socia_id,
-        nombre_socia: d.nombre_socia,
-        rol_socia: d.rol_socia,
-        porcentaje: d.porcentaje,
-        monto_bruto: d.monto_bruto,
-        deduccion_anticipos: d.deduccion_anticipos,
-        monto_neto_pagar: d.monto_neto_pagar,
-        estado_pago: d.estado_pago,
-        fecha_pago: d.estado_pago === 'PAGADO' ? (d.fecha_pago || new Date().toISOString().split('T')[0]) : undefined,
-        comprobante_transferencia: d.comprobante_transferencia,
-        banco_destino: d.banco_destino,
-      })),
-      observaciones: observaciones.value,
-    }
-    if (isEditing.value && props.liquidacionEditar) {
-      const act = atelier.actualizarLiquidacion(props.liquidacionEditar.id, payload)
-      if (act) {
-        showToast('success', 'Liquidación Actualizada', `La liquidación ${act.codigo} fue actualizada.`)
-        emit('guardada', act)
-      }
-    } else {
-      const nueva = atelier.crearLiquidacion(payload)
-      showToast('success', 'Liquidación Creada', `Liquidación ${nueva.codigo} registrada con ${formatCOP(nueva.utilidad_neta_total)} de utilidad.`)
-      emit('guardada', nueva)
-    }
-    emit('update:visible', false)
-    return
-  }
-
   // Real API: server computes codigo + distribucion, only header totals sent
   const apiPayload = {
     periodo: periodo.value.trim(),
@@ -229,14 +250,14 @@ async function guardar() {
   guardando.value = true
   try {
     if (isEditing.value && props.liquidacionEditar) {
-      // Editing not supported via API (only state transition); keep local mock for edit
-      showToast('warn', 'Edición', 'La edición de liquidaciones existentes solo está disponible en modo MOCK. Use cambio de estado para transiciones.')
+      // Editing not supported via API (only state transition in Finanzas).
+      showToast('warn', 'Edición', 'La edición de liquidaciones existentes no está soportada por la API. Use cambio de estado para transiciones.')
       return
     }
     const creada = await finanzasApi.createLiquidacion(apiPayload)
     const cod = (creada as unknown as Record<string, unknown>).codigo as string
     showToast('success', 'Liquidación Creada', `Liquidación ${cod} registrada en BD.`)
-    emit('guardada', creada as unknown as LiquidacionSocias)
+    emit('guardada', creada)
     emit('update:visible', false)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Error al crear liquidación'
@@ -287,11 +308,11 @@ async function guardar() {
             Balance Financiero del Periodo
           </div>
           <Button
-            label="Importar Ventas Reales del Atelier"
+            label="Importar Ventas del Taller"
             icon="pi pi-sync"
             size="small"
             class="p-button-outlined p-button-warning text-[11px] py-1 px-2.5"
-            @click="cargarDatosVentasReales"
+            @click="cargarTotalesVentas"
           />
         </div>
 

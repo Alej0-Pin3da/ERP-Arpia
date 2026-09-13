@@ -1,53 +1,46 @@
 <script setup lang="ts">
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, no-empty */
-import { computed, ref, onMounted, watch } from 'vue'
-import { useAtelierStore } from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
+import { computed, ref, onMounted } from 'vue'
 import { useInsumos } from '@/composables/useInsumos'
 import { useProduccion } from '@/composables/useProduccion'
 import { usePrendas } from '@/composables/usePrendas'
 import { useProductos } from '@/composables/useProductos'
 
-const atelier = useAtelierStore()
-const { isMock } = useMode()
 const insumosApi = useInsumos()
 const produccionApi = useProduccion()
 const prendasApi = usePrendas()
 const productosApi = useProductos()
-const insumosReal = ref<any[]>([])
-const pedidosReal = ref<any[]>([])
-const prendasReal = ref<any[]>([])
-async function cargarAnalisisReales() {
-  if (isMock.value) return
+const insumos = ref<any[]>([])
+const pedidos = ref<any[]>([])
+const prendas = ref<any[]>([])
+async function cargarAnalisis() {
   try {
     const [ir, pr, prr] = await Promise.all([
       insumosApi.list({ limit: 100 }),
       produccionApi.list({ limit: 100 }),
       prendasApi.list({ limit: 100 }),
     ])
-    insumosReal.value = (ir as any).items ?? []
-    pedidosReal.value = (pr as any).items ?? []
-    prendasReal.value = (prr as any).items ?? []
+    insumos.value = (ir as any).items ?? []
+    pedidos.value = (pr as any).items ?? []
+    prendas.value = (prr as any).items ?? []
   } catch {}
 }
-onMounted(() => { void cargarAnalisisReales(); void cargarProductosAnalisis() })
-watch(isMock, () => { void cargarAnalisisReales(); void cargarProductosAnalisis() })
+onMounted(() => { void cargarAnalisis(); void cargarProductosAnalisis() })
 
-const pedidosSrc = computed(() => isMock.value ? atelier.pedidos : (pedidosReal.value as any[]))
-const prendasSrc = computed(() => isMock.value ? (atelier as any).prendas ?? [] : (prendasReal.value as any[]))
-const insumosAlertasReal = computed(() => (insumosReal.value as any[]).filter((i: any) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)).length)
-const productosRealAnalisis = ref<any[]>([])
+const pedidosSrc = computed(() => (pedidos.value as any[]))
+const prendasSrc = computed(() => (prendas.value as any[]))
+const insumosAlertasCount = computed(() => (insumos.value as any[]).filter((i: any) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)).length)
+const productosAnalisis = ref<any[]>([])
 async function cargarProductosAnalisis() {
-  if (isMock.value) return
   try {
     const r = await productosApi.list({ limit: 100 })
-    productosRealAnalisis.value = (r.items as any) ?? []
-  } catch { productosRealAnalisis.value = [] }
+    productosAnalisis.value = (r.items as any) ?? []
+  } catch { productosAnalisis.value = [] }
 }
-// append to existing cargarAnalisisReales
+// append to existing cargarAnalisis
 // Numeric de Postgres serializa como string: normalizar a number para que
 // formatCOP y el margen no reciban strings ni nulls.
-const recetasDisplay = computed(() => isMock.value ? (atelier as any).recetas : productosRealAnalisis.value.map((p: any) => ({
+const recetasDisplay = computed(() => productosAnalisis.value.map((p: any) => ({
   id: p.id,
   nombre: p.nombre,
   costo_estimado_materiales: Number(p.costo_insumos ?? 0),
@@ -56,9 +49,8 @@ const recetasDisplay = computed(() => isMock.value ? (atelier as any).recetas : 
 })))
 
 const normEstado = (e: unknown) => String(e ?? '').toLowerCase()
-// MOCK usa etapas en mayúsculas (ENTREGADO/COSTURA...), REAL el enum del
-// backend (completado/en_produccion...): se normaliza para que los
-// contadores no queden en 0 en ningún modo.
+// El backend manda el enum de estado (completado/en_produccion...):
+// se normaliza para que los contadores no queden en 0.
 const esCompletado = (e: unknown) => ['entregado', 'completado', 'listo'].includes(normEstado(e))
 const esEnProceso = (e: unknown) =>
   ['pendiente', 'en_produccion', 'corte', 'costura', 'confeccion', 'prueba', 'acabados', 'calidad'].includes(normEstado(e))
@@ -66,11 +58,9 @@ const esEnProceso = (e: unknown) =>
 const metricas = computed(() => {
   const pedidosCompletados = pedidosSrc.value.filter((p: any) => esCompletado(p.estado)).length
   const pedidosEnProceso = pedidosSrc.value.filter((p: any) => esEnProceso(p.estado)).length
-  // PrendaRead no trae `vendida`; en REAL el stock es estado === 'disponible'.
-  const stockPrendas = isMock.value
-    ? prendasSrc.value.filter((p: any) => p.vendida !== true).length
-    : prendasSrc.value.filter((p: any) => p.estado === 'disponible').length
-  const insumosAlertas = isMock.value ? atelier.insumosCriticos.length : insumosAlertasReal.value
+  // PrendaRead no trae `vendida`; el stock es estado === 'disponible'.
+  const stockPrendas = prendasSrc.value.filter((p: any) => p.estado === 'disponible').length
+  const insumosAlertas = insumosAlertasCount.value
 
   return {
     pedidosCompletados,
@@ -135,7 +125,7 @@ function formatCOP(v: number): string {
           </thead>
           <tbody class="divide-y divide-stone-800/60 font-mono">
                 <tr v-if="!recetasDisplay.length">
-                  <td colspan="5" class="py-8 text-center text-stone-500">Sin recetas para analizar en modo {{ isMock ? 'MOCK' : 'REAL' }}.</td>
+                  <td colspan="5" class="py-8 text-center text-stone-500">Sin recetas para analizar.</td>
                 </tr>
             <tr v-for="r in recetasDisplay" :key="r.id" class="hover:bg-stone-900/50">
               <td class="py-3 px-3 font-serif text-sm font-semibold text-stone-200 sticky left-0 z-10 bg-stone-900/95 min-w-[180px]">{{ r.nombre }}</td>
@@ -154,7 +144,7 @@ function formatCOP(v: number): string {
       </div>
       <!-- Mobile cards: same recetasDisplay. No horizontal scroll. -->
       <div class="space-y-3 md:hidden max-w-full min-w-0">
-        <div v-if="!recetasDisplay.length" class="text-center py-8 text-sm text-stone-500">Sin recetas para analizar en modo {{ isMock ? 'MOCK' : 'REAL' }}.</div>
+        <div v-if="!recetasDisplay.length" class="text-center py-8 text-sm text-stone-500">Sin recetas para analizar.</div>
         <div v-for="r in recetasDisplay" :key="r.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
           <div class="font-bold text-sm text-stone-100">{{ r.nombre }}</div>
           <div class="flex items-center justify-between text-sm">

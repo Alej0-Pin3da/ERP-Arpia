@@ -1,45 +1,33 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import {
-  useAtelierStore,
-  type ProveedorMaestro,
-  type CanalVentaMaestro,
-  type MetodoPagoMaestro,
-  type CategoriaColeccionMaestro,
-  type UbicacionTallerMaestro,
-  type TallaEstandarMaestro,
-  type ProductoSinTallaMaestro,
-  type ParametrosCosteoMaestro,
-} from '@/stores/atelier'
-import { useMode } from '@/composables/useMode'
+import { ref, computed, onMounted } from 'vue'
+import type {
+  ProveedorRead,
+  CanalRead,
+  MetodoRead,
+  CategoriaRead,
+  UbicacionRead,
+  TallaRead,
+  ProductoSinTallaRead,
+  ParametrosRead,
+} from '@/services/api/maestros'
 import { useMaestros } from '@/composables/useMaestros'
 import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 import { showToast } from '@/utils/toast'
 
-const store = useAtelierStore()
-const { isMock } = useMode()
 const maestros = useMaestros()
 
-// Real API state (F5 persists via backend)
-const proveedoresApi = ref<ProveedorMaestro[]>([])
-const canalesApi = ref<CanalVentaMaestro[]>([])
-const metodosApi = ref<MetodoPagoMaestro[]>([])
-const categoriasApi = ref<CategoriaColeccionMaestro[]>([])
-const ubicacionesApi = ref<UbicacionTallerMaestro[]>([])
-const tallasApi = ref<TallaEstandarMaestro[]>([])
-const sinTallaApi = ref<ProductoSinTallaMaestro[]>([])
-const parametrosApi = ref<ParametrosCosteoMaestro | null>(null)
+// REAL API state (persists via backend)
+const proveedoresList = ref<ProveedorRead[]>([])
+const canalesList = ref<CanalRead[]>([])
+const metodosList = ref<MetodoRead[]>([])
+const categoriasList = ref<CategoriaRead[]>([])
+const ubicacionesList = ref<UbicacionRead[]>([])
+const tallasList = ref<TallaRead[]>([])
+const sinTallaList = ref<ProductoSinTallaRead[]>([])
+const parametrosApi = ref<ParametrosRead | null>(null)
 
-const proveedoresList = computed(() => (isMock.value ? store.proveedoresMaestros : proveedoresApi.value))
-const canalesList = computed(() => (isMock.value ? store.canalesVentaMaestros : canalesApi.value))
-const metodosList = computed(() => (isMock.value ? store.metodosPagoMaestros : metodosApi.value))
-const categoriasList = computed(() => (isMock.value ? store.categoriasColeccionMaestros : categoriasApi.value))
-const ubicacionesList = computed(() => (isMock.value ? store.ubicacionesTallerMaestros : ubicacionesApi.value))
-const tallasList = computed(() => (isMock.value ? store.tallasEstandarMaestros : tallasApi.value))
-const sinTallaList = computed(() => (isMock.value ? store.productosSinTallaMaestros : sinTallaApi.value))
-// Defaults locales (espejo del seed del store): en REAL no se lee atelier.*
-// ni siquiera como fallback, para no disparar el mockGuard.
-const PARAMETROS_COSTEO_DEFAULT: ParametrosCosteoMaestro = {
+// Defaults when the backend has no parametros row yet.
+const PARAMETROS_COSTEO_DEFAULT: ParametrosRead = {
   costo_minuto_costura: 280,
   costo_hora_patronaje: 22000,
   margen_meta_global_pct: 65,
@@ -48,8 +36,8 @@ const PARAMETROS_COSTEO_DEFAULT: ParametrosCosteoMaestro = {
   distribucion_reinversion_pct: 40,
   distribucion_margara_pct: 30,
   distribucion_valqui_pct: 30,
-}
-const parametrosData = computed(() => (isMock.value ? store.parametrosCosteo : (parametrosApi.value ?? PARAMETROS_COSTEO_DEFAULT)))
+} as ParametrosRead
+const parametrosData = computed(() => (parametrosApi.value ?? PARAMETROS_COSTEO_DEFAULT))
 
 function sanitizeProveedorPayload(form: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {}
@@ -130,8 +118,7 @@ function sanitizeMetodoPayload(form: Record<string, unknown>): Record<string, un
   return out
 }
 
-async function cargarDatosReales() {
-  if (isMock.value) return
+async function cargarDatos() {
   try {
     const [prov, cat, ub, can, met, tal, sin, par] = await Promise.all([
       maestros.listProveedores({ limit: 100 }),
@@ -143,25 +130,24 @@ async function cargarDatosReales() {
       maestros.listProductosSinTalla({ limit: 100 }),
       maestros.getParametros(),
     ])
-    proveedoresApi.value = (prov.items as unknown as ProveedorMaestro[]) ?? []
-    categoriasApi.value = (cat.items as unknown as CategoriaColeccionMaestro[]) ?? []
-    ubicacionesApi.value = (ub.items as unknown as UbicacionTallerMaestro[]) ?? []
-    canalesApi.value = (can.items as unknown as CanalVentaMaestro[]) ?? []
-    metodosApi.value = (met.items as unknown as MetodoPagoMaestro[]) ?? []
-    tallasApi.value = (tal.items as unknown as TallaEstandarMaestro[]) ?? []
-    sinTallaApi.value = (sin.items as unknown as ProductoSinTallaMaestro[]) ?? []
-    parametrosApi.value = par as unknown as ParametrosCosteoMaestro
+    proveedoresList.value = (prov.items as unknown as ProveedorRead[]) ?? []
+    categoriasList.value = (cat.items as unknown as CategoriaRead[]) ?? []
+    ubicacionesList.value = (ub.items as unknown as UbicacionRead[]) ?? []
+    canalesList.value = (can.items as unknown as CanalRead[]) ?? []
+    metodosList.value = (met.items as unknown as MetodoRead[]) ?? []
+    tallasList.value = (tal.items as unknown as TallaRead[]) ?? []
+    sinTallaList.value = (sin.items as unknown as ProductoSinTallaRead[]) ?? []
+    parametrosApi.value = par as unknown as ParametrosRead
     // sync costeo form
     if (par) Object.assign(parametrosForm.value, par)
   } catch {
-    // keep fallback (atelier) on error
+    // keep previous state on error
   }
 }
 
 onMounted(() => {
-  void cargarDatosReales()
+  void cargarDatos()
 })
-watch(isMock, () => { void cargarDatosReales() })
 
 // Tab active
 type TabType = 'proveedores' | 'canales' | 'pagos' | 'categorias' | 'ubicaciones' | 'costeo' | 'tallas'
@@ -172,7 +158,7 @@ const tabActiva = ref<TabType>('proveedores')
 // ==========================================
 const modalProveedor = ref(false)
 const modoEdicionProveedor = ref(false)
-const provForm = ref<Partial<ProveedorMaestro>>({
+const provForm = ref<Partial<ProveedorRead>>({
   nombre: '',
   categoria: 'Telas Principales',
   ciudad: 'Pereira, Risaralda',
@@ -204,7 +190,7 @@ function abrirNuevoProveedor() {
   modalProveedor.value = true
 }
 
-function abrirEditarProveedor(p: ProveedorMaestro) {
+function abrirEditarProveedor(p: ProveedorRead) {
   modoEdicionProveedor.value = true
   provForm.value = { ...p }
   modalProveedor.value = true
@@ -215,17 +201,11 @@ async function guardarProveedor() {
     showToast('warn', 'Campo requerido', 'Ingresá el nombre del proveedor.')
     return
   }
-  if (isMock.value) {
-    if (modoEdicionProveedor.value && provForm.value.id) store.actualizarProveedor(provForm.value.id, provForm.value)
-    else store.crearProveedor(provForm.value)
-    modalProveedor.value = false
-    return
-  }
   const payload = sanitizeProveedorPayload(provForm.value as unknown as Record<string, unknown>)
   try {
     if (modoEdicionProveedor.value && provForm.value.id) await maestros.updateProveedor(provForm.value.id, payload)
     else await maestros.createProveedor(payload)
-    await cargarDatosReales()
+    await cargarDatos()
     showToast('success', 'Proveedor guardado', `${provForm.value.nombre} guardado correctamente.`)
     modalProveedor.value = false
   } catch (e: unknown) {
@@ -240,7 +220,7 @@ async function guardarProveedor() {
 // ==========================================
 const modalCanal = ref(false)
 const modoEdicionCanal = ref(false)
-const canalForm = ref<Partial<CanalVentaMaestro>>({
+const canalForm = ref<Partial<CanalRead>>({
   nombre: '',
   tipo: 'DIGITAL',
   comision_pct: 0,
@@ -262,7 +242,7 @@ function abrirNuevoCanal() {
   modalCanal.value = true
 }
 
-function abrirEditarCanal(c: CanalVentaMaestro) {
+function abrirEditarCanal(c: CanalRead) {
   modoEdicionCanal.value = true
   canalForm.value = { ...c }
   modalCanal.value = true
@@ -273,17 +253,11 @@ async function guardarCanal() {
     showToast('warn', 'Campo requerido', 'Ingresá el nombre del canal.')
     return
   }
-  if (isMock.value) {
-    if (modoEdicionCanal.value && canalForm.value.id) store.actualizarCanalVenta(canalForm.value.id, canalForm.value)
-    else store.crearCanalVenta(canalForm.value)
-    modalCanal.value = false
-    return
-  }
   const payload = sanitizeCanalPayload(canalForm.value as unknown as Record<string, unknown>)
   try {
     if (modoEdicionCanal.value && canalForm.value.id) await maestros.updateCanal(canalForm.value.id, payload)
     else await maestros.createCanal(payload)
-    await cargarDatosReales()
+    await cargarDatos()
     showToast('success', 'Canal guardado', `${canalForm.value.nombre} guardado correctamente.`)
     modalCanal.value = false
   } catch (e: unknown) {
@@ -298,7 +272,7 @@ async function guardarCanal() {
 // ==========================================
 const modalPago = ref(false)
 const modoEdicionPago = ref(false)
-const pagoForm = ref<Partial<MetodoPagoMaestro>>({
+const pagoForm = ref<Partial<MetodoRead>>({
   nombre: '',
   tipo: 'TRANSFERENCIA',
   comision_pct: 0,
@@ -320,7 +294,7 @@ function abrirNuevoPago() {
   modalPago.value = true
 }
 
-function abrirEditarPago(p: MetodoPagoMaestro) {
+function abrirEditarPago(p: MetodoRead) {
   modoEdicionPago.value = true
   pagoForm.value = { ...p }
   modalPago.value = true
@@ -331,17 +305,11 @@ async function guardarPago() {
     showToast('warn', 'Campo requerido', 'Ingresá el nombre del método de pago.')
     return
   }
-  if (isMock.value) {
-    if (modoEdicionPago.value && pagoForm.value.id) store.actualizarMetodoPago(pagoForm.value.id, pagoForm.value)
-    else store.crearMetodoPago(pagoForm.value)
-    modalPago.value = false
-    return
-  }
   const payload = sanitizeMetodoPayload(pagoForm.value as unknown as Record<string, unknown>)
   try {
     if (modoEdicionPago.value && pagoForm.value.id) await maestros.updateMetodo(pagoForm.value.id, payload)
     else await maestros.createMetodo(payload)
-    await cargarDatosReales()
+    await cargarDatos()
     showToast('success', 'Método guardado', `${pagoForm.value.nombre} guardado correctamente.`)
     modalPago.value = false
   } catch (e: unknown) {
@@ -356,7 +324,7 @@ async function guardarPago() {
 // ==========================================
 const modalTalla = ref(false)
 const modoEdicionTalla = ref(false)
-const tallaForm = ref<Partial<TallaEstandarMaestro>>({
+const tallaForm = ref<Partial<TallaRead>>({
   talla: '',
   busto: '',
   cintura: '',
@@ -382,7 +350,7 @@ function abrirNuevaTalla() {
   modalTalla.value = true
 }
 
-function abrirEditarTalla(t: TallaEstandarMaestro) {
+function abrirEditarTalla(t: TallaRead) {
   modoEdicionTalla.value = true
   tallaForm.value = { ...t }
   modalTalla.value = true
@@ -390,14 +358,9 @@ function abrirEditarTalla(t: TallaEstandarMaestro) {
 
 async function guardarTalla() {
   if (!tallaForm.value.talla) return
-  if (isMock.value) {
-    if (modoEdicionTalla.value && tallaForm.value.id) store.actualizarTallaEstandar(tallaForm.value.id, tallaForm.value)
-    else store.crearTallaEstandar(tallaForm.value)
-  } else {
-    if (modoEdicionTalla.value && tallaForm.value.id) await maestros.updateTalla(tallaForm.value.id, tallaForm.value as Record<string, unknown>)
-    else await maestros.createTalla(tallaForm.value as Record<string, unknown>)
-    await cargarDatosReales()
-  }
+  if (modoEdicionTalla.value && tallaForm.value.id) await maestros.updateTalla(tallaForm.value.id, tallaForm.value as Record<string, unknown>)
+  else await maestros.createTalla(tallaForm.value as Record<string, unknown>)
+  await cargarDatos()
   modalTalla.value = false
 }
 
@@ -406,7 +369,7 @@ async function guardarTalla() {
 // ==========================================
 const modalSinTalla = ref(false)
 const modoEdicionSinTalla = ref(false)
-const sinTallaForm = ref<Partial<ProductoSinTallaMaestro>>({
+const sinTallaForm = ref<Partial<ProductoSinTallaRead>>({
   nombre: '',
   categoria: 'Tote Bags & Bolsos',
   dimensiones: '',
@@ -430,7 +393,7 @@ function abrirNuevoSinTalla() {
   modalSinTalla.value = true
 }
 
-function abrirEditarSinTalla(p: ProductoSinTallaMaestro) {
+function abrirEditarSinTalla(p: ProductoSinTallaRead) {
   modoEdicionSinTalla.value = true
   sinTallaForm.value = { ...p }
   modalSinTalla.value = true
@@ -438,14 +401,9 @@ function abrirEditarSinTalla(p: ProductoSinTallaMaestro) {
 
 async function guardarSinTalla() {
   if (!sinTallaForm.value.nombre) return
-  if (isMock.value) {
-    if (modoEdicionSinTalla.value && sinTallaForm.value.id) store.actualizarProductoSinTalla(sinTallaForm.value.id, sinTallaForm.value)
-    else store.crearProductoSinTalla(sinTallaForm.value)
-  } else {
-    if (modoEdicionSinTalla.value && sinTallaForm.value.id) await maestros.updateProductoSinTalla(sinTallaForm.value.id, sinTallaForm.value as Record<string, unknown>)
-    else await maestros.createProductoSinTalla(sinTallaForm.value as Record<string, unknown>)
-    await cargarDatosReales()
-  }
+  if (modoEdicionSinTalla.value && sinTallaForm.value.id) await maestros.updateProductoSinTalla(sinTallaForm.value.id, sinTallaForm.value as Record<string, unknown>)
+  else await maestros.createProductoSinTalla(sinTallaForm.value as Record<string, unknown>)
+  await cargarDatos()
   modalSinTalla.value = false
 }
 
@@ -454,7 +412,7 @@ async function guardarSinTalla() {
 // ==========================================
 const modalCategoria = ref(false)
 const modoEdicionCategoria = ref(false)
-const catForm = ref<Partial<CategoriaColeccionMaestro>>({
+const catForm = ref<Partial<CategoriaRead>>({
   nombre: '',
   tipo_talla: 'CON_TALLAS_ESTANDAR',
   descripcion: '',
@@ -476,7 +434,7 @@ function abrirNuevaCategoria() {
   modalCategoria.value = true
 }
 
-function abrirEditarCategoria(c: CategoriaColeccionMaestro) {
+function abrirEditarCategoria(c: CategoriaRead) {
   modoEdicionCategoria.value = true
   catForm.value = { ...c }
   modalCategoria.value = true
@@ -484,14 +442,9 @@ function abrirEditarCategoria(c: CategoriaColeccionMaestro) {
 
 async function guardarCategoria() {
   if (!catForm.value.nombre) return
-  if (isMock.value) {
-    if (modoEdicionCategoria.value && catForm.value.id) store.actualizarCategoriaColeccion(catForm.value.id, catForm.value)
-    else store.crearCategoriaColeccion(catForm.value)
-  } else {
-    if (modoEdicionCategoria.value && catForm.value.id) await maestros.updateCategoria(catForm.value.id, catForm.value as Record<string, unknown>)
-    else await maestros.createCategoria(catForm.value as Record<string, unknown>)
-    await cargarDatosReales()
-  }
+  if (modoEdicionCategoria.value && catForm.value.id) await maestros.updateCategoria(catForm.value.id, catForm.value as Record<string, unknown>)
+  else await maestros.createCategoria(catForm.value as Record<string, unknown>)
+  await cargarDatos()
   modalCategoria.value = false
 }
 
@@ -500,7 +453,7 @@ async function guardarCategoria() {
 // ==========================================
 const modalUbicacion = ref(false)
 const modoEdicionUbicacion = ref(false)
-const ubForm = ref<Partial<UbicacionTallerMaestro>>({
+const ubForm = ref<Partial<UbicacionRead>>({
   codigo: '',
   nombre: '',
   tipo: 'ROLLOS_TELAS',
@@ -520,7 +473,7 @@ function abrirNuevaUbicacion() {
   modalUbicacion.value = true
 }
 
-function abrirEditarUbicacion(u: UbicacionTallerMaestro) {
+function abrirEditarUbicacion(u: UbicacionRead) {
   modoEdicionUbicacion.value = true
   ubForm.value = { ...u }
   modalUbicacion.value = true
@@ -528,44 +481,32 @@ function abrirEditarUbicacion(u: UbicacionTallerMaestro) {
 
 async function guardarUbicacion() {
   if (!ubForm.value.nombre) return
-  if (isMock.value) {
-    if (modoEdicionUbicacion.value && ubForm.value.id) store.actualizarUbicacionTaller(ubForm.value.id, ubForm.value)
-    else store.crearUbicacionTaller(ubForm.value)
-  } else {
-    if (modoEdicionUbicacion.value && ubForm.value.id) await maestros.updateUbicacion(ubForm.value.id, ubForm.value as Record<string, unknown>)
-    else await maestros.createUbicacion(ubForm.value as Record<string, unknown>)
-    await cargarDatosReales()
-  }
+  if (modoEdicionUbicacion.value && ubForm.value.id) await maestros.updateUbicacion(ubForm.value.id, ubForm.value as Record<string, unknown>)
+  else await maestros.createUbicacion(ubForm.value as Record<string, unknown>)
+  await cargarDatos()
   modalUbicacion.value = false
 }
 
 async function eliminarProveedorWrapper(id: number) {
-  if (isMock.value) store.eliminarProveedor(id)
-  else { await maestros.removeProveedor(id); await cargarDatosReales() }
+  await maestros.removeProveedor(id); await cargarDatos()
 }
 async function eliminarCanalWrapper(id: number) {
-  if (isMock.value) store.eliminarCanalVenta(id)
-  else { await maestros.removeCanal(id); await cargarDatosReales() }
+  await maestros.removeCanal(id); await cargarDatos()
 }
 async function eliminarMetodoWrapper(id: number) {
-  if (isMock.value) store.eliminarMetodoPago(id)
-  else { await maestros.removeMetodo(id); await cargarDatosReales() }
+  await maestros.removeMetodo(id); await cargarDatos()
 }
 async function eliminarTallaWrapper(id: number) {
-  if (isMock.value) store.eliminarTallaEstandar(id)
-  else { await maestros.removeTalla(id); await cargarDatosReales() }
+  await maestros.removeTalla(id); await cargarDatos()
 }
 async function eliminarSinTallaWrapper(id: number) {
-  if (isMock.value) store.eliminarProductoSinTalla(id)
-  else { await maestros.removeProductoSinTalla(id); await cargarDatosReales() }
+  await maestros.removeProductoSinTalla(id); await cargarDatos()
 }
 async function eliminarCategoriaWrapper(id: number) {
-  if (isMock.value) store.eliminarCategoriaColeccion(id)
-  else { await maestros.removeCategoria(id); await cargarDatosReales() }
+  await maestros.removeCategoria(id); await cargarDatos()
 }
 async function eliminarUbicacionWrapper(id: number) {
-  if (isMock.value) store.eliminarUbicacionTaller(id)
-  else { await maestros.removeUbicacion(id); await cargarDatosReales() }
+  await maestros.removeUbicacion(id); await cargarDatos()
 }
 
 const showEliminarDialog = ref(false)
@@ -603,7 +544,7 @@ async function confirmarEliminar() {
 // ==========================================
 // 8. PARÁMETROS GLOBALES DE COSTEO
 // ==========================================
-const parametrosForm = ref<ParametrosCosteoMaestro>({ ...(isMock.value ? store.parametrosCosteo : PARAMETROS_COSTEO_DEFAULT) })
+const parametrosForm = ref<ParametrosRead>({ ...PARAMETROS_COSTEO_DEFAULT })
 const guardandoParametros = ref(false)
 const mensajeParametros = ref('')
 
@@ -622,12 +563,9 @@ async function guardarParametros() {
   }
   guardandoParametros.value = true
   try {
-    if (isMock.value) store.actualizarParametrosCosteo(parametrosForm.value)
-    else {
-      const updated = await maestros.updateParametros(parametrosForm.value as unknown as Record<string, unknown>)
-      parametrosApi.value = updated as unknown as ParametrosCosteoMaestro
-      Object.assign(parametrosForm.value, updated)
-    }
+    const updated = await maestros.updateParametros(parametrosForm.value as unknown as Record<string, unknown>)
+    parametrosApi.value = updated as unknown as ParametrosRead
+    Object.assign(parametrosForm.value, updated)
     mensajeParametros.value = '✓ Parámetros maestros de costeo y márgenes guardados con éxito'
     setTimeout(() => { mensajeParametros.value = '' }, 4000)
   } catch (e: unknown) {
