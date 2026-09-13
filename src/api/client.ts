@@ -12,7 +12,6 @@ import { readAccessToken } from './storage'
 import { refreshSession, setRefreshClient } from './refresh'
 import { FORBIDDEN_MESSAGE } from './errors'
 import { showToast } from '@/utils/toast'
-import { handleMockApiRequest } from '@/server/mockApi'
 
 export interface ClientOptions extends AxiosRequestConfig {
   /** Override the configured base URL (tests inject mocks via `adapter`). */
@@ -98,36 +97,9 @@ function attachInterceptors(instance: AxiosInstance): void {
       }
 
       // Anything other than an expired-token 401 passes through untouched.
+      // REAL-only: errors reject so views show the failure (no in-memory
+      // mock fallback — the backend is the single source of truth).
       if (status !== 401 || !config || config._retry || isAuthEndpoint) {
-        // If network failed or server was unreachable / returned 404/5xx, fallback to in-memory engine
-        if (!error.response || [404, 500, 502, 503, 504].includes(status || 0)) {
-          try {
-            const method = config?.method || 'GET'
-            const url = config?.url || '/'
-            let body = config?.data
-            if (typeof body === 'string') {
-              try {
-                body = JSON.parse(body)
-              } catch {
-                // Keep string if not valid JSON
-              }
-            }
-            const queryParams = (config?.params || {}) as Record<string, unknown>
-            const headers = (config?.headers || {}) as Record<string, unknown>
-            const res = handleMockApiRequest(method, url, body, queryParams, headers)
-            if (res.status >= 200 && res.status < 300) {
-              return {
-                data: res.data,
-                status: res.status,
-                statusText: 'OK',
-                headers: {},
-                config: config ?? ({} as AxiosRequestConfig),
-              }
-            }
-          } catch {
-            // If fallback also fails, reject normally
-          }
-        }
         return Promise.reject(error)
       }
 

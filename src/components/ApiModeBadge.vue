@@ -2,65 +2,26 @@
 /**
  * ApiModeBadge — Visual indicator for the current API data source.
  *
- * - MOCK: in-memory Express mock (server.ts + vite mockApiPlugin). Data is
- *   ephemeral and resets on server restart.
- * - REAL: external FastAPI + Postgres backend (VITE_API_BASE_URL points to
- *   an absolute host such as http://localhost:8000, :5433 or backend).
- *
- * Detection is read-only: never mutates api client logic.
+ * REAL-only: the app always talks to the FastAPI + Postgres backend.
+ * The badge statically shows REAL (kept for layout compat).
  */
 
-import { computed, ref, onMounted } from 'vue'
+import { computed } from 'vue'
 
 type ApiMode = 'MOCK' | 'REAL'
 
-function envMode(): ApiMode {
-  const rawBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined
-  const raw = (rawBaseUrl ?? '').trim()
-  if (!raw || raw.startsWith('/api')) return 'REAL' // V4 data-first default
-  const lower = raw.toLowerCase()
-  const isExternalHost =
-    lower.includes('http') || lower.includes(':8000') || lower.includes(':5433') || lower.includes('backend')
-  return isExternalHost ? 'REAL' : 'MOCK'
-}
+const mode = computed<ApiMode>(() => 'REAL')
 
-// Live probe — source of truth is server's /api/__mode (reflects USE_MOCK / proxy logic at runtime)
-const liveMode = ref<ApiMode | null>(null)
-const liveChecked = ref(false)
+const label = computed(() => 'BACKEND REAL — Postgres')
 
-onMounted(async () => {
-  try {
-    const res = await fetch('/api/__mode', { headers: { Accept: 'application/json' } })
-    if (res.ok) {
-      const data = (await res.json()) as { mode?: string }
-      if (data.mode === 'real') liveMode.value = 'REAL'
-      else if (data.mode === 'mock') liveMode.value = 'MOCK'
-    }
-  } catch {
-    // keep fallback
-  } finally {
-    liveChecked.value = true
-  }
-})
+const shortLabel = computed(() => 'REAL')
 
-const mode = computed<ApiMode>(() => liveMode.value ?? envMode())
+const icon = computed(() => 'pi-server')
 
-const label = computed(() =>
-  mode.value === 'MOCK' ? 'MODO MOCK \u2014 Datos en memoria' : 'BACKEND REAL \u2014 Postgres',
-)
-
-const shortLabel = computed(() => (mode.value === 'MOCK' ? 'MOCK' : 'REAL'))
-
-const icon = computed(() => (mode.value === 'MOCK' ? 'pi-database' : 'pi-server'))
-
-const tooltip = computed(() =>
-  mode.value === 'MOCK'
-    ? 'Los datos se pierden al reiniciar. Backend real inactivo.'
-    : 'Conectado a FastAPI + Postgres',
-)
+const tooltip = computed(() => 'Conectado a FastAPI + Postgres')
 
 // PrimeVue Tag severity mapping (kept for programmatic use / tests)
-const severity = computed(() => (mode.value === 'MOCK' ? 'warn' : 'success'))
+const severity = computed(() => 'success')
 </script>
 
 <template>
@@ -104,23 +65,6 @@ const severity = computed(() => (mode.value === 'MOCK' ? 'warn' : 'success'))
 
 .api-mode-badge:hover {
   transform: translateY(-1px);
-}
-
-/* MOCK — amber / orange (in-memory, ephemeral) */
-.api-mode-badge--mock {
-  background: rgba(245, 158, 11, 0.08);
-  border-color: rgba(245, 158, 11, 0.32);
-  color: #fcd34d;
-  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.06) inset;
-}
-
-.api-mode-badge--mock .api-mode-badge__dot {
-  background: #f59e0b;
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.85);
-}
-
-.api-mode-badge--mock .api-mode-badge__icon {
-  color: #fbbf24;
 }
 
 /* REAL — emerald / green (FastAPI + Postgres) */
@@ -173,12 +117,6 @@ const severity = computed(() => (mode.value === 'MOCK' ? 'warn' : 'success'))
 }
 
 /* Noir/Gold harmony: subtle gold hairline on hover */
-.api-mode-badge--mock:hover {
-  border-color: rgba(245, 158, 11, 0.5);
-  box-shadow:
-    0 0 0 1px rgba(245, 158, 11, 0.08) inset,
-    0 2px 12px rgba(245, 158, 11, 0.18);
-}
 
 .api-mode-badge--real:hover {
   border-color: rgba(16, 185, 129, 0.5);
