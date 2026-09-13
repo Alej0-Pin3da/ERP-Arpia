@@ -3,6 +3,11 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-13] - Mock slice 2: useAnaliticos a REAL-only (strangler por módulos)
+
+- **Slice 2:** 7 guards `if (isMock) return null` eliminados en los 7 getters; el path REAL ya delegaba completo a `/analiticos/*`, firmas intactas. `isMock` queda como passthrough informativo (su remoción va en slice posterior).
+- Verificación: build OK + 70/70 tests.
+
 ### [2026-09-13] - Mock slice 1: Devoluciones + Omisiones a REAL-only (strangler por módulos)
 
 - **Estrategia:** el mock es dual-path en ~50 archivos (~6500 líneas) con default mock-ON — big-bang rompería todo. Strangler por dominio, un slice por cambio.

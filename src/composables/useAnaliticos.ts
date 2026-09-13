@@ -1,11 +1,9 @@
 /**
- * useAnaliticos — thin adapter over src/services/api/analiticos.ts.
+ * useAnaliticos — thin adapter over src/services/api/analiticos.ts (REAL-only).
  *
- * The analiticos endpoints are read-only server aggregations with no mock
- * equivalent: in mock mode the views compute KPIs locally from atelier lists,
- * so every getter resolves to `null` when isMock is true. In REAL mode each
- * getter delegates to the backend and rejects on error, letting the caller
- * fall back to its local computation.
+ * The analiticos endpoints are read-only server aggregations. Each getter
+ * delegates to the backend and rejects on error, letting the caller fall
+ * back to its local computation.
  */
 import { useMode } from './useMode'
 import * as api from '@/services/api/analiticos'
@@ -31,37 +29,30 @@ export function useAnaliticos(): UseAnaliticosReturn {
   const { isMock, mode } = useMode()
 
   async function getResumen(params?: PeriodoParams) {
-    if (isMock.value) return null
     return api.getResumen(params)
   }
 
   async function getVentasMensuales(params?: PeriodoParams) {
-    if (isMock.value) return null
     return api.getVentasMensuales(params) as Promise<api.VentasMensuales[]>
   }
 
   async function getInsumosBajoStock() {
-    if (isMock.value) return null
     return api.getInsumosBajoStock()
   }
 
   async function getMargenPorProducto() {
-    if (isMock.value) return null
     return api.getMargenPorProducto()
   }
 
   async function getTopProductos() {
-    if (isMock.value) return null
     return api.getTopProductos()
   }
 
   async function getTopInsumos(params?: PeriodoParams) {
-    if (isMock.value) return null
     return api.getTopInsumos(params)
   }
 
   async function getFinanzasMensuales(params?: PeriodoParams) {
-    if (isMock.value) return null
     return api.getFinanzasMensuales(params)
   }
 
