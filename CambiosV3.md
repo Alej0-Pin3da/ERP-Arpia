@@ -3,6 +3,11 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-13] - MANUAL_USUARIO.md: manual de uso completo del ERP (ruta delegada directa)
+
+- **Alta:** `MANUAL_USUARIO.md` (~24KB) con los 16 módulos — qué es, cómo llegar, paso a paso con nombres exactos de botones/modales, roles y tips. Español neutro, estructura por tareas (skill cognitive-doc-design).
+- Puntos mock-vs-real documentados (precios ocultos en REAL, Editar solo admin, etc.).
+
 ### [2026-09-12] - Patrón compartido ResponsiveTable + CSS utilities, piloto Inventario/Ventas (ruta delegada directa)
 
 - **Deuda:** 23 tablas duplicadas desktop + cards (cambio futuro x2). Nuevo `src/components/ResponsiveTable.vue` (slots `#desktop`/`#mobile`, prop `minWidth`) + utilidades `.table-scroll`/`.th-sticky`/`.rt-mobile` en `main.css`.
