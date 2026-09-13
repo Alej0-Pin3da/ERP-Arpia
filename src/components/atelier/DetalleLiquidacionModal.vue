@@ -185,7 +185,7 @@ function compartirWhatsApp() {
             <i class="pi pi-users text-amber-400" />
             Desglose de Liquidación por Socia y Fondo de Taller
           </h3>
-          <span class="text-[11px] font-mono text-stone-400">Regla: 40% Taller / 30% Margara / 30% Valqui</span>
+          <span class="text-[11px] font-mono text-stone-400">Reparto según distribución registrada</span>
         </div>
 
         <div class="space-y-3">
@@ -245,7 +245,7 @@ function compartirWhatsApp() {
 
               <div>
                 <span class="text-stone-400 text-[10px] block">Datos de Cuenta / Pago:</span>
-                <span class="text-stone-300 text-[11px] truncate block">{{ d.banco_destino || 'Efectivo / Caja Taller' }}</span>
+                <span class="text-stone-300 text-[11px] truncate block">{{ d.banco_destino || '—' }}</span>
               </div>
             </div>
 
@@ -266,24 +266,20 @@ function compartirWhatsApp() {
           Observaciones y Conformidad de Cierre:
         </div>
         <p class="text-stone-300 text-xs italic bg-stone-950/70 p-3 rounded-lg border border-stone-800/80">
-          {{ liquidacion.observaciones || 'Liquidación conforme a los acuerdos del Atelier. Fondos debidamente asignados para reposición de insumos y cuotas de socias.' }}
+          {{ liquidacion.observaciones || '—' }}
         </p>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-stone-800 text-center">
-          <div class="p-3 bg-stone-950/60 rounded-xl border border-stone-800/60">
+          <div
+            v-for="d in liquidacion.distribucion"
+            :key="d.socia_id"
+            class="p-3 bg-stone-950/60 rounded-xl border border-stone-800/60"
+          >
             <div class="h-10 border-b border-stone-700/60 flex items-end justify-center pb-1 text-stone-500 font-serif italic text-sm">
-              Margarita Restrepo
+              {{ d.nombre_socia || '—' }}
             </div>
-            <div class="text-[11px] font-bold text-stone-300 mt-1">🪡 Margarita Restrepo (Margara)</div>
-            <div class="text-[10px] text-stone-400">Co-fundadora Confección & Taller</div>
-          </div>
-
-          <div class="p-3 bg-stone-950/60 rounded-xl border border-stone-800/60">
-            <div class="h-10 border-b border-stone-700/60 flex items-end justify-center pb-1 text-stone-500 font-serif italic text-sm">
-              Valeria Quintero
-            </div>
-            <div class="text-[11px] font-bold text-stone-300 mt-1">🎨 Valeria Quintero (Valqui)</div>
-            <div class="text-[10px] text-stone-400">Co-fundadora Dirección & Diseño</div>
+            <div class="text-[11px] font-bold text-stone-300 mt-1">{{ d.nombre_socia || '—' }} ({{ d.porcentaje }}%)</div>
+            <div class="text-[10px] text-stone-400">{{ d.rol_socia || '—' }}</div>
           </div>
         </div>
       </div>
@@ -333,7 +329,7 @@ function compartirWhatsApp() {
           Monto: {{ formatCOP(sociaPagoSeleccionada.monto_neto_pagar) }}
         </div>
         <div class="text-[10px] text-stone-400 mt-1">
-          Cuenta: {{ sociaPagoSeleccionada.banco_destino || 'Efectivo Taller' }}
+          Cuenta: {{ sociaPagoSeleccionada.banco_destino || '—' }}
         </div>
       </div>
 

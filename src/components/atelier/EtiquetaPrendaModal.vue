@@ -13,6 +13,9 @@ export interface EtiquetaPrenda {
 export interface EtiquetaVariante {
   talla: string
   sku?: string
+  color?: string
+  composicion?: string
+  lote?: string
 }
 
 const props = defineProps<{
@@ -26,16 +29,23 @@ const emit = defineEmits<{
 }>()
 
 const serialNumber = computed(() => {
-  if (!props.prenda || !props.variante) return 'ARP-2026-0001'
-  const sufijo = (props.variante.sku ?? '').slice(-4) || '0000'
+  if (!props.prenda || !props.variante) return '—'
+  const sufijo = (props.variante.sku ?? '').slice(-4) || '—'
   return `${props.prenda.codigo}-${props.variante.talla}-${sufijo}`
 })
+
+// REAL-only: sin prenda/variante real no se puede imprimir.
+const datosCompletos = computed(() => Boolean(props.prenda?.codigo && props.prenda?.nombre && props.variante?.talla))
 
 function formatCOP(val: number | string) {
   return `$${Math.round(Number(val ?? 0)).toLocaleString('es-CO')}`
 }
 
 function imprimirEtiqueta() {
+  if (!datosCompletos.value) {
+    showToast('warn', 'Sin datos', 'La etiqueta requiere prenda y variante reales.')
+    return
+  }
   showToast('success', 'Imprimiendo Etiqueta', `Enviando etiqueta de ${props.prenda?.nombre} a la impresora de taller.`)
   if (typeof window !== 'undefined') {
     window.print()
@@ -75,8 +85,11 @@ function imprimirEtiqueta() {
         <!-- Garment Details -->
         <div class="space-y-1">
           <h3 class="text-base font-serif font-bold text-stone-100 m-0">
-            {{ props.prenda?.nombre || 'Corset de Alta Costura' }}
+            {{ props.prenda?.nombre || '—' }}
           </h3>
+          <div v-if="!props.prenda" class="text-xs text-stone-500 font-mono">
+            Sin registro — pendiente: se requiere la prenda real.
+          </div>
           <div class="text-xs text-amber-300/90 font-mono">
             Colección Eterna · Hecho a Mano en Colombia
           </div>
@@ -86,15 +99,15 @@ function imprimirEtiqueta() {
         <div class="grid grid-cols-3 gap-2 w-full font-mono text-xs pt-1">
           <div class="bg-stone-900/90 border border-stone-800 p-2 rounded-lg">
             <span class="text-[9px] text-stone-400 block uppercase">Talla</span>
-            <span class="font-bold text-amber-300 text-sm">{{ props.variante?.talla || 'M' }}</span>
+            <span class="font-bold text-amber-300 text-sm">{{ props.variante?.talla || '—' }}</span>
           </div>
           <div class="bg-stone-900/90 border border-stone-800 p-2 rounded-lg">
             <span class="text-[9px] text-stone-400 block uppercase">Color</span>
-            <span class="font-bold text-stone-200 text-xs">{{ props.variante?.color || 'Noir' }}</span>
+            <span class="font-bold text-stone-200 text-xs">{{ props.variante?.color || '—' }}</span>
           </div>
           <div class="bg-stone-900/90 border border-stone-800 p-2 rounded-lg">
             <span class="text-[9px] text-stone-400 block uppercase">Precio PVP</span>
-            <span class="font-bold text-emerald-400 text-xs">{{ formatCOP(props.prenda?.precio_venta || 0) }}</span>
+            <span class="font-bold text-emerald-400 text-xs">{{ props.prenda ? formatCOP(props.prenda?.precio_venta || 0) : '—' }}</span>
           </div>
         </div>
 
@@ -102,10 +115,10 @@ function imprimirEtiqueta() {
         <div class="bg-stone-900/50 border border-stone-800/80 rounded-xl p-3 w-full text-left space-y-1.5 text-[11px] font-mono text-stone-300">
           <div class="flex items-center justify-between text-stone-400 text-[10px]">
             <span>COMPOSICIÓN TEXTIL:</span>
-            <span class="text-amber-400 font-bold">100% SEDA & ACERO</span>
+            <span class="text-amber-400 font-bold">{{ props.variante?.composicion || '—' }}</span>
           </div>
           <div class="text-[10px] text-stone-300 leading-snug">
-            92% Satín Duquesa de Seda · 8% Elastano · Varillas de Acero Espiralado Inoxidable
+            {{ '—' }}
           </div>
 
           <!-- Laundry Icons mockup -->
@@ -128,7 +141,7 @@ function imprimirEtiqueta() {
           <div class="text-right space-y-0.5">
             <div class="text-[9px] text-stone-400 uppercase">Número de Serie Único:</div>
             <div class="text-xs text-amber-400 font-bold">{{ serialNumber }}</div>
-            <div class="text-[9px] text-stone-500">Taller Arpía Pereira · Lote 2026-A</div>
+            <div class="text-[9px] text-stone-500">{{ props.variante?.lote || 'Sin registro — pendiente' }}</div>
           </div>
         </div>
       </div>
@@ -150,6 +163,7 @@ function imprimirEtiqueta() {
           icon="pi pi-print"
           size="small"
           class="p-button-warning text-xs font-semibold"
+          :disabled="!datosCompletos"
           @click="imprimirEtiqueta"
         />
       </div>

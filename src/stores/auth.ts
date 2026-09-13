@@ -54,18 +54,12 @@ export const useAuthStore = defineStore('auth', () => {
         }
       }
       writeStoredUser(user.value)
-    } catch {
-      // Fallback in-memory matching (modo MOCK)
-      if (email.includes('admin') || pass === 'admin123') {
-        user.value = { id: 1, nombre: 'Valeria Arpía', email, rol: 'admin' }
-      } else if (email.includes('oper') || pass === 'oper123') {
-        user.value = { id: 2, nombre: 'Camila Modista', email, rol: 'operador' }
-      } else {
-        user.value = { id: 3, nombre: 'Socia Auditora', email, rol: 'consulta' }
-      }
-      token.value = 'mock-auth-token'
-      writeTokens(token.value)
-      writeStoredUser(user.value)
+    } catch (err) {
+      // REAL-only: login failure must surface, never auto-login with a
+      // fabricated session. Clear any stale token and rethrow.
+      token.value = null
+      clearTokens()
+      throw err
     }
   }
 

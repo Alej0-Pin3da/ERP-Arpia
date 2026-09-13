@@ -270,7 +270,7 @@ function ejecutarOptimizacion() {
           <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 shadow-lg space-y-3">
             <div class="flex items-center justify-between text-xs">
               <span class="font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
-                <i class="pi pi-th-large" /> Esquema Visual de Tendido (15.00m x 1.50m)
+                <i class="pi pi-th-large" /> Esquema Visual de Tendido ({{ largoTotalDisponible.toFixed(2) }}m x {{ anchoTela.toFixed(2) }}m)
               </span>
               <span class="text-stone-400 font-mono">Escala Proporcional</span>
             </div>
@@ -278,24 +278,23 @@ function ejecutarOptimizacion() {
             <!-- Visual Canvas Simulation -->
             <div class="border border-stone-800 rounded-xl p-3 bg-stone-950 overflow-x-auto">
               <div class="min-w-[600px] h-32 bg-stone-900 rounded-lg p-2 flex gap-1.5 relative border border-stone-800">
-                <!-- Garment 1 Blocks -->
-                <div class="flex-1 bg-amber-900/60 border border-amber-500/40 rounded p-2 flex flex-col justify-between text-[10px] text-amber-200">
-                  <span class="font-bold">4x Vestido Lino (7.6m)</span>
-                  <span class="font-mono text-[9px] text-amber-400/80">Patrón al Hilo</span>
-                </div>
-                <!-- Garment 2 Blocks -->
-                <div class="w-40 bg-purple-900/50 border border-purple-500/40 rounded p-2 flex flex-col justify-between text-[10px] text-purple-200">
-                  <span class="font-bold">6x Corset (3.6m)</span>
-                  <span class="font-mono text-[9px] text-purple-300/80">Corte Intercalado 180°</span>
-                </div>
-                <!-- Garment 3 Blocks -->
-                <div class="w-24 bg-blue-900/50 border border-blue-500/40 rounded p-2 flex flex-col justify-between text-[10px] text-blue-200">
-                  <span class="font-bold">1x Falda (1.1m)</span>
-                  <span class="font-mono text-[9px] text-blue-300/80">Al Sesgo</span>
+                <div
+                  v-for="(p, idx) in prendas"
+                  :key="p.id"
+                  class="rounded p-2 flex flex-col justify-between text-[10px]"
+                  :class="idx % 3 === 0 ? 'bg-amber-900/60 border border-amber-500/40 text-amber-200' : idx % 3 === 1 ? 'bg-purple-900/50 border border-purple-500/40 text-purple-200' : 'bg-blue-900/50 border border-blue-500/40 text-blue-200'"
+                  :style="{ flex: `${p.cantidad * p.metros_unitario}` }"
+                >
+                  <span class="font-bold">{{ p.cantidad }}x {{ p.nombre }} ({{ (p.cantidad * p.metros_unitario).toFixed(1) }}m)</span>
+                  <span class="font-mono text-[9px] opacity-80">Patrón al Hilo</span>
                 </div>
                 <!-- Recoverable Scrap -->
-                <div class="w-28 bg-emerald-950/70 border border-dashed border-emerald-500/60 rounded p-2 flex flex-col justify-between text-[10px] text-emerald-300">
-                  <span class="font-bold">Retazos Útiles (2.7m)</span>
+                <div
+                  v-if="metrosRestantes > 0"
+                  class="bg-emerald-950/70 border border-dashed border-emerald-500/60 rounded p-2 flex flex-col justify-between text-[10px] text-emerald-300"
+                  :style="{ flex: `${metrosRestantes}` }"
+                >
+                  <span class="font-bold">Retazos Útiles ({{ metrosRestantes.toFixed(2) }}m)</span>
                   <span class="text-[9px] text-emerald-400">Para Accesorios</span>
                 </div>
               </div>
@@ -303,28 +302,28 @@ function ejecutarOptimizacion() {
           </div>
 
           <!-- Subproduct Monetization Opportunities -->
-          <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 shadow-lg space-y-3">
+          <div v-if="metrosRestantes > 0" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 shadow-lg space-y-3">
             <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
               <i class="pi pi-sparkles" /> Oportunidades de Monetización de Retazos
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div class="bg-stone-950/70 border border-stone-800 rounded-xl p-3 space-y-1 text-xs">
-                <div class="font-bold text-stone-100">18x Scrunchies de Tela</div>
-                <div class="text-[11px] text-stone-400">Consumo: ~15cm c/u</div>
-                <div class="text-amber-300 font-mono font-bold pt-1">$144.000 COP potenciales</div>
+                <div class="font-bold text-stone-100">{{ Math.floor(metrosRestantes / 0.15) }}x Scrunchies de Tela</div>
+                <div class="text-[11px] text-stone-400">Consumo: ~0.15m c/u</div>
+                <div class="text-amber-300 font-mono font-bold pt-1">${{(Math.floor(metrosRestantes / 0.15) * 8000).toLocaleString('es-CO')}} COP potenciales</div>
               </div>
 
               <div class="bg-stone-950/70 border border-stone-800 rounded-xl p-3 space-y-1 text-xs">
-                <div class="font-bold text-stone-100">6x Antifaces de Descanso</div>
-                <div class="text-[11px] text-stone-400">Consumo: ~25cm c/u</div>
-                <div class="text-amber-300 font-mono font-bold pt-1">$72.000 COP potenciales</div>
+                <div class="font-bold text-stone-100">{{ Math.floor(metrosRestantes / 0.25) }}x Antifaces de Descanso</div>
+                <div class="text-[11px] text-stone-400">Consumo: ~0.25m c/u</div>
+                <div class="text-amber-300 font-mono font-bold pt-1">${{(Math.floor(metrosRestantes / 0.25) * 12000).toLocaleString('es-CO')}} COP potenciales</div>
               </div>
 
               <div class="bg-stone-950/70 border border-stone-800 rounded-xl p-3 space-y-1 text-xs">
-                <div class="font-bold text-stone-100">12x Chokers con Herrajes</div>
-                <div class="text-[11px] text-stone-400">Consumo: ~10cm c/u</div>
-                <div class="text-amber-300 font-mono font-bold pt-1">$180.000 COP potenciales</div>
+                <div class="font-bold text-stone-100">{{ Math.floor(metrosRestantes / 0.10) }}x Chokers con Herrajes</div>
+                <div class="text-[11px] text-stone-400">Consumo: ~0.10m c/u</div>
+                <div class="text-amber-300 font-mono font-bold pt-1">${{(Math.floor(metrosRestantes / 0.10) * 15000).toLocaleString('es-CO')}} COP potenciales</div>
               </div>
             </div>
           </div>

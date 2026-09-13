@@ -3,6 +3,14 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-13] - Purga de datos quemados: respuestas estáticas y fallbacks reemplazados por flujo REAL (ruta directa)
+
+- **Auditoría & Limpieza:** Reemplazados datos simulados/estáticos en 14 componentes por estados vacíos explícitos o datos reales consumidos de API.
+- **DetallePedidoTallerModal:** Fases de modistería, tiempos y pruebas de calce inventadas reemplazadas por estado vacío "Sin registro de tiempos — pendiente".
+- **OptimizadorView:** Esquema visual de tendido y monetización de retazos convertidos en dinámicos basados en la tela e insumos reales cargados.
+- **NotificacionesModal, DashboardView, Auth, LoginView, EtiquetaPrenda:** Eliminados fallbacks ficticios y cuentas demo; todas las vistas consumen exclusivamente de FastAPI/Postgres.
+- Verificación: `npm run build` OK + 36/36 tests.
+
 ### [2026-09-13] - Fix start-all.ps1: scripts mock eliminados (post-purge)
 
 - **Causa:** el purge borró `start:real`/`dev:real` de `package.json` pero `start-all.ps1` los seguía invocando → `npm error Missing script` al final del arranque (DB + API + build OK, solo fallaba lanzar el front).

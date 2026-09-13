@@ -88,7 +88,8 @@ async function cargarInsumos() {
       tipo: (i.tipo as any) || 'Directo',
       categoria: i.nombre_categoria || 'General',
       ubicacion: i.ubicacion || 'Bodega',
-      proveedor: 'Atelier',
+      // Sin join de proveedor en el backend: se muestra — hasta que exista.
+      proveedor: (i.proveedor as string) || (i.nombre_proveedor as string) || '—',
       stock_actual: Number(i.stock_actual) || 0,
       stock_minimo: Number(i.stock_minimo) || 0,
       unidad_medida: i.unidad_medida,

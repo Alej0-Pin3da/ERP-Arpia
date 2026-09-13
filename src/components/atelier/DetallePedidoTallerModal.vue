@@ -22,26 +22,15 @@ const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
 }>()
 
-// Phased timers / modiste time logging
-const fasesTaller = ref([
-  { id: 1, fase: 'Patronaje & Escala', modista: 'Camila Modista', estimadoMin: 45, realMin: 50, completado: true },
-  { id: 2, fase: 'Corte Anatómico & Fusing', modista: 'Camila Modista', estimadoMin: 35, realMin: 30, completado: true },
-  { id: 3, fase: 'Canales de Varillas & Envarillado', modista: 'Valeria Arpía', estimadoMin: 60, realMin: 55, completado: false },
-  { id: 4, fase: 'Ojales & Puntas de Acero', modista: 'Camila Modista', estimadoMin: 40, realMin: 0, completado: false },
-  { id: 5, fase: 'Acabados a Mano & Sesgo Francés', modista: 'Valeria Arpía', estimadoMin: 50, realMin: 0, completado: false },
-])
+// REAL-only: no hay endpoint de tiempos por fase ni de pruebas de calce.
+// Se renderizan estados vacíos hasta que el backend los provea.
+const fasesTaller = ref<Array<{ id: number; fase: string; modista: string; estimadoMin: number; realMin: number; completado: boolean }>>([])
 
-const pruebasCalce = ref([
-  { id: 1, fecha: '2026-08-18', tipo: 'Toile de Prueba (Retor)', estado: 'Aprobada', notas: 'Cintura perfecta, reducir 1cm en sisa axilar.' },
-  { id: 2, fecha: '2026-08-23', tipo: '1ª Prueba en Seda & Varillas', estado: 'Pendiente', notas: 'Verificar tensión de cierre de espalda.' },
-])
+const pruebasCalce = ref<Array<{ id: number; fecha: string; tipo: string; estado: string; notas: string }>>([])
 
-const anticipoPagado = ref(true)
+const anticipoPagado = ref<boolean | null>(null)
 
-const totalHorasTaller = computed(() => {
-  const mins = fasesTaller.value.reduce((acc, f) => acc + (f.realMin || f.estimadoMin), 0)
-  return (mins / 60).toFixed(1)
-})
+const totalHorasTaller = computed(() => '—')
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
@@ -81,7 +70,7 @@ function generarReciboAnticipo() {
         <div class="flex items-center gap-4 text-xs font-mono">
           <div class="bg-stone-900 border border-stone-800 p-2 rounded-lg text-center">
             <span class="text-[10px] text-stone-400 block">Horas Acumuladas</span>
-            <span class="text-amber-300 font-bold text-sm">{{ totalHorasTaller }}h</span>
+            <span class="text-amber-300 font-bold text-sm">{{ totalHorasTaller }}</span>
           </div>
           <div class="bg-stone-900 border border-stone-800 p-2 rounded-lg text-center">
             <span class="text-[10px] text-stone-400 block">Precio Acordado</span>
@@ -90,54 +79,9 @@ function generarReciboAnticipo() {
         </div>
       </div>
 
-      <!-- Financial Split: 50% Anticipo / 50% Saldo -->
-      <div class="rounded-xl border border-amber-500/20 bg-stone-900/60 p-4 space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="text-xs font-mono font-bold text-amber-400 uppercase">
-            Control de Anticipos & Saldo Contra Entrega (50% / 50%)
-          </div>
-          <Button
-            label="Recibo de Anticipo"
-            icon="pi pi-file-pdf"
-            size="small"
-            outlined
-            class="text-xs"
-            @click="generarReciboAnticipo"
-          />
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-          <div
-            class="p-3 rounded-lg border flex items-center justify-between cursor-pointer transition"
-            :class="anticipoPagado ? 'border-emerald-500/30 bg-emerald-950/20' : 'border-stone-800 bg-stone-900/80'"
-            @click="anticipoPagado = !anticipoPagado"
-          >
-            <div>
-              <span class="text-[10px] uppercase font-bold block" :class="anticipoPagado ? 'text-emerald-300' : 'text-stone-400'">
-                Anticipo 50% (Reserva de Taller)
-              </span>
-              <span class="text-base font-bold" :class="anticipoPagado ? 'text-emerald-400' : 'text-stone-300'">
-                {{ formatCOP((props.pedido?.precio_venta || 0) * 0.5) }}
-              </span>
-            </div>
-            <span
-              class="px-2 py-0.5 rounded text-[10px] font-bold"
-              :class="anticipoPagado ? 'bg-emerald-900/80 text-emerald-300' : 'bg-stone-800 text-stone-400'"
-            >
-              {{ anticipoPagado ? '✓ Pagado' : 'Pendiente' }}
-            </span>
-          </div>
-
-          <div class="p-3 rounded-lg border border-stone-800 bg-stone-900/80 flex items-center justify-between">
-            <div>
-              <span class="text-[10px] text-stone-400 uppercase block">Saldo Pendiente 50% (Contra Entrega)</span>
-              <span class="text-base font-bold text-amber-300">{{ formatCOP((props.pedido?.precio_venta || 0) * 0.5) }}</span>
-            </div>
-            <span class="px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
-              Pendiente
-            </span>
-          </div>
-        </div>
+      <!-- Anticipo: solo con datos reales de venta/anticipo. Sin endpoint, se oculta con nota. -->
+      <div v-if="anticipoPagado === null" class="rounded-xl border border-stone-800 bg-stone-900/60 p-4 text-xs text-stone-400 font-mono">
+        Sin registro — pendiente: el control de anticipos requiere datos reales de venta/anticipo.
       </div>
 
       <!-- Workshop Phases & Timing Log -->
@@ -145,48 +89,8 @@ function generarReciboAnticipo() {
         <div class="text-xs font-mono font-bold text-stone-300 uppercase">
           Tiempos Reales por Fase de Modistería
         </div>
-        <div class="hidden overflow-x-auto border border-stone-800 rounded-xl bg-stone-950/60 sm:block">
-          <table class="w-full text-xs text-left border-collapse">
-            <thead>
-              <tr class="border-b border-stone-800 bg-stone-900/80 text-stone-400 font-mono text-[11px]">
-                <th class="py-2.5 px-3">Fase de Confección</th>
-                <th class="py-2.5 px-3">Modista / Especialista</th>
-                <th class="py-2.5 px-3">Tiempo Estimado</th>
-                <th class="py-2.5 px-3">Tiempo Real</th>
-                <th class="py-2.5 px-3 text-right">Estado</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-stone-800/60 font-mono">
-              <tr v-for="f in fasesTaller" :key="f.id" class="hover:bg-stone-900/40">
-                <td class="py-2.5 px-3 font-sans font-medium text-stone-200">{{ f.fase }}</td>
-                <td class="py-2.5 px-3 text-stone-400">{{ f.modista }}</td>
-                <td class="py-2.5 px-3 text-stone-400">{{ f.estimadoMin }} min</td>
-                <td class="py-2.5 px-3 font-bold text-amber-300">{{ f.realMin > 0 ? `${f.realMin} min` : '-' }}</td>
-                <td class="py-2.5 px-3 text-right">
-                  <span
-                    class="px-2 py-0.5 rounded text-[10px] font-bold"
-                    :class="f.completado ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30' : 'bg-stone-900 text-stone-400 border border-stone-800'"
-                  >
-                    {{ f.completado ? 'Completado' : 'En Curso' }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <!-- Mobile cards: same fasesTaller. No horizontal scroll. -->
-        <div class="space-y-3 sm:hidden max-w-full min-w-0">
-          <div v-for="f in fasesTaller" :key="f.id" class="border border-stone-800 rounded-2xl bg-stone-950/60 p-4 space-y-1 min-w-0">
-            <div class="flex items-start justify-between gap-2 min-w-0">
-              <div class="font-bold text-sm text-stone-100 min-w-0">{{ f.fase }}</div>
-              <span class="px-2 py-0.5 rounded text-xs font-bold shrink-0" :class="f.completado ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30' : 'bg-stone-900 text-stone-400 border border-stone-800'">{{ f.completado ? 'Completado' : 'En Curso' }}</span>
-            </div>
-            <div class="text-sm text-stone-400">{{ f.modista }}</div>
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-xs uppercase tracking-wider text-stone-500">Estimado {{ f.estimadoMin }} min</span>
-              <span class="font-mono font-bold text-amber-300">{{ f.realMin > 0 ? `${f.realMin} min` : '-' }}</span>
-            </div>
-          </div>
+        <div class="border border-stone-800 rounded-xl bg-stone-950/60 p-6 text-center text-xs text-stone-400 font-mono">
+          Sin registro de tiempos por fase — pendiente.
         </div>
       </div>
 
@@ -195,18 +99,8 @@ function generarReciboAnticipo() {
         <div class="text-xs font-mono font-bold text-stone-300 uppercase">
           Historial de Pruebas de Calce en Atelier
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div
-            v-for="p in pruebasCalce"
-            :key="p.id"
-            class="p-3 rounded-xl border border-stone-800 bg-stone-900/40 space-y-1.5"
-          >
-            <div class="flex items-center justify-between text-xs font-mono">
-              <span class="font-bold text-stone-200">{{ p.tipo }}</span>
-              <span class="text-[10px] px-2 py-0.5 rounded bg-stone-800 text-amber-300">{{ p.fecha }}</span>
-            </div>
-            <p class="text-xs text-stone-400 m-0">{{ p.notas }}</p>
-          </div>
+        <div class="border border-stone-800 rounded-xl bg-stone-900/40 p-6 text-center text-xs text-stone-400 font-mono">
+          Sin pruebas de calce registradas — pendiente.
         </div>
       </div>
     </div>

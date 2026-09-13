@@ -525,7 +525,7 @@ function imprimirBalance() {
             Reparto de Socias & Finanzas Atelier
           </h1>
           <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold">
-            Fórmula 40 / 30 / 30
+            Reparto según socias registradas
           </span>
         </div>
         <p class="text-xs text-stone-400 mt-1 font-mono m-0">
@@ -590,7 +590,7 @@ function imprimirBalance() {
 
       <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-3.5 flex flex-col justify-between">
         <div>
-          <div class="text-[10px] text-stone-400 uppercase tracking-wider">🪡 {{ nombreSociaReparto(0, 'Margara Restrepo') }} ({{ porcentajeSociaReparto(0, 30) }}%)</div>
+          <div class="text-[10px] text-stone-400 uppercase tracking-wider">🪡 {{ nombreSociaReparto(0, '—') }} ({{ porcentajeSociaReparto(0, 0) }}%)</div>
           <div class="text-lg font-serif font-bold text-stone-100 mt-1">
             {{ formatCOP(totalRepartidoMargara) }}
           </div>
@@ -602,7 +602,7 @@ function imprimirBalance() {
 
       <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-3.5 flex flex-col justify-between">
         <div>
-          <div class="text-[10px] text-stone-400 uppercase tracking-wider">🎨 {{ nombreSociaReparto(1, 'Valeria Quintero') }} ({{ porcentajeSociaReparto(1, 30) }}%)</div>
+          <div class="text-[10px] text-stone-400 uppercase tracking-wider">🎨 {{ nombreSociaReparto(1, '—') }} ({{ porcentajeSociaReparto(1, 0) }}%)</div>
           <div class="text-lg font-serif font-bold text-stone-100 mt-1">
             {{ formatCOP(totalRepartidoValqui) }}
           </div>
@@ -867,7 +867,7 @@ function imprimirBalance() {
           </div>
           <div class="text-[11px] text-stone-400 font-mono mt-0.5">
             Suma total activa: <strong class="text-emerald-400">{{ sumaPorcentajesSocias }}%</strong>
-            (Regla estatutaria de Atelier Arpía: 40% Taller / 30% Confección / 30% Dirección)
+            (Según porcentajes registrados de socias activas)
           </div>
         </div>
 
@@ -1294,11 +1294,11 @@ function imprimirBalance() {
             <span class="text-stone-200 font-bold text-sm">{{ formatCOP(gastosOperativosSimulator) }}</span>
           </div>
           <div class="p-2.5 rounded-lg bg-amber-950/40 border border-amber-500/30">
-            <span class="text-amber-300 block text-[10px]">Fondo Taller (40%):</span>
+            <span class="text-amber-300 block text-[10px]">Fondo Taller (estimado):</span>
             <span class="text-amber-300 font-bold text-sm">{{ formatCOP(Math.round(utilidadSimulada * 0.4)) }}</span>
           </div>
           <div class="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30">
-            <span class="text-emerald-300 block text-[10px]">Cuota Socias (Margara 30% / Valqui 30%):</span>
+            <span class="text-emerald-300 block text-[10px]">Cuota por socia (estimado):</span>
             <span class="text-emerald-300 font-bold text-sm">{{ formatCOP(Math.round(utilidadSimulada * 0.3)) }} c/u</span>
           </div>
         </div>

@@ -274,16 +274,17 @@ function compartirWhatsApp() {
           </div>
 
           <div class="mt-3 pt-2 border-t border-stone-800/80 space-y-1.5 text-[11px]">
+            <div class="text-[10px] text-stone-500 uppercase tracking-wider">Reparto estimado (no oficial — solo las liquidaciones de Finanzas son oficiales)</div>
             <div class="flex justify-between text-amber-300 font-semibold">
-              <span>🏛️ Fondo Reinversión Atelier (40%):</span>
+              <span>🏛️ Fondo Reinversión Atelier (40% estimado):</span>
               <span>{{ formatCOP(reinversion40) }}</span>
             </div>
             <div class="flex justify-between text-stone-300">
-              <span>🪡 Margara Confección (30%):</span>
+              <span>🪡 Socia Confección (30% estimado):</span>
               <span>{{ formatCOP(margarita30) }}</span>
             </div>
             <div class="flex justify-between text-stone-300">
-              <span>🎨 Valqui Diseño (30%):</span>
+              <span>🎨 Socia Diseño (30% estimado):</span>
               <span>{{ formatCOP(valqui30) }}</span>
             </div>
           </div>

@@ -753,21 +753,21 @@ async function guardar() {
             </div>
           </div>
 
-          <!-- Formula 40/30/30 Breakdown -->
+          <!-- Formula 40/30/30 Breakdown (estimado cliente — solo Finanzas es oficial) -->
           <div class="pt-2 border-t border-stone-800/80 space-y-1 text-[11px]">
             <div class="text-[10px] text-amber-500 font-bold tracking-wider uppercase">
-              Liquidación Socias (40% / 30% / 30%)
+              Liquidación Socias (40% / 30% / 30% — estimado, no oficial)
             </div>
             <div class="flex justify-between text-stone-300">
-              <span>🏛️ Fondo Reinversión Atelier (40%):</span>
+              <span>🏛️ Fondo Reinversión Atelier (40% estimado):</span>
               <span class="font-bold text-amber-400">{{ formatCOP(distribucion403030.reinversion40) }}</span>
             </div>
             <div class="flex justify-between text-stone-300">
-              <span>🪡 Margara Confección (30%):</span>
+              <span>🪡 Socia Confección (30% estimado):</span>
               <span class="font-bold text-stone-100">{{ formatCOP(distribucion403030.margara30) }}</span>
             </div>
             <div class="flex justify-between text-stone-300">
-              <span>🎨 Valqui Diseño (30%):</span>
+              <span>🎨 Socia Diseño (30% estimado):</span>
               <span class="font-bold text-stone-100">{{ formatCOP(distribucion403030.valqui30) }}</span>
             </div>
           </div>

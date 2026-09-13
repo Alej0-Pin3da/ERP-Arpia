@@ -44,8 +44,8 @@ async function cargarPedidos() {
       id: p.id,
       codigo: `ORD-${p.id}`,
       cliente_id: p.cliente_id ?? 0,
-      cliente_nombre: p.cliente_nombre || p.nombre_variante || p.nombre_producto || 'Taller Arpía',
-      prenda_nombre: p.nombre_producto || `Producto #${p.producto_id}`,
+      cliente_nombre: p.cliente_nombre || p.nombre_variante || p.nombre_producto || '—',
+      prenda_nombre: p.nombre_producto || (p.producto_id ? `Producto #${p.producto_id}` : '—'),
       estado: p.estado === 'pendiente' ? 'CORTE' : p.estado === 'en_produccion' ? 'COSTURA' : p.estado === 'completado' ? 'LISTO' : 'COTIZADO',
       estadoReal: p.estado,
       // PedidoProduccionRead no trae montos (sin join a productos, fuera de alcance);

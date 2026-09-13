@@ -57,18 +57,18 @@ function normalizeVenta(raw: Record<string, unknown>): VentaDisplay {
     id: raw.id as number,
     codigo: (raw.codigo as string) ?? `VEN-${raw.id}`,
     cliente_id: (raw.cliente_id as number | null) ?? null,
-    cliente_nombre: (raw.cliente_nombre as string) ?? (raw.cliente_id ? `Cliente #${raw.cliente_id}` : 'Sin cliente'),
+    cliente_nombre: (raw.cliente_nombre as string) ?? '—',
     fecha: (raw.fecha as string) ?? new Date().toISOString().split('T')[0],
-    canal: (raw.canal_venta as string) ?? (raw.canal as string) ?? 'web',
-    metodo_pago: (raw.metodo_pago as string) ?? 'efectivo',
+    canal: (raw.canal_venta as string) ?? (raw.canal as string) ?? '—',
+    metodo_pago: (raw.metodo_pago as string) ?? '—',
     estado: (raw.estado as string) ?? 'COMPLETADA',
     items: (raw.detalles as unknown[] ?? raw.items as unknown[] ?? []).map((it: unknown) => {
       const d = it as Record<string, unknown>
       return {
         id: d.id as number,
         producto_id: d.producto_id as number | null | undefined,
-        nombre_prenda: (d.nombre_prenda as string) ?? (d.nombre_variante as string) ?? `Producto #${d.producto_id}`,
-        talla: (d.talla as string) ?? (d.nombre_variante as string) ?? 'M',
+        nombre_prenda: (d.nombre_prenda as string) ?? (d.nombre_variante as string) ?? '—',
+        talla: (d.talla as string) ?? (d.nombre_variante as string) ?? '—',
         color: (d.color as string) ?? '—',
         cantidad: Number(d.cantidad ?? 0),
         precio_unitario: Number(d.precio_unitario ?? d.precio_unitario_aplicado ?? 0),
@@ -395,9 +395,9 @@ function exportarCSV() {
         </div>
       </div>
 
-      <!-- Fondo Reinversión 40% -->
+      <!-- Fondo Reinversión 40% (estimado cliente — solo Finanzas es oficial) -->
       <div class="bg-gradient-to-br from-stone-900/90 to-amber-950/40 border border-amber-500/30 rounded-2xl p-4 shadow-md flex flex-col justify-between">
-        <div class="text-[11px] text-amber-300 font-bold uppercase tracking-wider font-mono">🏛️ Fondo Taller 40%</div>
+        <div class="text-[11px] text-amber-300 font-bold uppercase tracking-wider font-mono">🏛️ Fondo Taller 40% (estimado)</div>
         <div class="text-xl font-extrabold text-amber-400 mt-2 font-mono">
           {{ formatCOP(metricasFiltradas.reinversion40) }}
         </div>
@@ -408,7 +408,7 @@ function exportarCSV() {
 
       <!-- Socias 30% / 30% -->
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md flex flex-col justify-between">
-        <div class="text-[11px] text-stone-400 font-bold uppercase tracking-wider font-mono">🪡 Margara & Valqui (30/30)</div>
+        <div class="text-[11px] text-stone-400 font-bold uppercase tracking-wider font-mono">🪡 Socias (30/30 estimado)</div>
         <div class="text-lg font-extrabold text-stone-200 mt-2 font-mono">
           {{ formatCOP(metricasFiltradas.margara30) }} <span class="text-xs text-stone-500 font-normal">c/u</span>
         </div>

@@ -7,6 +7,8 @@ import { useInsumos } from '@/composables/useInsumos'
 import { useProduccion } from '@/composables/useProduccion'
 import { useVentas } from '@/composables/useVentas'
 import { useAnaliticos } from '@/composables/useAnaliticos'
+import { useSocios } from '@/composables/useSocios'
+import { useFinanzas } from '@/composables/useFinanzas'
 import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
@@ -16,9 +18,13 @@ const insumosApi = useInsumos()
 const produccionApi = useProduccion()
 const ventasApi = useVentas()
 const analiticosApi = useAnaliticos()
+const sociosApi = useSocios()
+const finanzasApi = useFinanzas()
 const insumos = ref<any[]>([])
 const pedidos = ref<any[]>([])
 const ventas = ref<any[]>([])
+const socias = ref<any[]>([])
+const liquidaciones = ref<any[]>([])
 // Resumen del backend con fallback al cómputo local si falla.
 const resumen = ref<any | null>(null)
 async function cargarDashboard() {
@@ -35,6 +41,15 @@ async function cargarDashboard() {
   try {
     resumen.value = await analiticosApi.getResumen()
   } catch { resumen.value = null }
+  // REAL-only: reparto desde GET /socios + /liquidaciones (como FinanzasView).
+  try {
+    const [sr, lr] = await Promise.all([
+      sociosApi.list({ limit: 100, offset: 0 }),
+      finanzasApi.listLiquidaciones({ limit: 100, offset: 0 }),
+    ])
+    socias.value = (sr as any).items ?? []
+    liquidaciones.value = (lr as any).items ?? []
+  } catch { socias.value = []; liquidaciones.value = [] }
 }
 onMounted(() => { void cargarDashboard() })
 
@@ -48,8 +63,8 @@ const pedidosTabla = computed(() => {
     return {
       ...p,
       codigo: `ORD-${p.id}`,
-      cliente_nombre: p.cliente_nombre || p.nombre_variante || p.nombre_producto || 'Taller Arpía',
-      prenda_nombre: p.nombre_producto || `Producto #${p.producto_id}`,
+      cliente_nombre: p.cliente_nombre || p.nombre_variante || p.nombre_producto || '—',
+      prenda_nombre: p.nombre_producto || (p.producto_id ? `Producto #${p.producto_id}` : '—'),
       estado: rawEstado === 'pendiente' ? 'CORTE' : rawEstado === 'en_produccion' ? 'COSTURA' : rawEstado === 'completado' ? 'LISTO' : (rawEstado.toUpperCase() || 'COTIZADO'),
       precio_venta: Number(p.precio_venta ?? 0),
       utilidad_neta: Number(p.utilidad_neta ?? 0),
@@ -76,9 +91,30 @@ const pipelineCounts = computed(() => {
   ;(pedidos.value as any[]).forEach((p: any) => { const k = String(p.estado||'').toUpperCase(); if (k in counts) counts[k]++ })
   return counts
 })
+// REAL-only: reparto desde GET /socios + /liquidaciones (como FinanzasView).
+// Se oculta la sección cuando no hay datos; nunca se fabrica un 40/30/30.
+const sociasRepartoDashboard = computed(() =>
+  (socias.value as any[]).filter((s: any) => !s.es_fondo_taller && s.activo !== false).slice(0, 2),
+)
+const tieneRepartoReal = computed(() => sociasRepartoDashboard.value.length > 0 && liquidaciones.value.length > 0)
+function totalRepartidoSociaDashboard(sociaId: number | undefined): number {
+  if (sociaId == null) return 0
+  return (liquidaciones.value as any[]).reduce((a: number, l: any) => {
+    const item = (l.distribucion as any[] ?? []).find((d: any) => d.socia_id === sociaId)
+    return a + (item ? Number(item.monto_neto ?? item.monto_neto_pagar ?? 0) : 0)
+  }, 0)
+}
 const distribucion = computed(() => {
   const total = totalUtilidad.value
-  return { total, reversion40: Math.round(total*0.4), margara30: Math.round(total*0.3), valqui30: Math.round(total*0.3) }
+  const fondo = (liquidaciones.value as any[]).reduce((a: number, l: any) => a + Number(l.fondo_reinversion_monto ?? 0), 0)
+  const s0 = sociasRepartoDashboard.value[0] as any
+  const s1 = sociasRepartoDashboard.value[1] as any
+  return {
+    total,
+    fondo,
+    socia0: { nombre: s0 ? String(s0.nombre ?? '—') : '—', porcentaje: Number(s0?.porcentaje ?? s0?.porcentaje_participacion ?? 0), monto: totalRepartidoSociaDashboard(s0?.id) },
+    socia1: { nombre: s1 ? String(s1.nombre ?? '—') : '—', porcentaje: Number(s1?.porcentaje ?? s1?.porcentaje_participacion ?? 0), monto: totalRepartidoSociaDashboard(s1?.id) },
+  }
 })
 
 
@@ -162,7 +198,7 @@ function getEstadoBadgeClass(estado: string) {
         <div>
           <div class="flex items-center justify-between text-xs text-stone-400 font-bold uppercase tracking-wider">
             <span>Rentabilidad Mes</span>
-            <span class="text-emerald-400 font-semibold text-[11px]">+2.4%</span>
+            <!-- Sin delta: no hay endpoint de comparativa mensual -->
           </div>
           <div class="text-2xl sm:text-3xl font-extrabold text-stone-100 mt-2 font-mono">
             {{ rentabilidad }}%
@@ -290,15 +326,15 @@ function getEstadoBadgeClass(estado: string) {
       </div>
     </div>
 
-    <!-- Liquidación & Reparto de Utilidades Atelier Arpía (Fórmula de Socias) -->
-    <div class="bg-gradient-to-br from-stone-900 via-stone-950 to-amber-950/30 border border-amber-500/30 rounded-2xl p-5 shadow-xl space-y-4">
+    <!-- Liquidación & Reparto de Utilidades (REAL: GET /socios + /liquidaciones; oculto si vacío) -->
+    <div v-if="tieneRepartoReal" class="bg-gradient-to-br from-stone-900 via-stone-950 to-amber-950/30 border border-amber-500/30 rounded-2xl p-5 shadow-xl space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-800/80 pb-3">
         <div class="flex items-center gap-2 flex-wrap">
           <h3 class="text-sm font-bold uppercase tracking-wider text-amber-300 m-0 flex items-center gap-2">
             <i class="pi pi-wallet" /> Liquidación & Reparto de Utilidades Atelier Arpía
           </h3>
           <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            Fórmula de Socias Activa
+            Según liquidaciones registradas
           </span>
         </div>
         <div class="text-xs text-stone-300">
@@ -307,48 +343,50 @@ function getEstadoBadgeClass(estado: string) {
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- 40% Fondo Reinversión Taller -->
+        <!-- Fondo Reinversión Taller (monto real de liquidaciones) -->
         <div class="bg-stone-950/70 border border-stone-800 rounded-xl p-4 space-y-2 hover:border-amber-500/30 transition">
           <div class="flex justify-between items-center">
             <span class="text-xs font-bold text-stone-300">Fondo Reinversión Taller</span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-stone-800 text-stone-300">40%</span>
           </div>
           <div class="text-xl font-bold font-mono text-amber-400">
-            {{ formatCOP(distribucion.reversion40) }}
+            {{ formatCOP(distribucion.fondo) }}
           </div>
           <p class="text-[11px] text-stone-400 m-0 leading-tight">
-            Destinado a compra de insumos, telas Atenea, agujas y mantenimiento de máquinas Singer.
+            Acumulado del fondo de taller según liquidaciones registradas.
           </p>
         </div>
 
-        <!-- 30% Ganancia Margara -->
+        <!-- Socia 1 (real) -->
         <div class="bg-stone-950/70 border border-stone-800 rounded-xl p-4 space-y-2 hover:border-amber-500/30 transition">
           <div class="flex justify-between items-center">
-            <span class="text-xs font-bold text-stone-300">Ganancia Margara</span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-stone-800 text-stone-300">30%</span>
+            <span class="text-xs font-bold text-stone-300">{{ distribucion.socia0.nombre }}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-stone-800 text-stone-300">{{ distribucion.socia0.porcentaje }}%</span>
           </div>
           <div class="text-xl font-bold font-mono text-emerald-400">
-            {{ formatCOP(distribucion.margara30) }}
+            {{ formatCOP(distribucion.socia0.monto) }}
           </div>
           <p class="text-[11px] text-stone-400 m-0 leading-tight">
-            Liquidación de utilidades por confección y corte directo de corsetería.
+            Liquidado neto acumulado según liquidaciones registradas.
           </p>
         </div>
 
-        <!-- 30% Ganancia Valqui -->
+        <!-- Socia 2 (real) -->
         <div class="bg-stone-950/70 border border-stone-800 rounded-xl p-4 space-y-2 hover:border-amber-500/30 transition">
           <div class="flex justify-between items-center">
-            <span class="text-xs font-bold text-stone-300">Ganancia Valqui</span>
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-stone-800 text-stone-300">30%</span>
+            <span class="text-xs font-bold text-stone-300">{{ distribucion.socia1.nombre }}</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-stone-800 text-stone-300">{{ distribucion.socia1.porcentaje }}%</span>
           </div>
           <div class="text-xl font-bold font-mono text-emerald-400">
-            {{ formatCOP(distribucion.valqui30) }}
+            {{ formatCOP(distribucion.socia1.monto) }}
           </div>
           <p class="text-[11px] text-stone-400 m-0 leading-tight">
-            Liquidación de utilidades por patronaje, diseño y gestión del atelier.
+            Liquidado neto acumulado según liquidaciones registradas.
           </p>
         </div>
       </div>
+    </div>
+    <div v-else class="border border-stone-800 rounded-2xl p-6 text-center text-xs text-stone-500 font-mono">
+      Sin registro — pendiente: el reparto requiere socias y liquidaciones registradas.
     </div>
 
     <!-- Bottom Row: Seguimiento de Producción & Rentabilidad Table + Alerts Panel -->
@@ -447,16 +485,16 @@ function getEstadoBadgeClass(estado: string) {
           </div>
         </div>
 
-        <!-- Tip de Rentabilidad Textil -->
+        <!-- Tip de Rentabilidad Textil (contenido editorial, no dato operativo) -->
         <div class="bg-gradient-to-br from-stone-900 to-amber-950/20 border border-amber-500/30 rounded-2xl p-4 shadow-lg space-y-2.5">
           <div class="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
-            <i class="pi pi-lightbulb" /> Tip de Rentabilidad Textil
+            <i class="pi pi-lightbulb" /> Tip de Rentabilidad Textil <span class="text-[10px] font-mono font-normal text-stone-400 normal-case">(Consejo editorial)</span>
           </div>
           <p class="text-xs text-stone-300 leading-relaxed m-0">
             "Optimizar el corte de tela en trazos al hilo intercalados ahorra hasta un 8% de merma en rollos de 1.50m."
           </p>
           <div class="flex items-center justify-between pt-1">
-            <span class="text-[11px] text-stone-400">AtelierPro Advisor</span>
+            <span class="text-[11px] text-stone-400">Consejo del taller</span>
             <button
               type="button"
               class="text-xs text-amber-400 hover:underline font-bold"

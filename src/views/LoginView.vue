@@ -61,14 +61,6 @@ function onPasswordBlur(): void {
   passwordTouched.value = true
 }
 
-function setQuickUser(email: string, pass: string): void {
-  form.email = email
-  form.password = pass
-  emailTouched.value = false
-  passwordTouched.value = false
-  errorMessage.value = ''
-}
-
 async function onSubmit(): Promise<void> {
   emailTouched.value = true
   passwordTouched.value = true
@@ -196,37 +188,6 @@ async function onSubmit(): Promise<void> {
           icon="pi pi-arrow-right"
           icon-pos="right"
         />
-
-        <!-- Quick Access Switcher for fast evaluation -->
-        <div class="quick-access-box">
-          <span class="quick-access-title">Perfiles de Demostración:</span>
-          <div class="quick-buttons-row">
-            <button
-              type="button"
-              class="quick-pill-btn"
-              @click="setQuickUser('admin@arpia.com', 'admin123')"
-            >
-              <span class="pill-dot pill-dot--gold"></span>
-              Admin / Dirección
-            </button>
-            <button
-              type="button"
-              class="quick-pill-btn"
-              @click="setQuickUser('operador@arpia.com', 'operador123')"
-            >
-              <span class="pill-dot pill-dot--copper"></span>
-              Operador Taller
-            </button>
-            <button
-              type="button"
-              class="quick-pill-btn"
-              @click="setQuickUser('consulta@arpia.com', 'consulta123')"
-            >
-              <span class="pill-dot pill-dot--silver"></span>
-              Auditor / Finanzas
-            </button>
-          </div>
-        </div>
       </form>
 
       <div class="login-footer">
