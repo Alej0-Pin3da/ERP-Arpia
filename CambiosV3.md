@@ -3,6 +3,12 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-13] - Mock slice 1: Devoluciones + Omisiones a REAL-only (strangler por módulos)
+
+- **Estrategia:** el mock es dual-path en ~50 archivos (~6500 líneas) con default mock-ON — big-bang rompería todo. Strangler por dominio, un slice por cambio.
+- **Slice 1:** `useDevoluciones.ts` (121→47 líneas) y `useOmisiones.ts` (79→28) sin seeds ni ramas `isMock`; firmas intactas. `OmisionesView` ajusta import de tipo a `any[]` (sus 2 filas locales van en el slice de vista).
+- Verificación: build OK + 70/70 tests. Siguiente: un dominio por slice.
+
 ### [2026-09-13] - MANUAL_USUARIO.md: manual de uso completo del ERP (ruta delegada directa)
 
 - **Alta:** `MANUAL_USUARIO.md` (~24KB) con los 16 módulos — qué es, cómo llegar, paso a paso con nombres exactos de botones/modales, roles y tips. Español neutro, estructura por tareas (skill cognitive-doc-design).

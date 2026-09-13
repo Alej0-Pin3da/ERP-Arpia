@@ -2,12 +2,12 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import { useMode } from '@/composables/useMode'
-import { useOmisiones, type MockOmision } from '@/composables/useOmisiones'
+import { useOmisiones } from '@/composables/useOmisiones'
 import { showToast } from '@/utils/toast'
 
 const { isMock } = useMode()
 const omisionesApi = useOmisiones()
-const omisiones = ref<MockOmision[]>([
+const omisiones = ref<any[]>([
   {
     id: 1,
     fecha: '2026-08-20 14:30',
