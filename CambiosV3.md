@@ -3,6 +3,12 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-13] - Purge total del mock: app 100% REAL-only (strangler completo)
+
+- **Alcance:** 68 archivos, +1447/−9229. Adapters (10 composables) sin ramas `isMock`; 16 vistas + layout + 20 modales colapsados a REAL; eliminados `atelier.ts` (3411), `mockApi.ts` (970), `mockGuard.ts`, `check-mock-leak.mjs`; `server.ts` y `vite.config.ts` proxy-only; badges y `useMode` estáticos en REAL; tests reescritos a REAL-only (36/36).
+- **Consecuencia:** `npm run dev` exige FastAPI + Postgres; `USE_MOCK` es no-op. Gaps REAL expuestos y documentados (sin endpoint pago-por-socia, sin montos en pedidos, stock prendas solo vía Ingresar Prenda).
+- Verificación: build OK + 36/36 tests. Slices previos: b33b48c, 037c9d9.
+
 ### [2026-09-13] - Mock slice 2: useAnaliticos a REAL-only (strangler por módulos)
 
 - **Slice 2:** 7 guards `if (isMock) return null` eliminados en los 7 getters; el path REAL ya delegaba completo a `/analiticos/*`, firmas intactas. `isMock` queda como passthrough informativo (su remoción va en slice posterior).

@@ -1,31 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
 
 import { useMode } from './useMode'
 
 describe('useMode', () => {
-  let origFetch: typeof globalThis.fetch
-
   beforeEach(() => {
-    setActivePinia(createPinia())
-    origFetch = globalThis.fetch
     vi.restoreAllMocks()
   })
 
   afterEach(() => {
-    globalThis.fetch = origFetch
     vi.unstubAllEnvs()
     vi.restoreAllMocks()
   })
 
-  it('defaults to MOCK when VITE_USE_MOCK is true', () => {
+  it('is always REAL even when VITE_USE_MOCK=true (mock removed)', () => {
     vi.stubEnv('VITE_USE_MOCK', 'true')
     const { mode, isMock } = useMode()
-    expect(mode.value).toBe('MOCK')
-    expect(isMock.value).toBe(true)
+    expect(mode.value).toBe('REAL')
+    expect(isMock.value).toBe(false)
   })
 
-  it('returns REAL when VITE_USE_MOCK is false', () => {
+  it('is REAL when VITE_USE_MOCK is false', () => {
     vi.stubEnv('VITE_USE_MOCK', 'false')
     const { mode, isMock } = useMode()
     expect(mode.value).toBe('REAL')
@@ -39,44 +33,24 @@ describe('useMode', () => {
     expect(mode.value).toBe('REAL')
   })
 
-  it('live probe GET /api/__mode real overrides env', async () => {
-    vi.stubEnv('VITE_USE_MOCK', 'true')
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ mode: 'real' }),
-    } as Response)
-    const { mode, isMock, refresh } = useMode()
-    // before probe still MOCK via env
-    expect(mode.value).toBe('MOCK')
+  it('refresh resolves REAL and marks liveChecked without fetching', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const { mode, isMock, liveChecked, refresh } = useMode()
     await refresh()
     expect(mode.value).toBe('REAL')
     expect(isMock.value).toBe(false)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/__mode', expect.any(Object))
-  })
-
-  it('live probe mock keeps MOCK', async () => {
-    vi.stubEnv('VITE_USE_MOCK', 'false')
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ mode: 'mock' }),
-    } as Response)
-    const { mode, refresh } = useMode()
-    await refresh()
-    expect(mode.value).toBe('MOCK')
-  })
-
-  it('fetch failure keeps env fallback and marks liveChecked', async () => {
-    vi.stubEnv('VITE_USE_MOCK', 'true')
-    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network'))
-    const { mode, liveChecked, refresh } = useMode()
-    await refresh()
-    expect(mode.value).toBe('MOCK')
     expect(liveChecked.value).toBe(true)
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('badge contract: mode is MOCK or REAL only', () => {
+  it('badge contract: mode is REAL only', () => {
     vi.stubEnv('VITE_USE_MOCK', 'true')
     const { mode } = useMode()
-    expect(['MOCK', 'REAL']).toContain(mode.value)
+    expect(mode.value).toBe('REAL')
+  })
+
+  it('envMode always resolves REAL', () => {
+    const { envMode } = useMode()
+    expect(envMode()).toBe('REAL')
   })
 })

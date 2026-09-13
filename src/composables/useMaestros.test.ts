@@ -54,15 +54,6 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs())
 
 describe('useMaestros', () => {
-  it('isMock true routes to atelier', async () => {
-    vi.stubEnv('VITE_USE_MOCK', 'true')
-    const m = useMaestros()
-    expect(m.isMock.value).toBe(true)
-    const res = await m.listProveedores({ q: 'atenea' })
-    expect(res.total).toBeGreaterThanOrEqual(0)
-    expect(apiMaestros.listProveedores).not.toHaveBeenCalled()
-  })
-
   it('isMock false calls api', async () => {
     vi.stubEnv('VITE_USE_MOCK', 'false')
     const m = useMaestros()
@@ -71,12 +62,12 @@ describe('useMaestros', () => {
     expect(res.total).toBe(1)
   })
 
-  it('listCategorias mock filter', async () => {
-    vi.stubEnv('VITE_USE_MOCK', 'true')
+  it('listCategorias delegates to api', async () => {
+    vi.stubEnv('VITE_USE_MOCK', 'false')
     const m = useMaestros()
-    await m.createCategoria({ nombre: 'Cat Mock', tipo_talla: 'TALLA_UNICA' })
     const res = await m.listCategorias({ tipo_talla: 'TALLA_UNICA' })
-    expect(res.items.some((c) => c.nombre === 'Cat Mock')).toBe(true)
+    expect(apiMaestros.listCategorias).toHaveBeenCalledWith({ tipo_talla: 'TALLA_UNICA' })
+    expect(res.total).toBe(1)
   })
 
   it('listUbicaciones api', async () => {
@@ -116,42 +107,29 @@ describe('useMaestros', () => {
     expect(apiMaestros.listProductosSinTalla).toHaveBeenCalled()
   })
 
-  it('getParametros mock vs api', async () => {
-    vi.stubEnv('VITE_USE_MOCK', 'true')
-    const m1 = useMaestros()
-    const p1 = await m1.getParametros()
-    expect(p1).toBeDefined()
+  it('getParametros delegates to api', async () => {
     vi.stubEnv('VITE_USE_MOCK', 'false')
-    const m2 = useMaestros()
-    const p2 = await m2.getParametros()
-    expect(apiMaestros.getParametros).toHaveBeenCalled()
-    expect(p2.id).toBe(1)
-  })
-
-  it('createProveedor mock adds', async () => {
-    vi.stubEnv('VITE_USE_MOCK', 'true')
     const m = useMaestros()
-    const before = (await m.listProveedores()).total
-    await m.createProveedor({ nombre: 'Prov Test', categoria: 'Test', ciudad: 'Pereira' })
-    const after = (await m.listProveedores()).total
-    expect(after).toBe(before + 1)
+    const p = await m.getParametros()
+    expect(apiMaestros.getParametros).toHaveBeenCalled()
+    expect(p.id).toBe(1)
   })
 
-  it('updateParametros mock persists', async () => {
-    vi.stubEnv('VITE_USE_MOCK', 'true')
+  it('create/update/remove proveedor delegate to api', async () => {
+    vi.stubEnv('VITE_USE_MOCK', 'false')
+    const m = useMaestros()
+    await m.createProveedor({ nombre: 'Prov Test', categoria: 'Test', ciudad: 'Pereira' })
+    expect(apiMaestros.createProveedor).toHaveBeenCalledWith({ nombre: 'Prov Test', categoria: 'Test', ciudad: 'Pereira' })
+    await m.updateProveedor(99, { nombre: 'Updated Prov' })
+    expect(apiMaestros.updateProveedor).toHaveBeenCalledWith(99, { nombre: 'Updated Prov' })
+    await m.removeProveedor(99)
+    expect(apiMaestros.deleteProveedor).toHaveBeenCalledWith(99)
+  })
+
+  it('updateParametros delegates to api', async () => {
+    vi.stubEnv('VITE_USE_MOCK', 'false')
     const m = useMaestros()
     await m.updateParametros({ costo_minuto_costura: 999 })
-    const p = await m.getParametros()
-    expect(Number((p as unknown as Record<string, unknown>).costo_minuto_costura)).toBe(999)
-  })
-
-  it('removeProveedor mock deletes', async () => {
-    vi.stubEnv('VITE_USE_MOCK', 'true')
-    const m = useMaestros()
-    const created = (await m.createProveedor({ nombre: 'ToDelete', categoria: 'Test' })) as unknown as { id: number }
-    const before = (await m.listProveedores()).total
-    await m.removeProveedor(created.id)
-    const after = (await m.listProveedores()).total
-    expect(after).toBe(before - 1)
+    expect(apiMaestros.updateParametros).toHaveBeenCalledWith({ costo_minuto_costura: 999 })
   })
 })

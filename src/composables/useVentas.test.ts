@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { useAtelierStore } from '@/stores/atelier'
 
 vi.mock('@/services/api/ventas', () => ({
   listVentas: vi.fn().mockResolvedValue({ items: [{ id: 99, cliente_id: 1, canal_venta: 'web', metodo_pago: 'efectivo', estado: 'COMPLETADA', total_venta: 100 }], total: 1 }),
@@ -24,67 +23,6 @@ describe('useVentas', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs()
-  })
-
-  describe('VITE_USE_MOCK=true → atelier', () => {
-    beforeEach(() => {
-      vi.stubEnv('VITE_USE_MOCK', 'true')
-    })
-
-    it('list filters by canal_venta locally', async () => {
-      const uv = useVentas()
-      expect(uv.isMock.value).toBe(true)
-      const all = await uv.list({})
-      expect(all.total).toBeGreaterThan(0)
-      // atelier seeds have canal values like "Feria Showroom", "WhatsApp / DM"
-      const feria = await uv.list({ canal_venta: 'feria' as never })
-      // feria won't match legacy strings, so should be 0 or filtered; verify pagination still works
-      expect(feria.items.length).toBeLessThanOrEqual(all.total)
-    })
-
-    it('create pushes to atelier with canal_venta / metodo_pago', async () => {
-      const uv = useVentas()
-      const store = useAtelierStore()
-      const before = store.ventas.length
-      const created = await uv.create({
-        canal_venta: 'web',
-        metodo_pago: 'transferencia',
-        detalles: [{ producto_id: 1, cantidad: 2, precio_unitario: 50000 }],
-      })
-      expect(created).toBeDefined()
-      expect(store.ventas.length).toBe(before + 1)
-      expect((created as { canal: string }).canal).toBe('web')
-      expect((created as { metodo_pago: string }).metodo_pago).toBe('transferencia')
-      expect((created as { items: unknown[] }).items.length).toBe(1)
-    })
-
-    it('anular sets estado ANULADA', async () => {
-      const uv = useVentas()
-      const store = useAtelierStore()
-      const id = store.ventas[0].id
-      const anulada = await uv.anular(id)
-      expect(anulada).not.toBeNull()
-      expect((anulada as { estado: string }).estado).toBe('ANULADA')
-      expect(store.ventas.find((v) => v.id === id)?.estado).toBe('ANULADA')
-    })
-
-    it('does NOT call real API when isMock', async () => {
-      const uv = useVentas()
-      await uv.list({})
-      expect(apiVentas.listVentas).not.toHaveBeenCalled()
-    })
-
-    it('handles all 5 canonical canales + 4 metodos types', async () => {
-      const uv = useVentas()
-      for (const canal of ['web', 'whatsapp', 'instagram', 'feria', 'showroom_pereira'] as const) {
-        const c = await uv.create({ canal_venta: canal, detalles: [{ producto_id: 1, cantidad: 1, precio_unitario: 10000 }] })
-        expect((c as { canal: string }).canal).toBe(canal)
-      }
-      for (const metodo of ['efectivo', 'transferencia', 'tarjeta', 'contraentrega'] as const) {
-        const c = await uv.create({ canal_venta: 'web', metodo_pago: metodo, detalles: [{ producto_id: 1, cantidad: 1, precio_unitario: 10000 }] })
-        expect((c as { metodo_pago: string }).metodo_pago).toBe(metodo)
-      }
-    })
   })
 
   describe('VITE_USE_MOCK=false → /api/v1', () => {

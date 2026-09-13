@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { useAtelierStore } from '@/stores/atelier'
 
 vi.mock('@/services/api/insumos', () => ({
   listInsumos: vi.fn().mockResolvedValue({ items: [{ id: 99, nombre: 'Real Insumo', categoria_id: 1, unidad_medida: 'm', stock_actual: 10, stock_minimo: 2, costo_promedio_actual: 5000 }], total: 1 }),
@@ -26,40 +25,6 @@ describe('useInsumos', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs()
-  })
-
-  describe('VITE_USE_MOCK=true → atelier (mock)', () => {
-    beforeEach(() => {
-      vi.stubEnv('VITE_USE_MOCK', 'true')
-    })
-
-    it('list returns items and filters locally', async () => {
-      const composable = useInsumos()
-      expect(composable.isMock.value).toBe(true)
-      const res = await composable.list()
-      expect(res.total).toBeGreaterThan(0)
-      expect(apiInsumos.listInsumos).not.toHaveBeenCalled()
-    })
-
-    it('create, update, delete manipulate local store', async () => {
-      const composable = useInsumos()
-      const store = useAtelierStore()
-      const initialCount = store.insumos.length
-
-      const created = await composable.create({
-        categoria_id: 1,
-        nombre: 'Nuevo Test Insumo',
-        unidad_medida: 'm',
-      })
-      expect(created.nombre).toBe('Nuevo Test Insumo')
-      expect(store.insumos.length).toBe(initialCount + 1)
-
-      const updated = await composable.update(created.id, { nombre: 'Insumo Modificado' })
-      expect(updated?.nombre).toBe('Insumo Modificado')
-
-      await composable.remove(created.id)
-      expect(store.insumos.length).toBe(initialCount)
-    })
   })
 
   describe('VITE_USE_MOCK=false → API (real)', () => {
