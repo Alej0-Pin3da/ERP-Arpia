@@ -1,14 +1,14 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Levanta todo el stack ERP-Arpía de una vez (DB + Backend + Frontend) en modo REAL (USE_MOCK=false).
+  Levanta todo el stack ERP-Arpía de una vez (DB + Backend + Frontend) en modo REAL.
 .DESCRIPTION
   Por defecto levanta DB y Backend AMBOS en Docker (docker compose), porque tu .env usa
   DATABASE_URL=...@db:5432 — el host "db" solo resuelve dentro de la red Docker, NO desde el .venv local.
   La API se expone en 8080 (evita Splunk en 8000). El front (vite HMR :5173 o Node :3000) proxya a 8080.
   Con -UseLocalApi fuerza backend local venv (requiere que .env apunte a localhost:5433).
 .PARAMETER Mode
-  dev  -> vite dev:real (HMR) en 5173
+  dev  -> vite dev (HMR) en 5173
   prod -> vite build + node dist/server.mjs en 3000
 .PARAMETER UseLocalApi
   Usa backend local .venv en vez de Docker. Requiere DATABASE_URL apuntando a localhost:5433.
@@ -176,13 +176,11 @@ if ($Mode -eq 'prod') {
     $pn = (Get-Process -Id $p3000 -ErrorAction SilentlyContinue).ProcessName
     if ($pn -eq 'node') { try { Stop-Process -Id $p3000 -Force -ErrorAction SilentlyContinue } catch {} }
   }
-  $env:USE_MOCK = "false"
   Write-Host "Abrí http://localhost:3000 — API_PROXY_TARGET=$($env:API_PROXY_TARGET)" -ForegroundColor Green
-  npm run start:real
+  npm run start
 } else {
   Write-Step "3/3 — Frontend DEV (vite HMR + proxy) en :5173"
-  $env:USE_MOCK = "false"
   Write-Host "Abrí http://localhost:5173 — badge debe decir MODO REAL (proxy a $($env:API_PROXY_TARGET))" -ForegroundColor Green
   Write-Host "Verificá: curl http://localhost:5173/api/__mode" -ForegroundColor DarkGray
-  npm run dev:real
+  npm run dev
 }

@@ -3,6 +3,11 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-13] - Fix start-all.ps1: scripts mock eliminados (post-purge)
+
+- **Causa:** el purge borró `start:real`/`dev:real` de `package.json` pero `start-all.ps1` los seguía invocando → `npm error Missing script` al final del arranque (DB + API + build OK, solo fallaba lanzar el front).
+- **Fix:** `start:real`→`start`, `dev:real`→`dev`; restos `USE_MOCK=false` y menciones en comentarios eliminados. Sintaxis PS verificada, sin más referencias mock.
+
 ### [2026-09-13] - Purge total del mock: app 100% REAL-only (strangler completo)
 
 - **Alcance:** 68 archivos, +1447/−9229. Adapters (10 composables) sin ramas `isMock`; 16 vistas + layout + 20 modales colapsados a REAL; eliminados `atelier.ts` (3411), `mockApi.ts` (970), `mockGuard.ts`, `check-mock-leak.mjs`; `server.ts` y `vite.config.ts` proxy-only; badges y `useMode` estáticos en REAL; tests reescritos a REAL-only (36/36).
