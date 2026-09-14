@@ -5,8 +5,8 @@ from app.db.base import Base
 class PrecioVersion(Base):
     __tablename__ = "precio_versions"
     id = Column(Integer, primary_key=True)
-    producto_id = Column(Integer, ForeignKey("productos.id", ondelete="CASCADE"), nullable=False)
-    variante_id = Column(Integer, ForeignKey("variantes_producto.id", ondelete="CASCADE"), nullable=True)
+    producto_id = Column(Integer, ForeignKey("Productos.id", ondelete="CASCADE"), nullable=False)
+    variante_id = Column(Integer, ForeignKey("Variantes_Producto.id", ondelete="CASCADE"), nullable=True)
     precio = Column(Numeric(15,4), nullable=False)
     fecha_desde = Column(Date, nullable=False)
     creado_por = Column(Integer, nullable=True)
@@ -15,7 +15,7 @@ class PrecioVersion(Base):
 class CostoVersion(Base):
     __tablename__ = "costo_versions"
     id = Column(Integer, primary_key=True)
-    producto_id = Column(Integer, ForeignKey("productos.id", ondelete="CASCADE"), nullable=False)
+    producto_id = Column(Integer, ForeignKey("Productos.id", ondelete="CASCADE"), nullable=False)
     costo = Column(Numeric(15,4), nullable=False)
     fecha_desde = Column(Date, nullable=False)
     creado_por = Column(Integer, nullable=True)
