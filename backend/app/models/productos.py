@@ -48,6 +48,9 @@ class Producto(Base):
     codigo: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
     categoria: Mapped[str | None] = mapped_column(String(100), nullable=True)
     linea: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Etiqueta de Autor (0032): colección y composición textil imprimibles.
+    coleccion: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    composicion: Mapped[str | None] = mapped_column(String(255), nullable=True)
     descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
     tiempo_confeccion_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     costo_insumos: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True)

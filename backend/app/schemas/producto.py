@@ -30,6 +30,9 @@ class ProductoBase(BaseModel):
     codigo: str | None = Field(default=None, max_length=50)
     categoria: str | None = Field(default=None, max_length=100)
     linea: str | None = Field(default=None, max_length=100)
+    # Etiqueta de Autor (0032): colección y composición textil imprimibles.
+    coleccion: str | None = Field(default=None, max_length=150)
+    composicion: str | None = Field(default=None, max_length=255)
     descripcion: str | None = None
     tiempo_confeccion_min: int | None = Field(default=None, ge=0)
     costo_insumos: Decimal | None = Field(default=None, ge=0)
@@ -55,6 +58,9 @@ class ProductoUpdate(BaseModel):
     codigo: str | None = Field(default=None, max_length=50)
     categoria: str | None = Field(default=None, max_length=100)
     linea: str | None = Field(default=None, max_length=100)
+    # Etiqueta de Autor (0032): colección y composición textil imprimibles.
+    coleccion: str | None = Field(default=None, max_length=150)
+    composicion: str | None = Field(default=None, max_length=255)
     descripcion: str | None = None
     tiempo_confeccion_min: int | None = Field(default=None, ge=0)
     costo_insumos: Decimal | None = Field(default=None, ge=0)

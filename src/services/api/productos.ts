@@ -10,6 +10,9 @@ export interface ProductoRead {
   codigo?: string | null
   categoria?: string | null
   linea?: string | null
+  // Etiqueta de Autor (0032): colección y composición textil imprimibles.
+  coleccion?: string | null
+  composicion?: string | null
   descripcion?: string | null
   tiempo_confeccion_min?: number | null
   costo_insumos?: number | string | null
@@ -31,6 +34,9 @@ export interface ProductoCreate {
   codigo?: string | null
   categoria?: string | null
   linea?: string | null
+  // Etiqueta de Autor (0032): colección y composición textil imprimibles.
+  coleccion?: string | null
+  composicion?: string | null
   descripcion?: string | null
   tiempo_confeccion_min?: number | null
   costo_insumos?: number | string | null
@@ -50,6 +56,9 @@ export interface ProductoUpdate {
   codigo?: string | null
   categoria?: string | null
   linea?: string | null
+  // Etiqueta de Autor (0032): colección y composición textil imprimibles.
+  coleccion?: string | null
+  composicion?: string | null
   descripcion?: string | null
   tiempo_confeccion_min?: number | null
   costo_insumos?: number | string | null

@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
 import { showToast } from '@/utils/toast'
+import { updateProducto } from '@/services/api/productos'
 
 /** Minimal shapes this modal reads (REAL display objects from the caller). */
 export interface EtiquetaPrenda {
   codigo: string
   nombre: string
   precio_venta: number
+  coleccion?: string | null
+  composicion?: string | null
 }
 export interface EtiquetaVariante {
   talla: string
@@ -18,32 +22,85 @@ export interface EtiquetaVariante {
   lote?: string
 }
 
+const COLECCION_DEFAULT = 'Colección Eterna'
+
 const props = defineProps<{
   visible: boolean
   prenda: EtiquetaPrenda | null
   variante: EtiquetaVariante | null
+  /** Lote flow: producto id for persisting coleccion/composicion. */
+  productoId?: number | null
+  /** Lote flow: finished units — informational, shown OUTSIDE the tag, never as talla/color. */
+  cantidad?: number | null
 }>()
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
+  (e: 'guardado', payload: { coleccion: string | null; composicion: string | null }): void
 }>()
 
+/** Editable inputs (dialog, OUTSIDE the printable tag). Tag mockup reads these. */
+const coleccionInput = ref(COLECCION_DEFAULT)
+const composicionInput = ref('')
+const tallaInput = ref('')
+const colorInput = ref('')
+const saving = ref(false)
+
+function resetInputs() {
+  coleccionInput.value = props.prenda?.coleccion || COLECCION_DEFAULT
+  composicionInput.value = props.prenda?.composicion || props.variante?.composicion || ''
+  // Legacy synthetic lote variante used talla 'Lote' / color 'N uds' — never carry that over.
+  const rawTalla = props.variante?.talla || ''
+  tallaInput.value = rawTalla.toLowerCase() === 'lote' ? '' : rawTalla
+  const rawColor = props.variante?.color || ''
+  colorInput.value = /uds/i.test(rawColor) ? '' : rawColor
+}
+
+watch(() => props.visible, (open) => { if (open) resetInputs() })
+watch(() => props.prenda, () => { if (props.visible) resetInputs() })
+
 const serialNumber = computed(() => {
-  if (!props.prenda || !props.variante) return '—'
-  const sufijo = (props.variante.sku ?? '').slice(-4) || '—'
-  return `${props.prenda.codigo}-${props.variante.talla}-${sufijo}`
+  if (!props.prenda) return '—'
+  const tallaPart = tallaInput.value || props.variante?.talla || 'Lote'
+  const sufijo = props.variante?.sku?.slice(-4) || props.prenda.codigo.slice(-4) || '—'
+  return `${props.prenda.codigo}-${tallaPart}-${sufijo}`
 })
 
-// REAL-only: sin prenda/variante real no se puede imprimir.
-const datosCompletos = computed(() => Boolean(props.prenda?.codigo && props.prenda?.nombre && props.variante?.talla))
+// REAL-only: sin prenda real no se puede imprimir (la variante es opcional:
+// el flujo lote no tiene talla/color unitarios — se muestran como '—').
+const datosCompletos = computed(() => Boolean(props.prenda?.codigo && props.prenda?.nombre))
 
 function formatCOP(val: number | string) {
   return `$${Math.round(Number(val ?? 0)).toLocaleString('es-CO')}`
 }
 
+async function guardarEnProducto() {
+  if (props.productoId == null) {
+    showToast('warn', 'Sin producto', 'La etiqueta no trae productoId: no hay dónde guardar.')
+    return
+  }
+  saving.value = true
+  try {
+    const updated = await updateProducto(props.productoId, {
+      coleccion: coleccionInput.value.trim() || null,
+      composicion: composicionInput.value.trim() || null,
+    })
+    coleccionInput.value = updated.coleccion || COLECCION_DEFAULT
+    composicionInput.value = updated.composicion || ''
+    // Tag already reads the inputs; notify the caller so ITS state stays in sync (no prop mutation).
+    emit('guardado', { coleccion: updated.coleccion ?? null, composicion: updated.composicion ?? null })
+    showToast('success', 'Guardado', `Colección y composición guardadas en ${props.prenda?.nombre ?? 'el producto'}.`)
+  } catch (e) {
+    console.error('Error guardando colección/composición:', e)
+    showToast('error', 'No se pudo guardar', 'Revisá la conexión con el backend e intentá de nuevo.')
+  } finally {
+    saving.value = false
+  }
+}
+
 function imprimirEtiqueta() {
   if (!datosCompletos.value) {
-    showToast('warn', 'Sin datos', 'La etiqueta requiere prenda y variante reales.')
+    showToast('warn', 'Sin datos', 'La etiqueta requiere la prenda real.')
     return
   }
   showToast('success', 'Imprimiendo Etiqueta', `Enviando etiqueta de ${props.prenda?.nombre} a la impresora de taller.`)
@@ -63,7 +120,46 @@ function imprimirEtiqueta() {
     @update:visible="emit('update:visible', $event)"
   >
     <div class="space-y-6 pt-2">
-      <!-- Tag Physical Mockup (Front & Back Luxury Tag) -->
+      <!-- Lote units: informational, OUTSIDE the printable tag (never talla/color). -->
+      <div v-if="props.cantidad != null" class="mx-auto w-full max-w-sm rounded-xl bg-sky-950/60 border border-sky-500/30 px-3 py-2 text-center font-mono text-xs text-sky-300">
+        Lote de {{ Math.round(Number(props.cantidad)) }} uds · informativo, no se imprime
+      </div>
+
+      <!-- Editable fields (dialog only, outside the printable tag) -->
+      <div class="mx-auto w-full max-w-sm rounded-2xl border border-stone-800 bg-stone-900/60 p-4 space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="space-y-1 min-w-0">
+            <label for="etq-coleccion" class="text-[11px] font-bold uppercase tracking-wider text-stone-400">Colección</label>
+            <InputText id="etq-coleccion" v-model="coleccionInput" class="w-full text-xs" placeholder="Colección Eterna" />
+          </div>
+          <div class="space-y-1 min-w-0">
+            <label for="etq-composicion" class="text-[11px] font-bold uppercase tracking-wider text-stone-400">Composición textil</label>
+            <InputText id="etq-composicion" v-model="composicionInput" class="w-full text-xs" placeholder="Ej: 100% algodón" />
+          </div>
+          <div class="space-y-1 min-w-0">
+            <label for="etq-talla" class="text-[11px] font-bold uppercase tracking-wider text-stone-400">Talla</label>
+            <InputText id="etq-talla" v-model="tallaInput" class="w-full text-xs" placeholder="—" />
+          </div>
+          <div class="space-y-1 min-w-0">
+            <label for="etq-color" class="text-[11px] font-bold uppercase tracking-wider text-stone-400">Color</label>
+            <InputText id="etq-color" v-model="colorInput" class="w-full text-xs" placeholder="—" />
+          </div>
+        </div>
+        <Button
+          label="Guardar en producto"
+          icon="pi pi-save"
+          size="small"
+          severity="secondary"
+          outlined
+          class="text-xs w-full"
+          :loading="saving"
+          :disabled="props.productoId == null || saving"
+          title="Persiste colección y composición en el producto"
+          @click="guardarEnProducto"
+        />
+      </div>
+
+      <!-- Tag Physical Mockup (Front & Back Luxury Tag) — ONLY this prints. -->
       <div id="luxury-garment-tag" class="mx-auto w-full max-w-sm rounded-2xl bg-stone-950 border-2 border-amber-500/40 p-6 text-stone-100 shadow-2xl relative overflow-hidden flex flex-col items-center text-center space-y-4">
         <!-- Tag Hanging Eyelet -->
         <div class="w-4 h-4 rounded-full bg-stone-900 border-2 border-amber-500/60 shadow-inner -mt-2 flex items-center justify-center">
@@ -91,7 +187,7 @@ function imprimirEtiqueta() {
             Sin registro — pendiente: se requiere la prenda real.
           </div>
           <div class="text-xs text-amber-300/90 font-mono">
-            Colección Eterna · Hecho a Mano en Colombia
+            {{ coleccionInput || '—' }} · Hecho a Mano en Colombia
           </div>
         </div>
 
@@ -99,11 +195,11 @@ function imprimirEtiqueta() {
         <div class="grid grid-cols-3 gap-2 w-full font-mono text-xs pt-1">
           <div class="bg-stone-900/90 border border-stone-800 p-2 rounded-lg">
             <span class="text-[9px] text-stone-400 block uppercase">Talla</span>
-            <span class="font-bold text-amber-300 text-sm">{{ props.variante?.talla || '—' }}</span>
+            <span class="font-bold text-amber-300 text-sm">{{ tallaInput || '—' }}</span>
           </div>
           <div class="bg-stone-900/90 border border-stone-800 p-2 rounded-lg">
             <span class="text-[9px] text-stone-400 block uppercase">Color</span>
-            <span class="font-bold text-stone-200 text-xs">{{ props.variante?.color || '—' }}</span>
+            <span class="font-bold text-stone-200 text-xs">{{ colorInput || '—' }}</span>
           </div>
           <div class="bg-stone-900/90 border border-stone-800 p-2 rounded-lg">
             <span class="text-[9px] text-stone-400 block uppercase">Precio PVP</span>
@@ -115,10 +211,7 @@ function imprimirEtiqueta() {
         <div class="bg-stone-900/50 border border-stone-800/80 rounded-xl p-3 w-full text-left space-y-1.5 text-[11px] font-mono text-stone-300">
           <div class="flex items-center justify-between text-stone-400 text-[10px]">
             <span>COMPOSICIÓN TEXTIL:</span>
-            <span class="text-amber-400 font-bold">{{ props.variante?.composicion || '—' }}</span>
-          </div>
-          <div class="text-[10px] text-stone-300 leading-snug">
-            {{ '—' }}
+            <span class="text-amber-400 font-bold">{{ composicionInput || '—' }}</span>
           </div>
 
           <!-- Laundry Icons mockup -->
@@ -141,7 +234,7 @@ function imprimirEtiqueta() {
           <div class="text-right space-y-0.5">
             <div class="text-[9px] text-stone-400 uppercase">Número de Serie Único:</div>
             <div class="text-xs text-amber-400 font-bold">{{ serialNumber }}</div>
-            <div class="text-[9px] text-stone-500">{{ props.variante?.lote || 'Sin registro — pendiente' }}</div>
+            <div class="text-[9px] text-stone-500">{{ props.variante?.lote || props.prenda?.codigo || 'Sin registro — pendiente' }}</div>
           </div>
         </div>
       </div>
@@ -170,3 +263,37 @@ function imprimirEtiqueta() {
     </template>
   </Dialog>
 </template>
+
+<style>
+/* Print isolation (unscoped): bare window.print() used to dump the whole
+   /prendas page behind the dialog. Hide everything except the tag mockup
+   so only ONE tag prints on ONE page. */
+@media print {
+  /* Rollo térmico 80mm continuo: la página es la etiqueta, no una hoja normal. */
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  #luxury-garment-tag,
+  #luxury-garment-tag * {
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  #luxury-garment-tag {
+    position: absolute !important;
+    left: 4mm !important;
+    top: 4mm !important;
+    width: 72mm !important;
+    max-width: 72mm !important;
+    margin: 0 !important;
+    padding: 5mm !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+</style>
