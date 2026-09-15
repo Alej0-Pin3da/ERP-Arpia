@@ -11,6 +11,9 @@ When the order reaches the end of the line (``fase == 'listo'`` or
 4. ``Producto.stock_actual += N`` (NULL treated as 0 for legacy rows).
 5. Unit-cost snapshot via ``calcular_costo_produccion`` into the lot record
    (``pedido.costo_unitario_snapshot``) + ``cantidad_producida = cantidad``.
+6. Additive real-cost info (``mano_obra_real``/``energia_real`` from
+   TiempoFase rows x global rates) returned for the response — manual
+   ``Producto.mano_obra``/``cif_energia`` estimates are never overwritten.
 
 No commit here — the caller (PATCH /pedidos-produccion/{id}) owns the single
 commit, mirroring the ``descontar_stock`` convention. No per-garment
@@ -20,15 +23,19 @@ decision), so a phantom garment row would double-count finished units.
 
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import DomainValidationError, EntityNotFoundError
 from app.models.insumos import Insumo
+from app.models.maestros import ParametrosCosteo
 from app.models.produccion import (
     FASES_PRODUCCION_ORDEN,
+    FASES_TIEMPO_ORDEN,
     PedidoProduccion,
     PedidoProduccionEstado,
     PedidoProduccionFase,
+    TiempoFase,
 )
 from app.models.productos import Producto
 from app.services.costos import calcular_costo_produccion
@@ -74,13 +81,81 @@ def validar_avance_fase(fase_actual: str | None, fase_nueva: str) -> None:
         )
 
 
-def completar_lote(db: Session, pedido: PedidoProduccion) -> Decimal:
+def validar_fase_tiempo(fase_pedido: str | None, fase: str) -> None:
+    """Enforce that a TiempoFase log belongs to a reachable workshop phase.
+
+    422 for unknown phases and for ``listo`` (closing the lot is not worked
+    time). 400 when the phase is ahead of the order (e.g. logging
+    ``costura`` while the pedido is still in ``corte``). Logging a phase at
+    or behind the current one is allowed — the row records work done.
+    """
+    if fase not in FASES_TIEMPO_ORDEN:
+        raise DomainValidationError(
+            f"fase '{fase}' inválida para tiempos; "
+            f"valores: {', '.join(FASES_TIEMPO_ORDEN)}",
+            status_code=422,
+        )
+    actual = fase_pedido or PedidoProduccionFase.CORTE
+    idx_actual = (
+        FASES_PRODUCCION_ORDEN.index(actual)
+        if actual in FASES_PRODUCCION_ORDEN
+        else 0
+    )
+    idx_fase = FASES_PRODUCCION_ORDEN.index(fase)
+    if idx_fase > idx_actual:
+        raise DomainValidationError(
+            f"No se puede registrar tiempo de '{fase}': "
+            f"el pedido está en '{actual}'"
+        )
+
+
+def tasas_costeo(db: Session) -> tuple[Decimal, Decimal]:
+    """Global (mano/min, energia/min) rates. Read-only: never auto-creates.
+
+    Missing singleton row reads as 0/0 so GET endpoints stay side-effect
+    free; the singleton is created by GET/PATCH /maestros/parametros-costeo.
+    """
+    row = db.get(ParametrosCosteo, 1)
+    if row is None:
+        return Decimal("0"), Decimal("0")
+    return (
+        row.costo_minuto_costura or Decimal("0"),
+        row.costo_minuto_energia or Decimal("0"),
+    )
+
+
+def totales_tiempos(db: Session, pedido_id: int) -> dict[str, Decimal]:
+    """Read-time real-cost totals for a lot (no persistence, no estimates touched).
+
+    Returns minutos/mano/energia as Decimal; all zero when no rows exist.
+    Callers map all-zero to ``None`` on response models so "no data" stays
+    distinguishable from "zero minutes worked".
+    """
+    rows = db.scalars(
+        select(TiempoFase).where(TiempoFase.pedido_id == pedido_id)
+    ).all()
+    tasa_mano, tasa_energia = tasas_costeo(db)
+    minutos = sum((r.minutos_reales for r in rows), Decimal("0"))
+    return {
+        "minutos_totales": minutos,
+        "mano_obra_real": minutos * tasa_mano,
+        "energia_real": minutos * tasa_energia,
+    }
+
+
+def completar_lote(db: Session, pedido: PedidoProduccion) -> dict[str, Decimal]:
     """Complete a production lot: consume insumos, credit finished stock.
 
     Idempotency is the caller's job: invoke only when transitioning INTO
     listo/completado (guard with ``pedido_esta_completado`` before mutating).
     Raises 409 with per-insumo required-vs-available detail on shortage, 404
     on missing producto/insumo. No commit — caller owns the transaction.
+
+    Returns the unit-cost snapshot plus the additive real-cost info
+    (mano_obra_real/energia_real from TiempoFase rows x global rates, zero
+    when no tiempos exist). Producto.mano_obra/cif_energia are NEVER
+    overwritten here — manual estimates stay; the totals let a later slice
+    propose updating them.
     """
     cantidad = Decimal(pedido.cantidad)
     # Lock the producto FIRST, before any stock mutation. A locked re-read
@@ -127,4 +202,10 @@ def completar_lote(db: Session, pedido: PedidoProduccion) -> Decimal:
     )
     pedido.costo_unitario_snapshot = costo_unitario
     pedido.cantidad_producida = pedido.cantidad
-    return costo_unitario
+    totales = totales_tiempos(db, pedido.id)
+    return {
+        "costo_unitario": costo_unitario,
+        "minutos_totales": totales["minutos_totales"],
+        "mano_obra_real": totales["mano_obra_real"],
+        "energia_real": totales["energia_real"],
+    }

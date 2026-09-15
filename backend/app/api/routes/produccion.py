@@ -1,3 +1,5 @@
+from datetime import date
+from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,6 +15,7 @@ from app.models.produccion import (
     PedidoProduccionPrioridad,
     PrendaConfeccionada,
     PrendaEstado,
+    TiempoFase,
 )
 from app.models.productos import Producto, VarianteProducto
 from app.models.clientes import Cliente
@@ -24,12 +27,19 @@ from app.schemas.produccion import (
     PrendaConfeccionadaCreate,
     PrendaConfeccionadaRead,
     PrendaConfeccionadaUpdate,
+    TiempoFaseCreate,
+    TiempoFaseRead,
+    TiempoFaseUpdate,
+    TiemposListRead,
 )
 from app.services.paginacion import aplicar_orden, paginar
 from app.services.produccion import (
     completar_lote,
     pedido_esta_completado,
+    tasas_costeo,
+    totales_tiempos,
     validar_avance_fase,
+    validar_fase_tiempo,
 )
 
 router_prendas = APIRouter(prefix="/prendas-confeccionadas", tags=["prendas-confeccionadas"])
@@ -214,7 +224,9 @@ _SORTABLE_PEDIDOS = {
 }
 
 
-def _pedido_to_read(pedido: PedidoProduccion) -> PedidoProduccionRead:
+def _pedido_to_read(
+    pedido: PedidoProduccion, db: Session | None = None
+) -> PedidoProduccionRead:
     res = PedidoProduccionRead.model_validate(pedido)
     if pedido.producto is not None:
         res.nombre_producto = pedido.producto.nombre
@@ -222,6 +234,15 @@ def _pedido_to_read(pedido: PedidoProduccion) -> PedidoProduccionRead:
         res.nombre_variante = pedido.variante.nombre_variante
     if pedido.cliente is not None:
         res.cliente_nombre = pedido.cliente.nombre
+    # Read-time real cost (None while no tiempos exist — "no data", not 0).
+    if db is not None and pedido.id is not None:
+        totales = totales_tiempos(db, pedido.id)
+        tiene = db.scalar(
+            select(TiempoFase.id).where(TiempoFase.pedido_id == pedido.id)
+        )
+        if tiene is not None:
+            res.mano_obra_real = totales["mano_obra_real"]
+            res.energia_real = totales["energia_real"]
     return res
 
 
@@ -271,7 +292,7 @@ def list_pedidos(
     stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_PEDIDOS)
     rows, total = paginar(db, stmt, limit, offset)
     return Paginated[PedidoProduccionRead](
-        items=[_pedido_to_read(p) for p in rows], total=total
+        items=[_pedido_to_read(p, db) for p in rows], total=total
     )
 
 
@@ -284,7 +305,7 @@ def get_pedido(
     pedido = db.get(PedidoProduccion, pedido_id)
     if pedido is None:
         raise HTTPException(status_code=404, detail="Pedido de producción no encontrado")
-    return _pedido_to_read(pedido)
+    return _pedido_to_read(pedido, db)
 
 
 @router_pedidos.post("", response_model=PedidoProduccionRead, status_code=status.HTTP_201_CREATED)
@@ -317,7 +338,7 @@ def create_pedido(
         db.rollback()
         raise
 
-    return _pedido_to_read(pedido)
+    return _pedido_to_read(pedido, db)
 
 
 @router_pedidos.patch("/{pedido_id}", response_model=PedidoProduccionRead)
@@ -363,7 +384,7 @@ def update_pedido(
         db.rollback()
         raise
 
-    return _pedido_to_read(pedido)
+    return _pedido_to_read(pedido, db)
 
 
 # @deprecated: PUT alias — PATCH is the canonical verb for partial updates.
@@ -389,3 +410,128 @@ def delete_pedido(
         raise HTTPException(status_code=404, detail="Pedido de producción no encontrado")
     db.delete(pedido)
     db.commit()
+
+
+# --- Tiempos por fase (nested) ---
+# One row per (pedido, fase): POST creates, PATCH corrects minutes/operaria.
+# Money is derived at read time (minutos x global rates), never stored.
+
+
+def _tiempo_to_read(
+    tiempo: TiempoFase, tasa_mano: Decimal, tasa_energia: Decimal
+) -> TiempoFaseRead:
+    res = TiempoFaseRead.model_validate(tiempo)
+    res.costo_mano_obra = tiempo.minutos_reales * tasa_mano
+    res.costo_energia = tiempo.minutos_reales * tasa_energia
+    return res
+
+
+def _get_pedido_or_404(db: Session, pedido_id: int) -> PedidoProduccion:
+    pedido = db.get(PedidoProduccion, pedido_id)
+    if pedido is None:
+        raise HTTPException(status_code=404, detail="Pedido de producción no encontrado")
+    return pedido
+
+
+@router_pedidos.get("/{pedido_id}/tiempos", response_model=TiemposListRead)
+def list_tiempos(
+    pedido_id: int,
+    db: Session = Depends(get_db),
+    _: PedidoProduccion = Depends(audited_user),
+):
+    _get_pedido_or_404(db, pedido_id)
+    rows = db.scalars(
+        select(TiempoFase)
+        .where(TiempoFase.pedido_id == pedido_id)
+        .order_by(TiempoFase.id.asc())
+    ).all()
+    tasa_mano, tasa_energia = tasas_costeo(db)
+    items = [_tiempo_to_read(t, tasa_mano, tasa_energia) for t in rows]
+    return TiemposListRead(
+        items=items,
+        total_minutos=sum((t.minutos_reales for t in rows), Decimal("0")),
+        total_mano_obra=sum(
+            (t.costo_mano_obra for t in items if t.costo_mano_obra is not None),
+            Decimal("0"),
+        ),
+        total_energia=sum(
+            (t.costo_energia for t in items if t.costo_energia is not None),
+            Decimal("0"),
+        ),
+    )
+
+
+@router_pedidos.post(
+    "/{pedido_id}/tiempos", response_model=TiempoFaseRead, status_code=status.HTTP_201_CREATED
+)
+def create_tiempo(
+    pedido_id: int,
+    payload: TiempoFaseCreate,
+    db: Session = Depends(get_db),
+    _: PedidoProduccion = Depends(require_admin),
+):
+    pedido = _get_pedido_or_404(db, pedido_id)
+    # Sequential-order guard BEFORE mutating (422 unknown/listo, 400 ahead).
+    validar_fase_tiempo(pedido.fase, payload.fase)
+    operaria = payload.operaria.strip()
+    if not operaria:
+        raise HTTPException(status_code=400, detail="Operaria no puede estar vacía")
+    existente = db.scalar(
+        select(TiempoFase.id).where(
+            TiempoFase.pedido_id == pedido_id, TiempoFase.fase == payload.fase
+        )
+    )
+    if existente is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Ya existe un registro de tiempo para la fase '{payload.fase}' "
+                f"en el pedido {pedido_id} (use PATCH para corregir)"
+            ),
+        )
+    tiempo = TiempoFase(
+        pedido_id=pedido_id,
+        fase=payload.fase,
+        operaria=operaria,
+        minutos_reales=payload.minutos_reales,
+        fecha=payload.fecha or date.today(),
+    )
+    db.add(tiempo)
+    try:
+        db.commit()
+        db.refresh(tiempo)
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=f"Error de integridad: {e}") from e
+    tasa_mano, tasa_energia = tasas_costeo(db)
+    return _tiempo_to_read(tiempo, tasa_mano, tasa_energia)
+
+
+@router_pedidos.patch("/{pedido_id}/tiempos/{tiempo_id}", response_model=TiempoFaseRead)
+def update_tiempo(
+    pedido_id: int,
+    tiempo_id: int,
+    payload: TiempoFaseUpdate,
+    db: Session = Depends(get_db),
+    _: PedidoProduccion = Depends(require_admin),
+):
+    _get_pedido_or_404(db, pedido_id)
+    tiempo = db.get(TiempoFase, tiempo_id)
+    if tiempo is None or tiempo.pedido_id != pedido_id:
+        raise HTTPException(status_code=404, detail="Registro de tiempo no encontrado")
+    data = payload.model_dump(exclude_unset=True)
+    if "operaria" in data and data["operaria"] is not None:
+        operaria = data["operaria"].strip()
+        if not operaria:
+            raise HTTPException(status_code=400, detail="Operaria no puede estar vacía")
+        tiempo.operaria = operaria
+    if "minutos_reales" in data and data["minutos_reales"] is not None:
+        tiempo.minutos_reales = data["minutos_reales"]
+    try:
+        db.commit()
+        db.refresh(tiempo)
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=f"Error de integridad: {e}") from e
+    tasa_mano, tasa_energia = tasas_costeo(db)
+    return _tiempo_to_read(tiempo, tasa_mano, tasa_energia)

@@ -4,7 +4,18 @@ from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -48,6 +59,15 @@ FASES_PRODUCCION_ORDEN: tuple[str, ...] = (
     PedidoProduccionFase.ACABADOS,
     PedidoProduccionFase.CALIDAD,
     PedidoProduccionFase.LISTO,
+)
+
+# Phases that accept a real-minutes log. `listo` closes the lot — it is not
+# a worked phase, so it never gets a TiempoFase row.
+FASES_TIEMPO_ORDEN: tuple[str, ...] = (
+    PedidoProduccionFase.CORTE,
+    PedidoProduccionFase.COSTURA,
+    PedidoProduccionFase.ACABADOS,
+    PedidoProduccionFase.CALIDAD,
 )
 
 
@@ -109,9 +129,57 @@ class PedidoProduccion(Base):
     prendas: Mapped[list[PrendaConfeccionada]] = relationship(
         back_populates="pedido", lazy="selectin"
     )
+    tiempos: Mapped[list[TiempoFase]] = relationship(
+        back_populates="pedido",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
 
     def __repr__(self) -> str:
         return f"<PedidoProduccion id={self.id} producto_id={self.producto_id} estado={self.estado!r}>"
+
+
+class TiempoFase(Base):
+    """Real minutes worked on ONE workshop phase of a production order.
+
+    Guard: a single row per (pedido_id, fase) — a second POST for the same
+    phase is a 409, corrections go through PATCH. Labor/energy money is
+    NEVER stored here: it is derived at read time from the global
+    ParametrosCosteo rates (minutos x tasa), so rate changes apply
+    retroactively and no estimate column is ever overwritten.
+    """
+
+    __tablename__ = "produccion_tiempos_fase"
+    __table_args__ = (
+        CheckConstraint("minutos_reales > 0", name="ck_tiempos_minutos_pos"),
+        CheckConstraint(
+            "fase IN ('corte', 'costura', 'acabados', 'calidad')",
+            name="ck_tiempos_fase",
+        ),
+        UniqueConstraint("pedido_id", "fase", name="uq_tiempos_pedido_fase"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pedido_id: Mapped[int] = mapped_column(
+        ForeignKey("pedidos_produccion.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    fase: Mapped[str] = mapped_column(String(20), nullable=False)
+    operaria: Mapped[str] = mapped_column(String(150), nullable=False)
+    minutos_reales: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    fecha: Mapped[date] = mapped_column(Date, nullable=False, default=date.today)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    pedido: Mapped[PedidoProduccion] = relationship(back_populates="tiempos")
+
+    def __repr__(self) -> str:
+        return f"<TiempoFase id={self.id} pedido_id={self.pedido_id} fase={self.fase!r}>"
 
 
 class PrendaConfeccionada(Base):

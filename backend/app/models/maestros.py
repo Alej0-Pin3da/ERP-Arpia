@@ -210,6 +210,7 @@ class ParametrosCosteo(Base):
     __tablename__ = "maestros_parametros_costeo"
     __table_args__ = (
         CheckConstraint("costo_minuto_costura >= 0", name="ck_param_minuto"),
+        CheckConstraint("costo_minuto_energia >= 0", name="ck_param_energia"),
         CheckConstraint("costo_hora_patronaje >= 0", name="ck_param_patronaje"),
         CheckConstraint("margen_meta_global_pct >= 0 AND margen_meta_global_pct <= 100", name="ck_param_margen"),
         CheckConstraint("desperdicio_textil_default_pct >= 0 AND desperdicio_textil_default_pct <= 100", name="ck_param_desperdicio"),
@@ -217,6 +218,7 @@ class ParametrosCosteo(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     costo_minuto_costura: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("0"), default=Decimal("0"))
+    costo_minuto_energia: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("0"), default=Decimal("0"))
     costo_hora_patronaje: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("0"), default=Decimal("0"))
     margen_meta_global_pct: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("0"), default=Decimal("0"))
     desperdicio_textil_default_pct: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("0"), default=Decimal("0"))

@@ -92,6 +92,43 @@ class PedidoProduccionRead(PedidoProduccionBase):
     updated_at: datetime
     # Unit-cost snapshot taken once at lot completion (None until then).
     costo_unitario_snapshot: Decimal | None = None
+    # Real labor/energy cost derived at read time from TiempoFase rows x
+    # global rates (None when the lot has no tiempos logged yet).
+    mano_obra_real: Decimal | None = None
+    energia_real: Decimal | None = None
     nombre_producto: str | None = None
     nombre_variante: str | None = None
     cliente_nombre: str | None = None
+
+
+class TiempoFaseCreate(BaseModel):
+    fase: str = Field(max_length=20)
+    operaria: str = Field(min_length=1, max_length=150)
+    minutos_reales: Decimal = Field(gt=0)
+    fecha: date | None = None
+
+
+class TiempoFaseUpdate(BaseModel):
+    operaria: str | None = Field(default=None, min_length=1, max_length=150)
+    minutos_reales: Decimal | None = Field(default=None, gt=0)
+
+
+class TiempoFaseRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    pedido_id: int
+    fase: str
+    operaria: str
+    minutos_reales: Decimal
+    fecha: date
+    # Read-time derivation: minutos x global rate (never stored).
+    costo_mano_obra: Decimal | None = None
+    costo_energia: Decimal | None = None
+
+
+class TiemposListRead(BaseModel):
+    items: list[TiempoFaseRead]
+    total_minutos: Decimal
+    total_mano_obra: Decimal
+    total_energia: Decimal

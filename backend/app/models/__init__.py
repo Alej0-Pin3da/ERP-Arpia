@@ -19,6 +19,7 @@ from app.models.produccion import (
     PedidoProduccionPrioridad,
     PrendaConfeccionada,
     PrendaEstado,
+    TiempoFase,
 )
 from app.models.productos import (
     BomInsumo,
@@ -61,6 +62,7 @@ __all__ = [
     "PedidoProduccionPrioridad",
     "PrendaConfeccionada",
     "PrendaEstado",
+    "TiempoFase",
     "Venta",
     "DetalleVenta",
     "Devolucion",

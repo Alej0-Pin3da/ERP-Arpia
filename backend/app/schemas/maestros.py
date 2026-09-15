@@ -273,6 +273,7 @@ class ParametrosRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     costo_minuto_costura: Decimal
+    costo_minuto_energia: Decimal
     costo_hora_patronaje: Decimal
     margen_meta_global_pct: Decimal
     desperdicio_textil_default_pct: Decimal
@@ -286,6 +287,7 @@ class ParametrosRead(BaseModel):
 
 class ParametrosUpdate(BaseModel):
     costo_minuto_costura: Decimal | None = Field(default=None, ge=0)
+    costo_minuto_energia: Decimal | None = Field(default=None, ge=0)
     costo_hora_patronaje: Decimal | None = Field(default=None, ge=0)
     margen_meta_global_pct: Decimal | None = Field(default=None, ge=0, le=100)
     desperdicio_textil_default_pct: Decimal | None = Field(default=None, ge=0, le=100)
