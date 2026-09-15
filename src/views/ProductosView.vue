@@ -43,6 +43,8 @@ interface RecetaDisplay {
   markup_pct: number
   recomendaciones_taller: string
   fases: unknown[]
+  // Quantity stock (backend migración 0030, lote slice); null when absent.
+  stock_actual?: number | string | null
 }
 
 const showFichaModal = ref(false)
@@ -129,6 +131,7 @@ const recetasDisplay = computed(() => productos.value.map((p: any) => ({
   })(),
   recomendaciones_taller: p.recomendaciones_taller ?? '',
   fases: p.fases ?? [],
+  stock_actual: p.stock_actual ?? null,
 })))
 const recetasFiltradas = computed(() => {
   let list = recetasDisplay.value.filter((r) => {
@@ -366,6 +369,9 @@ function solicitarEliminar(r: RecetaDisplay) {
             </span>
             <span class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono">
               ⏱️ {{ r.tiempo_confeccion_min ?? '—' }}{{ r.tiempo_confeccion_min ? ' min confección' : '' }}
+            </span>
+            <span v-if="r.stock_actual !== null && r.stock_actual !== undefined" class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono">
+              📦 {{ r.stock_actual }} uds stock
             </span>
           </div>
 

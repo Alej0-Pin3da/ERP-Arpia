@@ -18,6 +18,8 @@ export interface ProductoRead {
   markup_pct?: number | string | null
   recomendaciones_taller?: string | null
   fases?: unknown | null
+  // Quantity stock (migración 0030, lote slice): finished units on hand.
+  stock_actual?: number | string | null
 }
 
 export interface ProductoCreate {
@@ -56,6 +58,7 @@ export interface ProductoUpdate {
   markup_pct?: number | string | null
   recomendaciones_taller?: string | null
   fases?: unknown | null
+  stock_actual?: number | string | null
 }
 
 export interface TipoProductoRead {

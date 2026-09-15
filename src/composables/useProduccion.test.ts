@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 vi.mock('@/services/api/pedidos-produccion', () => ({
-  listPedidosProduccion: vi.fn().mockResolvedValue({ items: [{ id: 99, producto_id: 1, cantidad: 5, cantidad_producida: 0, estado: 'pendiente', prioridad: 'normal', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }], total: 1 }),
-  getPedidoProduccion: vi.fn().mockResolvedValue({ id: 99, producto_id: 1, cantidad: 5, cantidad_producida: 0, estado: 'pendiente', prioridad: 'normal', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
-  createPedidoProduccion: vi.fn().mockResolvedValue({ id: 100, producto_id: 1, cantidad: 10, cantidad_producida: 0, estado: 'pendiente', prioridad: 'alta', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
-  updatePedidoProduccion: vi.fn().mockResolvedValue({ id: 99, producto_id: 1, cantidad: 5, cantidad_producida: 2, estado: 'en_produccion', prioridad: 'normal', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
+  listPedidosProduccion: vi.fn().mockResolvedValue({ items: [{ id: 99, producto_id: 1, cantidad: 5, cantidad_producida: 0, fase: 'corte', estado: 'pendiente', prioridad: 'normal', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }], total: 1 }),
+  getPedidoProduccion: vi.fn().mockResolvedValue({ id: 99, producto_id: 1, cantidad: 5, cantidad_producida: 0, fase: 'corte', estado: 'pendiente', prioridad: 'normal', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
+  createPedidoProduccion: vi.fn().mockResolvedValue({ id: 100, producto_id: 1, cantidad: 10, cantidad_producida: 0, fase: 'corte', estado: 'pendiente', prioridad: 'alta', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
+  updatePedidoProduccion: vi.fn().mockResolvedValue({ id: 99, producto_id: 1, cantidad: 5, cantidad_producida: 2, fase: 'costura', estado: 'en_produccion', prioridad: 'normal', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
   deletePedidoProduccion: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -16,10 +16,10 @@ describe('useProduccion', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.restoreAllMocks()
-    vi.mocked(apiPedidos.listPedidosProduccion).mockResolvedValue({ items: [{ id: 99, producto_id: 1, cantidad: 5, cantidad_producida: 0, estado: 'pendiente', prioridad: 'normal', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }], total: 1 })
-    vi.mocked(apiPedidos.getPedidoProduccion).mockResolvedValue({ id: 99, producto_id: 1, cantidad: 5, cantidad_producida: 0, estado: 'pendiente', prioridad: 'normal', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    vi.mocked(apiPedidos.createPedidoProduccion).mockResolvedValue({ id: 100, producto_id: 1, cantidad: 10, cantidad_producida: 0, estado: 'pendiente', prioridad: 'alta', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    vi.mocked(apiPedidos.updatePedidoProduccion).mockResolvedValue({ id: 99, producto_id: 1, cantidad: 5, cantidad_producida: 2, estado: 'en_produccion', prioridad: 'normal', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    vi.mocked(apiPedidos.listPedidosProduccion).mockResolvedValue({ items: [{ id: 99, producto_id: 1, cantidad: 5, cantidad_producida: 0, fase: 'corte', estado: 'pendiente', prioridad: 'normal', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }], total: 1 })
+    vi.mocked(apiPedidos.getPedidoProduccion).mockResolvedValue({ id: 99, producto_id: 1, cantidad: 5, cantidad_producida: 0, fase: 'corte', estado: 'pendiente', prioridad: 'normal', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    vi.mocked(apiPedidos.createPedidoProduccion).mockResolvedValue({ id: 100, producto_id: 1, cantidad: 10, cantidad_producida: 0, fase: 'corte', estado: 'pendiente', prioridad: 'alta', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    vi.mocked(apiPedidos.updatePedidoProduccion).mockResolvedValue({ id: 99, producto_id: 1, cantidad: 5, cantidad_producida: 2, fase: 'costura', estado: 'en_produccion', prioridad: 'normal', fecha_pedido: '2026-08-27', created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     vi.mocked(apiPedidos.deletePedidoProduccion).mockResolvedValue(undefined)
   })
 

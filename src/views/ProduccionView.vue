@@ -4,6 +4,11 @@ import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import { useProduccion } from '@/composables/useProduccion'
+import {
+  FASES_PRODUCCION,
+  extractApiDetail,
+  siguienteFase,
+} from '@/services/api/pedidos-produccion'
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import DetallePedidoTallerModal from '@/components/atelier/DetallePedidoTallerModal.vue'
 import { showToast } from '@/utils/toast'
@@ -18,10 +23,16 @@ interface PedidoDisplay {
   cliente_id: number
   cliente_nombre: string
   prenda_nombre: string
-  // Display: etapas del kanban. estadoReal guarda el enum del backend
-  // (pendiente/en_produccion/completado/cancelado) para las transiciones.
+  // Workshop phase from the backend (migración 0030):
+  // corte → costura → acabados → calidad → listo. Single source of truth
+  // for the kanban column; `estado` stays as the legacy enum for terminal
+  // display (completado/cancelado).
+  fase: string
   estado: string
   estadoReal?: string
+  cantidad: number
+  cantidad_producida: number
+  costo_unitario_snapshot?: number | string | null
   precio_venta: number
   costo_produccion: number
   utilidad_neta: number
@@ -32,6 +43,8 @@ interface PedidoDisplay {
 
 const search = ref('')
 const viewMode = ref<'kanban' | 'tabla'>('kanban')
+// Fase filter chip → GET /pedidos-produccion?fase=. '' = todas.
+const filtroFase = ref<string>('')
 const showNuevoPedidoModal = ref(false)
 const showDetallePedidoModal = ref(false)
 const pedidoSeleccionado = ref<PedidoDisplay | null>(null)
@@ -39,17 +52,23 @@ const pedidos = ref<PedidoDisplay[]>([])
 
 async function cargarPedidos() {
   try {
-    const res = await produccionService.list({ limit: 100 })
-    pedidos.value = res.items.map((p: any) => ({
+    const params = filtroFase.value ? { limit: 100, fase: filtroFase.value } : { limit: 100 }
+    const res = await produccionService.list(params)
+    pedidos.value = res.items.map((p) => ({
       id: p.id,
       codigo: `ORD-${p.id}`,
       cliente_id: p.cliente_id ?? 0,
       cliente_nombre: p.cliente_nombre || p.nombre_variante || p.nombre_producto || '—',
       prenda_nombre: p.nombre_producto || (p.producto_id ? `Producto #${p.producto_id}` : '—'),
-      estado: p.estado === 'pendiente' ? 'CORTE' : p.estado === 'en_produccion' ? 'COSTURA' : p.estado === 'completado' ? 'LISTO' : 'COTIZADO',
+      fase: p.fase || 'corte',
+      estado: (p.fase || 'corte').toUpperCase(),
       estadoReal: p.estado,
-      // PedidoProduccionRead no trae montos (sin join a productos, fuera de alcance);
-      // se mantienen en 0 y el template los oculta para no mostrar $0 mentiroso.
+      cantidad: p.cantidad,
+      cantidad_producida: p.cantidad_producida ?? 0,
+      costo_unitario_snapshot: p.costo_unitario_snapshot ?? null,
+      // PedidoProduccionRead no trae montos de venta (sin join a productos,
+      // fuera de alcance); se mantienen en 0 y el template los oculta para
+      // no mostrar $0 mentiroso.
       precio_venta: 0,
       costo_produccion: 0,
       utilidad_neta: 0,
@@ -62,12 +81,17 @@ async function cargarPedidos() {
   }
 }
 
+function seleccionarFase(fase: string) {
+  filtroFase.value = fase
+  void cargarPedidos()
+}
+
 onMounted(() => {
   cargarPedidos()
 })
 
-// Anti doble-submit por fila: un doble clic en "Siguiente" saltaba etapas
-// (pendiente→en_produccion→completado de una). Terminal = sin transiciones.
+// Anti doble-submit por fila: un doble clic en "Avanzar" enviaba dos PATCH.
+// Terminal = sin transiciones (completado/cancelado del enum legacy).
 const transicionandoId = ref<number | null>(null)
 function estadoRealDe(p: PedidoDisplay): string | undefined {
   return p.estadoReal
@@ -78,7 +102,11 @@ function esTerminal(p: PedidoDisplay): boolean {
 }
 function etapaBadge(p: PedidoDisplay): string {
   if (estadoRealDe(p) === 'cancelado') return 'CANCELADO'
+  if (estadoRealDe(p) === 'completado') return 'LISTO'
   return p.estado
+}
+function tieneCostoSnapshot(p: PedidoDisplay): boolean {
+  return p.costo_unitario_snapshot !== null && p.costo_unitario_snapshot !== undefined
 }
 
 function abrirFichaTaller(p: PedidoDisplay) {
@@ -86,16 +114,9 @@ function abrirFichaTaller(p: PedidoDisplay) {
   showDetallePedidoModal.value = true
 }
 
-const estados: string[] = [
-  'COTIZADO',
-  'RESERVADO',
-  'CORTE',
-  'COSTURA',
-  'ACABADOS',
-  'CALIDAD',
-  'LISTO',
-  'ENTREGADO',
-]
+// Kanban columns = the 5 real workshop phases (backend CHECK
+// ck_pedidos_produccion_fase). Display labels in uppercase.
+const estados: string[] = [...FASES_PRODUCCION.map((f) => f.toUpperCase())]
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 function formatCOP(val: number) {
@@ -119,49 +140,34 @@ function getPedidosPorEstado(est: string) {
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
-// Transiciones dentro del enum del backend (CHECK ck_pedidos_produccion_estado):
-// pendiente -> en_produccion -> completado. Cancelado es terminal.
-const AVANZAR_REAL: Record<string, string> = { pendiente: 'en_produccion', en_produccion: 'completado' }
-const RETROCEDER_REAL: Record<string, string> = { en_produccion: 'pendiente', completado: 'en_produccion' }
-const ETAPA_DISPLAY: Record<string, string> = { pendiente: 'CORTE', en_produccion: 'COSTURA', completado: 'LISTO', cancelado: 'CANCELADO' }
+// Avance secuencial de fase (PATCH /pedidos-produccion/{id} {fase}):
+// corte → costura → acabados → calidad → listo. El backend valida el paso
+// (422 fase inválida, 400 salto/retroceso) y al entrar a 'listo' corre el
+// lote UNA vez (409 atómico con detalle por-insumo). Los mensajes del
+// backend se muestran tal cual, sin reescritura.
+const FASE_DISPLAY: Record<string, string> = {
+  corte: 'CORTE',
+  costura: 'COSTURA',
+  acabados: 'ACABADOS',
+  calidad: 'CALIDAD',
+  listo: 'LISTO',
+}
 
 async function avanzarEstado(pedido: PedidoDisplay) {
   if (transicionandoId.value === pedido.id) return
-  const raw = estadoRealDe(pedido)
-  const next = raw ? AVANZAR_REAL[raw] : undefined
+  const next = siguienteFase(pedido.fase)
   if (!next) {
-    showToast('info', 'Sin transición', raw === 'cancelado' ? `La orden ${pedido.codigo} está cancelada.` : `La orden ${pedido.codigo} ya está en su etapa final.`)
+    showToast('info', 'Sin transición', `La orden ${pedido.codigo} ya está en su fase final (LISTO).`)
     return
   }
   transicionandoId.value = pedido.id
   try {
-    await produccionService.update(pedido.id, { estado: next } as unknown as Record<string, unknown> as never)
+    await produccionService.update(pedido.id, { fase: next })
     await cargarPedidos()
-    showToast('success', 'Etapa Actualizada', `Orden ${pedido.codigo} avanzada a ${ETAPA_DISPLAY[next] ?? next}.`)
+    showToast('success', 'Fase actualizada', `Orden ${pedido.codigo} avanzada a ${FASE_DISPLAY[next] ?? next}.`)
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Error al avanzar estado'
-    showToast('error', 'Error', String(msg))
-  } finally {
-    transicionandoId.value = null
-  }
-}
-
-async function retrocederEstado(pedido: PedidoDisplay) {
-  if (transicionandoId.value === pedido.id) return
-  const raw = estadoRealDe(pedido)
-  const prev = raw ? RETROCEDER_REAL[raw] : undefined
-  if (!prev) {
-    showToast('info', 'Sin transición', `La orden ${pedido.codigo} no puede retroceder desde ${ETAPA_DISPLAY[raw ?? ''] ?? raw ?? 'su estado'}.`)
-    return
-  }
-  transicionandoId.value = pedido.id
-  try {
-    await produccionService.update(pedido.id, { estado: prev } as unknown as Record<string, unknown> as never)
-    await cargarPedidos()
-    showToast('info', 'Etapa Actualizada', `Orden ${pedido.codigo} movida a ${ETAPA_DISPLAY[prev] ?? prev}.`)
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Error al retroceder estado'
-    showToast('error', 'Error', String(msg))
+    // 400/422/409 del backend, verbatim (incluye el detalle por-insumo del 409).
+    showToast('error', 'No se pudo avanzar', extractApiDetail(e))
   } finally {
     transicionandoId.value = null
   }
@@ -187,7 +193,7 @@ function abrirWhatsApp(p: PedidoDisplay) {
           </span>
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">
-          Tablero visual por etapas de confección: Cotizado, Reservado, Corte, Costura, Acabados, Calidad, Listo y Entregado.
+          Tablero por fases de confección: Corte, Costura, Acabados, Calidad y Listo. El avance es secuencial, una fase por vez.
         </p>
       </div>
 
@@ -245,9 +251,31 @@ function abrirWhatsApp(p: PedidoDisplay) {
       </div>
     </div>
 
+    <!-- Fase filter chips → GET /pedidos-produccion?fase= -->
+    <div class="flex flex-wrap gap-1.5">
+      <button
+        type="button"
+        class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition"
+        :class="filtroFase === '' ? 'bg-amber-500 text-stone-950 border-amber-500 shadow' : 'bg-stone-900 text-stone-400 border-stone-800 hover:text-stone-200 hover:border-stone-700'"
+        @click="seleccionarFase('')"
+      >
+        Todas
+      </button>
+      <button
+        v-for="f in FASES_PRODUCCION"
+        :key="f"
+        type="button"
+        class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition uppercase"
+        :class="filtroFase === f ? 'bg-amber-500 text-stone-950 border-amber-500 shadow' : 'bg-stone-900 text-stone-400 border-stone-800 hover:text-stone-200 hover:border-stone-700'"
+        @click="seleccionarFase(f)"
+      >
+        {{ FASE_DISPLAY[f] ?? f }}
+      </button>
+    </div>
+
     <!-- Kanban Board View -->
     <div v-if="viewMode === 'kanban'" class="overflow-x-auto pb-4">
-      <div class="flex gap-4 min-w-[1400px]">
+      <div class="flex gap-4 min-w-[1100px]">
         <div
           v-for="est in estados"
           :key="est"
@@ -305,25 +333,29 @@ function abrirWhatsApp(p: PedidoDisplay) {
                   {{ p.prenda_nombre }}
                 </div>
 
-                <!-- Price & Profit: la API no trae montos, no se muestran -->
+                <!-- Lote: cantidad pedida vs producida + costo snapshot (solo cuando el backend lo trae) -->
+                <div class="text-[11px] text-stone-400 bg-stone-900/60 p-2 rounded border border-stone-800/60 font-mono leading-snug">
+                  <div class="flex justify-between">
+                    <span>Cantidad:</span>
+                    <span class="text-stone-200 font-bold">{{ p.cantidad_producida }}/{{ p.cantidad }} uds</span>
+                  </div>
+                  <div v-if="tieneCostoSnapshot(p)" class="flex justify-between pt-0.5">
+                    <span>Costo unit.:</span>
+                    <span class="text-emerald-400 font-bold">{{ formatCOP(Number(p.costo_unitario_snapshot)) }}</span>
+                  </div>
+                </div>
 
-                <!-- Stage Movement Buttons -->
-                <div class="flex justify-between items-center pt-2 border-t border-stone-800/60">
-                  <button
-                    type="button"
-                    class="text-[11px] text-stone-400 hover:text-stone-200 transition disabled:opacity-30 disabled:cursor-not-allowed"
-                    :disabled="estados.indexOf(p.estado) === 0 || transicionandoId === p.id || esTerminal(p)"
-                    @click="retrocederEstado(p)"
-                  >
-                    ← Anterior
-                  </button>
+                <!-- Price & Profit: la API no trae montos de venta, no se muestran -->
+
+                <!-- Stage Movement: solo avance secuencial (el backend 400 ante retrocesos) -->
+                <div class="flex justify-end items-center pt-2 border-t border-stone-800/60">
                   <button
                     type="button"
                     class="text-[11px] text-amber-400 hover:text-amber-300 font-bold transition disabled:opacity-30 disabled:cursor-not-allowed"
-                    :disabled="estados.indexOf(p.estado) === estados.length - 1 || transicionandoId === p.id || esTerminal(p)"
+                    :disabled="p.estado === 'LISTO' || transicionandoId === p.id || esTerminal(p)"
                     @click="avanzarEstado(p)"
                   >
-                    Siguiente →
+                    Avanzar fase →
                   </button>
                 </div>
               </div>
@@ -365,6 +397,8 @@ function abrirWhatsApp(p: PedidoDisplay) {
                 <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-950/60 text-amber-300 border border-amber-500/30">
                   {{ etapaBadge(p) }}
                 </span>
+                <div class="text-[10px] text-stone-500 font-mono mt-1">{{ p.cantidad_producida }}/{{ p.cantidad }} uds</div>
+                <div v-if="tieneCostoSnapshot(p)" class="text-[10px] text-emerald-400 font-mono">{{ formatCOP(Number(p.costo_unitario_snapshot)) }}/ud</div>
               </td>
               <td class="py-3 px-4 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-2">
@@ -403,6 +437,7 @@ function abrirWhatsApp(p: PedidoDisplay) {
           </div>
           <div class="font-bold text-sm text-stone-100">{{ p.prenda_nombre }}</div>
           <div class="text-sm text-stone-300">{{ p.cliente_nombre }}</div>
+          <div class="text-xs text-stone-500 font-mono">{{ p.cantidad_producida }}/{{ p.cantidad }} uds<span v-if="tieneCostoSnapshot(p)" class="text-emerald-400"> · {{ formatCOP(Number(p.costo_unitario_snapshot)) }}/ud</span></div>
           <div class="flex gap-2 pt-1">
             <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-amber-500 text-stone-950 text-sm font-bold disabled:opacity-30" :disabled="transicionandoId === p.id || esTerminal(p)" @click="avanzarEstado(p)">Avanzar Fase</button>
             <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-emerald-400" title="WhatsApp" @click="abrirWhatsApp(p)"><i class="pi pi-whatsapp text-xs" /></button>
@@ -416,6 +451,7 @@ function abrirWhatsApp(p: PedidoDisplay) {
     <DetallePedidoTallerModal
       v-model:visible="showDetallePedidoModal"
       :pedido="pedidoSeleccionado"
+      @fase-avanzada="cargarPedidos"
     />
   </div>
 </template>

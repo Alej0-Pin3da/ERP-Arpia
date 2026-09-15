@@ -3,6 +3,16 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-15] - Lote por cantidad slice 2 (frontend): stepper de 5 fases + stock visible (ruta directa, sin commit)
+
+- **Alcance:** solo `src/`; backend intacto (slice 1 en 582b113). Sin endpoints nuevos, sin mocks, tipos extendidos sobre los existentes.
+- **Tipos API:** `PedidoProduccionRead` suma `fase` (requerido) + `costo_unitario_snapshot?`; `CreatePayload` suma `fase?`; `ListPedidosProduccionParams` suma `fase?` (`?fase=`). Nuevo `FASES_PRODUCCION` (orden canónico corte→costura→acabados→calidad→listo, espejo del backend), `siguienteFase()` y `extractApiDetail()` (detail string o array de validación, verbatim). `ProductoRead/Update` suman `stock_actual?`.
+- **ProduccionView:** kanban de 8 columnas ficticias → 5 columnas reales (CORTE/COSTURA/ACABADOS/CALIDAD/LISTO) keyed por `fase`; chips de filtro por fase (`Todas` + 5, vía `?fase=`); avance de un paso con `PATCH {fase}` (botón "Avanzar fase →", sin retroceso — el backend lo 400); tarjetas/filas/cards muestran `cantidad_producida/cantidad` + snapshot de costo solo cuando el backend lo trae; errores 400/422/409 en toast con el string del backend tal cual (incluye el detalle por-insumo del 409).
+- **DetallePedidoTallerModal:** nueva sección "Fase de confección & avance de lote" con stepper 1–5, fase actual, lote `producida/cantidad`, snapshot de costo y botón Avanzar con error inline verbatim; emite `fase-avanzada` y el padre recarga. Estados vacíos honestos SOLO para lo que sigue sin endpoint (tiempos por fase, pruebas de calce, anticipos) con nota pendiente.
+- **ProductosView:** badge "📦 N uds stock" por receta solo cuando `stock_actual` está presente. Mocks de `useProduccion.test.ts` acreditados con `fase`.
+- **Verificación:** `npm run build` OK (vite 409 módulos + server bundle); `vitest run src/composables/useProduccion.test.ts` 2/2; eslint en 6 archivos tocados: 9 errores + 2 warnings, todos preexistentes en HEAD (el slice elimina 2: `formatCOP` sin uso y `any` en el map de pedidos). Sin commit (árbol dirty).
+- **Archivos:** `src/views/ProduccionView.vue`, `src/components/atelier/DetallePedidoTallerModal.vue`, `src/views/ProductosView.vue`, `src/services/api/pedidos-produccion.ts`, `src/services/api/productos.ts`, `src/composables/useProduccion.test.ts`.
+
 ### [2026-09-14] - Lote por cantidad slice 1 (backend): fases Corte→Listo + stock por cantidad (ruta directa)
 
 - **Decisión acordada:** stock por columna de cantidad (`Productos.stock_actual`), SIN filas por prenda. `PrendaConfeccionada` intacta.
