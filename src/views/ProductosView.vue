@@ -371,7 +371,7 @@ function solicitarEliminar(r: RecetaDisplay) {
               ⏱️ {{ r.tiempo_confeccion_min ?? '—' }}{{ r.tiempo_confeccion_min ? ' min confección' : '' }}
             </span>
             <span v-if="r.stock_actual !== null && r.stock_actual !== undefined" class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono">
-              📦 {{ r.stock_actual }} uds stock
+              📦 {{ Math.round(Number(r.stock_actual)) }} en stock
             </span>
           </div>
 

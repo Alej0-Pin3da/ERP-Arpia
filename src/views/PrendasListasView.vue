@@ -3,11 +3,14 @@ import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import { usePrendas } from '@/composables/usePrendas'
+import { useProductos } from '@/composables/useProductos'
+import type { ProductoRead } from '@/services/api/productos'
 import EtiquetaPrendaModal from '@/components/atelier/EtiquetaPrendaModal.vue'
 import IngresarPrendaModal from '@/components/atelier/IngresarPrendaModal.vue'
 import { showToast } from '@/utils/toast'
 
 const prendasService = usePrendas()
+const productosService = useProductos()
 const search = ref('')
 
 /** REAL display shape: backend PrendaRead normalized for this view. */
@@ -71,7 +74,54 @@ async function cargarPrendas() {
 
 onMounted(() => {
   cargarPrendas()
+  cargarLotes()
 })
+
+/** LOTE display shape: backend ProductoRead with stock_actual > 0 (new batch flow). */
+interface LoteDisplay {
+  id: number
+  nombre: string
+  codigo: string
+  stock: number
+  precio: number
+}
+
+const lotes = ref<LoteDisplay[]>([])
+
+function toNum(v: number | string | null | undefined): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+async function cargarLotes() {
+  try {
+    const res = await productosService.list({ limit: 100 })
+    lotes.value = res.items
+      .filter((p: ProductoRead) => toNum(p.stock_actual) > 0)
+      .map((p: ProductoRead) => ({
+        id: p.id,
+        nombre: p.nombre,
+        codigo: p.codigo || `PROD-${p.id}`,
+        stock: toNum(p.stock_actual),
+        precio: toNum(p.precio_venta_sugerido),
+      }))
+  } catch (e) {
+    console.error('Error cargando stock por lote:', e)
+  }
+}
+
+const loteFiltrados = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  return lotes.value.filter(
+    (l) =>
+      !q ||
+      l.nombre.toLowerCase().includes(q) ||
+      l.codigo.toLowerCase().includes(q),
+  )
+})
+
+const loteStockTotal = computed(() => lotes.value.reduce((acc, l) => acc + l.stock, 0))
+const loteValorizacion = computed(() => lotes.value.reduce((acc, l) => acc + l.stock * l.precio, 0))
 
 const stockFisico = computed(() => prendas.value.reduce((acc: number, p: any) => acc + (p.fisico_total ?? 1), 0) || prendas.value.length)
 const stockDisponible = computed(() => prendas.value.reduce((acc: number, p: any) => acc + (p.disponible_total ?? (p.estado === 'disponible' ? 1 : 0)), 0))
@@ -112,6 +162,7 @@ function ingresarPrendaModal() {
 
 async function onPrendaIngresada() {
   await cargarPrendas()
+  await cargarLotes()
 }
 </script>
 
@@ -144,8 +195,8 @@ async function onPrendaIngresada() {
       </div>
     </div>
 
-    <!-- 4 KPI Summary Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- 4 KPI Summary Cards (prendas unitarias) + 2 lote cards (stock por lote, unidades separadas) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Prendas Físicas en Perchero</div>
         <div class="text-2xl font-extrabold text-stone-100 mt-2 font-mono">
@@ -177,6 +228,22 @@ async function onPrendaIngresada() {
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Total mercancía a precio venta</div>
       </div>
+
+      <div class="bg-stone-900/80 border border-sky-500/30 rounded-2xl p-4 shadow-md">
+        <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Stock por Lote</div>
+        <div class="text-2xl font-extrabold text-sky-300 mt-2 font-mono">
+          {{ Math.round(loteStockTotal) }} uds
+        </div>
+        <div class="text-[11px] text-stone-400 mt-1">Unidades en Producto.stock_actual</div>
+      </div>
+
+      <div class="bg-stone-900/80 border border-sky-500/30 rounded-2xl p-4 shadow-md">
+        <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Valorización Lote</div>
+        <div class="text-2xl font-extrabold text-sky-300 mt-2 font-mono">
+          {{ formatCOP(loteValorizacion) }}
+        </div>
+        <div class="text-[11px] text-stone-400 mt-1">Stock lote × precio sugerido</div>
+      </div>
     </div>
 
     <!-- Search Input -->
@@ -189,6 +256,94 @@ async function onPrendaIngresada() {
         />
       </span>
     </div>
+
+    <!-- Stock por lote (nuevo flujo batch: Producto.stock_actual, sin filas por prenda) -->
+    <section aria-label="Stock por lote">
+      <div class="flex items-center gap-2.5 flex-wrap mb-3">
+        <h2 class="text-base sm:text-lg font-bold font-serif tracking-wide text-stone-100 m-0">
+          Stock por lote
+        </h2>
+        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-950/80 text-sky-300 border border-sky-500/30 uppercase tracking-wider">
+          {{ Math.round(loteStockTotal) }} uds en {{ loteFiltrados.length }} productos
+        </span>
+      </div>
+      <p class="text-xs sm:text-sm text-stone-400 m-0 mb-3 max-w-2xl">
+        Unidades terminadas por lote de producción (GET /productos · stock_actual). Se consumen en Venta, no generan filas unitarias.
+      </p>
+
+      <div v-if="loteFiltrados.length === 0" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 text-sm text-stone-400">
+        Sin stock por lote — completá un lote en Producción.
+      </div>
+
+      <div v-else class="space-y-4">
+        <!-- Desktop table -->
+        <div class="hidden overflow-x-auto md:block bg-stone-900/80 border border-stone-800 rounded-2xl shadow-lg">
+          <table class="w-full min-w-[640px] text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-stone-800/80 text-stone-400 bg-stone-900/40 uppercase tracking-wider font-semibold">
+                <th class="py-2.5 px-4">Producto</th>
+                <th class="py-2.5 px-4 whitespace-nowrap">Código</th>
+                <th class="py-2.5 px-4 text-center whitespace-nowrap">Stock (uds)</th>
+                <th class="py-2.5 px-4 text-right whitespace-nowrap">Precio sugerido</th>
+                <th class="py-2.5 px-4 text-right whitespace-nowrap">Ficha</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-800/50 text-stone-200 font-mono">
+              <tr v-for="l in loteFiltrados" :key="l.id" class="hover:bg-stone-800/30">
+                <td class="py-2.5 px-4 font-bold text-stone-100 font-sans">{{ l.nombre }}</td>
+                <td class="py-2.5 px-4 text-sky-300 whitespace-nowrap">{{ l.codigo }}</td>
+                <td class="py-2.5 px-4 text-center font-bold text-sky-300 whitespace-nowrap">{{ Math.round(l.stock) }} uds</td>
+                <td class="py-2.5 px-4 text-right text-amber-300 whitespace-nowrap">{{ formatCOP(l.precio) }}</td>
+                <td class="py-2.5 px-4 text-right font-sans whitespace-nowrap">
+                  <RouterLink :to="{ name: 'productos' }" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-950/70 border border-sky-500/40 text-sky-300 hover:text-sky-200 text-xs font-semibold transition" title="Abrir ficha en Productos">
+                    <i class="pi pi-book text-xs" />
+                    <span>Ficha</span>
+                  </RouterLink>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Mobile cards -->
+        <div class="space-y-3 md:hidden">
+          <div v-for="l in loteFiltrados" :key="l.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
+            <div class="flex items-start justify-between gap-2 min-w-0">
+              <div class="font-bold text-sm text-stone-100 min-w-0">{{ l.nombre }}</div>
+              <span class="font-mono text-xs text-sky-300 shrink-0">{{ l.codigo }}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Stock</span>
+              <span class="font-mono font-bold text-sky-300">{{ Math.round(l.stock) }} uds</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-xs uppercase tracking-wider text-stone-400">Precio sugerido</span>
+              <span class="font-mono font-bold text-amber-300">{{ formatCOP(l.precio) }}</span>
+            </div>
+            <RouterLink :to="{ name: 'productos' }" class="flex items-center justify-center min-h-[40px] rounded-lg bg-sky-950/70 border border-sky-500/40 text-sky-300 text-sm font-semibold" title="Abrir ficha en Productos">
+              Ficha
+            </RouterLink>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Prendas unitarias (flujo excepción: muestras/ajustes — 1 fila = 1 prenda) -->
+    <section aria-label="Prendas unitarias">
+      <div class="flex items-center gap-2.5 flex-wrap mb-3">
+        <h2 class="text-base sm:text-lg font-bold font-serif tracking-wide text-stone-100 m-0">
+          Prendas unitarias
+        </h2>
+        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
+          {{ prendasFiltradas.length }} unidades · muestras / ajustes
+        </span>
+      </div>
+      <p class="text-xs sm:text-sm text-stone-400 m-0 mb-3 max-w-2xl">
+        Filas individuales de GET /prendas-confeccionadas (1 fila = 1 prenda). Solo para excepciones: muestras y ajustes.
+      </p>
+
+      <div v-if="prendasFiltradas.length === 0" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 text-sm text-stone-400">
+        Sin prendas unitarias registradas — usá "Ingresar Prenda Confeccionada" solo para muestras o ajustes.
+      </div>
 
     <!-- Garment Cards List with Variant Sub-Tables -->
     <div class="space-y-4">
@@ -330,6 +485,7 @@ async function onPrendaIngresada() {
         </div>
       </div>
     </div>
+    </section>
 
     <!-- Etiqueta Modal -->
     <EtiquetaPrendaModal

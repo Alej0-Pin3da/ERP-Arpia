@@ -3,6 +3,24 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-15] - Stock producto en entero ("N en stock") + prendas lote redondeado
+
+- **Motivo:** el badge mostraba "📦 2.0000 uds stock" porque el backend serializa Numeric como string con 4 decimales; el stock de producto terminado siempre es entero.
+- **Cambio:** `ProductosView.vue` badge → "📦 N en stock" con `Math.round(Number(...))`; `PrendasListasView.vue` sección lote (KPI, header, tabla y cards) redondea con `Math.round`.
+- **Verificación:** `npm run build` OK.
+- **Archivos:** `src/views/ProductosView.vue`, `src/views/PrendasListasView.vue`.
+
+### [2026-09-15] - Prendas: sección "Stock por lote" sobre Producto.stock_actual (ruta directa, sin commit)
+
+- **Alcance:** solo `src/views/PrendasListasView.vue` (+ esta entrada); `backend/` intacto. Sin commits (árbol dirty). Unidad de trabajo: visibilizar el flujo batch en /prendas sin tocar el flujo unitario.
+- **Nueva sección "Stock por lote"** (arriba): `GET /productos?limit=100` vía `useProductos`/`productosApi`, filtra `stock_actual > 0` y renderiza por producto nombre, código, stock uds, precio_venta_sugerido y RouterLink "Ficha" a la ruta `productos` (ProductosView no acepta deep-link por query, el enlace abre el catálogo con su Ficha). Tabla desktop + cards mobile, mismo patrón híbrido de la vista. Buscador compartido filtra ambas secciones.
+- **Sección unitaria intacta** (abajo): misma lista `GET /prendas-confeccionadas`, mismos modales Etiqueta/Ingresar; solo suma header "Prendas unitarias · muestras / ajustes" + nota "1 fila = 1 prenda". `onPrendaIngresada` recarga ambas fuentes. IngresarPrendaModal se conserva para excepciones (muestras/ajustes).
+- **Totales separados:** KPI grid pasa a 6 columnas con 2 cards nuevas (Stock por Lote uds, Valorización Lote = Σ stock × precio sugerido); las 4 cards unitarias existentes no se tocan ni se mezclan unidades.
+- **Vacíos honestos:** sin lote → "Sin stock por lote — completá un lote en Producción"; sin unitarias → mensaje nuevo (antes no había: la lista quedaba vacía en silencio) que dirige a Ingresar solo para muestras/ajustes.
+- **Verificación:** `npm run build` OK (vite + server bundle, 3.24s); `npx vitest run src/composables/usePrendas.test.ts src/composables/useProduccion.test.ts` 4/4. Sin commit (árbol dirty).
+- **Archivos:** `src/views/PrendasListasView.vue` (+158/−2).
+- **Rollback:** revertir ese archivo devuelve /prendas a solo filas unitarias; el backend 0030 y Producción quedan sin cambios.
+
 ### [2026-09-15] - Lote por cantidad slice 4 (frontend): tiempos reales por fase en ficha de taller (ruta directa, sin commit)
 
 - **Alcance:** solo `src/` (+ esta entrada); `backend/` intacto (slice 3 en 1c25a87). Sin commits (árbol dirty). Unidad de trabajo: UI de tiempos por fase sobre los endpoints de la migración 0031.
