@@ -3,32 +3,26 @@
 import { computed, ref, onMounted } from 'vue'
 import { useInsumos } from '@/composables/useInsumos'
 import { useProduccion } from '@/composables/useProduccion'
-import { usePrendas } from '@/composables/usePrendas'
 import { useProductos } from '@/composables/useProductos'
 
 const insumosApi = useInsumos()
 const produccionApi = useProduccion()
-const prendasApi = usePrendas()
 const productosApi = useProductos()
 const insumos = ref<any[]>([])
 const pedidos = ref<any[]>([])
-const prendas = ref<any[]>([])
 async function cargarAnalisis() {
   try {
-    const [ir, pr, prr] = await Promise.all([
+    const [ir, pr] = await Promise.all([
       insumosApi.list({ limit: 100 }),
       produccionApi.list({ limit: 100 }),
-      prendasApi.list({ limit: 100 }),
     ])
     insumos.value = (ir as any).items ?? []
     pedidos.value = (pr as any).items ?? []
-    prendas.value = (prr as any).items ?? []
   } catch {}
 }
 onMounted(() => { void cargarAnalisis(); void cargarProductosAnalisis() })
 
 const pedidosSrc = computed(() => (pedidos.value as any[]))
-const prendasSrc = computed(() => (prendas.value as any[]))
 const insumosAlertasCount = computed(() => (insumos.value as any[]).filter((i: any) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)).length)
 const productosAnalisis = ref<any[]>([])
 async function cargarProductosAnalisis() {
@@ -58,8 +52,8 @@ const esEnProceso = (e: unknown) =>
 const metricas = computed(() => {
   const pedidosCompletados = pedidosSrc.value.filter((p: any) => esCompletado(p.estado)).length
   const pedidosEnProceso = pedidosSrc.value.filter((p: any) => esEnProceso(p.estado)).length
-  // PrendaRead no trae `vendida`; el stock es estado === 'disponible'.
-  const stockPrendas = prendasSrc.value.filter((p: any) => p.estado === 'disponible').length
+  // TODO LOTE: stock = Σ Producto.stock_actual (productosAnalisis ya cargado); las filas unitarias no alimentan nada.
+  const stockPrendas = productosAnalisis.value.reduce((acc: number, p: any) => acc + (Number(p.stock_actual ?? 0) || 0), 0)
   const insumosAlertas = insumosAlertasCount.value
 
   return {
@@ -96,7 +90,7 @@ function formatCOP(v: number): string {
         <div class="text-2xl font-serif font-bold text-emerald-400 mt-1">{{ metricas.pedidosCompletados }}</div>
       </div>
       <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-4">
-        <div class="text-xs font-mono text-stone-400">Prendas en Showroom</div>
+        <div class="text-xs font-mono text-stone-400">Unidades en Stock (lote)</div>
         <div class="text-2xl font-serif font-bold text-stone-200 mt-1">{{ metricas.stockPrendas }}</div>
       </div>
       <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-4">
