@@ -24,6 +24,10 @@ export interface PedidoProduccionRead {
   updated_at: string
   // Unit-cost snapshot taken once at lot completion (null until then).
   costo_unitario_snapshot?: number | string | null
+  // Real labor/energy cost derived at read time from TiempoFase rows x
+  // global rates (null/undefined while no tiempos are logged — "no data").
+  mano_obra_real?: number | string | null
+  energia_real?: number | string | null
   nombre_producto?: string | null
   nombre_variante?: string | null
   cliente_nombre?: string | null
@@ -133,4 +137,74 @@ export async function updatePedidoProduccion(
 
 export async function deletePedidoProduccion(id: number): Promise<void> {
   await client.delete(`/pedidos-produccion/${id}`)
+}
+
+/**
+ * Real-time logging (backend FASES_TIEMPO_ORDEN, migración 0031): one row per
+ * (pedido, fase). `listo` closes the lot and is never logged. Money
+ * (costo_mano_obra/costo_energia) is derived at read time, never stored.
+ */
+export const FASES_TIEMPO: readonly string[] = [
+  'corte',
+  'costura',
+  'acabados',
+  'calidad',
+]
+
+export interface TiempoFaseRead {
+  id: number
+  pedido_id: number
+  fase: string
+  operaria: string
+  minutos_reales: number | string
+  fecha: string
+  costo_mano_obra?: number | string | null
+  costo_energia?: number | string | null
+}
+
+export interface TiemposListRead {
+  items: TiempoFaseRead[]
+  total_minutos: number | string
+  total_mano_obra: number | string
+  total_energia: number | string
+}
+
+export interface TiempoFaseCreatePayload {
+  fase: string
+  operaria: string
+  minutos_reales: number
+  fecha?: string
+}
+
+export interface TiempoFaseUpdatePayload {
+  operaria?: string
+  minutos_reales?: number
+}
+
+export async function listTiemposPedido(pedidoId: number): Promise<TiemposListRead> {
+  const { data } = await client.get<TiemposListRead>(`/pedidos-produccion/${pedidoId}/tiempos`)
+  return data
+}
+
+export async function createTiempoPedido(
+  pedidoId: number,
+  payload: TiempoFaseCreatePayload,
+): Promise<TiempoFaseRead> {
+  const { data } = await client.post<TiempoFaseRead>(
+    `/pedidos-produccion/${pedidoId}/tiempos`,
+    payload,
+  )
+  return data
+}
+
+export async function updateTiempoPedido(
+  pedidoId: number,
+  tiempoId: number,
+  payload: TiempoFaseUpdatePayload,
+): Promise<TiempoFaseRead> {
+  const { data } = await client.patch<TiempoFaseRead>(
+    `/pedidos-produccion/${pedidoId}/tiempos/${tiempoId}`,
+    payload,
+  )
+  return data
 }

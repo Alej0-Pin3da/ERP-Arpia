@@ -33,6 +33,8 @@ interface PedidoDisplay {
   cantidad: number
   cantidad_producida: number
   costo_unitario_snapshot?: number | string | null
+  mano_obra_real?: number | string | null
+  energia_real?: number | string | null
   precio_venta: number
   costo_produccion: number
   utilidad_neta: number
@@ -66,6 +68,8 @@ async function cargarPedidos() {
       cantidad: p.cantidad,
       cantidad_producida: p.cantidad_producida ?? 0,
       costo_unitario_snapshot: p.costo_unitario_snapshot ?? null,
+      mano_obra_real: p.mano_obra_real ?? null,
+      energia_real: p.energia_real ?? null,
       // PedidoProduccionRead no trae montos de venta (sin join a productos,
       // fuera de alcance); se mantienen en 0 y el template los oculta para
       // no mostrar $0 mentiroso.
@@ -107,6 +111,13 @@ function etapaBadge(p: PedidoDisplay): string {
 }
 function tieneCostoSnapshot(p: PedidoDisplay): boolean {
   return p.costo_unitario_snapshot !== null && p.costo_unitario_snapshot !== undefined
+}
+// Real labor/energy cost derived from TiempoFase rows — only when the backend brings it.
+function tieneCostosReales(p: PedidoDisplay): boolean {
+  return (
+    (p.mano_obra_real !== null && p.mano_obra_real !== undefined) ||
+    (p.energia_real !== null && p.energia_real !== undefined)
+  )
 }
 
 function abrirFichaTaller(p: PedidoDisplay) {
@@ -343,6 +354,14 @@ function abrirWhatsApp(p: PedidoDisplay) {
                     <span>Costo unit.:</span>
                     <span class="text-emerald-400 font-bold">{{ formatCOP(Number(p.costo_unitario_snapshot)) }}</span>
                   </div>
+                  <div v-if="tieneCostosReales(p)" class="flex justify-between pt-0.5">
+                    <span>Mano obra real:</span>
+                    <span class="text-sky-300 font-bold">{{ p.mano_obra_real !== null && p.mano_obra_real !== undefined ? formatCOP(Number(p.mano_obra_real)) : '—' }}</span>
+                  </div>
+                  <div v-if="tieneCostosReales(p)" class="flex justify-between pt-0.5">
+                    <span>Energía real:</span>
+                    <span class="text-sky-300 font-bold">{{ p.energia_real !== null && p.energia_real !== undefined ? formatCOP(Number(p.energia_real)) : '—' }}</span>
+                  </div>
                 </div>
 
                 <!-- Price & Profit: la API no trae montos de venta, no se muestran -->
@@ -399,6 +418,7 @@ function abrirWhatsApp(p: PedidoDisplay) {
                 </span>
                 <div class="text-[10px] text-stone-500 font-mono mt-1">{{ p.cantidad_producida }}/{{ p.cantidad }} uds</div>
                 <div v-if="tieneCostoSnapshot(p)" class="text-[10px] text-emerald-400 font-mono">{{ formatCOP(Number(p.costo_unitario_snapshot)) }}/ud</div>
+                <div v-if="tieneCostosReales(p)" class="text-[10px] text-sky-300 font-mono">MO real {{ p.mano_obra_real !== null && p.mano_obra_real !== undefined ? formatCOP(Number(p.mano_obra_real)) : '—' }} · E {{ p.energia_real !== null && p.energia_real !== undefined ? formatCOP(Number(p.energia_real)) : '—' }}</div>
               </td>
               <td class="py-3 px-4 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-2">
@@ -437,7 +457,7 @@ function abrirWhatsApp(p: PedidoDisplay) {
           </div>
           <div class="font-bold text-sm text-stone-100">{{ p.prenda_nombre }}</div>
           <div class="text-sm text-stone-300">{{ p.cliente_nombre }}</div>
-          <div class="text-xs text-stone-500 font-mono">{{ p.cantidad_producida }}/{{ p.cantidad }} uds<span v-if="tieneCostoSnapshot(p)" class="text-emerald-400"> · {{ formatCOP(Number(p.costo_unitario_snapshot)) }}/ud</span></div>
+          <div class="text-xs text-stone-500 font-mono">{{ p.cantidad_producida }}/{{ p.cantidad }} uds<span v-if="tieneCostoSnapshot(p)" class="text-emerald-400"> · {{ formatCOP(Number(p.costo_unitario_snapshot)) }}/ud</span><span v-if="tieneCostosReales(p)" class="text-sky-300"> · MO {{ p.mano_obra_real !== null && p.mano_obra_real !== undefined ? formatCOP(Number(p.mano_obra_real)) : '—' }}</span></div>
           <div class="flex gap-2 pt-1">
             <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-amber-500 text-stone-950 text-sm font-bold disabled:opacity-30" :disabled="transicionandoId === p.id || esTerminal(p)" @click="avanzarEstado(p)">Avanzar Fase</button>
             <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-emerald-400" title="WhatsApp" @click="abrirWhatsApp(p)"><i class="pi pi-whatsapp text-xs" /></button>
@@ -452,6 +472,7 @@ function abrirWhatsApp(p: PedidoDisplay) {
       v-model:visible="showDetallePedidoModal"
       :pedido="pedidoSeleccionado"
       @fase-avanzada="cargarPedidos"
+      @tiempos-actualizados="cargarPedidos"
     />
   </div>
 </template>
