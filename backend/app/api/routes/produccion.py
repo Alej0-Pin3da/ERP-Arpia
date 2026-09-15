@@ -414,7 +414,8 @@ def delete_pedido(
 
 # --- Tiempos por fase (nested) ---
 # One row per (pedido, fase): POST creates, PATCH corrects minutes/operaria.
-# Money is derived at read time (minutos x global rates), never stored.
+# Money is derived at read time (mano: minutos x global rate, all phases;
+# energia: minutos x global rate, 'costura' only, 0 otherwise), never stored.
 
 
 def _tiempo_to_read(
@@ -422,7 +423,13 @@ def _tiempo_to_read(
 ) -> TiempoFaseRead:
     res = TiempoFaseRead.model_validate(tiempo)
     res.costo_mano_obra = tiempo.minutos_reales * tasa_mano
-    res.costo_energia = tiempo.minutos_reales * tasa_energia
+    # ENERGY only in 'costura' (sewing machines); corte/acabados/calidad
+    # are manual — zero energy. Labor counts every phase.
+    res.costo_energia = (
+        tiempo.minutos_reales * tasa_energia
+        if tiempo.fase == "costura"
+        else Decimal("0")
+    )
     return res
 
 

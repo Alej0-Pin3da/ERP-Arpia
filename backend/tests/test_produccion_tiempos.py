@@ -1,13 +1,18 @@
 """Tiempos por fase: tarifa global de energia + minutos reales por fase.
 
+Regla ENERGY: solo la fase 'costura' (maquinas) genera costo de energia;
+corte/acabados/calidad son manuales (costo_energia 0). La mano de obra y
+los minutos cuentan TODAS las fases.
+
 - PATCH /maestros/parametros-costeo acepta `costo_minuto_energia` (>= 0).
 - POST /pedidos-produccion/{id}/tiempos crea un renglon por fase con costos
-  derivados (minutos x tasas globales); el segundo POST de la misma fase es
-  409 y PATCH corrige minutos/operaria.
+  derivados (mano: minutos x tasa global, todas las fases; energia:
+  minutos x tasa global solo en costura); el segundo POST de la misma fase
+  es 409 y PATCH corrige minutos/operaria.
 - Validacion de orden: no se puede registrar una fase por delante del pedido
   (400), `listo`/desconocidas son 422.
-- El cierre del lote incluye mano_obra_real + energia_real y NO toca los
-  estimados manuales Producto.mano_obra/cif_energia.
+- El cierre del lote incluye mano_obra_real (todas) + energia_real (costura)
+  y NO toca los estimados manuales Producto.mano_obra/cif_energia.
 """
 
 import uuid
@@ -213,9 +218,9 @@ def test_crear_tiempo_y_totales(client, admin_token):
         assert row["operaria"] == "Ana"
         assert Decimal(str(row["minutos_reales"])) == Decimal("30")
         assert row["fecha"] == date.today().isoformat()
-        # 30 min x 100 mano, 30 min x 10 energia.
+        # 30 min x 100 mano; corte es manual -> energia 0.
         assert Decimal(str(row["costo_mano_obra"])) == Decimal("3000")
-        assert Decimal(str(row["costo_energia"])) == Decimal("300")
+        assert Decimal(str(row["costo_energia"])) == Decimal("0")
 
         resp = client.get(
             f"/api/v1/pedidos-produccion/{pedido_id}/tiempos", headers=headers
@@ -225,13 +230,64 @@ def test_crear_tiempo_y_totales(client, admin_token):
         assert len(body["items"]) == 1
         assert Decimal(str(body["total_minutos"])) == Decimal("30")
         assert Decimal(str(body["total_mano_obra"])) == Decimal("3000")
-        assert Decimal(str(body["total_energia"])) == Decimal("300")
+        assert Decimal(str(body["total_energia"])) == Decimal("0")
 
         # Unknown pedido is 404.
         assert (
             client.get("/api/v1/pedidos-produccion/999999/tiempos", headers=headers).status_code
             == 404
         )
+    finally:
+        _fijar_tasas(
+            client, headers, str(prev["costo_minuto_costura"]), str(prev["costo_minuto_energia"])
+        )
+        _cleanup(producto_id, insumo_id, tipo_id, cat_id)
+
+
+def test_energia_solo_costura(client, admin_token):
+    """ENERGY solo en costura: corte 30min + costura 60min.
+
+    Energia = 60 x tasa_energia (solo costura); mano = 90 x tasa_costura
+    (todas las fases); minutos = 90 (es tiempo). El pedido expone los
+    mismos totales via mano_obra_real/energia_real.
+    """
+    cat_id, insumo_id, tipo_id, producto_id = _setup()
+    headers = _auth(admin_token)
+    prev = _tasas_actuales(client, headers)
+    try:
+        _fijar_tasas(client, headers, "100", "10")
+        pedido_id = _crear_pedido(client, headers, producto_id)
+        url = f"/api/v1/pedidos-produccion/{pedido_id}/tiempos"
+
+        resp = client.post(
+            url,
+            json={"fase": "corte", "operaria": "Ana", "minutos_reales": "30"},
+            headers=headers,
+        )
+        assert resp.status_code == 201, resp.text
+        assert Decimal(str(resp.json()["costo_mano_obra"])) == Decimal("3000")
+        assert Decimal(str(resp.json()["costo_energia"])) == Decimal("0")
+
+        assert _avanzar(client, headers, pedido_id, "costura").status_code == 200
+        resp = client.post(
+            url,
+            json={"fase": "costura", "operaria": "Bea", "minutos_reales": "60"},
+            headers=headers,
+        )
+        assert resp.status_code == 201, resp.text
+        assert Decimal(str(resp.json()["costo_mano_obra"])) == Decimal("6000")
+        assert Decimal(str(resp.json()["costo_energia"])) == Decimal("600")
+
+        body = client.get(url, headers=headers).json()
+        assert Decimal(str(body["total_minutos"])) == Decimal("90")
+        assert Decimal(str(body["total_mano_obra"])) == Decimal("9000")
+        assert Decimal(str(body["total_energia"])) == Decimal("600")
+
+        body = client.get(
+            f"/api/v1/pedidos-produccion/{pedido_id}", headers=headers
+        ).json()
+        assert Decimal(str(body["mano_obra_real"])) == Decimal("9000")
+        assert Decimal(str(body["energia_real"])) == Decimal("600")
     finally:
         _fijar_tasas(
             client, headers, str(prev["costo_minuto_costura"]), str(prev["costo_minuto_energia"])
@@ -278,7 +334,8 @@ def test_tiempo_duplicado_409_y_patch_corrige(client, admin_token):
         assert resp.status_code == 200, resp.text
         assert resp.json()["operaria"] == "Bea"
         assert Decimal(str(resp.json()["costo_mano_obra"])) == Decimal("2000")
-        assert Decimal(str(resp.json()["costo_energia"])) == Decimal("200")
+        # Corte es manual: energia 0 aunque haya minutos.
+        assert Decimal(str(resp.json()["costo_energia"])) == Decimal("0")
         # Non-positive minutes are rejected by the schema.
         resp = client.patch(
             f"{url}/{tiempo_id}", json={"minutos_reales": "0"}, headers=headers
@@ -368,9 +425,9 @@ def test_cierre_incluye_totales_reales_sin_tocar_estimados(client, admin_token):
         resp = _avanzar(client, headers, pedido_id, "listo")
         assert resp.status_code == 200, resp.text
         body = resp.json()
-        # 225 min x 100 mano, 225 min x 10 energia — additive info only.
+        # 225 min x 100 mano (todas las fases); energia solo costura 120 x 10.
         assert Decimal(str(body["mano_obra_real"])) == Decimal("22500")
-        assert Decimal(str(body["energia_real"])) == Decimal("2250")
+        assert Decimal(str(body["energia_real"])) == Decimal("1200")
         # Manual estimates on Producto stay exactly as set.
         db = SessionLocal()
         try:
@@ -386,7 +443,7 @@ def test_cierre_incluye_totales_reales_sin_tocar_estimados(client, admin_token):
             f"/api/v1/pedidos-produccion/{pedido_id}", headers=headers
         ).json()
         assert Decimal(str(body["mano_obra_real"])) == Decimal("22500")
-        assert Decimal(str(body["energia_real"])) == Decimal("2250")
+        assert Decimal(str(body["energia_real"])) == Decimal("1200")
     finally:
         _fijar_tasas(
             client, headers, str(prev["costo_minuto_costura"]), str(prev["costo_minuto_energia"])

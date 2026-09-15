@@ -11,9 +11,10 @@ When the order reaches the end of the line (``fase == 'listo'`` or
 4. ``Producto.stock_actual += N`` (NULL treated as 0 for legacy rows).
 5. Unit-cost snapshot via ``calcular_costo_produccion`` into the lot record
    (``pedido.costo_unitario_snapshot``) + ``cantidad_producida = cantidad``.
-6. Additive real-cost info (``mano_obra_real``/``energia_real`` from
-   TiempoFase rows x global rates) returned for the response — manual
-   ``Producto.mano_obra``/``cif_energia`` estimates are never overwritten.
+6. Additive real-cost info (``mano_obra_real`` from all TiempoFase rows and
+    ``energia_real`` from 'costura' rows only x global rates) returned for
+    the response — manual ``Producto.mano_obra``/``cif_energia`` estimates
+    are never overwritten.
 
 No commit here — the caller (PATCH /pedidos-produccion/{id}) owns the single
 commit, mirroring the ``descontar_stock`` convention. No per-garment
@@ -128,6 +129,9 @@ def totales_tiempos(db: Session, pedido_id: int) -> dict[str, Decimal]:
     """Read-time real-cost totals for a lot (no persistence, no estimates touched).
 
     Returns minutos/mano/energia as Decimal; all zero when no rows exist.
+    ENERGY applies ONLY to fase 'costura' (sewing machines): corte,
+    acabados and calidad are manual work with zero energy. Labor (mano de
+    obra) counts ALL phases; minutos counts ALL phases (it is time).
     Callers map all-zero to ``None`` on response models so "no data" stays
     distinguishable from "zero minutes worked".
     """
@@ -136,10 +140,13 @@ def totales_tiempos(db: Session, pedido_id: int) -> dict[str, Decimal]:
     ).all()
     tasa_mano, tasa_energia = tasas_costeo(db)
     minutos = sum((r.minutos_reales for r in rows), Decimal("0"))
+    minutos_costura = sum(
+        (r.minutos_reales for r in rows if r.fase == "costura"), Decimal("0")
+    )
     return {
         "minutos_totales": minutos,
         "mano_obra_real": minutos * tasa_mano,
-        "energia_real": minutos * tasa_energia,
+        "energia_real": minutos_costura * tasa_energia,
     }
 
 
@@ -152,8 +159,8 @@ def completar_lote(db: Session, pedido: PedidoProduccion) -> dict[str, Decimal]:
     on missing producto/insumo. No commit — caller owns the transaction.
 
     Returns the unit-cost snapshot plus the additive real-cost info
-    (mano_obra_real/energia_real from TiempoFase rows x global rates, zero
-    when no tiempos exist). Producto.mano_obra/cif_energia are NEVER
+    (mano_obra_real from all TiempoFase rows, energia_real from 'costura'
+    rows only, x global rates, zero when no tiempos exist). Producto.mano_obra/cif_energia are NEVER
     overwritten here — manual estimates stay; the totals let a later slice
     propose updating them.
     """

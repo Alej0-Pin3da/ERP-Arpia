@@ -3,6 +3,18 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-15] - Energía SOLO en costura: corte/acabados/calidad manuales (backend, ruta directa, sin commit)
+
+- **Regla acordada:** ENERGY aplica SOLO a la fase `costura` (máquinas). `corte`/`acabados`/`calidad` son manuales — energía cero. Mano de obra cuenta TODAS las fases; `total_minutos` cuenta TODAS (es tiempo).
+- **Backend `app/services/produccion.py::totales_tiempos`:** `energia_real` = minutos de filas `costura` × `tasa_energia`; `mano_obra_real` = minutos totales × `tasa_mano` (sin cambio); `minutos_totales` = todas las fases (sin cambio). `completar_lote` y `_pedido_to_read` heredan la regla vía `totales_tiempos` (mano_obra_real/energia_real del pedido, cierre y GET). Docstrings del módulo y de `completar_lote` acreditados.
+- **Backend `app/api/routes/produccion.py::_tiempo_to_read`:** per-row `costo_energia` = minutos × tasa SOLO si `fase == 'costura'`, si no `Decimal("0")`; `costo_mano_obra` sin cambio (todas). `total_energia` del GET /tiempos suma los per-row → costura-only automático. Comentario del bloque tiempos acreditado.
+- **Backend `app/schemas/produccion.py`:** solo comentarios (Read/List: mano todas las fases, energía solo costura). Sin cambios de forma.
+- **Frontend:** SIN cambios — renderiza los totales del backend. Nota: la energía unitaria aplicada al producto ahora viene solo de costura.
+- **Tests `backend/tests/test_produccion_tiempos.py`:** existentes migrados (corte 30min → energía 0; PATCH corte 40min → energía 0; cierre 60+120+30+15 → mano 22500, energía 1200 ex-2250) + nuevo `test_energia_solo_costura` (corte 30 + costura 60, tasas 100/10 → per-row 0/600, totales 90min/9000/600, pedido GET igual). Docstring del archivo con la regla.
+- **Verificación:** `configure_mappers()` OK; `pytest tests/test_produccion_tiempos.py` 7/7; regresión `test_produccion_lote.py + test_maestros_parametros.py` 13/13. Sin commit (árbol dirty; `src/` con cambios previos ajenos a este slice, intactos).
+- **Archivos:** `backend/app/services/produccion.py`, `backend/app/api/routes/produccion.py`, `backend/app/schemas/produccion.py` (comentarios), `backend/tests/test_produccion_tiempos.py`.
+- **Rollback:** `git checkout -- backend/app/services/produccion.py backend/app/api/routes/produccion.py backend/app/schemas/produccion.py backend/tests/test_produccion_tiempos.py` (más esta entrada).
+
 ### [2026-09-15] - Etiqueta print en rollo 80mm (@page 80mm, márgenes 0)
 
 - **Motivo:** al imprimir, la etiqueta se estiraba al ancho de hoja normal con márgenes grandes; los fondos oscuros se perdían.
@@ -1385,3 +1397,15 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Auditoria global:** 35 `__tablename__` en `backend/app/models/*.py` vs 38 `ForeignKey("...")` en modelos. Los otros 35 FK coinciden exacto (case-sensitive) con su tabla: `Tipos_Producto`, `Insumos`, `BOM_Insumos`, `BOM_Productos`, `pedidos_produccion`, `Ventas`, `Detalle_Ventas`, `Devoluciones`, `Items_Devolucion`, `Usuarios`, `Clientes`, `Socios_Configuracion`, `liquidaciones`, `Categorias_Insumos`, `maestros_proveedores`, etc. `DDL.sql` (32 `CREATE TABLE`) coincide con los modelos. Cero casos ambiguos (ninguna FK apunta a tabla realmente inexistente); nada mas que corregir.
 - **Reproduccion `PUT /api/v1/productos/2`:** el handler crea `PrecioVersion`/`CostoVersion` en la misma transaccion (versionado desde 2026-09-02); con el FK en minuscula, `configure_mappers()` / el flush lanzaba `NoReferencedTableError: productos` y el PUT fallaba con 500. Tras el fix, `configure_mappers()` pasa y el versionado persiste.
 - Verificacion: `py_compile` OK + `configure_mappers()` MAPPERS_OK (importa los 12 modulos de modelos). `pytest -k "producto or audit or version"` no corre en este entorno (requiere Postgres en 127.0.0.1:5433, caido) — fallo `OperationalError`, no relacionado al cambio. Sin commit (working tree dirty a proposito).
+
+### [2026-09-15] - Aplicar costos reales del lote al producto (ficha de taller, ruta directa, sin commit)
+
+- **Problema verificado:** /produccion registra tiempos reales con totales (mano_obra_real/energia_real por pedido), pero /productos muestra `Producto.mano_obra/cif_energia` manuales (a menudo 0) — el costo real nunca llegaba al producto.
+- **Alcance:** solo `src/` (+ esta entrada); `backend/` intacto (`PUT /productos/{id}` ya existe vía `updateProducto`). Sin commits (árbol dirty). Nada automático: solo acción explícita del usuario.
+- **`src/utils/costeo.ts` (nuevo) + `src/utils/costeo.test.ts` (nuevo):** `calcularCostosUnitarios(totales, unidades)` — totales del lote / N → `{mano_obra, cif_energia, tiempo_confeccion_min}`; `$` con round2 (`Math.round(v*100)/100`), minutos con `Math.round`; acepta strings Numeric del backend; `null` con N<=0/NaN/faltante.
+- **`src/components/atelier/DetallePedidoTallerModal.vue`:** `PedidoTallerDetalle` suma `producto_id?`; bloque "Costeo real → producto" tras el footer de totales — visible solo con totales cargados (`tiempos.length>0` + totales no null) y producto vinculado; N = `cantidad_producida>0 ? cantidad_producida : cantidad`; N=0/missing → botón deshabilitado con `title` explicativo (no se oculta: el title es la explicación). Click: preview por unidad + `window.confirm` con los valores computados, luego `PUT {mano_obra, cif_energia, tiempo_confeccion_min}`; error verbatim en el box de la sección (`extractApiDetail` + toast error); éxito con toast + emit `costos-aplicados`.
+- **`src/views/ProduccionView.vue`:** `PedidoDisplay` arrastra `producto_id` (antes se perdía en el mapping) y escucha `@costos-aplicados="cargarPedidos"`.
+- **Payload math:** `mano_obra = round2(total_mano_obra/N)`, `cif_energia = round2(total_energia/N)`, `tiempo_confeccion_min = round(total_minutos/N)`.
+- **Verificación:** `npx vitest run src/utils/costeo.test.ts src/composables/useProduccion.test.ts src/composables/usePrendas.test.ts` 9/9; `npm run build` OK (vite 3.32s + server bundle); `eslint` en los 4 archivos tocados limpio salvo 2 errores + 2 warnings pre-existentes en HEAD (verificado con `git stash`: `pruebasCalce`/`generarReciboAnticipo` sin uso, `eslint-disable` sobrantes). Sin commit (árbol dirty).
+- **Archivos:** `src/utils/costeo.ts` (nuevo), `src/utils/costeo.test.ts` (nuevo), `src/components/atelier/DetallePedidoTallerModal.vue`, `src/views/ProduccionView.vue`.
+- **Rollback:** `git checkout -- src/components/atelier/DetallePedidoTallerModal.vue src/views/ProduccionView.vue` + `git clean -f src/utils/costeo.ts src/utils/costeo.test.ts`.
