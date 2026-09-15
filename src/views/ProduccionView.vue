@@ -30,6 +30,7 @@ interface PedidoDisplay {
   fase: string
   estado: string
   estadoReal?: string
+  producto_id: number | null
   cantidad: number
   cantidad_producida: number
   costo_unitario_snapshot?: number | string | null
@@ -65,6 +66,7 @@ async function cargarPedidos() {
       fase: p.fase || 'corte',
       estado: (p.fase || 'corte').toUpperCase(),
       estadoReal: p.estado,
+      producto_id: p.producto_id ?? null,
       cantidad: p.cantidad,
       cantidad_producida: p.cantidad_producida ?? 0,
       costo_unitario_snapshot: p.costo_unitario_snapshot ?? null,
@@ -473,6 +475,7 @@ function abrirWhatsApp(p: PedidoDisplay) {
       :pedido="pedidoSeleccionado"
       @fase-avanzada="cargarPedidos"
       @tiempos-actualizados="cargarPedidos"
+      @costos-aplicados="cargarPedidos"
     />
   </div>
 </template>

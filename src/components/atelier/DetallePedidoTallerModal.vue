@@ -14,6 +14,8 @@ import {
   updateTiempoPedido,
 } from '@/services/api/pedidos-produccion'
 import type { TiempoFaseRead } from '@/services/api/pedidos-produccion'
+import { updateProducto } from '@/services/api/productos'
+import { calcularCostosUnitarios } from '@/utils/costeo'
 
 /** Minimal pedido shape this modal reads (REAL display object from the caller). */
 export interface PedidoTallerDetalle {
@@ -22,6 +24,8 @@ export interface PedidoTallerDetalle {
   cliente_nombre: string
   prenda_nombre: string
   estado: string
+  // FK al producto (se usa para aplicarle los costos reales prorrateados).
+  producto_id?: number | null
   // Workshop phase + lot data (backend migración 0030; null-safe for legacy rows).
   fase?: string | null
   cantidad?: number | null
@@ -43,6 +47,7 @@ const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
   (e: 'fase-avanzada', fase: string): void
   (e: 'tiempos-actualizados'): void
+  (e: 'costos-aplicados'): void
 }>()
 
 // Tiempos reales por fase (backend GET/POST/PATCH
@@ -88,6 +93,88 @@ const tieneEnergiaReal = computed(
     props.pedido?.energia_real !== null &&
     props.pedido?.energia_real !== undefined,
 )
+
+// Aplicar costos reales al producto (PUT /productos/{id}, acción explícita):
+// prorratea los totales del lote a valores unitarios y los escribe en
+// Producto.mano_obra / cif_energia / tiempo_confeccion_min. Nada automático.
+const aplicandoCostos = ref(false)
+
+// Unidades base N: producidas si hay avance, si no la cantidad pedida.
+const unidadesBase = computed(() => {
+  const prod = Number(props.pedido?.cantidad_producida ?? 0)
+  if (Number.isFinite(prod) && prod > 0) return prod
+  const cant = Number(props.pedido?.cantidad ?? 0)
+  return Number.isFinite(cant) && cant > 0 ? cant : 0
+})
+
+// Totales cargados del GET .../tiempos (null = sin datos; 0 inicial = aún no cargó).
+const tieneTotales = computed(
+  () =>
+    tiempos.value.length > 0 &&
+    totalManoObra.value !== null &&
+    totalManoObra.value !== undefined &&
+    totalEnergia.value !== null &&
+    totalEnergia.value !== undefined,
+)
+const tieneProducto = computed(
+  () => props.pedido?.producto_id !== null && props.pedido?.producto_id !== undefined,
+)
+// Visible solo con totales reales + producto vinculado; N=0/missing →
+// deshabilitado con title que explica por qué (no se oculta: el title es
+// la explicación).
+const mostrarAplicarCostos = computed(() => tieneTotales.value && tieneProducto.value)
+const costosUnitarios = computed(() =>
+  calcularCostosUnitarios(
+    { manoObra: totalManoObra.value, energia: totalEnergia.value, minutos: totalMinutos.value },
+    unidadesBase.value,
+  ),
+)
+const motivoBloqueoCostos = computed(() => {
+  if (unidadesBase.value <= 0)
+    return 'Sin unidades base para prorratear: cantidad producida y cantidad son 0 o faltan.'
+  return null
+})
+
+async function aplicarCostosAlProducto() {
+  if (!props.pedido?.producto_id || aplicandoCostos.value) return
+  const perUnit = costosUnitarios.value
+  if (!perUnit) {
+    showToast('warn', 'Sin unidades base', motivoBloqueoCostos.value ?? 'No se puede prorratear.')
+    return
+  }
+  const n = unidadesBase.value
+  const ok = window.confirm(
+    `Aplicar costos reales al producto?\n\n` +
+      `Mano de obra: $${perUnit.mano_obra.toLocaleString('es-CO')} /ud\n` +
+      `CIF / Energía: $${perUnit.cif_energia.toLocaleString('es-CO')} /ud\n` +
+      `Tiempo: ${perUnit.tiempo_confeccion_min} min/ud\n\n` +
+      `(Totales del lote ${props.pedido.codigo} / ${n} uds.)`,
+  )
+  if (!ok) return
+  aplicandoCostos.value = true
+  errorTiempos.value = null
+  try {
+    await updateProducto(props.pedido.producto_id, {
+      mano_obra: perUnit.mano_obra,
+      cif_energia: perUnit.cif_energia,
+      tiempo_confeccion_min: perUnit.tiempo_confeccion_min,
+    })
+    showToast(
+      'success',
+      'Costos aplicados',
+      `Producto actualizado: MO $${perUnit.mano_obra.toLocaleString('es-CO')}/ud, ` +
+        `energía $${perUnit.cif_energia.toLocaleString('es-CO')}/ud, ${perUnit.tiempo_confeccion_min} min/ud.`,
+    )
+    emit('costos-aplicados')
+  } catch (e: unknown) {
+    // 400/404/422 del backend, verbatim (mismo box de error de la sección).
+    const detail = extractApiDetail(e)
+    errorTiempos.value = detail
+    showToast('error', 'No se pudo aplicar', detail)
+  } finally {
+    aplicandoCostos.value = false
+  }
+}
 
 // Fase actual: prop del backend, con override local tras un avance exitoso
 // (el objeto del padre es un snapshot y puede tardar en recargarse).
@@ -443,6 +530,33 @@ function generarReciboAnticipo() {
               <span>Total: <strong class="text-amber-300">{{ Number(totalMinutos).toLocaleString('es-CO') }} min</strong></span>
               <span>Mano de obra: <strong class="text-amber-300">{{ formatCOP(Number(totalManoObra)) }}</strong></span>
               <span>Energía: <strong class="text-amber-300">{{ formatCOP(Number(totalEnergia)) }}</strong></span>
+            </div>
+
+            <!-- Costeo real → producto: prorratea los totales del lote a
+                 valores unitarios (PUT /productos/{id}). Explícito: solo
+                 con confirmación del usuario; nunca automático. -->
+            <div v-if="mostrarAplicarCostos" class="rounded-lg border border-emerald-500/30 bg-emerald-950/30 p-3 text-xs font-mono space-y-2 text-stone-200">
+              <div v-if="costosUnitarios" class="flex flex-wrap gap-x-5 gap-y-1">
+                <span>Por unidad ({{ unidadesBase }} uds):</span>
+                <span>MO <strong class="text-emerald-300">{{ formatCOP(costosUnitarios.mano_obra) }}</strong></span>
+                <span>Energía <strong class="text-emerald-300">{{ formatCOP(costosUnitarios.cif_energia) }}</strong></span>
+                <span>Tiempo <strong class="text-emerald-300">{{ costosUnitarios.tiempo_confeccion_min }} min</strong></span>
+              </div>
+              <div v-else class="text-stone-400">
+                Sin unidades base para prorratear.
+              </div>
+              <div class="flex justify-end">
+                <Button
+                  label="Aplicar costos al producto"
+                  icon="pi pi-send"
+                  size="small"
+                  class="p-button-success text-xs font-semibold"
+                  :loading="aplicandoCostos"
+                  :disabled="aplicandoCostos || !costosUnitarios"
+                  :title="motivoBloqueoCostos ?? `Escribe MO, energía y tiempo por unidad en el producto #${props.pedido?.producto_id}`"
+                  @click="aplicarCostosAlProducto"
+                />
+              </div>
             </div>
           </div>
 
