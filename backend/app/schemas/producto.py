@@ -38,6 +38,8 @@ class ProductoBase(BaseModel):
     markup_pct: Decimal | None = Field(default=None, ge=-1000, le=1000)
     recomendaciones_taller: str | None = None
     fases: list | dict | None = None
+    # Quantity stock (lote slice): finished units on hand.
+    stock_actual: Decimal = Field(default=Decimal("0"), ge=0)
 
 
 class ProductoCreate(ProductoBase):
@@ -61,6 +63,7 @@ class ProductoUpdate(BaseModel):
     markup_pct: Decimal | None = Field(default=None, ge=-1000, le=1000)
     recomendaciones_taller: str | None = None
     fases: list | dict | None = None
+    stock_actual: Decimal | None = Field(default=None, ge=0)
 
 
 class ProductoRead(ProductoBase):

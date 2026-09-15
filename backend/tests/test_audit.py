@@ -124,7 +124,11 @@ def _create_audit_venta_fixtures():
             tipo = TipoProducto(nombre=f"Audit Tipo {uuid.uuid4().hex[:6]}")
             db.add(tipo)
             db.flush()
-        producto = Producto(nombre=f"Audit Prod {uuid.uuid4().hex[:6]}", tipo_producto_id=tipo.id)
+        producto = Producto(
+            nombre=f"Audit Prod {uuid.uuid4().hex[:6]}",
+            tipo_producto_id=tipo.id,
+            stock_actual=Decimal("10000"),
+        )
         db.add(producto)
         db.flush()
         # Ensure a BOM so devoluciones can restore stock (total cancel needs consumables)

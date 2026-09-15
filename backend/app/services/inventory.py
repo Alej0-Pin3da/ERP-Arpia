@@ -176,6 +176,66 @@ def reponer_stock(db: Session, explosiones: dict[int, Decimal]) -> None:
         insumo.stock_actual += explosiones[insumo_id]
 
 
+def _bloquear_productos(db: Session, producto_ids) -> dict[int, Producto]:
+    """Lock Producto rows FIRST, before any stock mutation in the transaction.
+
+    A locked re-read (``populate_existing=True``) cascades refresh through the
+    selectin chain (producto -> bom_insumos -> insumo) and WIPES a pending
+    insumo deduction/restock made earlier in the same transaction — the exact
+    failure completar_lote hit. So callers lock every touched producto up
+    front, then mutate insumos and the already-locked producto instances with
+    plain attribute writes (never another locked re-read) until commit.
+    Unknown producto raises 404.
+    """
+    bloqueados: dict[int, Producto] = {}
+    for producto_id in sorted(producto_ids):
+        producto = db.get(
+            Producto, producto_id, with_for_update=True, populate_existing=True
+        )
+        if producto is None:
+            raise EntityNotFoundError("Producto", producto_id)
+        bloqueados[producto_id] = producto
+    return bloqueados
+
+
+def _descontar_producto_bloqueado(producto: Producto, cantidad: Decimal) -> None:
+    """Subtract finished units from an already-locked Producto (no re-read).
+
+    Legacy NULL stock counts as 0. Insufficient units raise 409 — the caller
+    owns the rollback, no commit here.
+    """
+    disponible = producto.stock_actual or Decimal("0")
+    if disponible < cantidad:
+        raise DomainValidationError(
+            f"Stock insuficiente de producto '{producto.nombre}': "
+            f"requiere {cantidad}, disponible {disponible}",
+            status_code=409,
+        )
+    producto.stock_actual = disponible - cantidad
+
+
+def _reponer_producto_bloqueado(producto: Producto, cantidad: Decimal) -> None:
+    """Restore finished units into an already-locked Producto (no re-read).
+
+    No commit here — the caller owns the transaction.
+    """
+    producto.stock_actual = (producto.stock_actual or Decimal("0")) + cantidad
+
+
+def _agregado_por_producto(detalles: list) -> dict[int, Decimal]:
+    """Sum quantities per producto_id across detail lines (dicts or ORM rows)."""
+    agregado: dict[int, Decimal] = {}
+    for detalle in detalles:
+        if isinstance(detalle, dict):
+            producto_id = detalle["producto_id"]
+            cantidad = Decimal(detalle["cantidad"])
+        else:
+            producto_id = detalle.producto_id
+            cantidad = Decimal(detalle.cantidad)
+        agregado[producto_id] = agregado.get(producto_id, Decimal("0")) + cantidad
+    return agregado
+
+
 def registrar_venta(db: Session, payload: dict) -> Venta:
     """Register a sale and deduct stock in ONE atomic commit.
 
@@ -187,7 +247,8 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
     Per line it snapshots ``costo_unitario_aplicado`` = the product's current
     production cost (read from ``Insumo.costo_promedio_actual`` through the
     reusable cost engine), aggregates the flat explosion across lines, deducts
-    stock with FOR UPDATE (409 if insufficient, all-or-nothing), then commits
+    stock with FOR UPDATE (409 if insufficient, all-or-nothing) — insumos AND
+    the finished units in Producto.stock_actual (409 if short) — then commits
     exactly once. ANY failure raises and rolls back — nothing is persisted.
     """
     detalles = payload["detalles"]
@@ -230,7 +291,18 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
         for insumo_id, qty in explosion_materiales(db, producto_id, variante_id, cantidad).items():
             explosiones[insumo_id] = explosiones.get(insumo_id, Decimal("0")) + qty
 
+    # Lock finished-stock rows BEFORE any mutation (see _bloquear_productos):
+    # a locked re-read after descontar_stock would cascade-refresh the selectin
+    # chain and wipe the pending insumo deduction.
+    agregados = _agregado_por_producto(detalles)
+    bloqueados = _bloquear_productos(db, agregados.keys())
+
     descontar_stock(db, explosiones)
+
+    # Finished-unit stock moves with the insumo stock in the same transaction:
+    # every sold unit leaves Producto.stock_actual (409 if short).
+    for producto_id, qty in sorted(agregados.items()):
+        _descontar_producto_bloqueado(bloqueados[producto_id], qty)
 
     total_venta = Decimal(sum(lineas_subtotal)) * descuento_factor
     es_regalo = bool(payload.get("es_regalo", False))
@@ -297,7 +369,8 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
 
     Payload is a plain dict mirroring VentaCreate (``cliente_id``,
     ``canal_venta``, ``descuento_porcentaje``, ``es_regalo``, ``detalles``).
-    The old material explosion is RESTORED into stock first, then the new
+    The old material explosion is RESTORED into stock first (insumos and the
+    finished Producto.stock_actual units), then the new
     payload is validated exactly like ``registrar_venta`` (404 missing
     producto/cliente, 400 foreign variante) and its explosion is deducted with
     FOR UPDATE (409 if insufficient — checked against the real available stock,
@@ -329,8 +402,18 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
     descuento = Decimal(payload.get("descuento_porcentaje", "0"))
     descuento_factor = Decimal("1") - descuento / Decimal("100")
 
-    # 1) Restore the CURRENT stock (the venta as sold).
+    # 1) Restore the CURRENT stock (the venta as sold) — insumos and the
+    #    finished units sold. Every touched producto (old AND new lines) is
+    #    locked BEFORE any mutation: a later locked re-read would wipe pending
+    #    changes (see _bloquear_productos).
+    agregados_viejos = _agregado_por_producto(list(venta.detalles))
+    agregados_nuevos = _agregado_por_producto(detalles)
+    bloqueados = _bloquear_productos(
+        db, set(agregados_viejos) | set(agregados_nuevos)
+    )
     reponer_stock(db, _explosion_venta(db, venta))
+    for producto_id, qty in sorted(agregados_viejos.items()):
+        _reponer_producto_bloqueado(bloqueados[producto_id], qty)
     # A FLUSH (not a commit) is required BEFORE the new deduction: both stock
     # helpers re-read with populate_existing + FOR UPDATE, so without it the
     # second re-read would clobber the session's pending restock with the stale
@@ -365,6 +448,9 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
             explosiones[insumo_id] = explosiones.get(insumo_id, Decimal("0")) + qty
 
     descontar_stock(db, explosiones)
+
+    for producto_id, qty in sorted(agregados_nuevos.items()):
+        _descontar_producto_bloqueado(bloqueados[producto_id], qty)
 
     # 3) Recalculate the total and replace the fields + detail lines.
     total_venta = Decimal(sum(lineas_subtotal)) * descuento_factor
@@ -413,7 +499,8 @@ def anular_venta(db: Session, venta_id: int) -> Venta:
     """Anular (soft-cancel) a venta in ONE atomic transaction.
 
     NOT a physical delete: the venta's current material explosion is restored
-    into stock (``reponer_stock``) and ``estado`` is marked 'anulada', keeping
+    into stock (``reponer_stock``) plus the finished Producto.stock_actual
+    units, and ``estado`` is marked 'anulada', keeping
     the history (consistent with the es_regalo flag philosophy). 404 when the
     venta does not exist, 400 when it is already anulada. A single commit at
     the end; any exception rolls everything back.
@@ -424,7 +511,11 @@ def anular_venta(db: Session, venta_id: int) -> Venta:
     if venta.estado == DocumentState.CANCELLED.value:
         raise DomainValidationError("La venta ya está anulada")
 
+    agregados = _agregado_por_producto(list(venta.detalles))
+    bloqueados = _bloquear_productos(db, agregados.keys())
     reponer_stock(db, _explosion_venta(db, venta))
+    for producto_id, qty in sorted(agregados.items()):
+        _reponer_producto_bloqueado(bloqueados[producto_id], qty)
     try:
         venta.transition_to(DocumentState.CANCELLED)
         db.commit()

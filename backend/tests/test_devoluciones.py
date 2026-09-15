@@ -105,6 +105,8 @@ def _make_producto(tipo_producto_id: int) -> int:
             nombre=f"Producto {_unique()}",
             requiere_fabricacion=True,
             costos_operativos_fijos=Decimal("0"),
+            # Finished-unit stock: sales consume it (409 if short).
+            stock_actual=Decimal("10000"),
         )
         db.add(producto)
         db.commit()

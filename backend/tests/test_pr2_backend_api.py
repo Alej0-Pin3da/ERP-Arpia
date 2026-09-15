@@ -193,7 +193,13 @@ def _make_tipo() -> int:
 def _make_producto(tipo_id: int) -> int:
     db = SessionLocal()
     try:
-        p = Producto(tipo_producto_id=tipo_id, nombre=f"Prod PR2 {_unique()}", requiere_fabricacion=True, costos_operativos_fijos=Decimal("0"))
+        p = Producto(
+            tipo_producto_id=tipo_id,
+            nombre=f"Prod PR2 {_unique()}",
+            requiere_fabricacion=True,
+            costos_operativos_fijos=Decimal("0"),
+            stock_actual=Decimal("10000"),
+        )
         db.add(p)
         db.commit()
         db.refresh(p)

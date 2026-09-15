@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.deps import get_db, require_admin, require_roles
+from app.core.exceptions import DomainError
 from app.models.produccion import (
     PedidoProduccion,
     PedidoProduccionEstado,
@@ -25,6 +26,11 @@ from app.schemas.produccion import (
     PrendaConfeccionadaUpdate,
 )
 from app.services.paginacion import aplicar_orden, paginar
+from app.services.produccion import (
+    completar_lote,
+    pedido_esta_completado,
+    validar_avance_fase,
+)
 
 router_prendas = APIRouter(prefix="/prendas-confeccionadas", tags=["prendas-confeccionadas"])
 router_pedidos = APIRouter(prefix="/pedidos-produccion", tags=["pedidos-produccion"])
@@ -200,6 +206,7 @@ _SORTABLE_PEDIDOS = {
     "cantidad": PedidoProduccion.cantidad,
     "cantidad_producida": PedidoProduccion.cantidad_producida,
     "estado": PedidoProduccion.estado,
+    "fase": PedidoProduccion.fase,
     "prioridad": PedidoProduccion.prioridad,
     "fecha_pedido": PedidoProduccion.fecha_pedido,
     "fecha_entrega_estimada": PedidoProduccion.fecha_entrega_estimada,
@@ -225,6 +232,7 @@ def list_pedidos(
     producto_id: int | None = None,
     variante_id: int | None = None,
     estado: str | None = None,
+    fase: str | None = None,
     prioridad: str | None = None,
     q: str | None = None,
     sort_by: str | None = None,
@@ -248,6 +256,8 @@ def list_pedidos(
         stmt = stmt.where(PedidoProduccion.variante_id == variante_id)
     if estado is not None:
         stmt = stmt.where(PedidoProduccion.estado == estado)
+    if fase is not None:
+        stmt = stmt.where(PedidoProduccion.fase == fase)
     if prioridad is not None:
         stmt = stmt.where(PedidoProduccion.prioridad == prioridad)
     if q is not None:
@@ -293,11 +303,19 @@ def create_pedido(
     pedido = PedidoProduccion(**payload.model_dump())
     db.add(pedido)
     try:
+        db.flush()
+        # Creating straight into listo/completado completes the lot at once.
+        if pedido_esta_completado(pedido):
+            completar_lote(db, pedido)
         db.commit()
         db.refresh(pedido)
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(status_code=409, detail=f"Error de integridad: {e}") from e
+    except DomainError:
+        # 409 shortage (per-insumo detail) / 404 / 422: nothing is persisted.
+        db.rollback()
+        raise
 
     return _pedido_to_read(pedido)
 
@@ -320,15 +338,30 @@ def update_pedido(
     if payload.cliente_id is not None and db.get(Cliente, payload.cliente_id) is None:
         raise HTTPException(status_code=400, detail="Cliente no existe")
 
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    # Sequential phase advance is validated BEFORE mutating (422 unknown fase,
+    # 400 skip/back), so a rejected PATCH leaves the session untouched.
+    if "fase" in data and data["fase"] is not None and data["fase"] != pedido.fase:
+        validar_avance_fase(pedido.fase, data["fase"])
+
+    estaba_completado = pedido_esta_completado(pedido)
+    for k, v in data.items():
         setattr(pedido, k, v)
 
     try:
+        db.flush()
+        # Idempotent completion: runs ONCE when transitioning INTO listo or
+        # completado. 409 shortage carries per-insumo detail, no partial commit.
+        if pedido_esta_completado(pedido) and not estaba_completado:
+            completar_lote(db, pedido)
         db.commit()
         db.refresh(pedido)
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(status_code=409, detail=f"Error de integridad: {e}") from e
+    except DomainError:
+        db.rollback()
+        raise
 
     return _pedido_to_read(pedido)
 

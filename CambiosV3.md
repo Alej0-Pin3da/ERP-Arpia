@@ -3,6 +3,17 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-14] - Lote por cantidad slice 1 (backend): fases Corte→Listo + stock por cantidad (ruta directa)
+
+- **Decisión acordada:** stock por columna de cantidad (`Productos.stock_actual`), SIN filas por prenda. `PrendaConfeccionada` intacta.
+- **Modelos + migración `0030_produccion_fase_stock`** (head sobre `0029_purge_ghost_oct25`): `Productos.stock_actual` NUMERIC(15,4) NOT NULL DEFAULT 0; `pedidos_produccion.fase` VARCHAR(20) DEFAULT 'corte' + CHECK (corte|costura|acabados|calidad|listo); `pedidos_produccion.costo_unitario_snapshot` NUMERIC(15,4) NULL. Esquemas exponen `stock_actual` (Base/Update/Read) y `fase` + `costo_unitario_snapshot` (Read).
+- **Transacción de cierre** (`backend/app/services/produccion.py::completar_lote`, sin commit propio): explosión BOM × N vía `explosion_materiales`, chequeo previo con detalle por-insumo, `descontar_stock` (FOR UPDATE), `producto.stock_actual += N`, snapshot de costo unitario (`calcular_costo_produccion`) + `cantidad_producida = N`. `PATCH /pedidos-produccion/{id}` valida avance secuencial (422 fase inválida, 400 salto/retroceso), filtra/ordena por `fase`, y corre el lote UNA vez al transicionar a `listo`/`completado` (409 atómico con `{"detail": "Stock insuficiente para completar el lote: 'Tela X' (requiere A, disponible B); ..."}`).
+- **Ventas** (`inventory.py::registrar_venta/actualizar_venta/anular_venta`): también mueven `Producto.stock_actual` (409 si no alcanza en venta, NULL tratado como 0; anular repone). Disciplina lock-first: se bloquean productos ANTES de mutar insumos porque un `db.get(..., populate_existing=True)` posterior refresca en cascada el chain selectin y BORRA deducciones pendientes (bug real encontrado por los tests nuevos, verificado empíricamente).
+- **Tests:** nuevo `backend/tests/test_produccion_lote.py` (6 tests: defaults, secuencial+rechazos, cierre con snapshot, 409 atómico, idempotencia, venta consume/anula repone); fábricas de `test_ventas_api/inventory/devoluciones(_api)/pr2/audit` acreditadas con `stock_actual=10000` (las ventas ahora exigen stock).
+- **Verificación:** `py_compile` OK; ruff sin violaciones nuevas (I001/F401/E501 restantes preexistentes, verificados contra HEAD); `configure_mappers()` OK; migración 0030 aplica vía `alembic upgrade head`; pytest: 6/6 lote + 42/42 (fase4/productos/lote/domain) + 44/44 migrate + suites ventas/inventario/devoluciones/pr2 121/123 (2 fallos por polución cruzada preexistente `.first()` sin orden en audit, reproducidos en HEAD limpio). Sin commit (árbol dirty). Sin cambios de frontend.
+- **Archivos:** `backend/app/models/productos.py`, `backend/app/models/produccion.py`, `backend/app/schemas/producto.py`, `backend/app/schemas/produccion.py`, `backend/app/services/produccion.py` (nuevo), `backend/app/services/inventory.py`, `backend/app/api/routes/produccion.py`, `backend/alembic/versions/0030_produccion_fase_stock.py` (nuevo), `backend/tests/test_produccion_lote.py` (nuevo) + 6 fábricas de tests.
+- **Siguiente slice:** UI frontend de lote (avance de fase + tratamientos 400/422/409).
+
 ### [2026-09-13] - Purga de datos quemados: respuestas estáticas y fallbacks reemplazados por flujo REAL (ruta directa)
 
 - **Auditoría & Limpieza:** Reemplazados datos simulados/estáticos en 14 componentes por estados vacíos explícitos o datos reales consumidos de API.

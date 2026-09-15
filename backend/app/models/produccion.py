@@ -33,6 +33,24 @@ class PedidoProduccionPrioridad(StrEnum):
     URGENTE = "urgente"
 
 
+class PedidoProduccionFase(StrEnum):
+    CORTE = "corte"
+    COSTURA = "costura"
+    ACABADOS = "acabados"
+    CALIDAD = "calidad"
+    LISTO = "listo"
+
+
+# Canonical workshop order — phase advance must step through it one at a time.
+FASES_PRODUCCION_ORDEN: tuple[str, ...] = (
+    PedidoProduccionFase.CORTE,
+    PedidoProduccionFase.COSTURA,
+    PedidoProduccionFase.ACABADOS,
+    PedidoProduccionFase.CALIDAD,
+    PedidoProduccionFase.LISTO,
+)
+
+
 class PedidoProduccion(Base):
     __tablename__ = "pedidos_produccion"
     __table_args__ = (
@@ -43,6 +61,10 @@ class PedidoProduccion(Base):
         CheckConstraint(
             "prioridad IN ('baja', 'normal', 'alta', 'urgente')",
             name="ck_pedidos_produccion_prioridad",
+        ),
+        CheckConstraint(
+            "fase IN ('corte', 'costura', 'acabados', 'calidad', 'listo')",
+            name="ck_pedidos_produccion_fase",
         ),
     )
 
@@ -59,6 +81,14 @@ class PedidoProduccion(Base):
     )
     cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
     cantidad_producida: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Workshop phase (lote slice): corte -> costura -> acabados -> calidad -> listo.
+    fase: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=PedidoProduccionFase.CORTE
+    )
+    # Unit-cost snapshot taken once at lot completion (completar_lote).
+    costo_unitario_snapshot: Mapped[Decimal | None] = mapped_column(
+        Numeric(15, 4), nullable=True
+    )
     estado: Mapped[str] = mapped_column(String(30), nullable=False, default=PedidoProduccionEstado.PENDIENTE)
     prioridad: Mapped[str] = mapped_column(
         String(20), nullable=False, default=PedidoProduccionPrioridad.NORMAL

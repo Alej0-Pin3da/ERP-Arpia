@@ -4,7 +4,12 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.produccion import PedidoProduccionEstado, PedidoProduccionPrioridad, PrendaEstado
+from app.models.produccion import (
+    PedidoProduccionEstado,
+    PedidoProduccionFase,
+    PedidoProduccionPrioridad,
+    PrendaEstado,
+)
 
 
 class PrendaConfeccionadaBase(BaseModel):
@@ -51,6 +56,8 @@ class PedidoProduccionBase(BaseModel):
     variante_id: int | None = None
     cantidad: int = Field(gt=0)
     cantidad_producida: int = Field(default=0, ge=0)
+    # Workshop phase (lote slice): corte -> costura -> acabados -> calidad -> listo.
+    fase: str = Field(default=PedidoProduccionFase.CORTE, max_length=20)
     estado: str = Field(default=PedidoProduccionEstado.PENDIENTE, max_length=30)
     prioridad: str = Field(default=PedidoProduccionPrioridad.NORMAL, max_length=20)
     fecha_pedido: date = Field(default_factory=date.today)
@@ -68,6 +75,8 @@ class PedidoProduccionUpdate(BaseModel):
     variante_id: int | None = None
     cantidad: int | None = Field(default=None, gt=0)
     cantidad_producida: int | None = Field(default=None, ge=0)
+    # Workshop phase (lote slice): corte -> costura -> acabados -> calidad -> listo.
+    fase: str | None = Field(default=None, max_length=20)
     estado: str | None = Field(default=None, max_length=30)
     prioridad: str | None = Field(default=None, max_length=20)
     fecha_pedido: date | None = None
@@ -81,6 +90,8 @@ class PedidoProduccionRead(PedidoProduccionBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    # Unit-cost snapshot taken once at lot completion (None until then).
+    costo_unitario_snapshot: Decimal | None = None
     nombre_producto: str | None = None
     nombre_variante: str | None = None
     cliente_nombre: str | None = None
