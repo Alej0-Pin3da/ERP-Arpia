@@ -88,7 +88,7 @@ async function registrar() {
 
       <div>
         <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Costo Unitario Factura ($ COP)</label>
-        <InputNumber v-model="costoUnitario" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono" />
+        <InputNumber v-model="costoUnitario" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="2" class="w-full font-mono" />
       </div>
 
       <div class="bg-stone-950/70 border border-stone-800 rounded-lg p-2.5 flex justify-between items-center text-xs">

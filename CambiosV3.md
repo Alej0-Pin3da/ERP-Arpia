@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-16] - Fix BOM decimales es-CO, costo unitario con centavos y crash /ventas (frontend, fix directo)
+
+- **Bug 1 — BOM decimales (`src/components/atelier/FichaTecnicaModal.vue`):** `newCantidad` / `newDesperdicio` (líneas ~636/640) y `newComboCantidad` (línea ~765) ahora usan `mode="decimal" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="4"`: con navegador es-AR/es-CO tipear `2.43` ya no se interpreta como miles (243) y acepta coma o punto con hasta 4 decimales. `editBomCantidad` / `editBomDesperdicio` (inputs nativos `type="number"` con `v-model.number`, vista desktop + cards mobile) se dejan nativos pero con `step="0.01"` (antes 0.1 / sin step) para permitir decimales. Lógica de guardado `Number(...)` sin cambios.
+- **Bug 2 — Costo unitario insumo (3 modales):** agregado `:max-fraction-digits="2"` al `InputNumber mode="currency" currency="COP" locale="es-CO"` de `EditarInsumoModal.vue:227`, `NuevoInsumoModal.vue:167` y `CompraInsumoModal.vue:91`: `2.58` ya no se vuelve 258. Sin cambios de currency/locale ni de backend (`Decimal` ya lo soporta). `formatCOP` (`InventarioView.vue`) no se tocó.
+- **Bug 3 — Crash /ventas (`src/views/VentasView.vue:2`):** import de `watch` agregado (`ref, computed, onMounted, watch`), usado en línea 136. Fix de 1 línea.
+- **Verificación:** `npm run build` PASS (vite built in 4.61s + esbuild server.mjs OK). Sin script `typecheck` en el repo y sin `vue-tsc` instalado (`node_modules/.bin/vue-tsc*` ausente), por lo que no se corrió typecheck dedicado.
+- **Archivos:** `src/components/atelier/FichaTecnicaModal.vue`, `src/components/atelier/EditarInsumoModal.vue`, `src/components/atelier/NuevoInsumoModal.vue`, `src/components/atelier/CompraInsumoModal.vue`, `src/views/VentasView.vue`.
+- **Rollback:** `git revert <commit>` (cambios solo de template + 1 import, sin backend ni migraciones).
+
 ### [2026-09-15] - Energía SOLO en costura: corte/acabados/calidad manuales (backend, ruta directa, sin commit)
 
 - **Regla acordada:** ENERGY aplica SOLO a la fase `costura` (máquinas). `corte`/`acabados`/`calidad` son manuales — energía cero. Mano de obra cuenta TODAS las fases; `total_minutos` cuenta TODAS (es tiempo).
@@ -14,6 +23,18 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 - **Verificación:** `configure_mappers()` OK; `pytest tests/test_produccion_tiempos.py` 7/7; regresión `test_produccion_lote.py + test_maestros_parametros.py` 13/13. Sin commit (árbol dirty; `src/` con cambios previos ajenos a este slice, intactos).
 - **Archivos:** `backend/app/services/produccion.py`, `backend/app/api/routes/produccion.py`, `backend/app/schemas/produccion.py` (comentarios), `backend/tests/test_produccion_tiempos.py`.
 - **Rollback:** `git checkout -- backend/app/services/produccion.py backend/app/api/routes/produccion.py backend/app/schemas/produccion.py backend/tests/test_produccion_tiempos.py` (más esta entrada).
+
+### [2026-09-15] - Aplicar costos reales del lote al producto (frontend, commit 188cdb8)
+
+- **Decisión acordada:** los estimados manuales `Producto.mano_obra/cif_energia/tiempo_confeccion_min` NO se auto-sobrescriben; se actualizan solo por acción explícita del usuario desde la ficha del lote (cierra el "Siguiente slice" pendiente de los slices 3/4).
+- **Nuevo `src/utils/costeo.ts`:** `calcularCostosUnitarios(totales, unidades)` = totales del lote / N uds → `{mano_obra, cif_energia}` a 2 decimales + `tiempo_confeccion_min` entero; acepta strings (el backend serializa Numeric así), nulos → 0, y devuelve `null` con N ≤ 0 / faltante (el caller deshabilita el botón).
+- **`DetallePedidoTallerModal`:** nueva sección "Aplicar costos al producto" (visible solo con totales reales cargados + `producto_id` vinculado): preview por unidad sobre N = `cantidad_producida` (si > 0) si no `cantidad`; botón con `confirm()` que detalla MO/energía/tiempo por unidad + `PUT /productos/{id}` vía `updateProducto`; toast success/error verbatim + emite `costos-aplicados`. N = 0 → botón deshabilitado con title explicativo (no se oculta).
+- **`ProduccionView`:** `PedidoDisplay` suma `producto_id` (mapeado del read) y el modal escucha `@costos-aplicados="cargarPedidos"` para recargar el tablero.
+- **Tests `src/utils/costeo.test.ts` (nuevo, 5 tests):** prorrateo base, redondeo ($ 2dec / min entero), strings del backend, null con N inválida, nulos como 0.
+- **Verificación:** `npx vitest run src/utils/costeo.test.ts` 5/5 (re-verificado al documentar). Sin cambios de backend.
+- **Archivos:** `src/utils/costeo.ts` (nuevo), `src/utils/costeo.test.ts` (nuevo), `src/components/atelier/DetallePedidoTallerModal.vue`, `src/views/ProduccionView.vue`.
+- **Rollback:** `git revert 188cdb8` (o `git checkout 188cdb8^ -- <esos 4 archivos>`) + esta entrada.
+- **Nota:** commit ya existente en `main` sin entrada previa — se documenta a posteriori (2026-09-15). La energía prorrateada hereda la regla posterior (7c40d0c): solo fase `costura`.
 
 ### [2026-09-15] - Etiqueta print en rollo 80mm (@page 80mm, márgenes 0)
 

@@ -633,11 +633,11 @@ function exportarMatriz() {
             </div>
             <div>
               <label class="block text-[11px] font-semibold uppercase text-stone-400 mb-1">Cantidad</label>
-              <InputNumber v-model="newCantidad" :min="0.01" :step="0.1" class="w-full" />
+              <InputNumber v-model="newCantidad" mode="decimal" locale="es-CO" :min="0.01" :step="0.1" :min-fraction-digits="0" :max-fraction-digits="4" class="w-full" />
             </div>
             <div>
               <label class="block text-[11px] font-semibold uppercase text-stone-400 mb-1">Desperdicio %</label>
-              <InputNumber v-model="newDesperdicio" :min="0" :max="100" class="w-full" />
+              <InputNumber v-model="newDesperdicio" mode="decimal" locale="es-CO" :min="0" :max="100" :min-fraction-digits="0" :max-fraction-digits="4" class="w-full" />
             </div>
           </div>
           <div class="flex justify-end">
@@ -667,11 +667,11 @@ function exportarMatriz() {
                   <td class="py-2.5 px-3 whitespace-nowrap"><span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="(it as any).tipo === 'Directo' ? 'bg-amber-950/60 text-amber-300 border border-amber-500/30' : 'bg-stone-800 text-stone-400'">{{ (it as any).tipo }}</span></td>
                   <td class="py-2.5 px-3 text-right font-mono whitespace-nowrap">
                     <span v-if="editingBomId !== (it as any).bomId">{{ (it as any).consumo_unitario }} {{ (it as any).unidad }}</span>
-                    <input v-else v-model.number="editBomCantidad" type="number" step="0.1" min="0.01" class="w-20 bg-stone-950 border border-amber-500/30 rounded px-1 py-0.5 text-right font-mono text-amber-300" />
+                    <input v-else v-model.number="editBomCantidad" type="number" step="0.01" min="0.01" class="w-20 bg-stone-950 border border-amber-500/30 rounded px-1 py-0.5 text-right font-mono text-amber-300" />
                   </td>
                   <td class="py-2.5 px-3 text-right font-mono whitespace-nowrap">
                     <span v-if="editingBomId !== (it as any).bomId" class="text-stone-400">{{ (it as any).merma_pct }}%</span>
-                    <span v-else class="flex items-center justify-end gap-1"><input v-model.number="editBomDesperdicio" type="number" min="0" max="100" class="w-16 bg-stone-950 border border-amber-500/30 rounded px-1 py-0.5 text-right font-mono text-amber-300" />%</span>
+                    <span v-else class="flex items-center justify-end gap-1"><input v-model.number="editBomDesperdicio" type="number" step="0.01" min="0" max="100" class="w-16 bg-stone-950 border border-amber-500/30 rounded px-1 py-0.5 text-right font-mono text-amber-300" />%</span>
                   </td>
                   <td class="py-2.5 px-3 text-right font-mono whitespace-nowrap">{{ formatCOP((it as any).costo_unitario) }}</td>
                   <td class="py-2.5 px-3 text-right font-mono font-bold text-amber-300 whitespace-nowrap">{{ formatCOP((it as any).subtotal) }}</td>
@@ -704,12 +704,12 @@ function exportarMatriz() {
               <div class="flex items-center justify-between text-sm">
                 <span class="text-xs uppercase tracking-wider text-stone-400">Consumo</span>
                 <span v-if="editingBomId !== (it as any).bomId" class="font-mono text-stone-200">{{ (it as any).consumo_unitario }} {{ (it as any).unidad }}</span>
-                <input v-else v-model.number="editBomCantidad" type="number" step="0.1" min="0.01" class="w-24 bg-stone-950 border border-amber-500/30 rounded px-1 py-1 text-right font-mono text-sm text-amber-300" />
+                <input v-else v-model.number="editBomCantidad" type="number" step="0.01" min="0.01" class="w-24 bg-stone-950 border border-amber-500/30 rounded px-1 py-1 text-right font-mono text-sm text-amber-300" />
               </div>
               <div class="flex items-center justify-between text-sm">
                 <span class="text-xs uppercase tracking-wider text-stone-400">Merma</span>
                 <span v-if="editingBomId !== (it as any).bomId" class="font-mono text-stone-400">{{ (it as any).merma_pct }}%</span>
-                <span v-else class="flex items-center gap-1"><input v-model.number="editBomDesperdicio" type="number" min="0" max="100" class="w-20 bg-stone-950 border border-amber-500/30 rounded px-1 py-1 text-right font-mono text-sm text-amber-300" />%</span>
+                <span v-else class="flex items-center gap-1"><input v-model.number="editBomDesperdicio" type="number" step="0.01" min="0" max="100" class="w-20 bg-stone-950 border border-amber-500/30 rounded px-1 py-1 text-right font-mono text-sm text-amber-300" />%</span>
               </div>
               <div class="flex items-center justify-between text-sm">
                 <span class="text-xs uppercase tracking-wider text-stone-400">Costo unit.</span>
@@ -762,7 +762,7 @@ function exportarMatriz() {
             </div>
             <div>
               <label class="block text-[11px] font-semibold uppercase text-stone-400 mb-1">Cantidad</label>
-              <InputNumber v-model="newComboCantidad" :min="1" :step="1" class="w-full" />
+              <InputNumber v-model="newComboCantidad" mode="decimal" locale="es-CO" :min="1" :step="1" :min-fraction-digits="0" :max-fraction-digits="4" class="w-full" />
             </div>
             <Button label="Agregar" icon="pi pi-plus" size="small" severity="warning" @click="agregarCombo" />
           </div>

@@ -164,7 +164,7 @@ function guardar() {
         </div>
         <div class="min-w-0">
           <label title="Costo Unitario ($)" class="block truncate text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Costo Unitario ($)</label>
-          <InputNumber v-model="costoUnitario" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full" input-class="w-full" />
+          <InputNumber v-model="costoUnitario" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="2" class="w-full" input-class="w-full" />
         </div>
       </div>
 
