@@ -225,6 +225,8 @@ async function guardar() {
             currency="COP"
             locale="es-CO"
             :min="1000"
+            :min-fraction-digits="0"
+            :max-fraction-digits="0"
             class="w-full text-xs font-mono"
             :disabled="soloLecturaReal"
           />

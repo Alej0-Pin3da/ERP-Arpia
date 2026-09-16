@@ -116,8 +116,6 @@ async function cargarVentas() {
 
 onMounted(() => void cargarVentas())
 
-void cargandoVentas
-
 // Search & Filter state
 const search = ref('')
 const selectedCanal = ref('TODOS')

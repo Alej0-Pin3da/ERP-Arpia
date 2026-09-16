@@ -83,7 +83,7 @@ async function registrar() {
 
       <div>
         <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Cantidad a Ingresar ({{ insumo.unidad_medida }})</label>
-        <InputNumber v-model="cantidad" :min="0.1" :max-fraction-digits="2" class="w-full font-mono" />
+        <InputNumber v-model="cantidad" mode="decimal" locale="es-CO" :min="0.1" :min-fraction-digits="0" :max-fraction-digits="2" class="w-full font-mono" />
       </div>
 
       <div>
@@ -94,7 +94,7 @@ async function registrar() {
       <div class="bg-stone-950/70 border border-stone-800 rounded-lg p-2.5 flex justify-between items-center text-xs">
         <span class="text-stone-400 uppercase font-bold">Total Factura:</span>
         <span class="font-mono text-sm font-bold text-amber-300">
-          ${{ Math.round(cantidad * costoUnitario).toLocaleString('es-CO') }}
+          ${{ (Number(cantidad || 0) * Number(costoUnitario || 0)).toLocaleString('es-CO', { maximumFractionDigits: 2 }) }}
         </span>
       </div>
 

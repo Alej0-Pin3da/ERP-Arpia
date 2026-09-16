@@ -213,7 +213,9 @@ watch(
   () => props.visible,
   (val) => {
     if (val) {
-      void cargarPreview().then(() => initForm())
+      void cargarPreview()
+        .then(() => initForm())
+        .catch(() => showToast('error', 'Error al cargar', 'No se pudo cargar la vista previa de la liquidación.'))
     }
   },
   { immediate: true },
@@ -327,6 +329,8 @@ async function guardar() {
               currency="COP"
               locale="es-CO"
               :min="0"
+              :min-fraction-digits="0"
+              :max-fraction-digits="0"
               class="w-full text-xs font-mono"
             />
           </div>
@@ -341,6 +345,8 @@ async function guardar() {
               currency="COP"
               locale="es-CO"
               :min="0"
+              :min-fraction-digits="0"
+              :max-fraction-digits="0"
               class="w-full text-xs font-mono"
             />
           </div>
@@ -355,6 +361,8 @@ async function guardar() {
               currency="COP"
               locale="es-CO"
               :min="0"
+              :min-fraction-digits="0"
+              :max-fraction-digits="0"
               class="w-full text-xs font-mono"
             />
           </div>
@@ -415,12 +423,14 @@ async function guardar() {
                   {{ formatCOP(d.monto_bruto) }}
                 </td>
                 <td class="py-3 px-3 text-right">
-                  <InputNumber
-                    v-model="d.deduccion_anticipos"
-                    mode="currency"
-                    currency="COP"
-                    locale="es-CO"
-                    :min="0"
+                    <InputNumber
+                     v-model="d.deduccion_anticipos"
+                     mode="currency"
+                     currency="COP"
+                     locale="es-CO"
+                     :min="0"
+                     :min-fraction-digits="0"
+                     :max-fraction-digits="0"
                     class="w-28 text-xs font-mono text-rose-400"
                     @update:model-value="d.monto_neto_pagar = Math.max(0, d.monto_bruto - d.deduccion_anticipos)"
                   />
@@ -461,7 +471,7 @@ async function guardar() {
             </div>
             <div class="flex items-center justify-between gap-2">
               <span class="text-xs uppercase tracking-wider text-stone-400">Anticipos</span>
-              <InputNumber v-model="d.deduccion_anticipos" mode="currency" currency="COP" locale="es-CO" :min="0" class="w-36 text-sm font-mono text-rose-400" @update:model-value="d.monto_neto_pagar = Math.max(0, d.monto_bruto - d.deduccion_anticipos)" />
+              <InputNumber v-model="d.deduccion_anticipos" mode="currency" currency="COP" locale="es-CO" :min="0" :min-fraction-digits="0" :max-fraction-digits="0" class="w-36 text-sm font-mono text-rose-400" @update:model-value="d.monto_neto_pagar = Math.max(0, d.monto_bruto - d.deduccion_anticipos)" />
             </div>
             <div class="flex items-center justify-between text-sm">
               <span class="text-xs uppercase tracking-wider text-stone-400">Neto a transferir</span>

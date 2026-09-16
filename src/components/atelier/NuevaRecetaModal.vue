@@ -273,19 +273,19 @@ async function guardar() {
         </div>
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Costo Insumos ($)</label>
-          <InputNumber v-model="costoInsumos" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono" />
+          <InputNumber v-model="costoInsumos" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="2" class="w-full font-mono" />
         </div>
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Mano Obra ($)</label>
-          <InputNumber v-model="manoObra" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono" />
+          <InputNumber v-model="manoObra" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" class="w-full font-mono" />
         </div>
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">CIF / Energía ($)</label>
-          <InputNumber v-model="cifEnergia" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono" />
+          <InputNumber v-model="cifEnergia" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" class="w-full font-mono" />
         </div>
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Precio Venta ($)</label>
-          <InputNumber v-model="precioVenta" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono" />
+          <InputNumber v-model="precioVenta" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" class="w-full font-mono" />
         </div>
       </div>
       <div class="bg-stone-900/60 border border-stone-800 rounded-lg p-2.5 flex items-center justify-between text-xs">

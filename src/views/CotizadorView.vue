@@ -201,7 +201,7 @@ function copiarPresupuestoWhatsApp() {
             </div>
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Precio Metro ($)</label>
-              <InputNumber v-model="precioMetroTela" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono text-xs" />
+              <InputNumber v-model="precioMetroTela" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="2" class="w-full font-mono text-xs" />
             </div>
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Metros Forro / Entretela</label>
@@ -209,7 +209,7 @@ function copiarPresupuestoWhatsApp() {
             </div>
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Precio Forro/m ($)</label>
-              <InputNumber v-model="precioMetroForro" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono text-xs" />
+              <InputNumber v-model="precioMetroForro" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="2" class="w-full font-mono text-xs" />
             </div>
           </div>
         </div>
@@ -226,11 +226,11 @@ function copiarPresupuestoWhatsApp() {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Cierres, Botones, Elásticos e Hilo ($)</label>
-              <InputNumber v-model="costoAvios" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono text-xs" />
+              <InputNumber v-model="costoAvios" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" class="w-full font-mono text-xs" />
             </div>
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Empaque, Bolsa & Etiquetas ($)</label>
-              <InputNumber v-model="costoEmpaque" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono text-xs" />
+              <InputNumber v-model="costoEmpaque" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" class="w-full font-mono text-xs" />
             </div>
           </div>
         </div>
@@ -251,11 +251,11 @@ function copiarPresupuestoWhatsApp() {
             </div>
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Tarifa $/hora</label>
-              <InputNumber v-model="tarifaHora" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono text-xs" />
+              <InputNumber v-model="tarifaHora" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" class="w-full font-mono text-xs" />
             </div>
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Costos CIF / Luz ($)</label>
-              <InputNumber v-model="costoCif" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" class="w-full font-mono text-xs" />
+              <InputNumber v-model="costoCif" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" class="w-full font-mono text-xs" />
             </div>
           </div>
         </div>

@@ -1238,6 +1238,8 @@ function imprimirBalance() {
             mode="currency"
             currency="COP"
             locale="es-CO"
+            :min-fraction-digits="0"
+            :max-fraction-digits="0"
             class="w-full text-xs"
           />
         </div>
@@ -1249,6 +1251,8 @@ function imprimirBalance() {
             mode="currency"
             currency="COP"
             locale="es-CO"
+            :min-fraction-digits="0"
+            :max-fraction-digits="2"
             class="w-full text-xs"
           />
         </div>
@@ -1257,8 +1261,13 @@ function imprimirBalance() {
           <label class="text-stone-400 block text-[11px]">Horas Confección Promedio</label>
           <InputNumber
             v-model="horasManoObraPromedio"
+            mode="decimal"
+            locale="es-CO"
             :min="1"
             :max="30"
+            :step="0.5"
+            :min-fraction-digits="0"
+            :max-fraction-digits="1"
             suffix=" horas"
             class="w-full text-xs"
           />
@@ -1271,6 +1280,8 @@ function imprimirBalance() {
             mode="currency"
             currency="COP"
             locale="es-CO"
+            :min-fraction-digits="0"
+            :max-fraction-digits="0"
             class="w-full text-xs"
           />
         </div>

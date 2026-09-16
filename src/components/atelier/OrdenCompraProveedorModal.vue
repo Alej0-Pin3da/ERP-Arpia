@@ -175,7 +175,12 @@ async function abastecerInventario() {
               <td class="py-2.5 px-3 w-32">
                 <InputNumber
                   v-model="item.cantidad_pedir"
-                  :min="1"
+                  mode="decimal"
+                  locale="es-CO"
+                  :min="0.1"
+                  :step="0.5"
+                  :min-fraction-digits="0"
+                  :max-fraction-digits="2"
                   :suffix="` ${item.unidad_medida}`"
                   class="w-full text-xs"
                 />
@@ -198,7 +203,7 @@ async function abastecerInventario() {
           <div class="text-sm" :class="item.stock_actual <= item.stock_minimo ? 'text-red-400 font-bold' : 'text-amber-300'">{{ item.stock_actual }} {{ item.unidad_medida }} <span class="text-xs text-stone-500 font-normal">mín: {{ item.stock_minimo }}</span></div>
           <div class="flex items-center justify-between gap-2">
             <span class="text-xs uppercase tracking-wider text-stone-400">A pedir</span>
-            <InputNumber v-model="item.cantidad_pedir" :min="1" :suffix="` ${item.unidad_medida}`" class="w-36 text-sm" />
+            <InputNumber v-model="item.cantidad_pedir" mode="decimal" locale="es-CO" :min="0.1" :step="0.5" :min-fraction-digits="0" :max-fraction-digits="2" :suffix="` ${item.unidad_medida}`" class="w-36 text-sm" />
           </div>
           <div class="flex items-center justify-between text-sm">
             <span class="text-xs uppercase tracking-wider text-stone-400">Subtotal</span>

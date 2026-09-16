@@ -644,13 +644,13 @@ async function guardar() {
               <!-- Cantidad -->
               <div class="sm:col-span-1">
                 <label class="block text-[10px] text-stone-400 mb-0.5">Cant.</label>
-                <InputNumber v-model="it.cantidad" :min="1" class="w-full text-xs font-mono" />
+                <InputNumber v-model="it.cantidad" mode="decimal" locale="es-CO" :min="1" :min-fraction-digits="0" :max-fraction-digits="0" class="w-full text-xs font-mono" />
               </div>
 
               <!-- Precio Unitario -->
               <div class="sm:col-span-2">
                 <label class="block text-[10px] text-stone-400 mb-0.5">Precio Venta ($)</label>
-                <InputNumber v-model="it.precio_unitario" mode="currency" currency="COP" locale="es-CO" :min="0" class="w-full text-xs font-mono" />
+                <InputNumber v-model="it.precio_unitario" mode="currency" currency="COP" locale="es-CO" :min="0" :min-fraction-digits="0" :max-fraction-digits="0" class="w-full text-xs font-mono" />
               </div>
 
               <!-- Actions & Cost -->
@@ -675,6 +675,8 @@ async function guardar() {
                   currency="COP"
                   locale="es-CO"
                   :min="0"
+                  :min-fraction-digits="0"
+                  :max-fraction-digits="2"
                   class="w-28 text-[11px]"
                 />
               </div>
@@ -698,8 +700,12 @@ async function guardar() {
               </label>
               <InputNumber
                 v-model="descuentoPct"
+                mode="decimal"
+                locale="es-CO"
                 :min="0"
                 :max="100"
+                :min-fraction-digits="0"
+                :max-fraction-digits="2"
                 suffix="%"
                 class="w-full text-xs font-mono"
               />

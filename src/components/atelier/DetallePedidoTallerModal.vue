@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
+import InputNumber from 'primevue/inputnumber'
 import { showToast } from '@/utils/toast'
 import {
   FASES_PRODUCCION,
@@ -494,12 +495,16 @@ function generarReciboAnticipo() {
                   </label>
                   <label class="block">
                     <span class="text-[10px] text-stone-400 uppercase">Minutos reales</span>
-                    <input
-                      v-model.number="editMinutos"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      class="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-2 py-1.5 text-xs text-stone-100"
+                    <InputNumber
+                      v-model="editMinutos"
+                      mode="decimal"
+                      locale="es-CO"
+                      :min="0"
+                      :step="0.01"
+                      :min-fraction-digits="0"
+                      :max-fraction-digits="2"
+                      class="mt-1 w-full text-xs"
+                      inputClass="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-2 py-1.5 text-xs text-stone-100"
                     />
                   </label>
                 </div>
@@ -586,13 +591,17 @@ function generarReciboAnticipo() {
               </label>
               <label class="block">
                 <span class="text-[10px] text-stone-400 uppercase font-mono">Minutos</span>
-                <input
-                  v-model.number="minutosNuevos"
-                  type="number"
-                  min="0"
-                  step="0.01"
+                <InputNumber
+                  v-model="minutosNuevos"
+                  mode="decimal"
+                  locale="es-CO"
+                  :min="0"
+                  :step="0.01"
+                  :min-fraction-digits="0"
+                  :max-fraction-digits="2"
                   placeholder="0"
-                  class="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-2 py-1.5 text-xs text-stone-100"
+                  class="mt-1 w-full text-xs"
+                  inputClass="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-2 py-1.5 text-xs text-stone-100"
                 />
               </label>
               <label class="block">

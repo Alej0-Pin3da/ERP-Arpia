@@ -209,9 +209,13 @@ async function guardar() {
           </label>
           <InputNumber
             v-model="porcentaje"
+            mode="decimal"
+            locale="es-CO"
             suffix="%"
             :min="0"
             :max="100"
+            :min-fraction-digits="0"
+            :max-fraction-digits="2"
             class="w-full text-xs font-mono"
           />
         </div>
