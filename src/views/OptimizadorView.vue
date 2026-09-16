@@ -143,11 +143,11 @@ function ejecutarOptimizacion() {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Ancho de Tela (m)</label>
-              <InputNumber v-model="anchoTela" :min="0.5" :max-fraction-digits="2" class="w-full font-mono text-xs" />
+              <InputNumber v-model="anchoTela" mode="decimal" locale="es-CO" :min="0.5" :max-fraction-digits="2" class="w-full font-mono text-xs" />
             </div>
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Largo Total Disponible (m)</label>
-              <InputNumber v-model="largoTotalDisponible" :min="0.5" :max-fraction-digits="2" class="w-full font-mono text-xs" />
+              <InputNumber v-model="largoTotalDisponible" mode="decimal" locale="es-CO" :min="0.5" :max-fraction-digits="2" class="w-full font-mono text-xs" />
             </div>
           </div>
         </div>
@@ -192,7 +192,7 @@ function ejecutarOptimizacion() {
                 </div>
                 <div>
                   <span class="block text-[10px] text-stone-400 font-sans">Metros c/u</span>
-                  <InputNumber v-model="p.metros_unitario" :min="0.1" :max-fraction-digits="2" class="w-full text-xs" />
+                  <InputNumber v-model="p.metros_unitario" mode="decimal" locale="es-CO" :min="0.1" :max-fraction-digits="2" class="w-full text-xs" />
                 </div>
               </div>
 

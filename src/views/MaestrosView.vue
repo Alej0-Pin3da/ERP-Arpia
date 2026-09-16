@@ -12,6 +12,7 @@ import type {
 } from '@/services/api/maestros'
 import { useMaestros } from '@/composables/useMaestros'
 import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
+import InputNumber from 'primevue/inputnumber'
 import { showToast } from '@/utils/toast'
 
 const maestros = useMaestros()
@@ -1350,15 +1351,19 @@ function formatoCOP(val: number) {
               Valor Minuto de Confección (COP/min):
             </label>
             <div class="relative">
-              <input
-                id="param-minuto-costura"
-                v-model.number="parametrosForm.costo_minuto_costura"
-                type="number"
-                min="0"
-                step="10"
-                class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 font-mono text-sm focus:border-amber-400 focus:outline-none"
+              <InputNumber
+                v-model="parametrosForm.costo_minuto_costura"
+                inputId="param-minuto-costura"
+                mode="decimal"
+                locale="es-CO"
+                :min="0"
+                :step="10"
+                :min-fraction-digits="0"
+                :max-fraction-digits="2"
+                suffix=" COP"
+                class="w-full"
+                inputClass="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 font-mono text-sm focus:border-amber-400 focus:outline-none"
               />
-              <span class="absolute right-3 top-2.5 text-xs text-stone-500 font-mono">COP</span>
             </div>
             <p class="text-[11px] text-stone-400">Tarifa por minuto de armado, planchado y colocado de varillas.</p>
           </div>
@@ -1369,15 +1374,19 @@ function formatoCOP(val: number) {
               Valor Hora Patronaje & Corte (COP/hora):
             </label>
             <div class="relative">
-              <input
-                id="param-hora-patronaje"
-                v-model.number="parametrosForm.costo_hora_patronaje"
-                type="number"
-                min="0"
-                step="1000"
-                class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 font-mono text-sm focus:border-amber-400 focus:outline-none"
+              <InputNumber
+                v-model="parametrosForm.costo_hora_patronaje"
+                inputId="param-hora-patronaje"
+                mode="decimal"
+                locale="es-CO"
+                :min="0"
+                :step="1000"
+                :min-fraction-digits="0"
+                :max-fraction-digits="2"
+                suffix=" COP"
+                class="w-full"
+                inputClass="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 font-mono text-sm focus:border-amber-400 focus:outline-none"
               />
-              <span class="absolute right-3 top-2.5 text-xs text-stone-500 font-mono">COP</span>
             </div>
             <p class="text-[11px] text-stone-400">Hora de diseño, digitalización y corte manual de precisión.</p>
           </div>
@@ -1388,15 +1397,20 @@ function formatoCOP(val: number) {
               Margen Meta de Utilidad Sugerido (%):
             </label>
             <div class="relative">
-              <input
-                id="param-margen-meta"
-                v-model.number="parametrosForm.margen_meta_global_pct"
-                type="number"
-                min="0"
-                max="100"
-                class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 font-mono text-sm focus:border-amber-400 focus:outline-none"
+              <InputNumber
+                v-model="parametrosForm.margen_meta_global_pct"
+                inputId="param-margen-meta"
+                mode="decimal"
+                locale="es-CO"
+                :min="0"
+                :max="100"
+                :step="0.5"
+                :min-fraction-digits="0"
+                :max-fraction-digits="2"
+                suffix=" %"
+                class="w-full"
+                inputClass="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 font-mono text-sm focus:border-amber-400 focus:outline-none"
               />
-              <span class="absolute right-3 top-2.5 text-xs text-stone-500 font-mono">%</span>
             </div>
             <p class="text-[11px] text-stone-400">Margen por defecto aplicado en el Cotizador rápido.</p>
           </div>
@@ -1407,15 +1421,20 @@ function formatoCOP(val: number) {
               Factor de Merma / Desperdicio Textil (%):
             </label>
             <div class="relative">
-              <input
-                id="param-desperdicio"
-                v-model.number="parametrosForm.desperdicio_textil_default_pct"
-                type="number"
-                min="0"
-                max="50"
-                class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 font-mono text-sm focus:border-amber-400 focus:outline-none"
+              <InputNumber
+                v-model="parametrosForm.desperdicio_textil_default_pct"
+                inputId="param-desperdicio"
+                mode="decimal"
+                locale="es-CO"
+                :min="0"
+                :max="50"
+                :step="0.5"
+                :min-fraction-digits="0"
+                :max-fraction-digits="2"
+                suffix=" %"
+                class="w-full"
+                inputClass="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 font-mono text-sm focus:border-amber-400 focus:outline-none"
               />
-              <span class="absolute right-3 top-2.5 text-xs text-stone-500 font-mono">%</span>
             </div>
             <p class="text-[11px] text-stone-400">Porcentaje de tela adicional estimado por mermas en tizado.</p>
           </div>
@@ -1437,37 +1456,52 @@ function formatoCOP(val: number) {
             <div class="grid grid-cols-3 gap-3 bg-stone-950 p-4 rounded-lg border border-stone-800 text-xs font-mono">
               <div>
                 <label for="param-dist-taller" class="block text-stone-400 mb-1">Fondo Taller (%):</label>
-                <input
-                  id="param-dist-taller"
-                  v-model.number="parametrosForm.distribucion_reinversion_pct"
-                  type="number"
-                  min="0"
-                  max="100"
-                  class="w-full bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-amber-300 font-bold focus:border-amber-400 focus:outline-none"
+                <InputNumber
+                  v-model="parametrosForm.distribucion_reinversion_pct"
+                  inputId="param-dist-taller"
+                  mode="decimal"
+                  locale="es-CO"
+                  :min="0"
+                  :max="100"
+                  :step="0.5"
+                  :min-fraction-digits="0"
+                  :max-fraction-digits="2"
+                  class="w-full"
+                  inputClass="w-full bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-amber-300 font-bold focus:border-amber-400 focus:outline-none"
                 />
               </div>
 
               <div>
                 <label for="param-dist-margara" class="block text-stone-400 mb-1">Margara (%):</label>
-                <input
-                  id="param-dist-margara"
-                  v-model.number="parametrosForm.distribucion_margara_pct"
-                  type="number"
-                  min="0"
-                  max="100"
-                  class="w-full bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-stone-200 font-bold focus:border-amber-400 focus:outline-none"
+                <InputNumber
+                  v-model="parametrosForm.distribucion_margara_pct"
+                  inputId="param-dist-margara"
+                  mode="decimal"
+                  locale="es-CO"
+                  :min="0"
+                  :max="100"
+                  :step="0.5"
+                  :min-fraction-digits="0"
+                  :max-fraction-digits="2"
+                  class="w-full"
+                  inputClass="w-full bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-stone-200 font-bold focus:border-amber-400 focus:outline-none"
                 />
               </div>
 
               <div>
                 <label for="param-dist-valqui" class="block text-stone-400 mb-1">Valqui (%):</label>
-                <input
-                  id="param-dist-valqui"
-                  v-model.number="parametrosForm.distribucion_valqui_pct"
-                  type="number"
-                  min="0"
-                  max="100"
-                  class="w-full bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-stone-200 font-bold focus:border-amber-400 focus:outline-none"
+                <InputNumber
+                  v-model="parametrosForm.distribucion_valqui_pct"
+                  inputId="param-dist-valqui"
+                  mode="decimal"
+                  locale="es-CO"
+                  :min="0"
+                  :max="100"
+                  :step="0.5"
+                  :min-fraction-digits="0"
+                  :max-fraction-digits="2"
+                  class="w-full"
+                  inputClass="w-full bg-stone-900 border border-stone-700 rounded-lg px-2.5 py-1.5 text-stone-200 font-bold focus:border-amber-400 focus:outline-none"
                 />
               </div>
             </div>
@@ -1565,12 +1599,17 @@ function formatoCOP(val: number) {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-stone-300 mb-1">Tiempo de Entrega (Días):</label>
-              <input
-                id="input-prov-dias"
-                v-model.number="provForm.tiempo_entrega_dias"
-                type="number"
-                min="1"
-                class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 focus:border-amber-400 focus:outline-none"
+              <InputNumber
+                v-model="provForm.tiempo_entrega_dias"
+                inputId="input-prov-dias"
+                mode="decimal"
+                locale="es-CO"
+                :min="1"
+                :step="1"
+                :min-fraction-digits="0"
+                :max-fraction-digits="0"
+                class="w-full"
+                inputClass="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 focus:border-amber-400 focus:outline-none"
               />
             </div>
             <div>
@@ -1656,26 +1695,37 @@ function formatoCOP(val: number) {
             </div>
             <div>
               <label class="block text-stone-300 mb-1">Comisión (%):</label>
-              <input
-                id="input-canal-comision"
-                v-model.number="canalForm.comision_pct"
-                type="number"
-                step="0.1"
-                min="0"
-                class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 focus:border-amber-400 focus:outline-none"
+              <InputNumber
+                v-model="canalForm.comision_pct"
+                inputId="input-canal-comision"
+                mode="decimal"
+                locale="es-CO"
+                :min="0"
+                :max="100"
+                :step="0.1"
+                :min-fraction-digits="0"
+                :max-fraction-digits="2"
+                suffix=" %"
+                class="w-full"
+                inputClass="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 focus:border-amber-400 focus:outline-none"
               />
             </div>
           </div>
 
           <div>
             <label class="block text-stone-300 mb-1">Costo Fijo / Stand (COP):</label>
-            <input
-              id="input-canal-costo-fijo"
-              v-model.number="canalForm.costo_fijo_mensual"
-              type="number"
-              min="0"
-              step="10000"
-              class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 focus:border-amber-400 focus:outline-none"
+            <InputNumber
+              v-model="canalForm.costo_fijo_mensual"
+              inputId="input-canal-costo-fijo"
+              mode="decimal"
+              locale="es-CO"
+              :min="0"
+              :step="10000"
+              :min-fraction-digits="0"
+              :max-fraction-digits="2"
+              suffix=" COP"
+              class="w-full"
+              inputClass="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 focus:border-amber-400 focus:outline-none"
             />
           </div>
 
@@ -1752,13 +1802,19 @@ function formatoCOP(val: number) {
             </div>
             <div>
               <label class="block text-stone-300 mb-1">Comisión (%):</label>
-              <input
-                id="input-pago-comision"
-                v-model.number="pagoForm.comision_pct"
-                type="number"
-                step="0.01"
-                min="0"
-                class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 focus:border-amber-400 focus:outline-none"
+              <InputNumber
+                v-model="pagoForm.comision_pct"
+                inputId="input-pago-comision"
+                mode="decimal"
+                locale="es-CO"
+                :min="0"
+                :max="100"
+                :step="0.01"
+                :min-fraction-digits="0"
+                :max-fraction-digits="2"
+                suffix=" %"
+                class="w-full"
+                inputClass="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 focus:border-amber-400 focus:outline-none"
               />
             </div>
           </div>
@@ -1942,13 +1998,18 @@ function formatoCOP(val: number) {
             </div>
             <div>
               <label class="block text-stone-300 mb-1">PVP Sugerido (COP):</label>
-              <input
-                id="input-sintalla-precio"
-                v-model.number="sinTallaForm.precio_sugerido"
-                type="number"
-                step="1000"
-                min="0"
-                class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-emerald-400 font-bold focus:border-amber-400 focus:outline-none"
+              <InputNumber
+                v-model="sinTallaForm.precio_sugerido"
+                inputId="input-sintalla-precio"
+                mode="decimal"
+                locale="es-CO"
+                :min="0"
+                :step="1000"
+                :min-fraction-digits="0"
+                :max-fraction-digits="2"
+                suffix=" COP"
+                class="w-full"
+                inputClass="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-emerald-400 font-bold focus:border-amber-400 focus:outline-none"
               />
             </div>
           </div>
@@ -2045,13 +2106,19 @@ function formatoCOP(val: number) {
             </div>
             <div>
               <label class="block text-stone-300 mb-1">Margen Meta (%):</label>
-              <input
-                id="input-cat-margen"
-                v-model.number="catForm.margen_meta_pct"
-                type="number"
-                min="0"
-                max="100"
-                class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-emerald-400 font-bold focus:border-amber-400 focus:outline-none"
+              <InputNumber
+                v-model="catForm.margen_meta_pct"
+                inputId="input-cat-margen"
+                mode="decimal"
+                locale="es-CO"
+                :min="0"
+                :max="100"
+                :step="0.5"
+                :min-fraction-digits="0"
+                :max-fraction-digits="2"
+                suffix=" %"
+                class="w-full"
+                inputClass="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-emerald-400 font-bold focus:border-amber-400 focus:outline-none"
               />
             </div>
           </div>

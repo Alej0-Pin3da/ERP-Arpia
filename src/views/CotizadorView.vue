@@ -197,7 +197,7 @@ function copiarPresupuestoWhatsApp() {
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Metros Tela Principal</label>
-              <InputNumber v-model="metrosTela" :min="0.1" :max-fraction-digits="2" class="w-full font-mono text-xs" />
+              <InputNumber v-model="metrosTela" mode="decimal" locale="es-CO" :min="0.1" :max-fraction-digits="2" class="w-full font-mono text-xs" />
             </div>
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Precio Metro ($)</label>
@@ -205,7 +205,7 @@ function copiarPresupuestoWhatsApp() {
             </div>
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Metros Forro / Entretela</label>
-              <InputNumber v-model="metrosForro" :min="0" :max-fraction-digits="2" class="w-full font-mono text-xs" />
+              <InputNumber v-model="metrosForro" mode="decimal" locale="es-CO" :min="0" :max-fraction-digits="2" class="w-full font-mono text-xs" />
             </div>
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Precio Forro/m ($)</label>

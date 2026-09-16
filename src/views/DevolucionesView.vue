@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
+import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import { showToast } from '@/utils/toast'
 import { useDevoluciones } from '@/composables/useDevoluciones'
@@ -234,7 +235,7 @@ async function submitCreate() {
       <div class="space-y-3 pt-2 text-xs">
         <div class="flex flex-col gap-1">
           <label class="font-semibold text-stone-300">ID de venta *</label>
-          <InputText v-model.number="formVentaId" type="number" min="1" placeholder="Ej. 12" class="text-xs" />
+          <InputNumber v-model="formVentaId" mode="decimal" locale="es-CO" :min="1" :step="1" :min-fraction-digits="0" :max-fraction-digits="0" placeholder="Ej. 12" class="text-xs" />
         </div>
         <div class="flex flex-col gap-1">
           <label class="font-semibold text-stone-300">Tipo *</label>
@@ -254,15 +255,15 @@ async function submitCreate() {
           <div v-for="(it, idx) in formItems" :key="idx" class="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
             <div class="flex flex-col gap-1">
               <label class="font-semibold text-stone-300">Producto ID *</label>
-              <InputText v-model.number="it.producto_id" type="number" min="1" placeholder="Ej. 5" class="text-xs" />
+              <InputNumber v-model="it.producto_id" mode="decimal" locale="es-CO" :min="1" :step="1" :min-fraction-digits="0" :max-fraction-digits="0" placeholder="Ej. 5" class="text-xs" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="font-semibold text-stone-300">Cantidad *</label>
-              <InputText v-model.number="it.cantidad" type="number" :min="1" class="text-xs" />
+              <InputNumber v-model="it.cantidad" mode="decimal" locale="es-CO" :min="1" :min-fraction-digits="0" :max-fraction-digits="2" class="text-xs" />
             </div>
             <div class="flex flex-col gap-1">
               <label class="font-semibold text-stone-300">Precio unit.</label>
-              <InputText v-model.number="it.precio" type="number" :min="0" class="text-xs" />
+              <InputNumber v-model="it.precio" mode="currency" currency="COP" locale="es-CO" :min="0" :min-fraction-digits="0" :max-fraction-digits="2" class="text-xs" />
             </div>
             <Button
               icon="pi pi-trash"
