@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -253,6 +254,11 @@ class Devolucion(Base):
             "estado IN ('draft', 'confirmed', 'cancelled', 'reversed')",
             name="ck_devoluciones_estado",
         ),
+        # Single-return invariant: one Devolucion per Venta at the DB level.
+        # The service also locks the Venta row + the existing-Devolucion check
+        # (SELECT ... FOR UPDATE); this constraint is the hard backstop that
+        # turns any residual race into a 409 instead of a double restock.
+        UniqueConstraint("venta_id", name="uq_devoluciones_venta_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

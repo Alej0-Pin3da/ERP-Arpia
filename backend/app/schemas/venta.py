@@ -2,7 +2,16 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def _check_finite(v: Decimal) -> Decimal:
+    # Decimal('Infinity') / Decimal('NaN') are valid Decimal values but must
+    # be rejected: Infinity passes gt=0/ge=0 comparisons and would reach the
+    # service as a non-finite quantity/price (mirrors compra_insumo.py).
+    if not v.is_finite():
+        raise ValueError("must be finite (Infinity/NaN not allowed)")
+    return v
 
 
 class DetalleVentaCreate(BaseModel):
@@ -10,6 +19,11 @@ class DetalleVentaCreate(BaseModel):
     variante_id: int | None = None
     cantidad: Decimal = Field(gt=0)
     precio_unitario: Decimal = Field(ge=0)
+
+    @field_validator("cantidad", "precio_unitario", mode="after")
+    @classmethod
+    def _finite(cls, v: Decimal) -> Decimal:
+        return _check_finite(v)
 
 
 class VentaCreate(BaseModel):
@@ -22,6 +36,11 @@ class VentaCreate(BaseModel):
     descuento_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
     es_regalo: bool = False
     detalles: list[DetalleVentaCreate] = Field(min_length=1)
+
+    @field_validator("descuento_porcentaje", mode="after")
+    @classmethod
+    def _finite_descuento(cls, v: Decimal) -> Decimal:
+        return _check_finite(v)
 
 
 class VentaUpdate(BaseModel):

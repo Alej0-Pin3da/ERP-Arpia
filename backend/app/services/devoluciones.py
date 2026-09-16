@@ -2,8 +2,10 @@
 
 ``registrar_devolucion`` runs the whole return (metadata + line items +
 inventory restore) inside ONE transaction: the Venta row is locked with
-SELECT ... FOR UPDATE so concurrent returns of the same sale serialize and the
-second one rejects with 409 (single-return invariant). Refunds always come from
+SELECT ... FOR UPDATE so concurrent returns of the same sale serialize, the
+existing-Devolucion check re-locks with FOR UPDATE, and a DB-level
+``UNIQUE(venta_id)`` is the hard backstop — the second return rejects with
+409 (single-return invariant). Refunds always come from
 the sale-time ``precio_unitario_aplicado`` snapshot, never from current values.
 The caller owns nothing else — this service performs the single commit.
 """
@@ -16,7 +18,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.ventas import Devolucion, DevolucionItem, DocumentState, Venta
-from app.services.inventory import explosion_materiales, reponer_stock
+from app.services.inventory import (
+    _agregado_por_producto,
+    _bloquear_productos,
+    _reponer_producto_bloqueado,
+    explosion_materiales,
+    reponer_stock,
+)
 
 
 def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Devolucion:
@@ -33,8 +41,9 @@ def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Dev
       (422 if it exceeds), priced at the sale-time snapshot, and only the
       returned items' BOM is restored; the sale stays 'completada'.
     - 400 when the sale is already 'anulada' or a total cancel finds no
-      material PObs; 409 when the sale already has a return; 409 on any
-      constraint failure (nothing persisted).
+      material PObs; 409 when the sale already has a return (locked check
+      plus UNIQUE(venta_id) backstop); 409 on any other constraint failure
+      (nothing persisted).
     """
     venta_id = payload["venta_id"]
     tipo = payload.get("tipo", "parcial")
@@ -49,7 +58,9 @@ def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Dev
             status_code=400, detail="La venta ya está anulada; no se puede devolver"
         )
 
-    existente = db.scalar(select(Devolucion).where(Devolucion.venta_id == venta_id))
+    existente = db.scalar(
+        select(Devolucion).where(Devolucion.venta_id == venta_id).with_for_update()
+    )
     if existente is not None:
         raise HTTPException(
             status_code=409,
@@ -57,6 +68,7 @@ def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Dev
         )
 
     explosiones: dict[int, Decimal] = {}
+    agregados: dict[int, Decimal] = {}
 
     if tipo == "total":
         for detalle in venta.detalles:
@@ -69,6 +81,7 @@ def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Dev
                 status_code=400,
                 detail="La venta no tiene materiales consumibles; no se puede anular",
             )
+        agregados = _agregado_por_producto(list(venta.detalles))
         venta.transition_to(DocumentState.CANCELLED)
         devolucion = Devolucion(
             venta_id=venta_id,
@@ -115,6 +128,7 @@ def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Dev
                 )
             subtotal = cantidad * precio
             reembolso += subtotal
+            agregados[producto_id] = agregados.get(producto_id, Decimal("0")) + cantidad
             items.append(
                 DevolucionItem(
                     producto_id=producto_id,
@@ -143,7 +157,15 @@ def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Dev
     else:
         raise HTTPException(status_code=400, detail="tipo debe ser 'total' o 'parcial'")
 
+    # Finished-unit restock moves with the insumo restock in the same
+    # transaction (mirrors anular_venta): lock every touched Producto FIRST
+    # (a later locked re-read would wipe pending mutations), then restore
+    # insumos and the already-locked finished units. No commit here — the
+    # single commit below owns everything.
+    bloqueados = _bloquear_productos(db, agregados.keys())
     reponer_stock(db, explosiones)
+    for producto_id, qty in sorted(agregados.items()):
+        _reponer_producto_bloqueado(bloqueados[producto_id], qty)
 
     try:
         db.commit()

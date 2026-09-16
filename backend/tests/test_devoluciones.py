@@ -152,6 +152,14 @@ def _read_stock(insumo_id: int) -> Decimal:
         db.close()
 
 
+def _read_producto_stock(producto_id: int) -> Decimal:
+    db = SessionLocal()
+    try:
+        return db.get(Producto, producto_id).stock_actual
+    finally:
+        db.close()
+
+
 def _read_venta(venta_id: int):
     db = SessionLocal()
     try:
@@ -313,6 +321,24 @@ def test_devolucion_total_cancela_y_restaura_todo_el_stock():
         _cleanup_tipo(tipo)
 
 
+def test_devolucion_total_restaura_producto_stock_actual():
+    """Total: Producto.stock_actual vuelve al nivel pre-venta, no solo insumos."""
+    ctx = _vender_una_linea(cantidad="3", stock="10")
+    try:
+        assert _read_producto_stock(ctx["producto"]) == Decimal("9997")
+        db = SessionLocal()
+        try:
+            registrar_devolucion(
+                db, None, {"venta_id": ctx["venta"].id, "tipo": "total"}
+            )
+        finally:
+            db.close()
+        assert _read_producto_stock(ctx["producto"]) == Decimal("10000")
+        assert _read_stock(ctx["insumo"]) == Decimal("10")
+    finally:
+        _cleanup_ctx_una_linea(ctx)
+
+
 def test_registrar_devolucion_total_venta_ya_anulada_400():
     """Ya anulada -> 400 y nada se restaura (DEV-1)."""
     categoria = _make_categoria()
@@ -438,6 +464,38 @@ def test_registrar_devolucion_parcial_restaura_solo_linea_devuelta():
         assert dev_id == dev.id
     finally:
         _cleanup_ctx_dos_lineas(ctx)
+
+
+def test_devolucion_parcial_restaura_producto_stock_actual():
+    """Parcial: solo las unidades devueltas vuelven a Producto.stock_actual."""
+    ctx = _vender_una_linea(cantidad="5", stock="10")
+    try:
+        assert _read_producto_stock(ctx["producto"]) == Decimal("9995")
+        db = SessionLocal()
+        try:
+            registrar_devolucion(
+                db,
+                None,
+                {
+                    "venta_id": ctx["venta"].id,
+                    "tipo": "parcial",
+                    "items": [
+                        {
+                            "producto_id": ctx["producto"],
+                            "variante_id": None,
+                            "cantidad": Decimal("2"),
+                        }
+                    ],
+                },
+            )
+        finally:
+            db.close()
+        assert _read_producto_stock(ctx["producto"]) == Decimal("9997")
+        assert _read_stock(ctx["insumo"]) == Decimal("7")  # 10 - 5 + 2
+        venta_r, _ = _read_venta(ctx["venta"].id)
+        assert venta_r.estado == "confirmed"
+    finally:
+        _cleanup_ctx_una_linea(ctx)
 
 
 def test_registrar_devolucion_parcial_usa_precio_snapshot_de_la_venta():
