@@ -3,6 +3,14 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-17] - Fix tests stale canal/metodo a 422 servicio + validación post-fix (backend tests, 1 commit)
+
+- **Stale tests `backend/tests/test_pr1_db_foundation.py`:** `test_venta_create_rejects_invalid_canal/metodo` esperaban reject en `VentaCreate`, pero desde 0024 `canal_venta/metodo_pago` son strings libres y la membresía se valida en servicio `_validar_canal_metodo` (422) + FK. Reescritos a assert service-level: construyen el schema (acepta el valor) y assert `DomainValidationError status_code 422` con fixture `db_session`. Sin tocar schema, servicio ni migraciones.
+- **Validación:** `test_pr1_db_foundation.py` 15/15 PASS; `test_venta_finite.py` 10/10 PASS; `alembic heads` solo `0033`; `npm run build` PASS (407 módulos, 5.66s). Suite `-k "devolucion or venta or inventory"`: 140 passed; 9 fallos restantes por polución de counts absolutos en DB dev compartida (pasan aislados 17/17, devoluciones 13/13) — no regresión de `fe19466`.
+- **DB dev:** `arpia-db` estaba `Exited (255)` por stop de Docker; recuperada con `docker start` sin wipe ni migrate. `pv_id_470` verificado como ID runtime de PrimeVue (0 hits en fuente); inputs BOM ya con `mode decimal locale es-CO`.
+- **Archivos:** `backend/tests/test_pr1_db_foundation.py` (solo tests).
+- **Rollback:** `git revert <commit>` (solo tests).
+
 ### [2026-09-16] - Fix masivo frontend decimales/locale es-CO + higiene (solo src/, 2 commits)
 
 - **Bloque A — decimales críticos (commit `3dbb02c`):** `CotizadorView.vue` (metrosTela/metrosForro) y `OptimizadorView.vue` (anchoTela/largoTotalDisponible/metros_unitario) agregan `mode="decimal" locale="es-CO"` conservando `:max-fraction-digits="2"`. `FichaTecnicaModal.vue`: los 7 inputs nativos de edición (`editBomCantidad` ×2 desktop/mobile, `editBomDesperdicio` ×2, `editMano`, `editCif`, `editPrecio`) pasan a `InputNumber mode="decimal" locale="es-CO"` (cantidad max 4 como `newCantidad`; % y montos max 2; se conserva el resaltado de `precioOverride` vía `:input-class` dinámico). `MaestrosView.vue`: los 13 params nativos (`costo_minuto_costura`, `costo_hora_patronaje`, `margen_meta_global_pct`, `desperdicio_textil_default_pct`, 3 de distribución, `tiempo_entrega_dias`, `comision_pct`/`costo_fijo_mensual` de canal, `comision_pct` de pago, `precio_sugerido` sin talla, `margen_meta_pct` de categoría) pasan a `InputNumber mode="decimal" locale="es-CO"` con min/max/step semánticos preservados (`inputId` conserva el `for` de los labels; unidades COP/% como `suffix`; estilo oscuro preservado vía `inputClass`). `DevolucionesView.vue`: los 4 `InputText type="number"` pasan a `InputNumber` (IDs venta/producto enteros max 0; cantidad decimal max 2; precio `mode="currency" COP` max 2).

@@ -4,10 +4,12 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import inspect
 
+from app.core.exceptions import DomainValidationError
 from app.models.clientes import Cliente
 from app.models.ventas import Venta
 from app.schemas.cliente import ClienteCreate, ClienteRead, ClienteUpdate
 from app.schemas.venta import VentaCreate, VentaRead
+from app.services.inventory import _validar_canal_metodo
 
 
 class TestClienteModelCRM:
@@ -91,20 +93,28 @@ class TestSchemasValidation:
         assert obj.canal_venta == "showroom_pereira"
         assert obj.metodo_pago == "transferencia"
 
-    def test_venta_create_rejects_invalid_canal(self):
-        with pytest.raises(Exception):
-            VentaCreate(
-                canal_venta="telefono",  # type: ignore
-                detalles=[{"producto_id": 1, "cantidad": "1", "precio_unitario": "10"}],
-            )
+    def test_venta_create_rejects_invalid_canal(self, db_session):
+        # P1-6 (0024): schema accepts any maestro-defined codigo; service rejects unknowns.
+        obj = VentaCreate(
+            canal_venta="telefono",
+            detalles=[{"producto_id": 1, "cantidad": "1", "precio_unitario": "10"}],
+        )
+        assert obj.canal_venta == "telefono"
+        with pytest.raises(DomainValidationError) as exc_info:
+            _validar_canal_metodo(db_session, obj.canal_venta, obj.metodo_pago)
+        assert exc_info.value.status_code == 422
 
-    def test_venta_create_rejects_invalid_metodo(self):
-        with pytest.raises(Exception):
-            VentaCreate(
-                canal_venta="web",
-                metodo_pago="cripto",  # type: ignore
-                detalles=[{"producto_id": 1, "cantidad": "1", "precio_unitario": "10"}],
-            )
+    def test_venta_create_rejects_invalid_metodo(self, db_session):
+        # P1-6 (0024): schema accepts any maestro-defined codigo; service rejects unknowns.
+        obj = VentaCreate(
+            canal_venta="web",
+            metodo_pago="cripto",
+            detalles=[{"producto_id": 1, "cantidad": "1", "precio_unitario": "10"}],
+        )
+        assert obj.metodo_pago == "cripto"
+        with pytest.raises(DomainValidationError) as exc_info:
+            _validar_canal_metodo(db_session, obj.canal_venta, obj.metodo_pago)
+        assert exc_info.value.status_code == 422
 
     def test_venta_create_null_metodo_allowed(self):
         obj = VentaCreate(
