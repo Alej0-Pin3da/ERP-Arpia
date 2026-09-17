@@ -4,6 +4,7 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Dropdown from 'primevue/dropdown'
 import InputNumber from 'primevue/inputnumber'
+import InputText from 'primevue/inputtext'
 import Tag from 'primevue/tag'
 import { showToast } from '@/utils/toast'
 import * as bomApi from '@/services/api/bom'
@@ -71,9 +72,11 @@ const loadingBom = ref(false)
 const newInsumoId = ref<number | null>(null)
 const newCantidad = ref<number>(1)
 const newDesperdicio = ref<number>(0)
+const newDetalle = ref('')
 const editingBomId = ref<number | null>(null)
 const editBomCantidad = ref<number>(1)
 const editBomDesperdicio = ref<number>(0)
+const editBomDetalle = ref('')
 
 // REAL Combos (BOM_Productos) — sección mínima: lista + crear (2+ productos) + eliminar
 const combosReal = ref<bomApi.BomProductoRead[]>([])
@@ -356,6 +359,7 @@ const selectedInsumo = computed(() => {
       merma_pct: merma,
       costo_unitario: costoUnit,
       subtotal,
+      detalle: b.detalle ?? null,
       bomId: b.id,
     }
   })
@@ -494,11 +498,13 @@ async function agregarInsumo() {
       insumo_id: newInsumoId.value,
       cantidad_requerida: Number(newCantidad.value),
       porcentaje_desperdicio: Number(newDesperdicio.value ?? 0),
+      detalle: newDetalle.value.trim() ? newDetalle.value.trim() : null,
     })
     showToast('success', 'Insumo agregado', 'BOM actualizado.')
     newInsumoId.value = null
     newCantidad.value = 1
     newDesperdicio.value = 0
+    newDetalle.value = ''
     await cargarBom()
   } catch (e: unknown) {
     const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
@@ -524,10 +530,12 @@ function startEditBom(bom: bomApi.BomInsumoRead) {
   editingBomId.value = bom.id
   editBomCantidad.value = Number(bom.cantidad_requerida ?? 1)
   editBomDesperdicio.value = Number(bom.porcentaje_desperdicio ?? 0)
+  editBomDetalle.value = bom.detalle ?? ''
 }
 
 function cancelEditBom() {
   editingBomId.value = null
+  editBomDetalle.value = ''
 }
 
 async function guardarEditBom(bom: bomApi.BomInsumoRead) {
@@ -540,9 +548,11 @@ async function guardarEditBom(bom: bomApi.BomInsumoRead) {
     await bomApi.updateBomInsumo(recetaId.value, bom.id, {
       cantidad_requerida: Number(editBomCantidad.value),
       porcentaje_desperdicio: Number(editBomDesperdicio.value ?? 0),
+      detalle: editBomDetalle.value.trim() ? editBomDetalle.value.trim() : null,
     })
     showToast('success', 'BOM actualizado', 'Cantidad y desperdicio guardados.')
     editingBomId.value = null
+    editBomDetalle.value = ''
     await cargarBom()
   } catch (e: unknown) {
     const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
@@ -640,6 +650,10 @@ function exportarMatriz() {
               <InputNumber v-model="newDesperdicio" mode="decimal" locale="es-CO" :min="0" :max="100" :min-fraction-digits="0" :max-fraction-digits="4" class="w-full" />
             </div>
           </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase text-stone-400 mb-1">Pieza / Detalle <span class="normal-case font-normal text-stone-500">(opcional)</span></label>
+            <InputText v-model="newDetalle" maxlength="150" placeholder="Pieza (ej. torso, manga)" class="w-full" />
+          </div>
           <div class="flex justify-end">
             <Button label="Agregar al BOM" icon="pi pi-plus" size="small" severity="warning" @click="agregarInsumo" />
           </div>
@@ -657,14 +671,18 @@ function exportarMatriz() {
           </div>
           <template v-else>
           <div class="hidden overflow-x-auto max-h-72 overflow-y-auto sm:block">
-            <table class="w-full min-w-[760px] text-left text-xs border-collapse">
+            <table class="w-full min-w-[880px] text-left text-xs border-collapse">
               <thead><tr class="border-b border-stone-800 text-stone-400 bg-stone-950/40">
-                <th class="py-2.5 px-3 font-semibold sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Insumo / Material</th><th class="py-2.5 px-3 font-semibold whitespace-nowrap">Tipo</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Consumo Unit.</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Merma %</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Costo Unit.</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Subtotal</th><th class="py-2.5 px-3"></th>
+                <th class="py-2.5 px-3 font-semibold sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Insumo / Material</th><th class="py-2.5 px-3 font-semibold whitespace-nowrap">Tipo</th><th class="py-2.5 px-3 font-semibold whitespace-nowrap">Pieza / Detalle</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Consumo Unit.</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Merma %</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Costo Unit.</th><th class="py-2.5 px-3 font-semibold text-right whitespace-nowrap">Subtotal</th><th class="py-2.5 px-3"></th>
               </tr></thead>
               <tbody class="divide-y divide-stone-800/50 text-stone-200">
                 <tr v-for="it in displayItems" :key="(it as any).id" class="hover:bg-stone-800/30" :class="editingBomId === (it as any).bomId ? 'bg-amber-950/20' : ''">
                   <td class="py-2.5 px-3 font-medium text-stone-100 sticky left-0 z-10 bg-stone-900/95 min-w-[180px]">{{ (it as any).nombre }}</td>
                   <td class="py-2.5 px-3 whitespace-nowrap"><span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="(it as any).tipo === 'Directo' ? 'bg-amber-950/60 text-amber-300 border border-amber-500/30' : 'bg-stone-800 text-stone-400'">{{ (it as any).tipo }}</span></td>
+                  <td class="py-2.5 px-3 whitespace-nowrap max-w-[180px]">
+                    <span v-if="editingBomId !== (it as any).bomId" class="text-stone-300 truncate block">{{ (it as any).detalle || '—' }}</span>
+                    <InputText v-else v-model="editBomDetalle" maxlength="150" placeholder="Pieza (ej. torso, manga)" class="w-36" input-class="w-36 bg-stone-950 border border-amber-500/30 rounded px-1 py-0.5 text-stone-200" />
+                  </td>
                   <td class="py-2.5 px-3 text-right font-mono whitespace-nowrap">
                     <span v-if="editingBomId !== (it as any).bomId">{{ (it as any).consumo_unitario }} {{ (it as any).unidad }}</span>
                     <InputNumber v-else v-model="editBomCantidad" mode="decimal" locale="es-CO" :min="0.01" :step="0.01" :min-fraction-digits="0" :max-fraction-digits="4" class="w-20" input-class="w-20 bg-stone-950 border border-amber-500/30 rounded px-1 py-0.5 text-right font-mono text-amber-300" />
@@ -688,7 +706,7 @@ function exportarMatriz() {
                 </tr>
               </tbody>
               <tfoot><tr class="bg-stone-950/70 border-t border-stone-800 font-bold">
-                <td colspan="5" class="py-2.5 px-3 text-stone-300 text-right uppercase text-[11px]">Total Insumos y Materiales:</td>
+                <td colspan="6" class="py-2.5 px-3 text-stone-300 text-right uppercase text-[11px]">Total Insumos y Materiales:</td>
                 <td class="py-2.5 px-3 text-right font-mono text-amber-400">{{ formatCOP(totalInsumosReal) }}</td>
                 <td></td>
               </tr></tfoot>
@@ -700,6 +718,11 @@ function exportarMatriz() {
               <div class="flex items-start justify-between gap-2 min-w-0">
                 <div class="font-bold text-sm text-stone-100 min-w-0">{{ (it as any).nombre }}</div>
                 <span class="px-2 py-0.5 rounded text-xs font-bold shrink-0" :class="(it as any).tipo === 'Directo' ? 'bg-amber-950/60 text-amber-300 border border-amber-500/30' : 'bg-stone-800 text-stone-400'">{{ (it as any).tipo }}</span>
+              </div>
+              <div class="flex items-center justify-between text-sm gap-2">
+                <span class="text-xs uppercase tracking-wider text-stone-400 shrink-0">Pieza</span>
+                <span v-if="editingBomId !== (it as any).bomId" class="text-stone-200 truncate min-w-0">{{ (it as any).detalle || '—' }}</span>
+                <InputText v-else v-model="editBomDetalle" maxlength="150" placeholder="Pieza (ej. torso, manga)" class="w-40" input-class="w-40 bg-stone-950 border border-amber-500/30 rounded px-1 py-1 text-sm text-stone-200" />
               </div>
               <div class="flex items-center justify-between text-sm">
                 <span class="text-xs uppercase tracking-wider text-stone-400">Consumo</span>

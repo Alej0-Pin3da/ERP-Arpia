@@ -13,6 +13,14 @@ def _lineas_insumo_efectivas(rows: list[BomInsumo], variante_id: int | None) -> 
 
     A row with variante_id NULL is the base rule for ALL variants; a row with
     variante_id == X overrides (not adds to) the base rule for variant X only.
+
+    Repeated lines SUM: several rows may share the same (producto, insumo,
+    variante) — e.g. one row per garment piece — and every effective row is
+    returned so the caller adds each one. The override is cross-level only:
+    when ANY variant-X row exists for insumo Y, ALL NULL base rows for Y are
+    ignored (`insumo_id in ids_variante`); multiple NULL rows (or multiple X
+    rows) still sum among themselves. This already holds with the code below,
+    no extra branch needed.
     """
     if variante_id is None:
         return [r for r in rows if r.variante_id is None]

@@ -91,9 +91,9 @@ class VarianteProducto(Base):
 
 class BomInsumo(Base):
     __tablename__ = "BOM_Insumos"
-    __table_args__ = (
-        UniqueConstraint("producto_id", "insumo_id", "variante_id", name="uq_bom_insumos_combo"),
-    )
+    # No uniqueness: repeated lines of the same insumo are legal and SUM
+    # (e.g. one row per garment piece). Variante_id is the size (talla),
+    # never a line splitter. BomProducto keeps its own combo uniqueness.
 
     id: Mapped[int] = mapped_column(primary_key=True)
     producto_id: Mapped[int] = mapped_column(
@@ -109,6 +109,9 @@ class BomInsumo(Base):
     porcentaje_desperdicio: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
+    # Optional piece label (torso, manga, any part): cost/stock neutral,
+    # only distinguishes repeated lines of the same insumo for the workshop.
+    detalle: Mapped[str | None] = mapped_column(String(150), nullable=True, default=None)
     fases: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
     tiempo_estimado_minutos: Mapped[int | None] = mapped_column(Integer, nullable=True)
     markup_porcentual: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True)

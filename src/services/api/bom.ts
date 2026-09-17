@@ -7,6 +7,7 @@ export interface BomInsumoRead {
   variante_id: number | null
   cantidad_requerida: number | string
   porcentaje_desperdicio: number | string
+  detalle?: string | null
   fases?: unknown | null
   tiempo_estimado_minutos?: number | null
   markup_porcentual?: number | string | null
@@ -17,6 +18,7 @@ export interface BomInsumoCreate {
   variante_id?: number | null
   cantidad_requerida: number | string
   porcentaje_desperdicio?: number | string
+  detalle?: string | null
   fases?: unknown | null
   tiempo_estimado_minutos?: number | null
   markup_porcentual?: number | string | null

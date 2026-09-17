@@ -2,20 +2,17 @@
 
 Exercises the bom spec scenarios: nested BOM_Insumos and BOM_Productos CRUD
 under /productos/{id}/bom, FK validation (insumo / variante / producto), the
-NULL-variant duplicate rule (PostgreSQL NULL != NULL defeats the unique
-constraint), waste bounds (0-100), combo duplicates and authorization
-(401/403/404/400/409/422). Uses the _unique() uuid4 helper (NOT id(object()))
-so rows never collide on unique constraints.
+repeated-lines rule (same insumo may appear N times and lines SUM — e.g. one
+row per garment piece), waste bounds (0-100), combo duplicates and
+authorization (401/403/404/400/409/422). Uses the _unique() uuid4 helper
+(NOT id(object())) so rows never collide on unique constraints.
 """
 
 import uuid
 from decimal import Decimal
 
-import pytest
-from fastapi import HTTPException
 from sqlalchemy import or_
 
-from app.api.routes.bom import validar_linea_insumo_unica
 from app.db.session import SessionLocal
 from app.models import (
     BomInsumo,
@@ -121,6 +118,7 @@ def _make_linea_insumo(
     insumo_id: int,
     variante_id: int | None = None,
     cantidad: str = "1",
+    detalle: str | None = None,
 ) -> int:
     db = SessionLocal()
     try:
@@ -130,6 +128,7 @@ def _make_linea_insumo(
             variante_id=variante_id,
             cantidad_requerida=Decimal(cantidad),
             porcentaje_desperdicio=Decimal("0"),
+            detalle=detalle,
         )
         db.add(linea)
         db.commit()
@@ -256,76 +255,92 @@ def _teardown_insumo_base(categoria_id: int, insumo_id: int, tipo_id: int) -> No
 
 
 # ---------------------------------------------------------------------------
-# Service-level: validar_linea_insumo_unica (NULL-variant duplicate rule)
+# Model-level: repeated insumo lines are legal and SUM (no uniqueness)
 # ---------------------------------------------------------------------------
 
 
-def test_validar_linea_null_null_es_409():
+def test_lineas_repetidas_null_coexisten_y_suman():
+    # Blusa case: 3 additive rows of the same insumo (torso + 2 sleeves).
     categoria_id, insumo_id, tipo_id = _setup_insumo_base()
     producto_id = _make_producto(tipo_id)
-    linea_id = _make_linea_insumo(producto_id, insumo_id, variante_id=None)
+    linea_ids = [
+        _make_linea_insumo(producto_id, insumo_id, variante_id=None, cantidad=c)
+        for c in ("1", "2", "3")
+    ]
     try:
         db = SessionLocal()
         try:
-            with pytest.raises(HTTPException) as excinfo:
-                validar_linea_insumo_unica(db, producto_id, insumo_id, None)
-            assert excinfo.value.status_code == 409
+            rows = (
+                db.query(BomInsumo)
+                .filter(
+                    BomInsumo.producto_id == producto_id,
+                    BomInsumo.insumo_id == insumo_id,
+                )
+                .all()
+            )
+            assert len(rows) == 3
+            assert sum((r.cantidad_requerida for r in rows), Decimal("0")) == Decimal("6")
         finally:
             db.close()
     finally:
-        _cleanup_linea_insumo(linea_id)
+        for linea_id in linea_ids:
+            _cleanup_linea_insumo(linea_id)
         _cleanup_producto(producto_id)
         _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
 
 
-def test_validar_linea_misma_variante_es_409():
+def test_lineas_repetidas_misma_variante_coexisten():
     categoria_id, insumo_id, tipo_id = _setup_insumo_base()
     producto_id = _make_producto(tipo_id)
     variante_id = _make_variante(producto_id)
-    linea_id = _make_linea_insumo(producto_id, insumo_id, variante_id=variante_id)
+    linea_a = _make_linea_insumo(producto_id, insumo_id, variante_id=variante_id, cantidad="1")
+    linea_b = _make_linea_insumo(producto_id, insumo_id, variante_id=variante_id, cantidad="2")
     try:
         db = SessionLocal()
         try:
-            with pytest.raises(HTTPException) as excinfo:
-                validar_linea_insumo_unica(db, producto_id, insumo_id, variante_id)
-            assert excinfo.value.status_code == 409
+            assert (
+                db.query(BomInsumo)
+                .filter(
+                    BomInsumo.producto_id == producto_id,
+                    BomInsumo.insumo_id == insumo_id,
+                )
+                .count()
+                == 2
+            )
         finally:
             db.close()
     finally:
-        _cleanup_linea_insumo(linea_id)
+        _cleanup_linea_insumo(linea_a)
+        _cleanup_linea_insumo(linea_b)
         _cleanup_producto(producto_id)
         _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
 
 
-def test_validar_linea_null_y_variante_ok():
-    # A NULL base row and a variant-specific row are distinct rules: a variant
-    # line must NOT be flagged as a duplicate of the NULL base line.
+def test_null_y_variante_coexisten():
+    # A NULL base row and a variant-specific row are distinct rules that
+    # coexist as separate rows (variante_id is the size, not a splitter).
     categoria_id, insumo_id, tipo_id = _setup_insumo_base()
     producto_id = _make_producto(tipo_id)
     variante_id = _make_variante(producto_id)
     linea_base_id = _make_linea_insumo(producto_id, insumo_id, variante_id=None)
+    linea_variante_id = _make_linea_insumo(producto_id, insumo_id, variante_id=variante_id)
     try:
         db = SessionLocal()
         try:
-            # no raise: NULL base exists, validating a variant-specific line
-            validar_linea_insumo_unica(db, producto_id, insumo_id, variante_id)
-            linea_variante_id = _make_linea_insumo(producto_id, insumo_id, variante_id=variante_id)
-            try:
-                # both rules coexist as separate rows
-                assert (
-                    db.query(BomInsumo)
-                    .filter(
-                        BomInsumo.producto_id == producto_id,
-                        BomInsumo.insumo_id == insumo_id,
-                    )
-                    .count()
-                    == 2
+            # both rules coexist as separate rows
+            assert (
+                db.query(BomInsumo)
+                .filter(
+                    BomInsumo.producto_id == producto_id,
+                    BomInsumo.insumo_id == insumo_id,
                 )
-            finally:
-                _cleanup_linea_insumo(linea_variante_id)
+                .count()
+                == 2
+            )
         finally:
             db.close()
     finally:
+        _cleanup_linea_insumo(linea_variante_id)
         _cleanup_linea_insumo(linea_base_id)
         _cleanup_producto(producto_id)
         _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
@@ -420,7 +435,8 @@ def test_list_bom_insumos_parent_missing_returns_404(client, admin_token):
     assert resp.status_code == 404
 
 
-def test_create_bom_insumo_dup_null_returns_409(client, admin_token):
+def test_create_bom_insumo_dup_null_returns_201_and_sums(client, admin_token):
+    # Repeated NULL lines are legal and SUM (one row per garment piece).
     categoria_id, insumo_id, tipo_id = _setup_insumo_base()
     producto_id = _make_producto(tipo_id)
     try:
@@ -430,19 +446,26 @@ def test_create_bom_insumo_dup_null_returns_409(client, admin_token):
             headers=_auth(admin_token),
         )
         assert first.status_code == 201
-        resp = client.post(
+        second = client.post(
             f"{BASE}/{producto_id}/bom/insumos",
             json={"insumo_id": insumo_id, "cantidad_requerida": 2},
             headers=_auth(admin_token),
         )
-        assert resp.status_code == 409
+        assert second.status_code == 201
+        rows = client.get(f"{BASE}/{producto_id}/bom/insumos", headers=_auth(admin_token)).json()
+        assert len(rows) == 2
+        assert sum((Decimal(str(r["cantidad_requerida"])) for r in rows), Decimal("0")) == Decimal(
+            "3"
+        )
         _cleanup_linea_insumo(first.json()["id"])
+        _cleanup_linea_insumo(second.json()["id"])
     finally:
         _cleanup_producto(producto_id)
         _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
 
 
-def test_create_bom_insumo_dup_variant_returns_409(client, admin_token):
+def test_create_bom_insumo_dup_variant_returns_201(client, admin_token):
+    # Repeated same-variant lines are legal too (variante_id is the size).
     categoria_id, insumo_id, tipo_id = _setup_insumo_base()
     producto_id = _make_producto(tipo_id)
     variante_id = _make_variante(producto_id)
@@ -457,17 +480,20 @@ def test_create_bom_insumo_dup_variant_returns_409(client, admin_token):
             headers=_auth(admin_token),
         )
         assert first.status_code == 201
-        resp = client.post(
+        second = client.post(
             f"{BASE}/{producto_id}/bom/insumos",
             json={
                 "insumo_id": insumo_id,
-                "cantidad_requerida": 1,
+                "cantidad_requerida": 2,
                 "variante_id": variante_id,
             },
             headers=_auth(admin_token),
         )
-        assert resp.status_code == 409
+        assert second.status_code == 201
+        rows = client.get(f"{BASE}/{producto_id}/bom/insumos", headers=_auth(admin_token)).json()
+        assert len(rows) == 2
         _cleanup_linea_insumo(first.json()["id"])
+        _cleanup_linea_insumo(second.json()["id"])
     finally:
         _cleanup_producto(producto_id)
         _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
@@ -498,6 +524,83 @@ def test_create_bom_insumo_null_y_variante_returns_201(client, admin_token):
         _cleanup_linea_insumo(base.json()["id"])
         _cleanup_linea_insumo(especifica.json()["id"])
     finally:
+        _cleanup_producto(producto_id)
+        _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
+
+
+def test_create_bom_insumo_detalle_piece_labels_coexist(client, admin_token):
+    # Same insumo twice with distinct piece labels -> both 201, list returns detalle.
+    categoria_id, insumo_id, tipo_id = _setup_insumo_base()
+    producto_id = _make_producto(tipo_id)
+    try:
+        torso = client.post(
+            f"{BASE}/{producto_id}/bom/insumos",
+            json={"insumo_id": insumo_id, "cantidad_requerida": 1, "detalle": "torso"},
+            headers=_auth(admin_token),
+        )
+        assert torso.status_code == 201
+        assert torso.json()["detalle"] == "torso"
+        manga = client.post(
+            f"{BASE}/{producto_id}/bom/insumos",
+            json={
+                "insumo_id": insumo_id,
+                "cantidad_requerida": 2,
+                "detalle": "manga izquierda",
+            },
+            headers=_auth(admin_token),
+        )
+        assert manga.status_code == 201
+        assert manga.json()["detalle"] == "manga izquierda"
+        rows = client.get(f"{BASE}/{producto_id}/bom/insumos", headers=_auth(admin_token)).json()
+        assert len(rows) == 2
+        assert {r["detalle"] for r in rows} == {"torso", "manga izquierda"}
+        _cleanup_linea_insumo(torso.json()["id"])
+        _cleanup_linea_insumo(manga.json()["id"])
+    finally:
+        _cleanup_producto(producto_id)
+        _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
+
+
+def test_create_bom_insumo_detalle_blank_becomes_null(client, admin_token):
+    # Blank labels collapse to NULL (same rule as factura in compra_insumo).
+    categoria_id, insumo_id, tipo_id = _setup_insumo_base()
+    producto_id = _make_producto(tipo_id)
+    try:
+        resp = client.post(
+            f"{BASE}/{producto_id}/bom/insumos",
+            json={"insumo_id": insumo_id, "cantidad_requerida": 1, "detalle": "   "},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 201
+        assert resp.json()["detalle"] is None
+        _cleanup_linea_insumo(resp.json()["id"])
+    finally:
+        _cleanup_producto(producto_id)
+        _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
+
+
+def test_update_bom_insumo_detalle_alone(client, admin_token):
+    # PUT with only detalle updates the label; explicit null clears it.
+    categoria_id, insumo_id, tipo_id = _setup_insumo_base()
+    producto_id = _make_producto(tipo_id)
+    linea_id = _make_linea_insumo(producto_id, insumo_id)
+    try:
+        resp = client.put(
+            f"{BASE}/{producto_id}/bom/insumos/{linea_id}",
+            json={"detalle": "torso"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["detalle"] == "torso"
+        resp = client.put(
+            f"{BASE}/{producto_id}/bom/insumos/{linea_id}",
+            json={"detalle": None},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["detalle"] is None
+    finally:
+        _cleanup_linea_insumo(linea_id)
         _cleanup_producto(producto_id)
         _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
 

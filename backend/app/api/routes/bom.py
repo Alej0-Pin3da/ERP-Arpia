@@ -36,37 +36,6 @@ def _validar_variante_del_producto(db: Session, producto_id: int, variante_id: i
         )
 
 
-def validar_linea_insumo_unica(
-    db: Session,
-    producto_id: int,
-    insumo_id: int,
-    variante_id: int | None,
-    exclude_id: int | None = None,
-) -> None:
-    """Reject duplicate BOM insumo lines.
-
-    PostgreSQL treats NULLs as distinct, so the (producto_id, insumo_id,
-    variante_id) unique constraint does NOT catch two rows with
-    variante_id IS NULL. An explicit SELECT including `variante_id IS NULL`
-    closes that hole; the IntegrityError branch is a defensive fallback.
-    """
-    stmt = select(BomInsumo.id).where(
-        BomInsumo.producto_id == producto_id,
-        BomInsumo.insumo_id == insumo_id,
-    )
-    if variante_id is None:
-        stmt = stmt.where(BomInsumo.variante_id.is_(None))
-    else:
-        stmt = stmt.where(BomInsumo.variante_id == variante_id)
-    if exclude_id is not None:
-        stmt = stmt.where(BomInsumo.id != exclude_id)
-    if db.scalars(stmt).first() is not None:
-        raise HTTPException(
-            status_code=409,
-            detail="BomInsumo line already exists for this product, insumo and variant",
-        ) from None
-
-
 def _validar_linea_producto_unica(
     db: Session, combo_id: int, producto_incluido_id: int, exclude_id: int | None = None
 ) -> None:
@@ -114,7 +83,9 @@ def create_bom_insumo(
         raise HTTPException(status_code=400, detail="Insumo does not exist")
     if payload.variante_id is not None:
         _validar_variante_del_producto(db, producto_id, payload.variante_id)
-    validar_linea_insumo_unica(db, producto_id, payload.insumo_id, payload.variante_id)
+    # Repeated insumo lines are legal and SUM (one row per garment piece),
+    # so there is no uniqueness check here; the IntegrityError branch below
+    # stays as a defensive backstop for any residual DB-level constraint.
     linea = BomInsumo(producto_id=producto_id, **payload.model_dump())
     db.add(linea)
     try:
@@ -148,9 +119,6 @@ def update_bom_insumo(
         raise HTTPException(status_code=400, detail="Insumo does not exist")
     if nueva_variante_id is not None:
         _validar_variante_del_producto(db, producto_id, nueva_variante_id)
-    validar_linea_insumo_unica(
-        db, producto_id, nuevo_insumo_id, nueva_variante_id, exclude_id=linea_id
-    )
     for field, value in updates.items():
         setattr(linea, field, value)
     try:

@@ -48,6 +48,7 @@ P_BLUSA_ML = f"{P} BOM Blusa ML"
 P_BLUSA_MC = f"{P} BOM Blusa MC"
 P_COMBO = f"{P} BOM Combo"
 P_CADENA = f"{P} BOM Cadena"
+P_REP = f"{P} BOM Repetido"
 
 # Canonical catalog insumos (recalculated 2026-08 workbook) that recipe names
 # resolve to via ALIASES_BOM_A_CATALOGO (now mostly exact match / identity).
@@ -150,7 +151,7 @@ def _borrar_filas_test(db) -> None:
     db.query(Insumo).filter(Insumo.nombre.in_(insumo_nombres)).delete(synchronize_session=False)
     productos = (
         db.query(Producto)
-        .filter(Producto.nombre.in_([P_CORSET, P_BLUSA_ML, P_BLUSA_MC, P_COMBO]))
+        .filter(Producto.nombre.in_([P_CORSET, P_BLUSA_ML, P_BLUSA_MC, P_COMBO, P_REP]))
         .all()
     )
     for prod in productos:
@@ -164,7 +165,7 @@ def _borrar_filas_test(db) -> None:
             synchronize_session=False
         )
     db.query(Producto).filter(
-        Producto.nombre.in_([P_CORSET, P_BLUSA_ML, P_BLUSA_MC, P_COMBO])
+        Producto.nombre.in_([P_CORSET, P_BLUSA_ML, P_BLUSA_MC, P_COMBO, P_REP])
     ).delete(synchronize_session=False)
     # Remove the canonical catalog tipos that bootstrap_catalogo() inserts.
     # They are migration content, not app seed data; leaving them pollutes the
@@ -412,14 +413,52 @@ def test_aplicar_bom_idempotente_variante_null(db, mini_bom):
     _preparar_catalogo(db)
     with LibroMigracion(mini_bom) as libro:
         plan = plan_bom(libro, bloques=_bloques_mini())
-    aplicar_bom(db, plan)
+    res1 = aplicar_bom(db, plan)
     db.commit()
-    aplicar_bom(db, plan)
+    res2 = aplicar_bom(db, plan)
     db.commit()
 
     corset = db.query(Producto).filter(Producto.nombre == P_CORSET).one()
     lineas = db.query(BomInsumo).filter(BomInsumo.producto_id == corset.id).all()
-    assert len(lineas) == 3  # re-ejecucion no duplica (dedup manual NULL)
+    assert len(lineas) == 3  # re-ejecucion no duplica (match exacto por cantidad)
+    assert res2["bom_insumos"] == 0  # segunda pasada: todo ya-existente
+    assert res1["bom_insumos"] > 0 or res2["ya_exist"] > 0
+
+
+def test_aplicar_bom_lineas_repetidas_insertan_n_filas_que_suman(db):
+    """Blusa case: 3 plan rows of the same insumo -> 3 DB lines that SUM.
+
+    Every plan line inserts its own row (first-wins would keep 1); the
+    quantities accumulate in costos/explosion instead of overriding.
+    """
+    from migrate.bom import BomLinea, BomPlan, aplicar_bom
+    from migrate.catalog import upsert_producto
+
+    _preparar_catalogo(db)
+    rep_id = upsert_producto(db, P_REP, tipo="Blusa").id
+    db.commit()
+    plan = BomPlan(
+        insumos=[
+            BomLinea(P_REP, P_TELA, Decimal("0.64"), "BLUSAS", 3),
+            BomLinea(P_REP, P_TELA, Decimal("0.45"), "BLUSAS", 4),
+            BomLinea(P_REP, P_TELA, Decimal("0.45"), "BLUSAS", 5),
+        ]
+    )
+    res = aplicar_bom(db, plan)
+    db.commit()
+
+    assert res["bom_insumos"] == 3
+    lineas = db.query(BomInsumo).filter(BomInsumo.producto_id == rep_id).all()
+    assert len(lineas) == 3
+    assert all(item.variante_id is None for item in lineas)
+    assert sum((item.cantidad_requerida for item in lineas), Decimal("0")) == Decimal("1.54")
+
+    # Re-run is idempotent: identical lines match, nothing stacks.
+    res2 = aplicar_bom(db, plan)
+    db.commit()
+    assert res2["bom_insumos"] == 0
+    assert res2["ya_exist"] == 3
+    assert db.query(BomInsumo).filter(BomInsumo.producto_id == rep_id).count() == 3
 
 
 def test_aplicar_bom_multinivel_combo(db, mini_bom):

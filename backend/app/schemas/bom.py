@@ -1,7 +1,15 @@
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def _normalizar_detalle(v: str | None) -> str | None:
+    """Blank piece labels become NULL (same rule as factura in compra_insumo)."""
+    if v is None:
+        return None
+    stripped = v.strip()
+    return stripped if stripped else None
 
 
 class BomInsumoBase(BaseModel):
@@ -12,6 +20,12 @@ class BomInsumoBase(BaseModel):
     fases: list[Any] | dict[str, Any] | None = None
     tiempo_estimado_minutos: int | None = Field(default=None, ge=0)
     markup_porcentual: Decimal | None = Field(default=None, ge=0)
+    detalle: str | None = Field(default=None, max_length=150)
+
+    @field_validator("detalle", mode="after")
+    @classmethod
+    def _strip_detalle(cls, v: str | None) -> str | None:
+        return _normalizar_detalle(v)
 
 
 class BomInsumoCreate(BomInsumoBase):
@@ -26,6 +40,12 @@ class BomInsumoUpdate(BaseModel):
     fases: list[Any] | dict[str, Any] | None = None
     tiempo_estimado_minutos: int | None = Field(default=None, ge=0)
     markup_porcentual: Decimal | None = Field(default=None, ge=0)
+    detalle: str | None = Field(default=None, max_length=150)
+
+    @field_validator("detalle", mode="after")
+    @classmethod
+    def _strip_detalle(cls, v: str | None) -> str | None:
+        return _normalizar_detalle(v)
 
 
 class BomInsumoRead(BomInsumoBase):

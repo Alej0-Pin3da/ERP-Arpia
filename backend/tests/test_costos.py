@@ -131,6 +131,7 @@ def _make_linea_insumo(
     variante_id: int | None = None,
     cantidad: str = "1",
     desperdicio: str = "0",
+    detalle: str | None = None,
 ) -> int:
     db = SessionLocal()
     try:
@@ -140,6 +141,7 @@ def _make_linea_insumo(
             variante_id=variante_id,
             cantidad_requerida=Decimal(cantidad),
             porcentaje_desperdicio=Decimal(desperdicio),
+            detalle=detalle,
         )
         db.add(linea)
         db.commit()
@@ -331,6 +333,68 @@ def test_costo_multinivel_combo():
         _cleanup_insumo(insumo_id)
         _cleanup_categoria(categoria_id)
         _cleanup_tipo(tipo_id)
+
+
+def test_costo_lineas_repetidas_suman():
+    # Blusa case: 3 additive rows of the same insumo SUM instead of
+    # overriding — (1 + 2 + 3) x 5 = 30.
+    categoria_id, insumo_id, tipo_id = _setup_insumo_base(costo="5")
+    producto_id = _make_producto(tipo_id)
+    _make_linea_insumo(producto_id, insumo_id, cantidad="1")
+    _make_linea_insumo(producto_id, insumo_id, cantidad="2")
+    _make_linea_insumo(producto_id, insumo_id, cantidad="3")
+    try:
+        db = SessionLocal()
+        try:
+            total = calcular_costo_produccion(db, producto_id)
+            assert total == Decimal("30.0000")
+        finally:
+            db.close()
+    finally:
+        _cleanup_producto(producto_id)
+        _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
+
+
+def test_costo_detalle_no_cambia_total():
+    # detalle is a cost-neutral piece label: labeled lines cost exactly the
+    # same as unlabeled ones — (1 + 2) x 5 = 15 either way.
+    categoria_id, insumo_id, tipo_id = _setup_insumo_base(costo="5")
+    producto_id = _make_producto(tipo_id)
+    _make_linea_insumo(producto_id, insumo_id, cantidad="1", detalle="torso")
+    _make_linea_insumo(producto_id, insumo_id, cantidad="2", detalle="manga izquierda")
+    try:
+        db = SessionLocal()
+        try:
+            total, lineas = desglosar_costo_produccion(db, producto_id)
+            assert total == Decimal("15.0000")
+            assert sum((l.costo_total for l in lineas), Decimal("0")) == Decimal("15.0000")
+        finally:
+            db.close()
+    finally:
+        _cleanup_producto(producto_id)
+        _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
+
+
+def test_costo_variante_repetidas_suman_sin_base():
+    # Variant override is cross-level only: with ANY variant row for the
+    # insumo, ALL NULL base rows are ignored, while the variant rows
+    # themselves still SUM — (2 + 3) x 5 = 25, base 1 x 5 NOT added.
+    categoria_id, insumo_id, tipo_id = _setup_insumo_base(costo="5")
+    producto_id = _make_producto(tipo_id)
+    variante_id = _make_variante(producto_id)
+    _make_linea_insumo(producto_id, insumo_id, variante_id=None, cantidad="1")
+    _make_linea_insumo(producto_id, insumo_id, variante_id=variante_id, cantidad="2")
+    _make_linea_insumo(producto_id, insumo_id, variante_id=variante_id, cantidad="3")
+    try:
+        db = SessionLocal()
+        try:
+            assert calcular_costo_produccion(db, producto_id, variante_id) == Decimal("25.0000")
+            assert calcular_costo_produccion(db, producto_id) == Decimal("5.0000")
+        finally:
+            db.close()
+    finally:
+        _cleanup_producto(producto_id)
+        _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
 
 
 def test_costo_variante_override_no_se_suma_base():

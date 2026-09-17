@@ -26,10 +26,11 @@ mode, applies it inside a single ``session_scope`` (EXM-4):
   cm2) -> as-is. Uninterpretable amounts (None, '#DIV/0!', cero, no-numeric)
   are reported and excluded, never inferred (EXM-2).
 
-Idempotencia (NFR-1/EXM-3): PG UNIQUE does not apply over NULLs, and the app
-model has no UNIQUE over (producto, insumo, variante), so BomInsumo dedup is
-MANUAL by natural key (producto_id, insumo_id, variante_id NULL) and
-BomProducto by (combo_id, producto_incluido_id): re-running never duplicates.
+Idempotencia (NFR-1/EXM-3): repeated insumo lines are legal and SUM (one
+row per garment piece), so BomInsumo dedup is by EXACT line identity
+(producto_id, insumo_id, variante_id NULL, cantidad, desperdicio): re-running
+never stacks identical lines and never drops distinct ones. BomProducto by
+(combo_id, producto_incluido_id): re-running never duplicates.
 
 Transactions: the caller owns the commit; the enclosing ``session_scope``
 commits once at the end (EXM-4). In dry-run nothing is written (NFR-2).
@@ -39,10 +40,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from openpyxl.utils import column_index_from_string
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.models import BomInsumo, BomProducto, Insumo, Producto
 from migrate.catalog import _es_material_valido, clave_normalizada, normalizar_nombre
@@ -370,21 +371,51 @@ def plan_bom(
 
 
 # ------------------------------------------------------------------------- #
-# DB apply (idempotente: NFR-1 / EX-3; variante NULL -> dedup manual)
+# DB apply (idempotente: NFR-1 / EX-3; exact line identity incl. quantity)
 # ------------------------------------------------------------------------- #
 
 
-def _bom_insumo_existente(db, producto_id: int, insumo_id: int) -> bool:
-    return (
-        db.scalar(
-            select(BomInsumo.id).where(
-                BomInsumo.producto_id == producto_id,
-                BomInsumo.insumo_id == insumo_id,
-                BomInsumo.variante_id.is_(None),
-            )
+def _cantidad_almacenada(cantidad: Decimal) -> Decimal:
+    """Plan quantity as the DB stores it (NUMERIC(15,4) rounds on write).
+
+    Postgres rounds half away from zero; all BOM quantities are positive so
+    ROUND_HALF_UP matches. Comparing the stored shape keeps re-runs stable
+    for batch-divided values with >4 decimals.
+    """
+    return cantidad.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+
+def _contar_bom_insumos_identicos(
+    db,
+    producto_id: int,
+    insumo_id: int,
+    cantidad: Decimal,
+    desperdicio: Decimal,
+) -> int:
+    """Count identical NULL-variant rows (exact line identity).
+
+    Repeated lines are legal (one row per garment piece), so a plan line
+    counts as "already applied" only against an identical (producto, insumo,
+    variante NULL, cantidad, desperdicio) row — matching on the combo alone
+    would shadow every repetition after the first. The caller compares this
+    count against the line's occurrence index within the run, so N identical
+    plan rows (e.g. 2 manga sleeves with the same quantity) keep N DB rows
+    while a re-run inserts nothing. detalle is intentionally NOT part of the
+    identity: import rows are always unlabeled (NULL) and API-set labels must
+    never shadow import idempotence.
+    """
+    stmt = (
+        select(func.count())
+        .select_from(BomInsumo)
+        .where(
+            BomInsumo.producto_id == producto_id,
+            BomInsumo.insumo_id == insumo_id,
+            BomInsumo.variante_id.is_(None),
+            BomInsumo.cantidad_requerida == cantidad,
+            BomInsumo.porcentaje_desperdicio == desperdicio,
         )
-        is not None
     )
+    return db.scalar(stmt) or 0
 
 
 def _bom_producto_existente(db, combo_id: int, producto_incluido_id: int) -> bool:
@@ -415,7 +446,10 @@ def aplicar_bom(db, plan: BomPlan, report=None) -> dict[str, int]:
     El caller (session_scope) controla el commit unico (EXM-4). Una fila cuyo
     producto o insumo no existe aun en el catalogo se OMITE y reporta (el
     catalogo F1 corre antes; un faltante aqui es un error de datos -> report).
-    Idempotente: re-ejecutar nunca duplica (dedup manual sobre variables NULL).
+    Idempotente: re-ejecutar nunca apila lineas identicas (match exacto por
+    cantidad contra el indice de ocurrencia en la pasada) y nunca elimina
+    repeticiones distintas (cada cantidad inserta su propia fila, que SUMAN
+    en costos/explosion).
     """
     res = {
         "bom_insumos": 0,
@@ -424,6 +458,22 @@ def aplicar_bom(db, plan: BomPlan, report=None) -> dict[str, int]:
         "ya_exist": 0,
         "omitidos": 0,
     }
+    # Occurrence index per exact line identity within THIS run: the k-th
+    # identical plan line (0-based) is already applied when >k identical rows
+    # exist. Each insert flushes, so the count sees this run's own rows.
+    vistos: dict[tuple[int, int, Decimal, Decimal], int] = {}
+
+    def _ya_aplicada(
+        producto_id: int, insumo_id: int, cantidad: Decimal, desperdicio: Decimal
+    ) -> bool:
+        clave = (producto_id, insumo_id, cantidad, desperdicio)
+        indice = vistos.get(clave, 0)
+        vistos[clave] = indice + 1
+        return (
+            _contar_bom_insumos_identicos(db, producto_id, insumo_id, cantidad, desperdicio)
+            > indice
+        )
+
     for linea in plan.insumos:
         producto = _producto_por_nombre(db, linea.producto_nombre)
         insumo = _insumo_por_nombre(db, linea.insumo_nombre)
@@ -438,7 +488,17 @@ def aplicar_bom(db, plan: BomPlan, report=None) -> dict[str, int]:
                     f"insumo ausente en catalogo; linea omitida",
                 )
             continue
-        if _bom_insumo_existente(db, producto.id, insumo.id):
+        # Every plan line inserts its own row: repeated lines of the same
+        # insumo are additive (one row per garment piece). The match below is
+        # on the exact quantity, quantized to the column scale NUMERIC(15,4):
+        # the DB rounds on store, so comparing the raw plan value would miss
+        # on re-runs with >4dp quantities (e.g. batch-divided 0.088333...).
+        if _ya_aplicada(
+            producto.id,
+            insumo.id,
+            _cantidad_almacenada(linea.cantidad),
+            Decimal("0"),
+        ):
             res["ya_exist"] += 1
             continue
         db.add(
@@ -448,6 +508,8 @@ def aplicar_bom(db, plan: BomPlan, report=None) -> dict[str, int]:
                 variante_id=None,
                 cantidad_requerida=linea.cantidad,
                 porcentaje_desperdicio=Decimal("0"),
+                # Excel has no detalle column: import lines stay unlabeled.
+                detalle=None,
             )
         )
         db.flush()
@@ -493,7 +555,12 @@ def aplicar_bom(db, plan: BomPlan, report=None) -> dict[str, int]:
         if combo is None or insumo is None:
             res["omitidos"] += 1
             continue
-        if _bom_insumo_existente(db, combo.id, insumo.id):
+        if _ya_aplicada(
+            combo.id,
+            insumo.id,
+            _cantidad_almacenada(linea.cantidad),
+            Decimal("0"),
+        ):
             res["ya_exist"] += 1
             continue
         db.add(
@@ -503,6 +570,8 @@ def aplicar_bom(db, plan: BomPlan, report=None) -> dict[str, int]:
                 variante_id=None,
                 cantidad_requerida=linea.cantidad,
                 porcentaje_desperdicio=Decimal("0"),
+                # Excel has no detalle column: import lines stay unlabeled.
+                detalle=None,
             )
         )
         db.flush()
