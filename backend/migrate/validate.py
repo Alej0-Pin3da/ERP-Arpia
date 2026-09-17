@@ -11,8 +11,18 @@ Checks (spec EXM-5, NFR-1/2; design #423; slice-8 contract N7a-g):
   BOM_-insumos, compras, ventas, movimientos, socios). Identity is the plan's
   own rows (normalized names / natural identifiers); the DB is checked for
   each expected identifier: missing -> WARN (with cause), duplicated rows of
-  the same identity -> ERROR (a re-run duplicated). DB rows NOT attributable
-  to the plan (manual ERP data, other-source rows) are out of scope.
+  the same identity -> ERROR (a re-run duplicated). BOM_Insumos repeats are
+  legal and SUM (one row per garment piece), so BOM duplicados use EXACT
+  line identity like the loader (producto, insumo, variante NULL-ness,
+  cantidad quantized NUMERIC(15,4), desperdicio) + occurrence index: only
+  DB occurrences BEYOND the plan count flag. The same SUM/excess semantics
+  apply to compras (insumo, fecha, cantidad, precio — loader F2 natural key),
+  ventas (fecha, producto, variante, cantidad, precio — loader F5 key with the
+  same unidirectional variante_coincide as N7g), and movimientos (fecha, tipo,
+  monto, socio, descripcion — loader F6 key): legitimate repeats with
+  different dates/amounts are distinct keys and never flag; only exact twins
+  BEYOND the plan count flag. DB rows NOT attributable to the plan (manual
+  ERP data, other-source rows) are out of scope.
 - N7b "stock_negativo": no Insumo with stock_actual < 0 (EXM-5).
 - N7c "finanzas": scoped movements (descripcion of the plan) have monto > 0
   and the sum per tipo matches the plan; canonical partners (FIN-2) sum 100.
@@ -26,9 +36,12 @@ Checks (spec EXM-5, NFR-1/2; design #423; slice-8 contract N7a-g):
   descuento_porcentaje == 0 (no double discount, VTA-2).
 - N7f "fechas": no migration row carries a fake now() date (D5).
 - N7g "idempotencia": natural keys (insumo, fecha, cantidad, precio) of
-  compras / (fecha, tipo, monto, socio, descripcion) of movimientos /
-  (producto, insumo) of BOM with count > 1 -> ERROR; sales per natural key
-  greater than the plan count -> ERROR.
+  compras / (fecha, tipo, monto, socio, descripcion) of movimientos with
+  count greater than the plan count -> ERROR; BOM_Insumos repeats are legal
+  and SUM, so only DB occurrences of an EXACT line (producto, insumo,
+  variante NULL-ness, cantidad quantized, desperdicio — detalle excluded)
+  BEYOND the plan count -> ERROR; sales per natural key greater than the
+  plan count -> ERROR.
 
 The F7 runner is registered in ``migrate/__init__.py`` (FASES_IMPLEMENTADAS+F7).
 """
@@ -182,6 +195,260 @@ def _identidades_bom_db(db) -> dict[str, int]:
     return conteos
 
 
+def _claves_exactas_bom_plan(plan: PlanValidacion) -> dict[tuple, int]:
+    """Plan BOM occurrences per EXACT line (SUM semantics, loader-like).
+
+    Key is (producto, insumo, variante NULL-ness, cantidad quantized
+    NUMERIC(15,4), desperdicio). Plan lines are always variante NULL with
+    desperdicio 0 (the loader writes exactly that); normalized names proxy
+    producto_id/insumo_id at the validation layer (catalog names are unique).
+    """
+    conteos: dict[tuple, int] = defaultdict(int)
+    for item in plan.bom.insumos:
+        conteos[
+            (
+                clave_normalizada(item.producto_nombre),
+                clave_normalizada(item.insumo_nombre),
+                None,
+                _moneda(item.cantidad),
+                _moneda(Decimal("0")),
+            )
+        ] += 1
+    return conteos
+
+
+def _claves_exactas_bom_db(db) -> dict[tuple, int]:
+    """DB BOM occurrences per EXACT line (SUM semantics, loader-like).
+
+    Same key shape as :func:`_claves_exactas_bom_plan`: variante_id NULL-ness
+    distinguishes import rows (always NULL) from variant-scoped rows, and
+    quantities/desperdicio are quantized to the NUMERIC(15,4) column scale.
+    ``detalle`` is explicitly NOT part of the identity (NULL-safe): import
+    never populates it and API-set piece labels (torso, manga, ...) must not
+    shadow loader idempotence.
+    """
+    conteos: dict[tuple, int] = defaultdict(int)
+    filas = (
+        db.query(
+            Producto.nombre,
+            Insumo.nombre,
+            BomInsumo.variante_id,
+            BomInsumo.cantidad_requerida,
+            BomInsumo.porcentaje_desperdicio,
+        )
+        .join(Producto, BomInsumo.producto_id == Producto.id)
+        .join(Insumo, BomInsumo.insumo_id == Insumo.id)
+        .all()
+    )
+    for producto, insumo, variante_id, cantidad, desperdicio in filas:
+        conteos[
+            (
+                clave_normalizada(producto),
+                clave_normalizada(insumo),
+                variante_id,
+                _moneda(cantidad),
+                _moneda(desperdicio),
+            )
+        ] += 1
+    return conteos
+
+
+def _exceso_exactas_bom(db, plan: PlanValidacion) -> int:
+    """DB occurrences of exact BOM lines BEYOND the plan count (SUM semantics).
+
+    Only keys present in the plan count; DB-only exact lines (manual ERP
+    data, variant-scoped rows, combo packaging) are out of scope. Legal
+    repeats with different quantities are distinct keys, so torso-vs-manga
+    lines never flag; identical-quantity twins flag only past the plan count.
+    """
+    plan_conteos = _claves_exactas_bom_plan(plan)
+    if not plan_conteos:
+        return 0
+    db_conteos = _claves_exactas_bom_db(db)
+    return sum(
+        max(0, db_conteos.get(clave, 0) - esperadas)
+        for clave, esperadas in plan_conteos.items()
+    )
+
+
+def _claves_exactas_compras_plan(plan: PlanValidacion) -> dict[tuple, int]:
+    """Plan compra occurrences per EXACT line (SUM/excess semantics, F2-like).
+
+    Key is (insumo, fecha, cantidad quantized, precio quantized) — the F2
+    natural key (insumo_id, fecha_compra, cantidad, precio). Same shape as
+    N7g ``_clave_compra`` so N7a/N7g never drift. Legitimate repeats of the
+    same insumo on different dates/prices are distinct keys; only exact twins
+    beyond the plan count flag. proveedor_id/factura are NOT part of the
+    loader identity (F2 ignores them) so they are excluded here too.
+    """
+    conteos: dict[tuple, int] = defaultdict(int)
+    for compra in plan.compras.compras:
+        conteos[_clave_compra(compra)] += 1
+    return conteos
+
+
+def _claves_exactas_compras_db(db) -> dict[tuple, int]:
+    """DB compra occurrences per EXACT line (same key shape as the plan)."""
+    conteos: dict[tuple, int] = defaultdict(int)
+    filas = (
+        db.query(
+            Insumo.nombre,
+            CompraInsumo.fecha_compra,
+            CompraInsumo.cantidad_comprada,
+            CompraInsumo.precio_unitario_compra,
+        )
+        .join(Insumo, CompraInsumo.insumo_id == Insumo.id)
+        .all()
+    )
+    for insumo, fecha, cantidad, precio in filas:
+        conteos[
+            (
+                clave_normalizada(insumo),
+                fecha.date().isoformat() if fecha is not None else "SIN-FECHA",
+                _moneda(cantidad),
+                _moneda(precio),
+            )
+        ] += 1
+    return conteos
+
+
+def _exceso_exactas_compras(db, plan: PlanValidacion) -> int:
+    """DB occurrences of exact compra lines BEYOND the plan count.
+
+    Only keys present in the plan count; DB-only exact lines (legitimate
+    repeat purchases of the same insumo on other dates/prices, manual ERP
+    data) are out of scope.
+    """
+    plan_conteos = _claves_exactas_compras_plan(plan)
+    if not plan_conteos:
+        return 0
+    db_conteos = _claves_exactas_compras_db(db)
+    return sum(
+        max(0, db_conteos.get(clave, 0) - esperadas)
+        for clave, esperadas in plan_conteos.items()
+    )
+
+
+def _claves_exactas_movimientos_plan(plan: PlanValidacion) -> dict[tuple, int]:
+    """Plan movimiento occurrences per EXACT line (F6-like natural key).
+
+    Key is (fecha, tipo, monto quantized, socio, descripcion) — the same
+    shape N7g uses (loader F6 identity). Same descripcion on different
+    dates/amounts/types are distinct keys and never flag.
+    """
+    conteos: dict[tuple, int] = defaultdict(int)
+    for mov in plan.finanzas.movimientos:
+        conteos[
+            (
+                mov.fecha.date().isoformat() if mov.fecha else "SIN-FECHA",
+                mov.tipo,
+                _moneda(mov.monto),
+                clave_normalizada(mov.socio_nombre) if mov.socio_nombre else None,
+                clave_normalizada(mov.descripcion),
+            )
+        ] += 1
+    return conteos
+
+
+def _claves_exactas_movimientos_db(db) -> dict[tuple, int]:
+    """DB movimiento occurrences per EXACT line (same key shape as the plan)."""
+    conteos: dict[tuple, int] = defaultdict(int)
+    socio_por_id = {s.id: clave_normalizada(s.nombre) for s in db.query(SociosConfiguracion).all()}
+    for m in db.query(MovimientoFinanciero).all():
+        conteos[
+            (
+                m.fecha.date().isoformat() if m.fecha else "SIN-FECHA",
+                m.tipo,
+                _moneda(m.monto),
+                socio_por_id.get(m.socio_id) if m.socio_id else None,
+                clave_normalizada(m.descripcion),
+            )
+        ] += 1
+    return conteos
+
+
+def _exceso_exactas_movimientos(db, plan: PlanValidacion) -> int:
+    """DB occurrences of exact movimiento lines BEYOND the plan count.
+
+    Only keys present in the plan count; DB-only exact lines (same
+    descripcion reused on other dates/amounts, manual ERP data) are out of
+    scope.
+    """
+    plan_conteos = _claves_exactas_movimientos_plan(plan)
+    if not plan_conteos:
+        return 0
+    db_conteos = _claves_exactas_movimientos_db(db)
+    return sum(
+        max(0, db_conteos.get(clave, 0) - esperadas)
+        for clave, esperadas in plan_conteos.items()
+    )
+
+
+def _exceso_exactas_ventas(db, plan: PlanValidacion) -> int:
+    """DB occurrences of exact venta lines BEYOND the plan count.
+
+    Same key shape and unidirectional ``variante_coincide`` matching as N7g
+    (plan CON talla matches DB rows with that talla OR historic NULL rows),
+    so N7a/N7g never drift. Repeats of the same product on different
+    dates/prices/quantities are distinct keys and never flag; only exact
+    twins beyond the plan count flag. DB-only exact lines (manual ERP data)
+    are out of scope. canal_venta is NOT part of the loader identity (F5
+    always writes 'feria') so it is excluded here too.
+    """
+    plan_ventas: dict[tuple, int] = defaultdict(int)
+    for v in plan.ventas.ventas:
+        plan_ventas[
+            (
+                v.fecha.date(),
+                clave_normalizada(v.producto_nombre),
+                clave_normalizada(v.variante_nombre) if v.variante_nombre else None,
+                v.cantidad,
+                _moneda(v.precio),
+            )
+        ] += 1
+    if not plan_ventas:
+        return 0
+    variantes = {
+        vid: clave_normalizada(name)
+        for vid, name in db.query(VarianteProducto.id, VarianteProducto.nombre_variante).all()
+    }
+    filas_db: list[tuple] = [
+        (
+            fecha.date(),
+            clave_normalizada(producto),
+            variantes.get(vid),
+            cantidad,
+            _moneda(precio),
+        )
+        for fecha, producto, vid, cantidad, precio in db.query(
+            Venta.fecha,
+            Producto.nombre,
+            DetalleVenta.variante_id,
+            DetalleVenta.cantidad,
+            DetalleVenta.precio_unitario_aplicado,
+        )
+        .join(DetalleVenta, DetalleVenta.venta_id == Venta.id)
+        .join(Producto, DetalleVenta.producto_id == Producto.id)
+        .all()
+    ]
+
+    def _cuenta_db(plan_clave: tuple) -> int:
+        fecha, prod, var, cant, prec = plan_clave
+        return sum(
+            1
+            for d_fecha, d_prod, d_var, d_cant, d_prec in filas_db
+            if d_fecha == fecha
+            and d_prod == prod
+            and d_cant == cant
+            and d_prec == prec
+            and variante_coincide(var, d_var)
+        )
+
+    return sum(
+        max(0, _cuenta_db(clave) - esperadas) for clave, esperadas in plan_ventas.items()
+    )
+
+
 def _identidades_compras_db(db) -> dict[str, int]:
     """Compra ids keyed by the insumo name (the F2 natural id)."""
     conteos: dict[str, int] = defaultdict(int)
@@ -222,7 +489,17 @@ def _productos_del_plan(plan: PlanValidacion) -> list[str]:
 
 
 def _n7a_conteos(db, plan: PlanValidacion) -> CheckResult:
-    """Dominios tipificados: esperado = filas del plan; DB = filas con identidad."""
+    """Dominios tipificados: esperado = filas del plan; DB = filas con identidad.
+
+    BOM_Insumos repeats are legal and SUM: faltantes stay coarse
+    (producto|insumo present), but duplicados count only exact-line
+    occurrences (loader identity + occurrence index) BEYOND the plan.
+    The same SUM/excess semantics apply to compras, ventas and
+    movimientos: faltantes stay coarse (bare-name presence, untouched),
+    but duplicados count only exact-line occurrences BEYOND the plan —
+    legitimate repeats (same insumo/producto/descripcion on different
+    dates/amounts) are distinct exact keys and never flag.
+    """
     esperados_por_dominio: list[tuple[str, list[str]]] = [
         ("insumos", [normalizar_nombre(i.nombre) for i in plan.catalogo.insumos]),
         ("tipos", [normalizar_nombre(t) for t in plan.catalogo.tipos]),
@@ -259,11 +536,25 @@ def _n7a_conteos(db, plan: PlanValidacion) -> CheckResult:
             cuenta = db_claves[nombre].get(clave_normalizada(esperado), 0)
             if cuenta >= 1:
                 presentes += 1
-                if cuenta > 1:
+                # BOM/compras/ventas/movimientos repeats are legal and SUM:
+                # coarse cuenta > 1 is NOT a duplicate (multiple purchases of
+                # the same insumo, multiple sales of the same product, and
+                # movements sharing a descripcion are legitimate). Exact-line
+                # excess is added below via _exceso_exactas_*.
+                if cuenta > 1 and nombre not in (
+                    "bom_insumos",
+                    "compras",
+                    "ventas",
+                    "movimientos",
+                ):
                     duplicados += 1
             else:
                 faltantes += 1
         piezas.append(f"{nombre} {presentes}/{len(esperados)}")
+    duplicados += _exceso_exactas_bom(db, plan)
+    duplicados += _exceso_exactas_compras(db, plan)
+    duplicados += _exceso_exactas_ventas(db, plan)
+    duplicados += _exceso_exactas_movimientos(db, plan)
 
     estado = "ERROR" if duplicados else ("WARN" if faltantes else "OK")
     detalle = f"conteos: {' | '.join(piezas)} - faltantes {faltantes}, duplicados {duplicados}"
@@ -522,7 +813,11 @@ def _clave_compra(plan) -> tuple:
 
 
 def _n7g_idempotencia(db, plan: PlanValidacion) -> CheckResult:
-    """Claves naturales con count > 1 → ERROR (un re-run habria duplicado)."""
+    """Claves naturales con count > plan count → ERROR (un re-run habria duplicado).
+
+    BOM uses SUM semantics (exact-line identity + occurrence index, detalle
+    excluded): genuine multi-piece repeats pass clean.
+    """
     errores: list[str] = []
 
     # compras: clave natural F2 (insumo, fecha, cantidad, precio).
@@ -581,14 +876,20 @@ def _n7g_idempotencia(db, plan: PlanValidacion) -> CheckResult:
         if db_movimientos.get(clave, 0) > esperadas:
             errores.append(f"movimiento duplicado: {clave[4]} @ {clave[0]}")
 
-    # bom: identidad producto|insumo con count > 1.
-    plan_bom_ids = {
-        f"{clave_normalizada(item.producto_nombre)}|{clave_normalizada(item.insumo_nombre)}"
-        for item in plan.bom.insumos
-    }
-    for identidad, cuenta in _identidades_bom_db(db).items():
-        if identidad in plan_bom_ids and cuenta > 1:
-            errores.append(f"BOM_INSUMOS duplicado: {identidad}")
+    # bom: SUM semantics — repeated lines are legal (one row per garment
+    # piece). Only DB occurrences of an EXACT line (loader identity +
+    # occurrence index, detalle excluded) BEYOND the plan count flag; repeats
+    # with distinct quantities pass clean.
+    plan_bom_exactas = _claves_exactas_bom_plan(plan)
+    if plan_bom_exactas:
+        db_bom_exactas = _claves_exactas_bom_db(db)
+        for clave, esperadas in plan_bom_exactas.items():
+            encontradas = db_bom_exactas.get(clave, 0)
+            if encontradas > esperadas:
+                errores.append(
+                    f"BOM_INSUMOS duplicado: {clave[0]}|{clave[1]} x {clave[3]} "
+                    f"(DB {encontradas} > plan {esperadas})"
+                )
 
     # ventas: count por clave natural > count del plan. MIG-5/D4: la clave del
     # plan CON talla matchea filas DB con ESA talla O filas NULL historicas

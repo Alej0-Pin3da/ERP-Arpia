@@ -820,6 +820,296 @@ def test_n7g_omitida_sin_talla_no_duplicada(db, tmp_path):
 
 
 # --------------------------------------------------------------------------- #
+# N7a/N7g: BOM SUM semantics (repeats are legal, one row per garment piece)
+# --------------------------------------------------------------------------- #
+
+
+def _espejar_plan_bom_en_db(db, plan, detalles=None):
+    """Replace test BOM rows with one NULL-variant row per plan line.
+
+    Mirrors the loader output (variante NULL, desperdicio 0, detalle as
+    given) so the DB holds exactly the plan's exact lines. Extra ``detalles``
+    labels prove ``detalle`` is excluded from the check identity.
+    """
+    db.query(BomInsumo).filter(
+        BomInsumo.producto_id.in_(db.query(Producto.id).filter(Producto.nombre == P_PROD))
+    ).delete(synchronize_session=False)
+    db.query(BomInsumo).filter(
+        BomInsumo.insumo_id.in_(db.query(Insumo.id).filter(Insumo.nombre == P_TELA))
+    ).delete(synchronize_session=False)
+    db.commit()
+    producto = db.query(Producto).filter(Producto.nombre == P_PROD).one()
+    tela = db.query(Insumo).filter(Insumo.nombre == P_TELA).one()
+    etiquetas = list(detalles) if detalles is not None else [None] * len(plan.bom.insumos)
+    for linea, detalle in zip(plan.bom.insumos, etiquetas):
+        db.add(
+            BomInsumo(
+                producto_id=producto.id,
+                insumo_id=tela.id,
+                variante_id=None,
+                cantidad_requerida=linea.cantidad,
+                porcentaje_desperdicio=Decimal("0"),
+                detalle=detalle,
+            )
+        )
+    db.commit()
+
+
+def test_n7a_bom_mismo_insumo_distinta_cantidad_no_duplica(db, tmp_path):
+    """SUM: 3 plan lines, same producto|insumo, distinct quantities (torso vs
+    manga pieces) with piece labels -> N7a duplicados 0 and N7g clean."""
+    from migrate.validate import checks_n7, plan_para_validacion
+
+    path = tmp_path / "mini-validate-bom-sum.xlsx"
+    _mini_workbook(path)
+    wb = openpyxl.load_workbook(path)
+    ws = wb["Corset Garras"]
+    ws.append([P_TELA, 100, 37, 10000, 2.5, None])
+    ws.append([P_TELA, 150, 37, 15000, 2.5, None])
+    wb.save(path)
+
+    _preparar_entorno(db)
+    with LibroMigracion(path) as libro:
+        plan = plan_para_validacion(libro)
+    assert len(plan.bom.insumos) == 3
+    assert len({l.cantidad for l in plan.bom.insumos}) == 3
+    _espejar_plan_bom_en_db(db, plan, detalles=["torso", "manga", "espalda"])
+    res = {c.id: c for c in checks_n7(db, plan)}
+    n7a = _no_resultado(res, "N7a")
+    assert n7a.estado == "OK", n7a.mensaje
+    assert "duplicados 0" in n7a.mensaje
+    assert _no_resultado(res, "N7g").estado == "OK"
+
+
+def test_n7a_bom_gemelas_misma_cantidad_limpio(db, tmp_path):
+    """Identical-quantity twins: DB count == plan count -> N7a/N7g clean."""
+    from migrate.validate import checks_n7, plan_para_validacion
+
+    path = tmp_path / "mini-validate-bom-twins.xlsx"
+    _mini_workbook(path)
+    wb = openpyxl.load_workbook(path)
+    wb["Corset Garras"].append([P_TELA, 64, 37, 2368, 2.5, None])
+    wb.save(path)
+
+    _preparar_entorno(db)
+    with LibroMigracion(path) as libro:
+        plan = plan_para_validacion(libro)
+    assert len(plan.bom.insumos) == 2
+    assert plan.bom.insumos[0].cantidad == plan.bom.insumos[1].cantidad
+    _espejar_plan_bom_en_db(db, plan, detalles=[None, "manga"])
+    res = {c.id: c for c in checks_n7(db, plan)}
+    n7a = _no_resultado(res, "N7a")
+    assert n7a.estado == "OK", n7a.mensaje
+    assert "duplicados 0" in n7a.mensaje
+    assert _no_resultado(res, "N7g").estado == "OK"
+
+
+def test_n7a_bom_gemelas_exceso_es_error(db, tmp_path):
+    """Same twin plan but the DB holds one extra identical line (beyond loader
+    idempotence) -> N7a ERROR and N7g 'BOM_INSUMOS duplicado' ERROR."""
+    from migrate.validate import checks_n7, plan_para_validacion
+
+    path = tmp_path / "mini-validate-bom-twins-exceso.xlsx"
+    _mini_workbook(path)
+    wb = openpyxl.load_workbook(path)
+    wb["Corset Garras"].append([P_TELA, 64, 37, 2368, 2.5, None])
+    wb.save(path)
+
+    _preparar_entorno(db)
+    with LibroMigracion(path) as libro:
+        plan = plan_para_validacion(libro)
+    assert len(plan.bom.insumos) == 2
+    _espejar_plan_bom_en_db(db, plan)
+    producto = db.query(Producto).filter(Producto.nombre == P_PROD).one()
+    tela = db.query(Insumo).filter(Insumo.nombre == P_TELA).one()
+    db.add(
+        BomInsumo(
+            producto_id=producto.id,
+            insumo_id=tela.id,
+            variante_id=None,
+            cantidad_requerida=plan.bom.insumos[0].cantidad,
+            porcentaje_desperdicio=Decimal("0"),
+            detalle=None,
+        )
+    )
+    db.commit()
+    res = {c.id: c for c in checks_n7(db, plan)}
+    assert _no_resultado(res, "N7a").estado == "ERROR"
+    n7g = _no_resultado(res, "N7g")
+    assert n7g.estado == "ERROR"
+    assert "BOM_INSUMOS duplicado" in n7g.mensaje
+
+
+# --------------------------------------------------------------------------- #
+# N7a: non-BOM SUM semantics (legitimate repeats are distinct exact lines)
+# --------------------------------------------------------------------------- #
+
+
+def test_n7a_compras_mismo_insumo_distinta_fecha_limpio(db, mini_libro):
+    """Same insumo purchased again on another date/price is a distinct exact
+    line -> N7a duplicados 0 and N7g clean (DB-only key out of scope)."""
+    from datetime import UTC, datetime
+
+    _preparar_entorno(db)
+    tela = db.query(Insumo).filter(Insumo.nombre == P_TELA).one()
+    db.add(
+        CompraInsumo(
+            insumo_id=tela.id,
+            fecha_compra=datetime(2025, 9, 16, tzinfo=UTC),
+            cantidad_comprada=Decimal("5"),
+            precio_unitario_compra=Decimal("120"),
+        )
+    )
+    db.commit()
+    res = _controllers(db, mini_libro)
+    n7a = _no_resultado(res, "N7a")
+    assert n7a.estado == "OK", n7a.mensaje
+    assert "duplicados 0" in n7a.mensaje
+    assert _no_resultado(res, "N7g").estado == "OK"
+
+
+def test_n7a_compras_gemela_exacta_exceso_es_error(db, mini_libro):
+    """One extra DB row with the SAME exact compra key (insumo, fecha,
+    cantidad, precio) beyond the plan -> N7a ERROR and N7g compra ERROR."""
+    _preparar_entorno(db)
+    compra = db.query(CompraInsumo).first()
+    db.add(
+        CompraInsumo(
+            insumo_id=compra.insumo_id,
+            fecha_compra=compra.fecha_compra,
+            cantidad_comprada=compra.cantidad_comprada,
+            precio_unitario_compra=compra.precio_unitario_compra,
+        )
+    )
+    db.commit()
+    res = _controllers(db, mini_libro)
+    assert _no_resultado(res, "N7a").estado == "ERROR"
+    n7g = _no_resultado(res, "N7g")
+    assert n7g.estado == "ERROR"
+    assert "compra duplicada" in n7g.mensaje
+
+
+def test_n7a_ventas_mismo_producto_distinta_fecha_limpio(db, mini_libro):
+    """Same product sold again on another date/price is a distinct exact
+    line -> N7a duplicados 0 and N7g clean (DB-only key out of scope)."""
+    from datetime import UTC, datetime
+
+    _preparar_entorno(db)
+    producto = db.query(Producto).filter(Producto.nombre == P_PROD).one()
+    var = next(v for v in producto.variantes if v.nombre_variante == P_VAR)
+    otra_fecha = datetime(2024, 10, 21, tzinfo=UTC)
+    otro_precio = PRECIO_VENTA + Decimal("1000")
+    venta = Venta(
+        fecha=otra_fecha,
+        canal_venta="feria",
+        descuento_porcentaje=Decimal("0"),
+        total_venta=otro_precio,
+        estado="confirmed",
+        cliente=None,
+    )
+    db.add(venta)
+    db.flush()
+    db.add(
+        DetalleVenta(
+            venta_id=venta.id,
+            producto_id=producto.id,
+            variante_id=var.id,
+            cantidad=Decimal("1"),
+            precio_unitario_aplicado=otro_precio,
+            costo_unitario_aplicado=COSTO_VENTA,
+        )
+    )
+    db.commit()
+    res = _controllers(db, mini_libro)
+    n7a = _no_resultado(res, "N7a")
+    assert n7a.estado == "OK", n7a.mensaje
+    assert "duplicados 0" in n7a.mensaje
+    assert _no_resultado(res, "N7g").estado == "OK"
+
+
+def test_n7a_ventas_gemela_exacta_exceso_es_error(db, mini_libro):
+    """One extra DB row with the SAME exact venta key (fecha, producto,
+    variante, cantidad, precio) beyond the plan -> N7a ERROR and N7g ERROR."""
+    _preparar_entorno(db)
+    producto = db.query(Producto).filter(Producto.nombre == P_PROD).one()
+    var = next(v for v in producto.variantes if v.nombre_variante == P_VAR)
+    venta = Venta(
+        fecha=FECHA_VENTA,
+        canal_venta="feria",
+        descuento_porcentaje=Decimal("0"),
+        total_venta=PRECIO_VENTA,
+        estado="confirmed",
+        cliente=None,
+    )
+    db.add(venta)
+    db.flush()
+    db.add(
+        DetalleVenta(
+            venta_id=venta.id,
+            producto_id=producto.id,
+            variante_id=var.id,
+            cantidad=Decimal("1"),
+            precio_unitario_aplicado=PRECIO_VENTA,
+            costo_unitario_aplicado=COSTO_VENTA,
+        )
+    )
+    db.commit()
+    res = _controllers(db, mini_libro)
+    assert _no_resultado(res, "N7a").estado == "ERROR"
+    n7g = _no_resultado(res, "N7g")
+    assert n7g.estado == "ERROR"
+    assert "venta duplicada" in n7g.mensaje
+
+
+def test_n7a_movimientos_misma_descripcion_distinto_monto_limpio(db, mini_libro):
+    """Same descripcion reused on another date/monto is a distinct exact
+    line -> N7a duplicados 0 and N7g clean (DB-only key out of scope)."""
+    from datetime import UTC, datetime
+
+    _preparar_entorno(db)
+    mov = db.query(MovimientoFinanciero).filter(MovimientoFinanciero.descripcion == P_MOV).first()
+    db.add(
+        MovimientoFinanciero(
+            tipo=mov.tipo,
+            descripcion=mov.descripcion,
+            monto=Decimal("1000"),
+            fecha=datetime(2025, 8, 2, tzinfo=UTC),
+            socio_id=mov.socio_id,
+            estado="confirmed",
+        )
+    )
+    db.commit()
+    res = _controllers(db, mini_libro)
+    n7a = _no_resultado(res, "N7a")
+    assert n7a.estado == "OK", n7a.mensaje
+    assert "duplicados 0" in n7a.mensaje
+    assert _no_resultado(res, "N7g").estado == "OK"
+
+
+def test_n7a_movimientos_gemelo_exacto_exceso_es_error(db, mini_libro):
+    """One extra DB row with the SAME exact movimiento key (fecha, tipo,
+    monto, socio, descripcion) beyond the plan -> N7a ERROR and N7g ERROR."""
+    _preparar_entorno(db)
+    mov = db.query(MovimientoFinanciero).filter(MovimientoFinanciero.descripcion == P_MOV).first()
+    db.add(
+        MovimientoFinanciero(
+            tipo=mov.tipo,
+            descripcion=mov.descripcion,
+            monto=mov.monto,
+            fecha=mov.fecha,
+            socio_id=mov.socio_id,
+            estado="confirmed",
+        )
+    )
+    db.commit()
+    res = _controllers(db, mini_libro)
+    assert _no_resultado(res, "N7a").estado == "ERROR"
+    n7g = _no_resultado(res, "N7g")
+    assert n7g.estado == "ERROR"
+    assert "movimiento duplicado" in n7g.mensaje
+
+
+# --------------------------------------------------------------------------- #
 # Fase runner + dry-run real (NFR-2)
 # --------------------------------------------------------------------------- #
 

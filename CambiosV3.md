@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-17] - F7 N7a/N7g a semántica SUM (repetidos legales ya no flaggean)
+
+- **Problema:** tras permitir repetidos (0034/0035), F7 seguía ERROR: N7a contaba duplicados por clave gruesa (producto|insumo, 131 flags con 35 BOM) y N7g 5 `BOM_INSUMOS duplicado` en piezas genuinas; además 96 residuales no-BOM (compras 69 por nombre insumo, ventas 15 por producto, movimientos 12 por descripción).
+- **Fix `backend/migrate/validate.py` (sin tocar loaders ni DB):** N7a/N7g usan identidad exacta como el loader (producto, insumo, variante NULL-ness, cantidad/desperdicio quantizados NUMERIC(15,4), detalle excluido NULL-safe) + índice de ocurrencia vs plan: solo flaggea excesos DB-sobre-plan. Compras suman fecha+cantidad+precio, ventas producto+fecha+cantidad+precio (con variante_coincide de N7g), movimientos descripción+fecha+monto+tipo. Faltantes intactos (presencia gruesa).
+- **Verificación:** `test_migrate_validate` 37/37 PASS (31 previas + 6 nuevas: repetidas distintas fechas/montos → 0, gemelas exactas sobre-plan → ERROR por dominio); `test_bom+costos+migrate_bom` 69/69; chequeo read-only canónico: N7a `duplicados 0`, N7g OK. Dry-run `--all` 267 entradas 0 errores (N7 se omite en dry-run por diseño).
+- **Archivos:** `backend/migrate/validate.py`, `backend/tests/test_migrate_validate.py` (sin commit aún).
+- **Rollback:** `git checkout -- backend/migrate/validate.py backend/tests/test_migrate_validate.py` + esta entrada.
+- **Riesgo:** ventas duplica la lógica `variante_coincide` en vez de compartirla — si N7g cambia el matching hay que espejarlo; counts canónicos observados (ventas 21, movs 146) difieren leve del baseline 19/143 por drift dev.
+
 ### [2026-09-17] - BOM permite repetidos + detalle pieza torso/mangas (backend + frontend)
 
 - **Problema:** blusa con 3 líneas aditivas `Tela Maya Ilustrada` (torso 64x37 + 2 mangas 45x54) chocaba con 409 `BomInsumo line already exists`; el import solo guardaba la 1.ª y salteaba 2.ª/3.ª como `ya_exist` (subcosteo silencioso 2/3).
