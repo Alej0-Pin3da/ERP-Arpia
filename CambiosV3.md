@@ -56,6 +56,14 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 - **Pendientes explícitos:** stocks viejos en metros vs consumo cm (NO tocados: Blusa −7.218 por déficit histórico, resto a criterio dueña); compras futuras deben cargarse en cm (o pedir conversión m→cm en el form); loaders xlsx (F3 /100) quedan para cuando se reactive el workbook; TOTE con semántica batch sin resolver.
 - **Archivos:** `backend/migrate/catalog.py` (override cm). Solo DB dev. Sin commit.
 
+### [2026-09-20] - Tasas exactas Valor/pack (decimales del CSV)
+
+- **Causa:** `$0,23` y varios Unitarios están redondeados en display (880×0.23=202.40 vs $205,33 del CSV). La tasa real sale de INVERSION: `Valor/(Largo×Ancho)` — ramitas 3.50/15=0.23333.
+- **Regla por fila:** candidatos crudo vs miles, se usa el que cae a ≤2% del display (costo = cociente exacto a 4dp). 44 exactas (ej: Ref159 4.0675, Satín 0.5267, Maya 2.5769, Tira poli 23.00, Sublimación 1.4286, Lino 1.1333, cuadros 0.7933, ramitas 0.2333); 2 FALLBACK con display (Cinta 1.40, Sesgo satín 13.63: packs atípicos, pedir factura); 10 del archivo no existen en DB (no se crean: fuera de BOMs).
+- **Efecto caso reportado:** ramitas 880×0.2333=205.304 → muestra $205 vs $205,33 (residuo centavos por columna 4dp, documentado).
+- **Nota:** TOTE solo-insumos también quedaron a escala archivo (líneas batch/6 pendientes). Escala absoluta del archivo (pesos vs miles) queda como pregunta abierta: la consistencia interna BOM↔ventas↔INVERSION es total.
+- **Verificación:** rebuild CHECKs verdes post-apply; backup en `backend/migrate/reports/`. Solo DB dev (44 costos). Sin commit.
+
 ### [2026-09-18] - Número de WhatsApp del taller corregido
 
 - **Fix:** fallback hardcodeado `573124567890` → `573217265049` (número real del taller) en `ProduccionView.vue`, `ClientesView.vue` y `FichaTallasClienteModal.vue`. Cero ocurrencias del viejo en `src/`.
