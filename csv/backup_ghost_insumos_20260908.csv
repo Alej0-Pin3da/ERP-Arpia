@@ -1,9 +1,0 @@
-id,categoria_id,nombre,unidad_medida,stock_actual,stock_minimo,costo_promedio_actual,codigo,descripcion,tipo,ubicacion,origen_costo
-1,2,* Argollas Medianas,un,122.0000,0.0000,0.0000,,,,,
-2,2,* Argollas Pequeñas,un,100.0000,0.0000,0.0000,,,,,
-3,2,* Gancho G grandes,un,115.0000,5.0000,182.6087,,,,,
-4,2,* Gancho G Medianos,un,134.0000,0.0000,0.0000,,,,,
-5,2,* Ganchos G Pequeños,un,84.0000,0.0000,0.0000,,,,,
-6,2,* Ochos Grandes,un,100.0000,0.0000,0.0000,,,,,
-7,2,* Ochos Medianos,un,44.0000,0.0000,0.0000,,,,,
-8,2,* Ochos Pequeños,un,190.0000,0.0000,0.0000,,,,,

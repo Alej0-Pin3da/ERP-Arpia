@@ -3,6 +3,31 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-20] - Conciliación BOM dev contra CSV reales (cantidades y valores)
+
+- **Fuente real:** los 9 CSV de `csv/` ( AELO, BLUSAS, CELENO, ARTEMISIA, GARRAS, Hypatia, EMILY, OSIPETE, TOTEBAG) + `ARPIA - VENTAS (1).csv` renombrado a `csv/ARPIA - VENTAS.csv` (nombre canónico que espera `migrate/sales.py`; el viejo estaba borrado del disco).
+- **Fix 1 — Blusa ML:** línea `Tela Maya Ilustrada` 2768 → 2368 (typo en DB; CSV manda 64×37=2368).
+- **Fix 2 — Bralete:** receta rancia del mini-workbook (3 líneas 0.035/0.01) reemplazada por bloque BRALETE de CELENO (9 líneas: encajes 0.28/0.08, herrajes, elásticos). Gafete excluido por cantidad 0 (EXM-2).
+- **Fix 3 — Set Aelo +14 líneas:** faltaban 4 herrajes del corset (Aro, Argollas, Tensor) y el bloque TANGA completo (10 líneas). Costo ventas 38.805 = corset 33.504 + tanga 5.300 lo confirma.
+- **Fix 4 — Set Ocipete +14 líneas:** faltaban Tensor, Argolla 10, Cordón Satín Rosa, varilla (bustier) + bloque TANGA (10). Costo ventas 26.109 = 20.680 + 5.428 lo confirma. Las 2 gemelas (Tensor/Argolla 2.0 corset+tanga) se insertaron en paso aparte: el chequeo de presencia contra DB viva las había tragado.
+- **Fix 5 — Falda Emily +1:** línea `resorte(sin precio aun)` 0.3 m (insumo nuevo, costo 0: precio desconocido, pendiente dueña).
+- **Insumos nuevos (4, costo/stock 0):** Cordon Satin Rosa (Telas/m vía override nuevo en `_CLASIFICACION_FORZADA`; el keyword 'cordon' lo mandaba a Herrajes/un), Elastico de Contorno, Elastico pitillo rosa, resorte(sin precio aun). Posible duplicado: `Elastico de Contorno` vs `Elastico de Contorno 1 CM` (pendiente dueña).
+- **Verificados sin cambios:** ARTEMISIA (10), GARRAS (8), Hypatia (15), TOTEBAG (10), Blusa MC (3) — cantidades DB = convención Ancho/100 (m) / as-is (un,cm).
+- **NO tocado a propósito:** `costo_promedio_actual` de insumos (dominio compras/WAC, otra escala), snapshots de ventas (historia: GARRAS 29.826 ×3 + 33.581 vigente se conservan), footer de VENTAS (ganancia duplica costo y TOTAL ARPIA sin sustento: solo reporte, el loader corta en fila 21), precios de lista en 0 (dominio F8 backfill).
+- **Pendientes dueña:** bloque CACHETERO sin producto en DB (¿nuevo 'Cachetero' o va a Set Celeno?); 2 ventas sin talla que el pipeline omite por diseño MIG-3 (Ocipete 28/3 Valeria, Blusa ML 5/8 María); precio del resorte; tarifa 734 en Maestros→Energía si es la real.
+- **Misterio CAJA resuelto (sin fix):** 129.388 = Ocipete 26.109 + Aelo 38.804 + Celeno 12.677 + Blusa 21.561 + Garras@29.826 + ~409 empaques. La caja lleva Corset Garras adentro (no está en el combo DB: propuesto, no aplicado).
+- **Verificación:** script `reconcile_bom.py` (dry-run → apply, backup en `backend/migrate/reports/reconcile_bom_20260920_144521.json`); `pytest` 183/183 PASS (catalog, bom, costos, validate, sales, backfill, productos); F7 dry-run `--all` 267 entradas 0 errores; conteos finales: insumos 75, bom_ins 129, ventas 19.
+- **Archivos:** `backend/migrate/catalog.py` (override Cordón), `csv/ARPIA - VENTAS.csv` (renombrado desde ` (1)`), DB dev `arpia` (BOM + 4 insumos). Sin commit.
+- **Rollback:** backup JSON trae deletes/updates previos; re-aplicar cantidades viejas o restaurar dump si hiciera falta (ventas/stock no tocados).
+
+### [2026-09-20] - Decisiones dueña aplicadas (Celeno, tallas, resorte, fusión elástico)
+
+- **1. Set Celeno = cachetero + bralette:** bloque CACHETERO (3 líneas: encajes 0.6/0.6, jersey 0.12) cargado a `Set Celeno` (estaba en 0). Bralette ya estaba en `Bralete`. Precio 75.000 intacto (lock MIG-2).
+- **2. Ventas sin talla cargadas vía F5** (canal feria, déficit permitido como el histórico): Ocipete S 28/3 Valeria (71.250/26.109, id 20) + Blusa M 5/8 María (90.000/21.561, id 21). Ventas 19→21, calzan fila por fila con el CSV. Destock: 18 insumos (stock negativo permitido con WARN, igual que F5 histórico).
+- **3. Resorte:** `resorte(sin precio aun)` → `Resorte`, costo 1.300/m (origen manual, F8 lo preserva por ser no-cero). Falda queda costeada completa.
+- **4. Fusión:** `Elastico de Contorno` (duplicado creado en la conciliación) → `Elastico de Contorno 1 CM` (id 14); línea de Bralete re-apuntada, duplicado borrado. Insumos 75→74.
+- **Verificación:** snapshot (ventas 21, bom_ins 132, Celeno 3); `pytest` 75/75 (sales, bom, venta_finite, inventory). Sin cambios de código en esta tanda (solo DB dev). Sin commit.
+
 ### [2026-09-18] - Número de WhatsApp del taller corregido
 
 - **Fix:** fallback hardcodeado `573124567890` → `573217265049` (número real del taller) en `ProduccionView.vue`, `ClientesView.vue` y `FichaTallasClienteModal.vue`. Cero ocurrencias del viejo en `src/`.
