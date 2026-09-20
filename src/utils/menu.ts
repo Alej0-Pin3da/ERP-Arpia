@@ -25,6 +25,7 @@ export interface MenuItem {
 
 export const MENU_ITEMS: MenuItem[] = [
   { name: 'dashboard', path: '/dashboard', label: 'Panel General', icon: 'pi-chart-bar', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'analisis', path: '/analisis', label: 'Análisis', icon: 'pi-chart-line', roles: ['admin', 'operador', 'consulta'] },
   { name: 'produccion', path: '/produccion', label: 'Producción & Pedidos', icon: 'pi-sliders-h', roles: ['admin', 'operador', 'consulta'] },
   { name: 'inventario', path: '/inventario', label: 'Insumos & Telas', icon: 'pi-box', roles: ['admin', 'operador', 'consulta'] },
   { name: 'productos', path: '/productos', label: 'Recetas BOM', icon: 'pi-file', roles: ['admin', 'operador', 'consulta'] },
@@ -33,8 +34,11 @@ export const MENU_ITEMS: MenuItem[] = [
   { name: 'cotizador', path: '/cotizador', label: 'Cotizador Rápido', icon: 'pi-calculator', roles: ['admin', 'operador', 'consulta'] },
   { name: 'optimizador', path: '/optimizador', label: 'Optimizador Textil', icon: 'pi-sparkles', roles: ['admin', 'operador', 'consulta'] },
   { name: 'ventas', path: '/ventas', label: 'Ventas Realizadas', icon: 'pi-shopping-cart', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'devoluciones', path: '/devoluciones', label: 'Devoluciones', icon: 'pi-undo', roles: ['admin', 'operador', 'consulta'] },
   { name: 'finanzas', path: '/finanzas', label: 'Reparto de Socias', icon: 'pi-wallet', roles: ['admin', 'operador', 'consulta'] },
   { name: 'maestros', path: '/maestros', label: 'Maestros', icon: 'pi-book', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'omisiones', path: '/omisiones', label: 'Omisiones', icon: 'pi-list-check', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'auditoria', path: '/auditoria', label: 'Auditoría', icon: 'pi-file-check', roles: ['admin', 'operador', 'consulta'] },
   { name: 'usuarios', path: '/usuarios', label: 'Usuarios', icon: 'pi-shield', roles: ['admin'] },
 ]
 

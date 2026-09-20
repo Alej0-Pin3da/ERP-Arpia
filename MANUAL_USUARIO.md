@@ -19,20 +19,8 @@ Guía práctica para operar el sistema día a día: qué hace cada módulo, cóm
 
 - Ruta de ingreso: `/login` (botón **Ingresar al Atelier**). Las rutas no autenticadas redirigen a `/login?redirect=...`.
 - Si un rol no autorizado intenta abrir `/usuarios`, el sistema redirige a `/dashboard`.
-- Cambio rápido de rol (solo para pruebas, visible en `/usuarios`): botones **Admin**, **Operador**, **Consulta**.
 
-## Modos MOCK vs REAL
-
-El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourceBadge`):
-
-| Aspecto | MOCK | REAL |
-|---------|------|------|
-| Origen de datos | Memoria local del navegador | API `GET /api/v1/...` (Postgres) |
-| Persistencia | Se pierde al recargar (excepto lo guardado en store local) | Persiste en base de datos (F5 conserva los datos) |
-| Precios/utilidades en Producción | Visibles en tarjetas Kanban | Ocultos (solo flujo de taller) |
-| Ajustes rápidos de stock (±1, −1) | Habilitados | Deshabilitados; el stock se mueve con los modales de ingreso/compra |
-
-> Regla general: si un botón aparece deshabilitado en modo REAL, no es un error. Utilice el flujo oficial (ej. **Ingresar Prenda Confeccionada** en lugar de `+1`).
+> El sistema opera en modo REAL contra Postgres: los datos persisten en base de datos (F5 conserva todo). Si un botón aparece deshabilitado, no es un error: utilice el flujo oficial indicado en cada módulo.
 
 ---
 
@@ -44,7 +32,7 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 
 **Acciones principales.**
 
-- **Crear Receta con IA**: abre el modal **Asistente IA**. Describa la prenda y seleccione **Guardar como Receta BOM**.
+- **Sugerencias de taller**: abre el modal de ejemplos y sugerencias incorporadas. Describa la prenda para ver un texto de referencia (solo lectura; para crear de verdad use **Nueva Receta Manual**).
 - **Cotizador Rápido**: navega a `/cotizador` para presupuestar antes de crear el pedido.
 - **Nuevo Pedido**: abre **Registrar Nuevo Pedido & Confección**. Complete cliente, prenda, medidas y confirme con **Crear Pedido**.
 - **Ver inventario de insumos** (enlace bajo la tarjeta de Insumos Críticos): navega a `/insumos`.
@@ -55,29 +43,29 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 
 **Tips / errores comunes.**
 
-- Los KPI cambian según el modo: en MOCK verá cifras de demostración; en REAL, los valores vacíos significan que aún no hay datos en la base.
+- Si un KPI aparece vacío, aún no hay datos en la base para ese indicador.
 - Si la rentabilidad muestra 0 %, verifique que existan ventas en estado COMPLETADA y productos con costo cargado.
 
 ## 2. Producción / Pedidos (`/produccion`)
 
-**Qué es.** Tablero de confección por etapas: Cotizado, Reservado, Corte, Costura, Acabados, Calidad, Listo y Entregado.
+**Qué es.** Tablero de confección por fases: Corte → Costura → Acabados → Calidad → Listo. El avance es secuencial, una fase por vez.
 
 **Cómo llegar.** Menú → Producción, o ruta `/produccion`.
 
 **Paso a paso.**
 
-1. Pulsar **Nuevo Pedido** → modal **Registrar Nuevo Pedido & Confección** → completar cliente, prenda/modelo, talla, fecha y anticipo → **Crear Pedido**.
-2. Localizar el pedido con el buscador (*código, cliente o prenda*) o cambiar entre **Tablero Kanban** y **Vista de Lista**.
-3. Avanzar el pedido con **Siguiente →** (Kanban) o **Avanzar Fase** (lista). Para corregir, usar **← Anterior**.
-4. Abrir la ficha de taller con el icono de reloj (**Ver Ficha de Taller & Tiempos**) para ver detalle y tiempos.
+1. Pulsar **Nuevo Pedido** → modal **Registrar Nuevo Pedido & Confección** (puede precargar con **Cargar desde Receta / Ficha BOM (Opcional)**) → completar cliente, prenda/modelo, talla, fecha y anticipo → **Crear Pedido**.
+2. Localizar el pedido con el buscador (*código, cliente o prenda*) o cambiar entre **Tablero Kanban** y **Vista de Lista** (la tabla también muestra el costo snapshot y los costos reales MO/E del pedido).
+3. Avanzar el pedido con **Avanzar fase →** (Kanban) o **Avanzar Fase** (lista). El avance es solo hacia adelante: no existe retroceso (el backend rechaza saltos y retrocesos).
+4. Abrir la ficha de taller con el icono de reloj (**Ver Ficha de Taller & Tiempos**): allí se registran los tiempos reales por fase y, cuando hay totales, se usa **Aplicar costos al producto** (ver sección Tiempos estándar).
 5. Contactar a la clienta con el icono **WhatsApp**.
 6. Atajo: **Cotizador Rápido** lleva a `/cotizador` sin perder el contexto.
 
-**Roles.** Todos. Las transiciones de estado en modo REAL exigen autenticación válida; los pedidos en estado terminal ya no avanzan.
+**Roles.** Todos. Las transiciones de estado exigen autenticación válida; los pedidos en estado terminal ya no avanzan.
 
 **Tips / errores comunes.**
 
-- En modo REAL las tarjetas no muestran precio ni utilidad (diseño intencional).
+- Las tarjetas no muestran precio ni utilidad (diseño intencional: la API no trae montos de venta).
 - Si **Avanzar Fase** aparece deshabilitado, el pedido está en estado terminal o hay una transición en curso.
 - Los pedidos se recargan automáticamente después de crear uno nuevo (`pedido-creado`).
 
@@ -91,7 +79,7 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 
 1. **Nuevo Insumo** → modal **Registrar Nuevo Insumo / Materia Prima** → completar nombre, categoría, Stock Inicial, Stock Mínimo (Alerta), Costo Unitario → **Guardar Insumo**.
 2. **+ Compra** sobre un insumo → modal **Registrar Compra** → cantidad y costo → **Registrar Entrada**. Actualiza stock y valor promedio.
-3. Ajuste rápido con botones **−** y **+** (suma/resta 1 unidad).
+3. Ajuste rápido con botones **−** y **+** (suma/resta 1 unidad; en REAL use **+ Compra**).
 4. **Editar** (solo admin) → modal **Editar Insumo** → modificar Stock Actual, Stock Mínimo, Costo → **Guardar Cambios**.
 5. Eliminar con el icono de papelera (confirme en el diálogo).
 6. **Sugerir Orden (N)** → modal **Sugerir Orden de Compra de Insumos** para reponer los insumos bajo mínimo.
@@ -103,21 +91,21 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 **Tips / errores comunes.**
 
 - Configure siempre el **Stock Mínimo (Alerta)**; sin este valor el insumo nunca entra en la lista de críticos.
-- En modo REAL los botones `−1 / +1` de ajuste rápido no aplican; utilice **+ Compra**.
+- Los botones **−** / **+** de ajuste rápido no aplican en REAL; utilice **+ Compra**.
 - El valor del inventario usa costo promedio ponderado.
 
 ## 4. Productos / Recetas / BOM (`/productos`, alias `/recetas`)
 
-**Qué es.** Catálogo de modelos con escandallo de costeo (insumos, mano de obra, CIF) y margen sugerido. Cada receta es una ficha técnica con su BOM.
+**Qué es.** Catálogo de modelos con escandallo de costeo (insumos + costos operativos fijos) y margen sugerido. Cada receta es una ficha técnica con su BOM.
 
 **Cómo llegar.** Menú → Productos o Recetas; rutas `/productos` y `/recetas` (misma pantalla).
 
 **Paso a paso.**
 
-1. **Nueva Receta Manual** → modal **Crear Nueva Receta / Ficha Técnica (BOM)** → nombre, código, categoría, tiempos, insumos del BOM → guardar.
-2. **Generar con IA** → modal **Asistente IA** → describir la prenda → **Guardar como Receta BOM**.
-3. **Ver Ficha Técnica >** sobre una tarjeta → modal de ficha: ver costos, BOM, tiempos y precio. Para modificar, usar el icono de lápiz (**Editar Receta**) → editar campos → **Guardar**.
-4. **Planilla Google Sheet (Matriz de Corte)**: abre la ficha del primer modelo para preparar la matriz de corte.
+1. **Nueva Receta Manual** → modal **Crear Nueva Receta / Ficha Técnica (BOM)** → nombre, código, categoría, tiempos, insumos del BOM → **Guardar Ficha Técnica** (al editar: **Actualizar Ficha Técnica**).
+2. **Ver sugerencias de taller** → modal de ejemplos → describir la prenda para ver una sugerencia de referencia (solo lectura).
+3. **Ver Ficha Técnica >** sobre una tarjeta → modal de ficha: ver costos, BOM, tiempos estándar y precio. Para modificar, pulsar **Editar** → editar campos → **Guardar** (también puede **Imprimir** o **Exportar Planilla** desde la pestaña de matriz).
+4. En el BOM, cada renglón puede llevar **Pieza / Detalle** (ej. torso, manga): el mismo insumo puede repetirse en varias piezas y los costos se suman.
 5. Filtrar por buscador (*nombre, código o material*), categorías (Corsetería, Blusas y Tops, Conjuntos y Sets, Vestidos, Pantalones, Accesorios, Alta Costura), margen (**Pérdida / Por debajo / En meta / Alto**) y ordenar por Nombre, Margen, Precio o Costo.
 6. Eliminar con el icono de papelera → confirmar en **Eliminar receta**.
 
@@ -125,29 +113,72 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 
 **Tips / errores comunes.**
 
-- En modo REAL sin productos, la pantalla indica la fuente (`GET /api/v1/productos`): cree el producto desde el backend o vuelva a modo demostración.
-- El margen se compara contra la meta global (parámetro en Maestros, por defecto 35–65 % según vista). Un margen en rojo indica pérdida o precio por debajo del costo.
-- El conteo **Insumos BOM** en modo REAL se calcula por producto; puede tardar unos segundos en aparecer.
+- El costo del BOM = insumos + costos operativos fijos. Las filas (≈) de mano y energía estándar son solo referencia: no mueven el total, el precio ni el margen.
+- El margen se compara contra la meta global (parámetro en Maestros). Un margen en rojo indica pérdida o precio por debajo del costo.
+- El conteo **Insumos BOM** se calcula por producto; puede tardar unos segundos en aparecer.
+
+## Tiempos estándar por fase y ciclo real vs estándar
+
+**Para qué sirve.** Cada producto guarda 4 tiempos estándar (minutos de Corte, Costura, Acabados y Calidad) que alimentan la referencia de costeo (≈ mano y energía) sin depender de ningún pedido. Los tiempos reales se miden por pedido en el Taller; al compararlos se detectan desvíos y, si se desea, se actualizan los costos heredados del producto con un clic.
+
+**Ruta rápida.**
+
+1. Configurar las tarifas globales una vez en **Maestros** (ver módulo 13).
+2. Cargar los 4 minutos estándar en la ficha de cada producto (**Ver Ficha Técnica >** → **Editar**).
+3. Registrar los tiempos reales de cada pedido en su **Ficha de Taller & Tiempos** y comparar contra el estándar.
+4. Si el lote cerró bien, pulsar **Aplicar costos al producto** para actualizar los costos heredados.
+
+**Configuración única (prerrequisito).**
+
+| Dato | Dónde | Notas |
+|------|-------|-------|
+| Tarifa de mano de obra ($/min) | Maestros → **Guardar Parámetros de Costeo** (`costo_minuto_costura`) | Aplica a todas las fases para la mano estimada |
+| Tarifa de energía ($/min máquina) | Parámetros del backend (`costo_minuto_energia`) | Sin casilla en Maestros: la ajusta el soporte técnico |
+| Columnas de tiempos por fase | Base de datos (migración 0036) | Si las casillas de minutos no aparecen en la ficha, pida al soporte ejecutar `alembic upgrade head` |
+
+**Cargar los minutos estándar del producto.**
+
+1. En `/productos`, abrir **Ver Ficha Técnica >** → **Editar**.
+2. Completar **Corte (min)**, **Costura (min)**, **Acabados (min)** y **Calidad (min)** (enteros, de 5 en 5; "—" = sin dato).
+3. Verificar el **Total estándar** (suma de las 4 fases) y la referencia (≈ mano + energía). Pulsar **Guardar**. En lectura, la barra **Estándar por fase** muestra cada fase con su total.
+
+**Qué significan los valores (≈).**
+
+- Mano estimada ≈ total estándar × tarifa de costura (todas las fases suman trabajo).
+- Energía estimada ≈ minutos de costura × tarifa de energía (solo la costura usa máquina; corte, acabados y calidad son manuales).
+- Ambas filas llevan (≈) y la aclaración *(referencia, no alimenta el costo)*: son solo visuales y no cambian el costo unitario, el precio sugerido ni el margen.
+
+**Ciclo real vs estándar en el Taller.**
+
+1. En `/produccion`, abrir la ficha del pedido (**Ver Ficha de Taller & Tiempos**).
+2. En **Registrar tiempo**, elegir Fase, Operaria, Minutos y Fecha → **Guardar tiempo**. El pie muestra **Total** (min), **Mano de obra** y **Energía** reales del lote.
+3. Comparar esos totales contra el **Estándar por fase** de la ficha del producto para detectar desvíos (ej. costura real muy por encima del estándar).
+
+**Qué hace y qué no hace Aplicar costos al producto.**
+
+- **Hace:** muestra el prorrateo **Por unidad (N uds)** con MO, Energía y Tiempo; con **Aplicar costos al producto** escribe los heredados `mano_obra`, `cif_energia` y `tiempo_confeccion_min` del producto (previa confirmación). Usa N = `cantidad_producida` (o `cantidad` si aún no hay producidas); sin unidades el botón se deshabilita.
+- **No hace:** no toca los 4 tiempos estándar por fase (siguen manuales); nada es automático (cerrar el lote jamás sobrescribe los estimados); la energía prorrateada proviene solo de la fase costura.
 
 ## 5. Prendas (`/prendas`)
 
-**Qué es.** Inventario de prendas terminadas en perchero/showroom, con variantes por talla, reservas y etiquetas de autor con QR.
+**Qué es.** Stock de prenda terminada controlado por lote (unidades, valorización y precio medio), con etiquetas de autor con QR.
 
 **Cómo llegar.** Menú → Prendas, o ruta `/prendas`.
 
 **Paso a paso.**
 
-1. **Ingresar Prenda Confeccionada** → modal **Ingresar Prenda Confeccionada al Perchero** → producto, talla, variante → confirmar. Cada fila equivale a 1 unidad en modo REAL.
-2. Buscar con el campo (*nombre o código*).
-3. Ver **Etiqueta QR** (botón o icono QR por variante) → modal **Etiqueta de Autor & Certificado de Autenticidad** con cuidados (lavado en seco, no cloro, plancha baja).
-4. Ajustar stock con **−1 / +1** (solo MOCK). En REAL estos botones están deshabilitados a propósito.
+1. Buscar con el campo (*nombre o código*).
+2. Revisar las tarjetas de lote: unidades, valorización y precio medio.
+3. **Etiqueta QR** por lote → modal de etiqueta de autor y certificado de autenticidad (colección, composición, talla y color editables; **Guardar en producto** para persistir; **Imprimir Etiqueta Térmica / PDF** para impresora de 80 mm).
+4. Para producir más stock: **Completar lote en Producción** (lleva a `/produccion`; el lote se cierra allí y alimenta el stock).
+5. **Abrir ficha en Productos** (enlace por lote) para ver el costeo del modelo.
 
 **Roles.** Todos.
 
 **Tips / errores comunes.**
 
-- Físico vs Disponible vs Reservado: Físico es lo que hay en perchero; Reservado está apartado por pedidos con abono; Disponible es la diferencia vendible de inmediato.
-- Si necesita mover stock en REAL, no busque un botón de edición: use **Ingresar Prenda Confeccionada**.
+- El stock entra por cierre de lote en Producción, no con botones de ajuste: no existe ingreso unitario manual.
+- Si la etiqueta sale con datos viejos, abra la ficha en Productos y verifique la colección y la composición guardadas.
 
 ## 6. Clientes (`/clientes`)
 
@@ -195,25 +226,25 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 - Si el precio sugerido parece duplicado, revise que el margen no esté en 100 % o más.
 - **Usar costo real** ajusta el CIF para igualar el cálculo manual al BOM; es reversible editando el CIF.
 
-## 8. Optimizador (`/optimizador`)
+## 8. Calculadora de tendido (`/optimizador`)
 
-**Qué es.** Planificador de corte: calcula cuánta tela requiere un tendido, el aprovechamiento del rollo y qué hacer con los retazos.
+**Qué es.** Calculadora de tendido: estima cuánta tela requiere un corte, el aprovechamiento del rollo y el sobrante disponible. Todos los resultados se calculan de forma directa a partir de los datos ingresados, sin pasos adicionales ni servicios externos.
 
 **Cómo llegar.** Menú → Optimizador, o ruta `/optimizador`.
 
 **Paso a paso.**
 
-1. En **Datos del Rollo o Corte de Tela**, seleccionar **Cargar Tela desde Inventario** (trae el stock en metros) o cargar **Ancho de Tela** y **Largo Total Disponible** manualmente.
-2. En **Prendas a Cortar en la Mesa**, pulsar **+ Agregar Prenda** por cada modelo; completar nombre, **Cantidad** y **Metros c/u**. Eliminar filas con la papelera.
-3. Revisar **Total Tela Requerida**, barra de **Aprovechamiento**, **Sobrante** o **Faltan** metros.
-4. Pulsar **Optimizar Rendimiento & Retazos con IA** y leer el resultado: **Eficiencia de Corte en Mesa** (Alta/Media/Baja), **Esquema Visual de Tendido** y **Oportunidades de Monetización de Retazos** (scrunchies, antifaces, chokers con valores estimados).
+1. En **Datos del Rollo o Corte de Tela**, seleccionar **Cargar Tela desde Inventario** (trae el stock en metros) o cargar **Ancho de Tela** y **Largo Total Disponible** manualmente. El ancho útil descuenta 2 × 2 cm de orillos no utilizables.
+2. En **Prendas a Cortar en la Mesa**, pulsar **+ Agregar Prenda** por cada modelo; completar nombre, **Cantidad** y **Metros c/u**. Eliminar filas con la papelera. Se incluyen filas de ejemplo editables como punto de partida.
+3. Leer los resultados, que se actualizan automáticamente al editar: **Total Tela Requerida**, barra de **Aprovechamiento**, **Sobrante** o **Faltan** metros, **Aprovechamiento del Ancho** (ancho útil y desperdicio estimado de orillos), **Eficiencia de Corte en Mesa** (Alta/Media/Baja), **Esquema Visual de Tendido** e **Ideas para Aprovechar los Retazos** (estimación simple a partir del sobrante, con valores potenciales).
 
 **Roles.** Todos.
 
 **Tips / errores comunes.**
 
-- Si el aprovechamiento supera el 100 %, faltan metros: reduzca cantidades o consiga más tela antes de tender.
+- Si el aprovechamiento supera el 100 %, faltan metros: reducir cantidades o conseguir más tela antes de tender.
 - El esquema visual es proporcional e ilustrativo, no un plano de corte a escala real.
+- El cálculo no realiza encaje de patrones: el desperdicio de orillos es una estimación fija, no una medición del corte real.
 
 ## 9. Análisis (`/analisis`)
 
@@ -230,8 +261,7 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 
 **Tips / errores comunes.**
 
-- Sin recetas en modo REAL, la tabla muestra el mensaje de fuente vacía; no es un error de permisos.
-- Los estados de pedido se normalizan entre modos (mayúsculas MOCK vs enum REAL); los contadores ya contemplan ambas formas.
+- Si la tabla indica fuente vacía, aún no hay recetas cargadas; no es un error de permisos.
 
 ## 10. Ventas (`/ventas`)
 
@@ -291,7 +321,7 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 4. **Registrar Nuevo Anticipo** → modal **Registrar Nuevo Anticipo / Adelanto a Socia** → socia, monto, concepto, método, comprobante → guardar. Marcar como descontado con el icono de check (**Marcar como Descontado**; en REAL exige liquidación asociada). Editar con lápiz, eliminar con papelera.
 5. **Movimientos**: vista de solo lectura con filtros por tipo (Gasto/Inversión/Retiro) y estado (draft/confirmed/cancelled/reversed).
 6. **Simulador Punto Equilibrio Textil**: ajustar precio promedio, costo de insumos, horas, costo hora, gastos operativos y meta de prendas para ver margen de contribución, unidades de equilibrio y utilidad simulada.
-7. **Imprimir Balance**: prepara el balance oficial para impresión.
+7. **Imprimir Balance**: abre el diálogo de impresión del navegador con el contenido visible.
 
 **Roles.** Todos para operar; la gestión de socias y pagos es sensible: reservar a `admin` por política interna aunque el sistema la permita a otros roles.
 
@@ -307,7 +337,7 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 
 **Cómo llegar.** Menú → Maestros, o ruta `/maestros`.
 
-**Pestañas.** Proveedores Textil & Herrajes · Canales de Venta · Métodos de Pago · Matriz de Tallas & Sin Talla · Familias de Colección · Ubicaciones Taller · Parámetros (costeo).
+**Pestañas.** Proveedores Textil & Herrajes · Canales de Venta · Métodos de Pago · Matriz de Tallas & Sin Talla · Familias de Colección · Ubicaciones Taller · Tarifas de Mano de Obra & Parámetros de Rentabilidad.
 
 **Paso a paso.**
 
@@ -317,7 +347,7 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 4. **Nueva Talla Estándar** → talla, medidas, descripción → **Guardar Talla**. **Nuevo Producto Sin Talla** → formato (ej. Tote Bag) → **Guardar Formato**.
 5. **Nueva Familia de Colección** → nombre, tipo de talla (Con Tallas XXS-XL o Sin Talla/Merch) → **Guardar Familia**.
 6. **Nueva Ubicación** → nombre de zona de almacenamiento → **Guardar Ubicación**.
-7. **Guardar Parámetros de Costeo**: costo minuto costura, costo hora patronaje, margen meta global %, desperdicio textil %, IVA, distribución 40/30/30.
+7. **Guardar Parámetros de Costeo**: costo minuto costura, costo hora patronaje, margen meta global %, desperdicio textil %, IVA, distribución 40/30/30. La tarifa de energía (`costo_minuto_energia`) no tiene casilla aquí: la ajusta el soporte en parámetros del backend.
 
 **Roles.** Todos en el sistema; por política interna reservar a `admin` (un error aquí afecta costos y reportes).
 
@@ -341,7 +371,7 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 
 **Tips / errores comunes.**
 
-- En modo REAL vacía, la pantalla indica la fuente (`GET /api/v1/omisiones`); significa que no hay registros, no un error.
+- Si la tabla está vacía, significa que no hay registros, no un error.
 - No eliminar registros de esta bitácora: es evidencia de auditoría.
 
 ## 15. Auditoría (`/auditoria`)
@@ -360,7 +390,7 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 
 **Tips / errores comunes.**
 
-- En modo MOCK no hay datos por diseño: cambie a modo REAL para consultar los endpoints de auditoría fiscal.
+- Si una pestaña aparece vacía, aún no hay registros de auditoría para ese criterio.
 - Para rastrear un cambio de precio necesita el ID numérico del producto, no su código.
 
 ## 16. Usuarios (`/usuarios`)
@@ -374,14 +404,12 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 1. Buscar por nombre o email; filtrar por rol (**Admin / Operador / Consulta**).
 2. **Nuevo usuario** → completar Nombre, Email, Rol (Administrador, Operador de taller, Auditor/Consulta), Contraseña (mín. 6) → **Guardar**.
 3. Editar con el lápiz (**Editar usuario**); cambiar contraseña con la llave (**Cambiar contraseña** → **Actualizar**); dar de baja con la papelera (**Dar de baja** → confirmar en **Confirmar baja de usuario**).
-4. Solo pruebas: **Cambio rápido de rol** (Admin/Operador/Consulta) para verificar permisos.
 
 **Roles.** Solo `admin` (restricción en `src/router/index.ts`: `meta.roles: ['admin']`).
 
 **Tips / errores comunes.**
 
-- La baja es irreversible y en REAL ejecuta DELETE (no existe desactivación).
-- En MOCK la lista es local y mínima (3 usuarios de ejemplo); en REAL proviene de `GET /api/v1/usuarios`.
+- La baja es irreversible y ejecuta DELETE (no existe desactivación).
 - Para cambiar la contraseña propia se verifica la actual; para otros usuarios el admin puede indicar cualquiera.
 
 ---
@@ -393,8 +421,8 @@ El sistema opera en dos modos (indicador visible en cada pantalla con `DataSourc
 - [ ] Puedo cargar un insumo y registrar una compra.
 - [ ] Puedo registrar una venta y ver su comprobante.
 - [ ] Puedo crear una liquidación y entender el reparto 40/30/30.
-- [ ] Sé distinguir el modo MOCK del modo REAL antes de reportar un error.
+- [ ] Cargué los tiempos estándar del producto y sé comparar contra los tiempos reales del pedido.
 
 ## Siguiente paso
 
-Si un dato no aparece en modo REAL, verificar primero el modo activo y los filtros aplicados; si persiste, revisar el módulo Maestros (catálogos) y luego reportar con código, fecha y captura de pantalla.
+Si un dato no aparece, verificar primero los filtros aplicados; si persiste, revisar el módulo Maestros (catálogos) y luego reportar con código, fecha y captura de pantalla.

@@ -4,11 +4,8 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
-import { useAuthStore } from '@/stores/auth'
 import { showToast } from '@/utils/toast'
 import * as usuariosApi from '@/services/api/usuarios'
-
-const auth = useAuthStore()
 
 const usuarios = ref<usuariosApi.UsuarioRead[]>([])
 const cargando = ref(false)
@@ -163,10 +160,6 @@ async function submitPassword() {
   }
 }
 
-function cambiarRol(rol: 'admin' | 'operador' | 'consulta') {
-  auth.changeRole(rol)
-  showToast('info', 'Rol Activo Modificado', `Sesión ejecutando ahora como: ${rol.toUpperCase()}`)
-}
 </script>
 
 <template>
@@ -179,30 +172,6 @@ function cambiarRol(rol: 'admin' | 'operador' | 'consulta') {
         <p class="text-xs text-stone-400 mt-1 font-mono">
           Control de accesos y permisos por rol (Administrador, Operador de Taller, Auditor/Consulta).
         </p>
-      </div>
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-stone-400 font-mono">Cambio rápido de rol:</span>
-        <Button
-          label="Admin"
-          size="small"
-          :class="auth.role === 'admin' ? 'p-button-warning' : 'p-button-outlined p-button-secondary'"
-          class="text-xs"
-          @click="cambiarRol('admin')"
-        />
-        <Button
-          label="Operador"
-          size="small"
-          :class="auth.role === 'operador' ? 'p-button-warning' : 'p-button-outlined p-button-secondary'"
-          class="text-xs"
-          @click="cambiarRol('operador')"
-        />
-        <Button
-          label="Consulta"
-          size="small"
-          :class="auth.role === 'consulta' ? 'p-button-warning' : 'p-button-outlined p-button-secondary'"
-          class="text-xs"
-          @click="cambiarRol('consulta')"
-        />
       </div>
     </div>
 

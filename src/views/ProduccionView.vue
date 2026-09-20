@@ -188,7 +188,7 @@ async function avanzarEstado(pedido: PedidoDisplay) {
 
 function abrirWhatsApp(p: PedidoDisplay) {
   const msg = encodeURIComponent(`¡Hola ${p.cliente_nombre}! Te escribimos de Atelier Arpía sobre tu pedido *${p.codigo}* (${p.prenda_nombre}). Estado actual: *${p.estado}*. ✨`)
-  window.open(`https://wa.me/573124567890?text=${msg}`, '_blank')
+  window.open(`https://wa.me/573217265049?text=${msg}`, '_blank')
 }
 </script>
 

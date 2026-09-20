@@ -100,6 +100,7 @@ export interface ProductoSinTallaRead {
 export interface ParametrosRead {
   id: number
   costo_minuto_costura: number
+  costo_minuto_energia?: number | null
   costo_hora_patronaje: number
   margen_meta_global_pct: number
   desperdicio_textil_default_pct: number

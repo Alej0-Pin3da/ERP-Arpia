@@ -30,13 +30,14 @@ const parametrosApi = ref<ParametrosRead | null>(null)
 // Defaults when the backend has no parametros row yet.
 const PARAMETROS_COSTEO_DEFAULT: ParametrosRead = {
   costo_minuto_costura: 280,
+  costo_minuto_energia: 0,
   costo_hora_patronaje: 22000,
   margen_meta_global_pct: 65,
   desperdicio_textil_default_pct: 12,
   iva_regimen_pct: 0,
   distribucion_reinversion_pct: 40,
-  distribucion_margara_pct: 30,
-  distribucion_valqui_pct: 30,
+  reparto_margara_pct: 30,
+  reparto_valqui_pct: 30,
 } as ParametrosRead
 const parametrosData = computed(() => (parametrosApi.value ?? PARAMETROS_COSTEO_DEFAULT))
 
@@ -552,8 +553,8 @@ const mensajeParametros = ref('')
 const sumaDistribucion = computed(() => {
   return (
     Number(parametrosForm.value.distribucion_reinversion_pct || 0) +
-    Number(parametrosForm.value.distribucion_margara_pct || 0) +
-    Number(parametrosForm.value.distribucion_valqui_pct || 0)
+    Number(parametrosForm.value.reparto_margara_pct || 0) +
+    Number(parametrosForm.value.reparto_valqui_pct || 0)
   )
 })
 
@@ -1368,6 +1369,29 @@ function formatoCOP(val: number) {
             <p class="text-[11px] text-stone-400">Tarifa por minuto de armado, planchado y colocado de varillas.</p>
           </div>
 
+          <!-- Costo minuto energía -->
+          <div class="space-y-2">
+            <label for="param-minuto-energia" class="block text-xs font-mono text-stone-300">
+              Valor Minuto de Energía (COP/min):
+            </label>
+            <div class="relative">
+              <InputNumber
+                v-model="parametrosForm.costo_minuto_energia"
+                inputId="param-minuto-energia"
+                mode="decimal"
+                locale="es-CO"
+                :min="0"
+                :step="10"
+                :min-fraction-digits="0"
+                :max-fraction-digits="2"
+                suffix=" COP"
+                class="w-full"
+                inputClass="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 font-mono text-sm focus:border-amber-400 focus:outline-none"
+              />
+            </div>
+            <p class="text-[11px] text-stone-400">Tarifa por minuto de energía de maquinaria en costura.</p>
+          </div>
+
           <!-- Costo hora patronaje -->
           <div class="space-y-2">
             <label for="param-hora-patronaje" class="block text-xs font-mono text-stone-300">
@@ -1474,7 +1498,7 @@ function formatoCOP(val: number) {
               <div>
                 <label for="param-dist-margara" class="block text-stone-400 mb-1">Margara (%):</label>
                 <InputNumber
-                  v-model="parametrosForm.distribucion_margara_pct"
+                  v-model="parametrosForm.reparto_margara_pct"
                   inputId="param-dist-margara"
                   mode="decimal"
                   locale="es-CO"
@@ -1491,7 +1515,7 @@ function formatoCOP(val: number) {
               <div>
                 <label for="param-dist-valqui" class="block text-stone-400 mb-1">Valqui (%):</label>
                 <InputNumber
-                  v-model="parametrosForm.distribucion_valqui_pct"
+                  v-model="parametrosForm.reparto_valqui_pct"
                   inputId="param-dist-valqui"
                   mode="decimal"
                   locale="es-CO"

@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useInsumos } from '@/composables/useInsumos'
-import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
-import { showToast } from '@/utils/toast'
 
 interface PrendaTendido {
   id: number
@@ -24,18 +22,20 @@ async function cargarInsumos() {
 }
 onMounted(() => { void cargarInsumos() })
 
-const telaSeleccionadaId = ref<number | null>(8) // Default Lino Vértigo
+const telaSeleccionadaId = ref<number | null>(null) // No default: the user picks a real fabric from inventory
 const anchoTela = ref<number>(1.5)
 const largoTotalDisponible = ref<number>(15.0)
+
+// Fixed selvedge assumption: 2 cm per edge (2 x 0.02 m = 0.04 m) are not
+// usable for cutting. Simple arithmetic only, no nesting computation.
+const ORILLO_POR_BORDE_M = 0.02
+const DESPERDICIO_ORILLOS_M = ORILLO_POR_BORDE_M * 2
 
 const prendas = ref<PrendaTendido[]>([
   { id: 1, nombre: 'Vestido Lino Solero', cantidad: 4, metros_unitario: 1.9 },
   { id: 2, nombre: 'Corset "Garras" Estructurado', cantidad: 6, metros_unitario: 0.6 },
   { id: 3, nombre: 'Falda Emily Asimétrica', cantidad: 1, metros_unitario: 1.1 },
 ])
-
-const optimizando = ref(false)
-const optimizado = ref(false)
 
 const telasOptions = computed(() => {
   return [
@@ -66,12 +66,28 @@ const metrosRestantes = computed(() => {
   return largoTotalDisponible.value - totalMetrosRequeridos.value
 })
 
+// Usable width = nominal width minus fixed selvedge waste (never negative).
+const anchoUtilEstimado = computed(() => {
+  return Math.max(0, anchoTela.value - DESPERDICIO_ORILLOS_M)
+})
+
+// Selvedge waste share of the nominal width, as a percentage.
+const desperdicioOrillosPct = computed(() => {
+  if (anchoTela.value <= 0) return 0
+  return Math.min(100, (DESPERDICIO_ORILLOS_M / anchoTela.value) * 100)
+})
+
+// Whether there is anything to calculate (honest data-driven flag).
+const tieneCalculo = computed(() => {
+  return prendas.value.length > 0 && largoTotalDisponible.value > 0
+})
+
 const porcentajeAprovechamiento = computed(() => {
   if (largoTotalDisponible.value <= 0) return 0
   return Math.min(100, Math.round((totalMetrosRequeridos.value / largoTotalDisponible.value) * 100))
 })
 
-// Etiqueta según el cálculo real (antes: "88.4%" hardcodeado).
+// Efficiency label from the real length calculation (honest thresholds).
 const etiquetaEficiencia = computed(() => {
   const p = porcentajeAprovechamiento.value
   if (p >= 85) return 'Alta Eficiencia'
@@ -93,15 +109,6 @@ function agregarPrenda() {
 function eliminarPrenda(id: number) {
   prendas.value = prendas.value.filter((p) => p.id !== id)
 }
-
-function ejecutarOptimizacion() {
-  optimizando.value = true
-  setTimeout(() => {
-    optimizando.value = false
-    optimizado.value = true
-    showToast('success', 'Tendido Optimizado', 'Cálculo de rendimiento y sugerencia de subproductos generado con IA.')
-  }, 900)
-}
 </script>
 
 <template>
@@ -110,10 +117,10 @@ function ejecutarOptimizacion() {
     <div class="bg-gradient-to-r from-stone-900 via-stone-900/90 to-stone-950 border border-amber-500/20 rounded-2xl p-5 sm:p-6 shadow-xl">
       <div class="space-y-1.5">
         <h1 class="text-xl sm:text-2xl font-bold font-serif tracking-wide text-stone-100 m-0">
-          Optimizador de Rendimiento Textil & Retazos
+          Calculadora de Tendido y Rendimiento Textil
         </h1>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-3xl">
-          Maximiza el aprovechamiento del rollo de tela, reduce la merma y descubre subproductos rentables.
+          Calcula cuánta tela requiere el tendido, el aprovechamiento del rollo y una estimación simple del sobrante.
         </p>
       </div>
     </div>
@@ -144,6 +151,7 @@ function ejecutarOptimizacion() {
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Ancho de Tela (m)</label>
               <InputNumber v-model="anchoTela" mode="decimal" locale="es-CO" :min="0.5" :max-fraction-digits="2" class="w-full font-mono text-xs" />
+              <p class="text-[10px] text-stone-500 mt-1 m-0">Se descuentan 2 × 2 cm de orillos no utilizables del ancho total.</p>
             </div>
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Largo Total Disponible (m)</label>
@@ -224,33 +232,27 @@ function ejecutarOptimizacion() {
             </div>
           </div>
 
-          <Button
-            label="Optimizar Rendimiento & Retazos con IA"
-            icon="pi pi-sparkles"
-            :loading="optimizando"
-            class="w-full p-button-warning text-xs font-semibold py-2.5"
-            @click="ejecutarOptimizacion"
-          />
+          <!-- Results update automatically from the inputs above (no calculation step needed). -->
         </div>
       </div>
 
-      <!-- Right Column (7 Cols): Visual Canvas & AI Optimization Output -->
+      <!-- Right Column (7 Cols): Live calculation results -->
       <div class="lg:col-span-7 space-y-5">
-        <!-- If Not Optimized Yet -->
+        <!-- Empty state: no rows to calculate yet -->
         <div
-          v-if="!optimizado"
+          v-if="!tieneCalculo"
           class="bg-stone-900/40 border border-dashed border-stone-800 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[420px] space-y-3"
         >
           <div class="w-16 h-16 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center text-2xl border border-amber-500/20">
             ✂️
           </div>
-          <h3 class="text-base font-bold text-stone-200 m-0">Listo para optimizar el tendido</h3>
+          <h3 class="text-base font-bold text-stone-200 m-0">Agrega prendas para ver el cálculo del tendido</h3>
           <p class="text-xs text-stone-400 max-w-md m-0 leading-relaxed">
-            Ingresa las medidas de tu rollo de tela y las prendas a cortar para recibir el cálculo de rendimiento y sugerencias de accesorios.
+            Ingresa las medidas de tu rollo de tela y las prendas a cortar para ver el cálculo de rendimiento y el sobrante estimado.
           </p>
         </div>
 
-        <!-- Optimized Output View -->
+        <!-- Live results (computed synchronously from the inputs) -->
         <div v-else class="space-y-5 animate-fade-in">
           <!-- Efficiency Metric Bar -->
           <div class="bg-gradient-to-r from-stone-900 to-amber-950/30 border border-amber-500/30 rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -264,6 +266,19 @@ function ejecutarOptimizacion() {
               <div>Tela Útil en Prendas: <strong class="text-stone-100">{{ totalMetrosRequeridos.toFixed(2) }} m</strong></div>
               <div>Retazos Recuperables: <strong class="text-amber-300">{{ Math.max(0, metrosRestantes).toFixed(2) }} m</strong></div>
             </div>
+          </div>
+
+          <!-- Width usage: nominal width vs usable width after selvedge -->
+          <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 shadow-lg space-y-2">
+            <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
+              <i class="pi pi-arrows-h" /> Aprovechamiento del Ancho
+            </div>
+            <div class="text-xs text-stone-300 font-mono space-y-1">
+              <div>Ancho total: <strong class="text-stone-100">{{ anchoTela.toFixed(2) }} m</strong></div>
+              <div>Ancho útil estimado: <strong class="text-stone-100">{{ anchoUtilEstimado.toFixed(2) }} m</strong></div>
+              <div>Desperdicio estimado (orillos): <strong class="text-amber-300">{{ desperdicioOrillosPct.toFixed(1) }} %</strong></div>
+            </div>
+            <p class="text-[10px] text-stone-500 m-0">Estimación simple: se restan 2 × 2 cm de orillos del ancho total. Sin cálculo de encaje de patrones.</p>
           </div>
 
           <!-- Visual Layout Diagram of Cutting Table -->
@@ -301,12 +316,12 @@ function ejecutarOptimizacion() {
             </div>
           </div>
 
-          <!-- Subproduct Monetization Opportunities -->
+          <!-- Remnant reuse ideas (simple estimates from the leftover meters) -->
           <div v-if="metrosRestantes > 0" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 shadow-lg space-y-3">
             <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
-              <i class="pi pi-sparkles" /> Oportunidades de Monetización de Retazos
+              <i class="pi pi-lightbulb" /> Ideas para Aprovechar los Retazos
             </div>
-
+            <p class="text-[10px] text-stone-500 m-0">Estimación simple a partir de los metros sobrantes; los valores son potenciales, no precios de venta.</p>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div class="bg-stone-950/70 border border-stone-800 rounded-xl p-3 space-y-1 text-xs">
                 <div class="font-bold text-stone-100">{{ Math.floor(metrosRestantes / 0.15) }}x Scrunchies de Tela</div>

@@ -53,6 +53,13 @@ class Producto(Base):
     composicion: Mapped[str | None] = mapped_column(String(255), nullable=True)
     descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
     tiempo_confeccion_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Per-phase STANDARD estimates (0036): minutes per phase shown on BOM/Ficha
+    # without needing a pedido. NULL = no estimate. NEVER overwritten by
+    # completar_lote (real times live on TiempoFase rows, not here).
+    tiempo_corte_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tiempo_costura_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tiempo_acabados_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tiempo_calidad_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     costo_insumos: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True)
     mano_obra: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True)
     cif_energia: Mapped[Decimal | None] = mapped_column(Numeric(15, 4), nullable=True)

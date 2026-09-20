@@ -3,9 +3,8 @@ import { ref } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Textarea from 'primevue/textarea'
-import { showToast } from '@/utils/toast'
 
-/** Suggested-recipe payload emitted to the caller (REAL: caller persists via API). */
+/** Built-in workshop suggestion shown read-only (bundled examples, no backend or AI service). */
 export interface RecetaSugerida {
   nombre: string
   categoria: string
@@ -28,7 +27,6 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:visible', val: boolean): void
-  (e: 'receta-generada', receta: RecetaSugerida): void
 }>()
 
 const prompt = ref('')
@@ -47,7 +45,7 @@ function selectPreset(p: string) {
   prompt.value = p
 }
 
-async function consultarIA() {
+async function consultarSugerencia() {
   if (!prompt.value.trim()) return
   loading.value = true
   respuesta.value = null
@@ -77,36 +75,29 @@ async function consultarIA() {
           { nombre: 'Mallatex Forro', consumo_unitario: 0.4, unidad: 'm', merma_pct: 2, costo_unitario: 8000, subtotal: 3200 },
         ],
       }
-      respuesta.value = `✨ He analizado los costos de confección y los insumos en tu inventario actual.\n\nPara este diseño, el costo estimado de materia prima es de **$34.500 COP**, sumado a 190 min de mano de obra calificada ($12.000 COP) y CIF ($2.500 COP). El costo total de confección es de **$49.000 COP**. Con un margen comercial del 65%, el precio de venta recomendado es de **$140.000 COP**.`
+      respuesta.value = `Ejemplo de referencia del taller (no usa tus datos).\n\nPara este diseño de ejemplo, el costo de materia prima es de **$34.500 COP**, sumado a 190 min de mano de obra calificada ($12.000 COP) y CIF ($2.500 COP). El costo total de confección es de **$49.000 COP**. Con un margen comercial del 65%, el precio de venta de referencia es de **$140.000 COP**. Para crear la receta de verdad, usá "Nueva Receta Manual".`
     } else if (q.includes('retazo') || q.includes('desperdicio') || q.includes('lino') || q.includes('corte')) {
       respuesta.value = `✂️ **Estrategia de Optimización Textil de Atelier Arpía**:\n\n1. **Tendido Intercalado**: Al cortar piezas simétricas de bustiers y corsetería, invierte el patrón 180° sobre el orillo para ahorrar entre un 7% y 11% de tela por metro.\n2. **Subproductos Inmediatos**: Los retazos menores a 20x30 cm son ideales para confeccionar *Scrunchies de satén*, *Máscaras de descanso para ojos* o *Mini portacuchillas para máquinas de coser*.\n3. **Cuidado de Hilo**: Cortar al sesgo a 45° solo en piezas que requieran elasticidad natural (copas y sesgos); en cuerpos estructurados, mantén el hilo recto para evitar deformaciones.`
     } else {
-      respuesta.value = `🧵 **Recomendación AtelierPro**: Basado en el balance actual de pedidos y el stock de insumos críticos, te sugiero programar lotes de corte agrupados por color de hilo para optimizar los tiempos de enhebrado en las máquinas Singer y fileteadoras.`
+      respuesta.value = `🧵 **Sugerencia general del taller** (ejemplo, no usa tus datos): conviene programar lotes de corte agrupados por color de hilo para optimizar los tiempos de enhebrado en las máquinas Singer y fileteadoras.`
     }
   }, 1000)
 }
 
-function aplicarReceta() {
-  if (recetaSugerida.value) {
-    showToast('success', 'Receta generada', 'Se ha guardado la nueva receta en el catálogo de fichas BOM.')
-    emit('receta-generada', recetaSugerida.value)
-    emit('update:visible', false)
-  }
-}
 </script>
 
 <template>
   <Dialog
     :visible="visible"
     modal
-    header="✨ Asistente IA • Atelier Arpía"
+    header="Sugerencias de taller • Atelier Arpía"
     :style="{ width: '90vw', maxWidth: '680px' }"
     @update:visible="(v) => emit('update:visible', v)"
   >
     <div class="space-y-4 pt-1">
       <div class="bg-amber-950/20 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-200/90 leading-relaxed flex items-center gap-2.5">
-        <i class="pi pi-sparkles text-amber-400 text-base flex-shrink-0" />
-        <span>El asistente inteligente de taller analiza tu inventario, fichas técnicas y precios para generar cotizaciones y escandallos precisos.</span>
+        <i class="pi pi-lightbulb text-amber-400 text-base flex-shrink-0" />
+        <span>Ejemplos y sugerencias incorporadas del taller para orientar costeo y corte. Son textos de referencia: no analizan tus datos.</span>
       </div>
 
       <div>
@@ -136,32 +127,25 @@ function aplicarReceta() {
 
       <div class="flex justify-end gap-2">
         <Button
-          label="Consultar Atelier IA"
-          icon="pi pi-sparkles"
+          label="Ver sugerencia"
+          icon="pi pi-lightbulb"
           :loading="loading"
           class="p-button-warning font-semibold text-sm"
-          @click="consultarIA"
+          @click="consultarSugerencia"
         />
       </div>
 
       <!-- Result Card -->
       <div v-if="respuesta" class="bg-stone-900/80 border border-amber-500/30 rounded-xl p-4 text-sm space-y-3 mt-4 animate-fade-in">
         <div class="flex items-center gap-2 text-amber-400 font-semibold text-xs tracking-wider uppercase border-b border-stone-800 pb-2">
-          <i class="pi pi-check-circle" /> Respuesta del Asistente
+          <i class="pi pi-check-circle" /> Sugerencia del taller (ejemplo)
         </div>
         <div class="text-stone-200 whitespace-pre-line text-xs sm:text-sm leading-relaxed">
           {{ respuesta }}
         </div>
 
-        <div v-if="recetaSugerida" class="pt-3 border-t border-stone-800 flex items-center justify-between">
-          <span class="text-xs text-stone-400">Receta: <strong class="text-amber-300">{{ recetaSugerida.nombre }}</strong></span>
-          <Button
-            label="Guardar como Receta BOM"
-            icon="pi pi-plus"
-            size="small"
-            class="p-button-sm p-button-warning"
-            @click="aplicarReceta"
-          />
+        <div v-if="recetaSugerida" class="pt-3 border-t border-stone-800">
+          <span class="text-xs text-stone-400">Ejemplo de referencia: <strong class="text-amber-300">{{ recetaSugerida.nombre }}</strong>. Para crearla de verdad, usá "Nueva Receta Manual".</span>
         </div>
       </div>
     </div>

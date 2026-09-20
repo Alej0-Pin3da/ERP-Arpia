@@ -21,6 +21,11 @@ export interface RecetaFicha {
   categoria?: string
   descripcion?: string
   tiempo_confeccion_min?: number
+  // Per-phase STANDARD estimates (0036): null = no estimate yet.
+  tiempo_corte_min?: number | null
+  tiempo_costura_min?: number | null
+  tiempo_acabados_min?: number | null
+  tiempo_calidad_min?: number | null
   mano_obra?: number
   cif_energia?: number
   precio_venta?: number
@@ -53,6 +58,14 @@ const editCategoria = ref('')
 const editLinea = ref('')
 const editDescripcion = ref('')
 const editTiempo = ref(60)
+// Per-phase STANDARD estimates (0036): null = no estimate yet.
+const editCorte = ref<number | null>(null)
+const editCostura = ref<number | null>(null)
+const editAcabados = ref<number | null>(null)
+const editCalidad = ref<number | null>(null)
+// Global rates for display-only standard-cost estimates (never feed totals).
+const tasaMano = ref(0)
+const tasaEnergia = ref(0)
 const editMano = ref(0)
 const editCif = ref(0)
 const editPrecio = ref(0)
@@ -129,6 +142,8 @@ async function agregarCombo() {
     newComboProductoId.value = null
     newComboCantidad.value = 1
     await cargarCombos()
+    // Refresh the cost card too so totals stay in sync without a page reload.
+    await cargarBom()
   } catch (e: unknown) {
     const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
     const msg = Array.isArray(detail) ? (detail as { msg?: string }[]).map((d) => d.msg ?? JSON.stringify(d)).join('; ') : (detail as string ?? (e as Error)?.message ?? 'Error al agregar')
@@ -142,6 +157,8 @@ async function eliminarCombo(lineaId: number) {
     await bomApi.deleteBomProducto(recetaId.value, lineaId)
     showToast('success', 'Producto quitado', 'Combo actualizado.')
     await cargarCombos()
+    // Refresh the cost card too so totals stay in sync without a page reload.
+    await cargarBom()
   } catch (e: unknown) {
     const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
     const msg = Array.isArray(detail) ? (detail as { msg?: string }[]).map((d) => d.msg ?? JSON.stringify(d)).join('; ') : (detail as string ?? (e as Error)?.message ?? 'Error al eliminar')
@@ -169,7 +186,9 @@ async function cargarMargenMeta() {
   try {
     const p = await maestrosApi.getParametros()
     margenMetaGlobal.value = Number(p.margen_meta_global_pct ?? 35)
-  } catch { margenMetaGlobal.value = 35 }
+    tasaMano.value = Number(p.costo_minuto_costura ?? 0)
+    tasaEnergia.value = Number(p.costo_minuto_energia ?? 0)
+  } catch { margenMetaGlobal.value = 35; tasaMano.value = 0; tasaEnergia.value = 0 }
 }
 
 async function cargarBom() {
@@ -207,6 +226,10 @@ async function enterEdit() {
   editLinea.value = (r.linea as string) ?? 'General'
   editDescripcion.value = (r.descripcion as string) ?? ''
   editTiempo.value = Number(r.tiempo_confeccion_min ?? 60)
+  editCorte.value = r.tiempo_corte_min != null ? Number(r.tiempo_corte_min) : null
+  editCostura.value = r.tiempo_costura_min != null ? Number(r.tiempo_costura_min) : null
+  editAcabados.value = r.tiempo_acabados_min != null ? Number(r.tiempo_acabados_min) : null
+  editCalidad.value = r.tiempo_calidad_min != null ? Number(r.tiempo_calidad_min) : null
   editMano.value = Number(r.mano_obra ?? 0)
   editCif.value = Number(r.cif_energia ?? 0)
   // precio_venta_sugerido is the DB column, precio_venta is the mapped alias — try both, and handle string Decimal
@@ -227,6 +250,10 @@ async function enterEdit() {
     linea: editLinea.value,
     descripcion: editDescripcion.value,
     tiempo: editTiempo.value,
+    corte: editCorte.value,
+    costura: editCostura.value,
+    acabados: editAcabados.value,
+    calidad: editCalidad.value,
     mano: editMano.value,
     cif: editCif.value,
     precio: editPrecio.value,
@@ -275,6 +302,10 @@ async function guardarEdicion() {
       linea: editLinea.value || null,
       descripcion: editDescripcion.value.trim() || null,
       tiempo_confeccion_min: Number(editTiempo.value ?? 0),
+      tiempo_corte_min: editCorte.value == null ? null : Number(editCorte.value),
+      tiempo_costura_min: editCostura.value == null ? null : Number(editCostura.value),
+      tiempo_acabados_min: editAcabados.value == null ? null : Number(editAcabados.value),
+      tiempo_calidad_min: editCalidad.value == null ? null : Number(editCalidad.value),
       mano_obra: Number(editMano.value ?? 0),
       cif_energia: Number(editCif.value ?? 0),
       precio_venta_sugerido: Number(editPrecio.value ?? 0),
@@ -383,6 +414,34 @@ const costoTotalCalculado = computed(() => {
   return base + mano + cif
 })
 
+// Per-phase STANDARD totals (0036) — display-only estimates. They NEVER feed
+// costoTotalCalculado / calcular_costo_produccion (still fijos+insumos) so the
+// precio sugerido and margen do not move unexpectedly. Energy follows the
+// taller rule (only costura minutes consume machine energy); labor counts all
+// four phases.
+function stdMinutes(src: { tiempo_corte_min?: number | null; tiempo_costura_min?: number | null; tiempo_acabados_min?: number | null; tiempo_calidad_min?: number | null }): number | null {
+  const parts = [src.tiempo_corte_min, src.tiempo_costura_min, src.tiempo_acabados_min, src.tiempo_calidad_min]
+  if (parts.every((p) => p == null)) return null
+  return parts.reduce((acc, p) => acc + Number(p ?? 0), 0)
+}
+const totalEstandarMin = computed(() => {
+  if (!props.receta) return null
+  if (isEditing.value) {
+    return stdMinutes({ tiempo_corte_min: editCorte.value, tiempo_costura_min: editCostura.value, tiempo_acabados_min: editAcabados.value, tiempo_calidad_min: editCalidad.value })
+  }
+  return stdMinutes(props.receta)
+})
+const estimManoEstandar = computed(() => {
+  const total = totalEstandarMin.value
+  if (total == null) return null
+  return total * Number(tasaMano.value ?? 0)
+})
+const estimEnergiaEstandar = computed(() => {
+  const costura = isEditing.value ? editCostura.value : props.receta?.tiempo_costura_min
+  if (costura == null) return null
+  return Number(costura) * Number(tasaEnergia.value ?? 0)
+})
+
 const markupCalculado = computed(() => {
   if (!props.receta) return 0
   const total = Number(costoTotalCalculado.value ?? 0)
@@ -433,6 +492,10 @@ const isDirty = computed(() => {
     editLinea.value !== (s.linea as string) ||
     editDescripcion.value !== (s.descripcion as string) ||
     Number(editTiempo.value) !== Number(s.tiempo ?? 60) ||
+    (editCorte.value ?? null) !== (s.corte as number | null ?? null) ||
+    (editCostura.value ?? null) !== (s.costura as number | null ?? null) ||
+    (editAcabados.value ?? null) !== (s.acabados as number | null ?? null) ||
+    (editCalidad.value ?? null) !== (s.calidad as number | null ?? null) ||
     Number(editMano.value) !== Number(s.mano ?? 0) ||
     Number(editCif.value) !== Number(s.cif ?? 0) ||
     Number(editPrecio.value) !== Number(s.precio ?? 0) ||
@@ -617,6 +680,25 @@ function exportarMatriz() {
           <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Categoría</label><Dropdown v-model="editCategoria" :options="categoriasOptions" class="w-full" /></div>
           <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Línea</label><Dropdown v-model="editLinea" :options="lineasOptions" class="w-full" /></div>
           <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Tiempo (min)</label><input v-model.number="editTiempo" type="number" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-stone-200" /></div>
+        </div>
+        <div v-if="isEditing" class="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-stone-900/60 border border-stone-800 rounded-xl p-3.5">
+          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Corte (min)</label><InputNumber v-model="editCorte" mode="decimal" locale="es-CO" :min="0" :min-fraction-digits="0" :max-fraction-digits="0" placeholder="—" class="w-full" input-class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-stone-200" showButtons :step="5" /></div>
+          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Costura (min)</label><InputNumber v-model="editCostura" mode="decimal" locale="es-CO" :min="0" :min-fraction-digits="0" :max-fraction-digits="0" placeholder="—" class="w-full" input-class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-stone-200" showButtons :step="5" /></div>
+          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Acabados (min)</label><InputNumber v-model="editAcabados" mode="decimal" locale="es-CO" :min="0" :min-fraction-digits="0" :max-fraction-digits="0" placeholder="—" class="w-full" input-class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-stone-200" showButtons :step="5" /></div>
+          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Calidad (min)</label><InputNumber v-model="editCalidad" mode="decimal" locale="es-CO" :min="0" :min-fraction-digits="0" :max-fraction-digits="0" placeholder="—" class="w-full" input-class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-stone-200" showButtons :step="5" /></div>
+          <div class="col-span-2 lg:col-span-4 text-[11px] text-stone-400">
+            Total estándar: <span class="font-mono font-bold text-amber-300">{{ totalEstandarMin != null ? `${totalEstandarMin} min` : '—' }}</span>
+            <span v-if="estimManoEstandar != null || estimEnergiaEstandar != null" class="text-stone-500"> · referencia ≈ mano {{ estimManoEstandar != null ? formatCOP(estimManoEstandar) : '—' }} + energía {{ estimEnergiaEstandar != null ? formatCOP(estimEnergiaEstandar) : '—' }} (no alimenta el costo)</span>
+          </div>
+        </div>
+        <div v-if="!isEditing && (receta.tiempo_corte_min != null || receta.tiempo_costura_min != null || receta.tiempo_acabados_min != null || receta.tiempo_calidad_min != null)" class="bg-stone-900/40 border border-stone-800/80 rounded-xl px-3 py-2 text-xs text-stone-300 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span class="uppercase text-[10px] font-bold text-stone-500">Estándar por fase:</span>
+          <span v-if="receta.tiempo_corte_min != null">Corte <span class="font-mono text-stone-100">{{ receta.tiempo_corte_min }} min</span></span>
+          <span v-if="receta.tiempo_costura_min != null">Costura <span class="font-mono text-stone-100">{{ receta.tiempo_costura_min }} min</span></span>
+          <span v-if="receta.tiempo_acabados_min != null">Acabados <span class="font-mono text-stone-100">{{ receta.tiempo_acabados_min }} min</span></span>
+          <span v-if="receta.tiempo_calidad_min != null">Calidad <span class="font-mono text-stone-100">{{ receta.tiempo_calidad_min }} min</span></span>
+          <span class="text-stone-500">· Total <span class="font-mono font-bold text-amber-300">{{ totalEstandarMin }} min</span></span>
+          <span v-if="estimManoEstandar != null || estimEnergiaEstandar != null" class="text-stone-500">· ≈ mano {{ estimManoEstandar != null ? formatCOP(estimManoEstandar) : '—' }} + energía {{ estimEnergiaEstandar != null ? formatCOP(estimEnergiaEstandar) : '—' }} (referencia, no alimenta el costo)</span>
         </div>
 
         <div v-if="!isEditing" class="bg-stone-900/40 border border-stone-800/80 rounded-xl p-3 text-xs text-stone-300 leading-relaxed">
@@ -808,6 +890,8 @@ function exportarMatriz() {
               <div class="flex justify-between py-1 text-stone-300"><span>(+) Costo Insumos Directos / Indirectos</span><span class="font-mono font-semibold">{{ formatCOP(totalInsumosReal) }}</span></div>
               <div class="flex justify-between py-1 text-stone-300"><span>(+) Mano de Obra ({{ isEditing ? editTiempo : receta.tiempo_confeccion_min }} min)</span><span v-if="!isEditing" class="font-mono font-semibold">{{ formatCOP(receta.mano_obra) }}</span><InputNumber v-else v-model="editMano" mode="decimal" locale="es-CO" :min="0" :step="0.01" :min-fraction-digits="0" :max-fraction-digits="2" class="w-24" input-class="w-24 bg-stone-950 border border-stone-700 rounded px-2 py-1 text-right font-mono text-stone-200" /></div>
               <div class="flex justify-between py-1 text-stone-300"><span>(+) Costos CIF / Energía Eléctrica</span><span v-if="!isEditing" class="font-mono font-semibold">{{ formatCOP(receta.cif_energia) }}</span><InputNumber v-else v-model="editCif" mode="decimal" locale="es-CO" :min="0" :step="0.01" :min-fraction-digits="0" :max-fraction-digits="2" class="w-24" input-class="w-24 bg-stone-950 border border-stone-700 rounded px-2 py-1 text-right font-mono text-stone-200" /></div>
+              <div v-if="estimManoEstandar != null" class="flex justify-between py-1 text-stone-500"><span>(≈) Mano estimada estándar ({{ totalEstandarMin }} min × tarifa) — referencia</span><span class="font-mono">{{ formatCOP(estimManoEstandar) }}</span></div>
+              <div v-if="estimEnergiaEstandar != null" class="flex justify-between py-1 text-stone-500"><span>(≈) Energía estimada estándar (costura × tarifa) — referencia</span><span class="font-mono">{{ formatCOP(estimEnergiaEstandar) }}</span></div>
               <div class="flex justify-between py-1.5 font-bold text-stone-100 bg-stone-950/40 px-2 rounded"><span>(=) Costo Unitario de Confección</span><span class="font-mono text-emerald-400">{{ formatCOP(costoTotalCalculado) }}</span></div>
               <div class="flex justify-between py-2 items-center gap-2"><div><div class="font-bold text-amber-400 text-sm">PRECIO VENTA</div><div class="text-[10px] text-stone-400">Margen real: {{ markupCalculado }}% <span class="text-stone-500">| Meta: {{ margenMetaGlobal }}%</span></div><div v-if="!isEditing && precioSugeridoAuto > 0" class="text-[10px] text-amber-400/70">Sugerido ({{ margenMetaGlobal }}%): {{ formatCOP(precioSugeridoAuto) }}</div><div v-else-if="isEditing" class="text-[10px] text-amber-400/70">Sugerido: {{ formatCOP(precioSugeridoAuto) }} <span v-if="precioOverride" class="text-stone-500">| editado</span></div></div><div v-if="!isEditing" class="font-mono text-lg font-extrabold text-amber-300">{{ formatCOP(precioMostrado) }}</div><div v-else class="flex items-center gap-1"><InputNumber v-model="editPrecio" mode="decimal" locale="es-CO" :min="0" :step="0.01" :min-fraction-digits="0" :max-fraction-digits="2" class="w-32" :input-class="precioOverride ? 'w-32 bg-stone-950 border rounded px-2 py-1.5 text-right font-mono text-lg font-extrabold border-stone-600 text-stone-100' : 'w-32 bg-stone-950 border rounded px-2 py-1.5 text-right font-mono text-lg font-extrabold border-amber-500/30 text-amber-300'" @input="precioOverride = true" /><button v-if="precioOverride && precioSugeridoAuto > 0" type="button" class="text-[10px] px-2 py-1 rounded bg-stone-800 text-stone-400 hover:text-amber-300 whitespace-nowrap" title="Volver al precio sugerido" @click="resetPrecio()">&#8634; auto</button></div></div>
             </div>

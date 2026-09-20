@@ -124,7 +124,7 @@ function enviarGuiaWhatsApp() {
     `• Productos Sin Talla: Tote Bags ilustradas y accesorios\n\n` +
     `¿Deseas encargar alguna prenda de nuestra colección? 🪡`
   )
-  window.open(`https://wa.me/${cleanPhone || '573124567890'}?text=${msg}`, '_blank')
+  window.open(`https://wa.me/${cleanPhone || '573217265049'}?text=${msg}`, '_blank')
 }
 </script>
 

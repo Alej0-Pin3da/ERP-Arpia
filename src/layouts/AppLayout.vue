@@ -153,8 +153,8 @@ function closeSidebar(): void {
       <div class="header-right">
         <!-- AI Assistant Fast Trigger -->
         <Button
-          label="Asistente IA"
-          icon="pi pi-sparkles"
+          label="Sugerencias de taller"
+          icon="pi pi-lightbulb"
           size="small"
           class="p-button-warning text-xs font-semibold hidden sm:inline-flex"
           @click="showIaModal = true"

@@ -204,7 +204,7 @@ function abrirWhatsApp(c: ClienteDisplay) {
     msgText = `¡Hola ${c.nombre}! Te escribimos de Atelier Arpía. Tenemos novedades en tus prendas favoritas en talla ${c.talla_habitual || 'estándar'}. ¿Deseas coordinar un nuevo pedido? 🪡✨`
   }
   const msg = encodeURIComponent(msgText)
-  const url = `https://wa.me/${cleanPhone || '573124567890'}?text=${msg}`
+  const url = `https://wa.me/${cleanPhone || '573217265049'}?text=${msg}`
   window.open(url, '_blank')
 }
 </script>

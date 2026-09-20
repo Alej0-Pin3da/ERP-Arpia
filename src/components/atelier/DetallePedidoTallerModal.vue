@@ -324,13 +324,6 @@ function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
 }
 
-function generarReciboAnticipo() {
-  showToast(
-    'success',
-    'Recibo de Caja Generado',
-    `Comprobante de anticipo por ${formatCOP((props.pedido?.precio_venta || 0) * 0.5)} listo para enviar a la clienta.`
-  )
-}
 </script>
 
 <template>

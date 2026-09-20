@@ -508,7 +508,7 @@ async function confirmarEliminarAnticipo() {
 }
 
 function imprimirBalance() {
-  showToast('info', 'Balance Preparado', 'Generando balance financiero oficial de Atelier Arpía.')
+  showToast('info', 'Balance', 'Abriendo diálogo de impresión del navegador.')
   if (typeof window !== 'undefined') {
     window.print()
   }

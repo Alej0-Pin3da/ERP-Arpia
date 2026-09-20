@@ -260,17 +260,8 @@ function solicitarEliminar(r: RecetaDisplay) {
 
       <div class="flex flex-wrap items-center gap-2">
         <Button
-          label="Planilla Google Sheet (Matriz de Corte)"
-          icon="pi pi-file-excel"
-          size="small"
-          severity="secondary"
-          outlined
-          class="text-xs font-semibold"
-          @click="abrirFicha(recetasDisplay[0])"
-        />
-        <Button
-          label="Generar con IA"
-          icon="pi pi-sparkles"
+          label="Ver sugerencias de taller"
+          icon="pi pi-lightbulb"
           size="small"
           class="p-button-warning text-xs font-semibold"
           @click="showIaModal = true"

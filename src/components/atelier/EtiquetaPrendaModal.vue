@@ -103,7 +103,7 @@ function imprimirEtiqueta() {
     showToast('warn', 'Sin datos', 'La etiqueta requiere la prenda real.')
     return
   }
-  showToast('success', 'Imprimiendo Etiqueta', `Enviando etiqueta de ${props.prenda?.nombre} a la impresora de taller.`)
+  showToast('info', 'Vista previa de etiqueta', 'Abriendo diálogo de impresión del navegador.')
   if (typeof window !== 'undefined') {
     window.print()
   }
@@ -224,8 +224,8 @@ function imprimirEtiqueta() {
 
         <!-- Serial QR Code & Barcode SVG -->
         <div class="w-full flex items-center justify-between pt-1 font-mono">
-          <!-- QR SVG Mockup -->
-          <div class="w-16 h-16 bg-white p-1 rounded-lg shadow flex items-center justify-center">
+          <!-- QR placeholder: static preview, not scannable -->
+          <div class="w-16 h-16 bg-white p-1 rounded-lg shadow flex items-center justify-center" title="Vista previa — código ilustrativo, no escaneable">
             <svg viewBox="0 0 24 24" class="w-full h-full text-stone-950">
               <path fill="currentColor" d="M2 2h8v8H2V2zm2 2v4h4V4H4zm10-2h8v8h-8V2zm2 2v4h4V4h-4zM2 14h8v8H2v-8zm2 2v4h4v-4H4zm12 0h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm4 0h2v2h-2v-2zm-6-4h2v2h-2v-2zm0 4h2v2h-2v-2z" />
             </svg>
@@ -237,6 +237,8 @@ function imprimirEtiqueta() {
             <div class="text-[9px] text-stone-500">{{ props.variante?.lote || props.prenda?.codigo || 'Sin registro — pendiente' }}</div>
           </div>
         </div>
+
+        <div class="w-full text-center text-[9px] font-mono text-stone-500">Vista previa: el código es ilustrativo, no escaneable.</div>
       </div>
     </div>
 

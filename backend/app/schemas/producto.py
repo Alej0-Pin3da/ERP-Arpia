@@ -35,6 +35,11 @@ class ProductoBase(BaseModel):
     composicion: str | None = Field(default=None, max_length=255)
     descripcion: str | None = None
     tiempo_confeccion_min: int | None = Field(default=None, ge=0)
+    # Per-phase STANDARD estimates (0036): NULL = no estimate yet.
+    tiempo_corte_min: int | None = Field(default=None, ge=0)
+    tiempo_costura_min: int | None = Field(default=None, ge=0)
+    tiempo_acabados_min: int | None = Field(default=None, ge=0)
+    tiempo_calidad_min: int | None = Field(default=None, ge=0)
     costo_insumos: Decimal | None = Field(default=None, ge=0)
     mano_obra: Decimal | None = Field(default=None, ge=0)
     cif_energia: Decimal | None = Field(default=None, ge=0)
@@ -63,6 +68,11 @@ class ProductoUpdate(BaseModel):
     composicion: str | None = Field(default=None, max_length=255)
     descripcion: str | None = None
     tiempo_confeccion_min: int | None = Field(default=None, ge=0)
+    # Per-phase STANDARD estimates (0036): NULL = no estimate yet.
+    tiempo_corte_min: int | None = Field(default=None, ge=0)
+    tiempo_costura_min: int | None = Field(default=None, ge=0)
+    tiempo_acabados_min: int | None = Field(default=None, ge=0)
+    tiempo_calidad_min: int | None = Field(default=None, ge=0)
     costo_insumos: Decimal | None = Field(default=None, ge=0)
     mano_obra: Decimal | None = Field(default=None, ge=0)
     cif_energia: Decimal | None = Field(default=None, ge=0)

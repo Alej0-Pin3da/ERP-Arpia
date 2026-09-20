@@ -3,6 +3,63 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-18] - Número de WhatsApp del taller corregido
+
+- **Fix:** fallback hardcodeado `573124567890` → `573217265049` (número real del taller) en `ProduccionView.vue`, `ClientesView.vue` y `FichaTallasClienteModal.vue`. Cero ocurrencias del viejo en `src/`.
+- **Verificación:** `npm run build` PASS.
+- **Archivos:** `src/views/ProduccionView.vue`, `src/views/ClientesView.vue`, `src/components/atelier/FichaTallasClienteModal.vue`.
+
+### [2026-09-18] - Auditoría de honestidad: 6 funciones falsas/sobredimensionadas corregidas
+
+- **Fix 1 — Sugerencias de taller (antes "Asistente IA"):** `AsistenteIaModal.vue` era `setTimeout` + keyword-match con respuestas fijas y textos que afirmaban "analiza tu inventario"; el botón "Guardar como Receta BOM" solo emitía `receta-generada` sin ningún listener (falso guardado). Opción (b): sin handler real porque el payload no mapea limpio (ítems con nombres libres sin `insumo_id`, sin `tipo_producto_id` para `ProductoCreate` ni creación de BOM por nombre). El modal ahora es solo lectura: título/descripción/botón dicen sugerencias incorporadas/ejemplos sin análisis de datos, respuestas reescritas como referencia, emit y botón de guardado eliminados. Botones de entrada renombrados en `ProductosView`, `DashboardView` y `AppLayout`. Manual (secciones 1 y 4) actualizado al flujo real.
+- **Fix 2 — Sin cambio rápido de rol:** `UsuariosView.vue` traía botones Admin/Operador/Consulta que llamaban `auth.changeRole` (solo localStorage) y desbloqueaban UI de admin con un toast. Botones y handler eliminados de la vista (CRUD y contraseñas intactos; `changeRole` queda en el store sin ningún trigger UI). Manual: párrafos de "Cambio rápido de rol" eliminados (acceso y sección 16).
+- **Fix 3 — Sin botón falso de Sheet:** `ProductosView.vue` traía "Planilla Google Sheet (Matriz de Corte)" que solo abría la ficha del primer modelo y rompía con lista vacía; no existe integración real con Sheets/Google (verificado en `src/services`: solo `exportarMatriz` local con toast en `FichaTecnicaModal`, fuera de alcance). Botón eliminado. Manual (paso 5 de sección 4) eliminado con renumerado.
+- **Fix 4 — Etiqueta QR honesta:** `EtiquetaPrendaModal.vue` mostraba un SVG estático como si fuera QR y un toast de "enviando a impresora". Sin librería QR en `package.json` (no se agregan dependencias): el código lleva rótulo "Vista previa: ilustrativo, no escaneable" y el toast ahora dice "Abriendo diálogo de impresión". CSS de impresión y guardado PUT intactos.
+- **Fix 5 — Toast de balance:** `FinanzasView.vue` anunciaba "Generando balance financiero oficial" antes de un simple `window.print()`; ahora dice "Abriendo diálogo de impresión". Nada más. Manual (paso 7 de sección 12) ajustado.
+- **Fix 6 — Código muerto:** `generarReciboAnticipo` en `DetallePedidoTallerModal.vue` (toast sin llamada ni referencia en plantilla) eliminada; `formatCOP` y `showToast` siguen en uso en el archivo.
+- **Verificación:** `npm run build` PASS; sin tests que cubran estos archivos (solo composables/utils) → no se corre vitest; greps: cero `receta-generada` en `src`, cero `changeRole` en vistas, cero `Planilla Google Sheet` y `Generando balance` en `src`, cero `generarReciboAnticipo` en `src`, cero `IA` visible en `AsistenteIaModal.vue` salvo comentario de código.
+- **Archivos:** `src/components/atelier/AsistenteIaModal.vue`, `src/views/UsuariosView.vue`, `src/views/ProductosView.vue`, `src/views/DashboardView.vue`, `src/layouts/AppLayout.vue`, `src/components/atelier/EtiquetaPrendaModal.vue`, `src/views/FinanzasView.vue`, `src/components/atelier/DetallePedidoTallerModal.vue`, `MANUAL_USUARIO.md`.
+
+### [2026-09-18] - OptimizadorView honesto: calculadora de tendido sin teatro de IA
+
+- **Problema:** `ejecutarOptimizacion()` solo esperaba 900 ms con `setTimeout` y mostraba un toast de "generado con IA" sin backend, IA ni cómputo; `anchoTela` se pedía pero nunca se usaba; la tela por defecto (`id 8`) podía no existir y dejar el selector vacío en silencio.
+- **Fix:** la vista es ahora una calculadora de tendido con resultados sincrónicos (computeds directos, sin banderas de teatro ni botón de cálculo): título y textos dicen calculadora/tendido, sin menciones a optimización ni IA. `anchoTela` alimenta un bloque de aprovechamiento del ancho con supuesto fijo documentado (2 × 2 cm de orillos no utilizables, en comentario del código y ayuda de la UI). Se conserva lo real: selector de telas del inventario (unidad 'm'), stock → largo disponible, filas de prendas editables (las de ejemplo se mantienen como punto de partida), total/sobrante y umbrales de eficiencia. Selección de tela por defecto en `null` con opción placeholder. Sin backend, sin migración, sin dependencias nuevas.
+- **Verificación:** `npm run build` PASS; sin test específico para esta vista (no se ejecuta suite completa).
+- **Archivos:** `src/views/OptimizadorView.vue`, `MANUAL_USUARIO.md` (sección 8 reescrita).
+
+### [2026-09-18] - 4 módulos reales agregados al menú lateral
+
+- **Problema:** Análisis, Devoluciones, Omisiones y Auditoría existían como rutas pero sin entrada en el menú lateral (solo URL directa); el manual los nombraba como items del menú y la dueña no los encontraba.
+- **Fix:** 4 entradas en `MENU_ITEMS` (`src/utils/menu.ts`, única fuente del sidebar): Análisis (`pi-chart-line`, tras Panel), Devoluciones (`pi-undo`, tras Ventas), Omisiones (`pi-list-check`) y Auditoría (`pi-file-check`, antes de Usuarios). Mismos roles que sus rutas (todos). El agrupador `getItemCategory` ya contemplaba `analisis`/`devoluciones`; Omisiones/Auditoría caen en SISTEMA & CONTROL. Iconos verificados contra el `primeicons.css` instalado. El manual queda correcto sin tocarlo.
+- **Verificación:** `npm run build` PASS (407 módulos).
+- **Archivos:** `src/utils/menu.ts`.
+
+### [2026-09-18] - Fix nombres de reparto en Maestros (margara/valqui no se guardaban)
+
+- **Bug:** `MaestrosView.vue` bindeaba `distribucion_margara_pct` / `distribucion_valqui_pct`, pero el backend (modelo, schemas, servicio, migración 0015, tests) usa `reparto_margara_pct` / `reparto_valqui_pct`. El form validaba contra `undefined` (suma rota) y el PATCH mandaba claves que el backend no reconoce: el reparto 30/30 no se podía editar desde la UI. Solo `distribucion_reinversion_pct` estaba bien.
+- **Fix:** rename de las 6 ocurrencias en `MaestrosView.vue` (default, `sumaDistribucion`, 2 v-model) a `reparto_*`, alineado con `ParametrosRead` en `src/services/api/maestros.ts` (ya correcto). Sin cambios backend.
+- **Verificación:** `npx vitest run src/composables/useMaestros.test.ts` PASS; `npm run build` PASS.
+- **Archivos:** `src/views/MaestrosView.vue`.
+
+### [2026-09-18] - Refresh de costos tras mutación de combos + input de tarifa de energía en Maestros
+
+- **Bug 1 verificado en código:** los handlers de insumos (`agregarInsumo`, `guardarEditBom`, `eliminarInsumo` en `FichaTecnicaModal.vue`) ya re-leían el costo vía `cargarBom()` (lista + `getCostoProduccion`), así que el reporte no reproduce en insumos; el hueco real estaba en combos: `agregarCombo`/`eliminarCombo` solo llamaban `cargarCombos()`. No existe handler de update de combo en el modal (`updateBomProducto` solo vive en `bom.ts`/`useBom.ts`, sin uso aquí).
+- **Fix (mínimo):** `agregarCombo` y `eliminarCombo` ahora hacen `await cargarBom()` tras el éxito, con el mismo patrón loading/error existente (`loadingBom`, toasts intactos). La sección de combos no muestra costos y los combos no alimentan `costoReal`, pero la tarjeta de costeo queda recargada tras cada mutación BOM sin recargar la página. Filas `(≈)` estándar intactas (solo-display desde tasas globales, no alimentan totales).
+- **Feature 2 (Maestros):** el backend ya aceptaba y devolvía `costo_minuto_energia` (`ParametrosUpdate`/`ParametrosRead` + `patch_parametros` genérico, columna desde 0031) — sin cambios backend ni migración. Solo UI: `MaestrosView.vue` suma `costo_minuto_energia: 0` al default + `InputNumber locale="es-CO" :min="0"` "Valor Minuto de Energía (COP/min)" junto a costo_minuto_costura (misma validación y formato que los inputs hermanos). `guardarParametros` ya envía el form completo y `cargarDatos`/`guardarParametros` sincronizan con `Object.assign`, así que el valor hace round-trip (GET muestra lo guardado).
+- **Verificación:** `npm run build` PASS (407 módulos); `npx vitest run src/composables/useMaestros.test.ts` 10/10 PASS. Backend intacto en esta tarea → `pytest tests/test_productos.py` no aplica (sin cambios `backend/`).
+- **Archivos:** `src/components/atelier/FichaTecnicaModal.vue`, `src/views/MaestrosView.vue`.
+- **Rollback:** `git checkout -- src/components/atelier/FichaTecnicaModal.vue src/views/MaestrosView.vue` + esta entrada.
+
+### [2026-09-18] - Tiempos estándar por fase en Producto (BOM/Ficha sin pedido)
+
+- **Motivo:** BOM/Ficha siempre debía mostrar mano/CIF estimada sin depender de un pedido; los tiempos reales viven en `TiempoFase` (por pedido) y `completar_lote` nunca debe pisar estimados del producto. La mano NO se modela como líneas `BomInsumo`.
+- **Backend:** migración `0036_producto_tiempos_fase_std` (head sobre `0035_bom_insumo_detalle`): 4 columnas NULL `Productos.tiempo_{corte,costura,acabados,calidad}_min` INTEGER + CHECK `>= 0` cada una (`ck_productos_tiempo_*_min`), guards idempotentes estilo 0031/0034/0035 (probeo exacto tabla/columna/check, nunca CAST AS regclass); downgrade baja checks y luego columnas. Modelo `Producto` con 4 `Mapped[int | None]`; schemas `ProductoBase`/`ProductoUpdate` con 4 opcionales `ge=0` (`ProductoRead` hereda). `PUT /productos/{id}` ya fluía por `ProductoUpdate` genérico (`model_dump(exclude_unset)` + setattr) — sin ruta nueva. `calcular_costo_produccion` intacto (sigue fijos+insumos); `completar_lote` intacto (nunca toca los estimados).
+- **Frontend:** tipos `productos.ts` (`Read/Create/Update`) con 4 campos opcionales; `maestros.ts` suma `costo_minuto_energia?` opcional a `ParametrosRead`. `FichaTecnicaModal` (tab ficha): 4 `InputNumber mode="decimal" locale="es-CO"` enteros (min 0, step 5, placeholder "—" para NULL) que cargan desde receta y guardan vía `updateProducto`; total estándar derivado (suma de los 4) como hint read-only en edición y barra "Estándar por fase" en lectura. Helper solo-display: mano estimada ≈ total × `costo_minuto_costura`, energía estimada ≈ costura × `costo_minuto_energia` (misma regla del taller: solo costura consume energía de máquina) en el hint y 2 filas `(≈)` en la tarjeta de costeo — NO alimentan costo unitario, precio sugerido ni margen (documentado en comentario del código).
+- **Tests:** `backend/tests/test_productos.py` suma 4 tests (round-trip create/update/read, defaults NULL, negativos → 422 ×4 campos + PUT, CHECK DB rechaza -1 directo al modelo). Lógica BOM/combos intacta.
+- **Verificación:** `python -m pytest tests/test_productos.py -q` PASS; `npm run build` PASS.
+- **Archivos:** `backend/alembic/versions/0036_producto_tiempos_fase_std.py` (nuevo), `backend/app/models/productos.py`, `backend/app/schemas/producto.py`, `backend/tests/test_productos.py`, `src/services/api/productos.ts`, `src/services/api/maestros.ts`, `src/components/atelier/FichaTecnicaModal.vue`.
+- **Rollback:** `git checkout -- <archivos>` (sin commit) + `alembic downgrade -1` si la 0036 ya aplicó en algún entorno.
+
 ### [2026-09-17] - F7 N7a/N7g a semántica SUM (repetidos legales ya no flaggean)
 
 - **Problema:** tras permitir repetidos (0034/0035), F7 seguía ERROR: N7a contaba duplicados por clave gruesa (producto|insumo, 131 flags con 35 BOM) y N7g 5 `BOM_INSUMOS duplicado` en piezas genuinas; además 96 residuales no-BOM (compras 69 por nombre insumo, ventas 15 por producto, movimientos 12 por descripción).

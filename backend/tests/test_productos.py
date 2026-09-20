@@ -566,3 +566,148 @@ def test_get_productos_consulta_allowed(client, consulta_token):
     assert resp.status_code == 200
     body = resp.json()
     assert set(body.keys()) == {"items", "total"}
+
+
+# ---------------------------------------------------------------------------
+# Per-phase STANDARD times (0036): estimates on Producto, never real times
+# ---------------------------------------------------------------------------
+
+STD_TIEMPOS = {
+    "tiempo_corte_min": 10,
+    "tiempo_costura_min": 45,
+    "tiempo_acabados_min": 15,
+    "tiempo_calidad_min": 5,
+}
+
+
+def test_producto_tiempos_fase_std_roundtrip(client, admin_token):
+    """Create/update/read round-trip for the 4 per-phase STANDARD times."""
+    tipo_id = _make_tipo()
+    producto_id = None
+    try:
+        resp = client.post(
+            "/api/v1/productos",
+            json={
+                "tipo_producto_id": tipo_id,
+                "nombre": f"Producto Std {_unique()}",
+                **STD_TIEMPOS,
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        producto_id = body["id"]
+        for field, value in STD_TIEMPOS.items():
+            assert body[field] == value
+
+        resp = client.get(
+            f"/api/v1/productos/{producto_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        for field, value in STD_TIEMPOS.items():
+            assert resp.json()[field] == value
+
+        nuevos = {
+            "tiempo_corte_min": 12,
+            "tiempo_costura_min": 50,
+            "tiempo_acabados_min": 18,
+            "tiempo_calidad_min": 7,
+        }
+        resp = client.put(
+            f"/api/v1/productos/{producto_id}",
+            json=nuevos,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        for field, value in nuevos.items():
+            assert resp.json()[field] == value
+
+        resp = client.get(
+            f"/api/v1/productos/{producto_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        for field, value in nuevos.items():
+            assert resp.json()[field] == value
+    finally:
+        if producto_id is not None:
+            _cleanup_producto(producto_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_producto_tiempos_fase_std_defaults_null(client, admin_token):
+    """Without estimates the 4 fields read back as NULL (backward compat)."""
+    tipo_id = _make_tipo()
+    producto_id = None
+    try:
+        resp = client.post(
+            "/api/v1/productos",
+            json={
+                "tipo_producto_id": tipo_id,
+                "nombre": f"Producto Sin Std {_unique()}",
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 201
+        producto_id = resp.json()["id"]
+        for field in STD_TIEMPOS:
+            assert resp.json()[field] is None
+    finally:
+        if producto_id is not None:
+            _cleanup_producto(producto_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_producto_tiempos_fase_std_negative_returns_422(client, admin_token):
+    """Negative standard times are rejected by schema validation (422)."""
+    tipo_id = _make_tipo()
+    try:
+        for field in STD_TIEMPOS:
+            resp = client.post(
+                "/api/v1/productos",
+                json={
+                    "tipo_producto_id": tipo_id,
+                    "nombre": f"Producto Neg Std {_unique()}",
+                    field: -1,
+                },
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+            assert resp.status_code == 422
+        producto_id = _make_producto(tipo_id)
+        try:
+            resp = client.put(
+                f"/api/v1/productos/{producto_id}",
+                json={"tiempo_costura_min": -5},
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+            assert resp.status_code == 422
+        finally:
+            _cleanup_producto(producto_id)
+    finally:
+        _cleanup_tipo(tipo_id)
+
+
+def test_producto_tiempos_fase_std_check_rejects_negative_db():
+    """DB CHECK constraint rejects negative standard times (defense in depth)."""
+    from sqlalchemy.exc import IntegrityError
+
+    db = SessionLocal()
+    tipo_id = _make_tipo()
+    try:
+        producto = Producto(
+            tipo_producto_id=tipo_id,
+            nombre=f"Producto Check {_unique()}",
+            tiempo_corte_min=-1,
+        )
+        db.add(producto)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+        else:
+            db.rollback()
+            raise AssertionError("CHECK ck_productos_tiempo_corte_min did not reject -1")
+    finally:
+        db.close()
+        _cleanup_tipo(tipo_id)

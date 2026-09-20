@@ -165,8 +165,8 @@ function getEstadoBadgeClass(estado: string) {
 
         <div class="flex flex-wrap items-center gap-2">
           <Button
-            label="Crear Receta con IA"
-            icon="pi pi-sparkles"
+            label="Ver sugerencias de taller"
+            icon="pi pi-lightbulb"
             size="small"
             class="p-button-warning text-xs font-semibold"
             @click="showIaModal = true"

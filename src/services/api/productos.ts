@@ -15,6 +15,11 @@ export interface ProductoRead {
   composicion?: string | null
   descripcion?: string | null
   tiempo_confeccion_min?: number | null
+  // Per-phase STANDARD estimates (0036): null = no estimate yet.
+  tiempo_corte_min?: number | null
+  tiempo_costura_min?: number | null
+  tiempo_acabados_min?: number | null
+  tiempo_calidad_min?: number | null
   costo_insumos?: number | string | null
   mano_obra?: number | string | null
   cif_energia?: number | string | null
@@ -39,6 +44,11 @@ export interface ProductoCreate {
   composicion?: string | null
   descripcion?: string | null
   tiempo_confeccion_min?: number | null
+  // Per-phase STANDARD estimates (0036): null = no estimate yet.
+  tiempo_corte_min?: number | null
+  tiempo_costura_min?: number | null
+  tiempo_acabados_min?: number | null
+  tiempo_calidad_min?: number | null
   costo_insumos?: number | string | null
   mano_obra?: number | string | null
   cif_energia?: number | string | null
@@ -61,6 +71,11 @@ export interface ProductoUpdate {
   composicion?: string | null
   descripcion?: string | null
   tiempo_confeccion_min?: number | null
+  // Per-phase STANDARD estimates (0036): null = no estimate yet.
+  tiempo_corte_min?: number | null
+  tiempo_costura_min?: number | null
+  tiempo_acabados_min?: number | null
+  tiempo_calidad_min?: number | null
   costo_insumos?: number | string | null
   mano_obra?: number | string | null
   cif_energia?: number | string | null
