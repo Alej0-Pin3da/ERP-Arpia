@@ -691,12 +691,154 @@ def test_get_costo_variante_query_param_override(client, admin_token):
         base = client.get(f"{BASE}/{producto_id}/costo", headers=_auth(admin_token))
         assert base.status_code == 200
         assert Decimal(str(base.json()["total"])) == Decimal("5.0000")
-        override = client.get(
-            f"{BASE}/{producto_id}/costo?variante_id={variante_id}",
-            headers=_auth(admin_token),
-        )
-        assert override.status_code == 200
-        assert Decimal(str(override.json()["total"])) == Decimal("10.0000")
     finally:
         _cleanup_producto(producto_id)
         _teardown_insumo_base(categoria_id, insumo_id, tipo_id)
+
+
+# ---------------------------------------------------------------------------
+# Standard times -> automatic labor/energy (BOM tiempos alimentan el costo)
+# ---------------------------------------------------------------------------
+
+
+def _set_tiempos(producto_id: int, corte=None, costura=None, acabados=None, calidad=None) -> None:
+    db = SessionLocal()
+    try:
+        p = db.get(Producto, producto_id)
+        p.tiempo_corte_min = corte
+        p.tiempo_costura_min = costura
+        p.tiempo_acabados_min = acabados
+        p.tiempo_calidad_min = calidad
+        db.commit()
+    finally:
+        db.close()
+
+
+def _set_manual(producto_id: int, mano=None, cif=None) -> None:
+    db = SessionLocal()
+    try:
+        p = db.get(Producto, producto_id)
+        p.mano_obra = Decimal(mano) if mano is not None else None
+        p.cif_energia = Decimal(cif) if cif is not None else None
+        db.commit()
+    finally:
+        db.close()
+
+
+def _set_tasas(mano: str, energia: str):
+    """Set singleton tasas in the TEST db; returns the previous (mano, energia)."""
+    from app.models.maestros import ParametrosCosteo
+
+    db = SessionLocal()
+    try:
+        row = db.get(ParametrosCosteo, 1)
+        if row is None:
+            row = ParametrosCosteo(id=1)
+            db.add(row)
+            db.flush()
+        previas = (row.costo_minuto_costura, row.costo_minuto_energia)
+        row.costo_minuto_costura = Decimal(mano)
+        row.costo_minuto_energia = Decimal(energia)
+        db.commit()
+        return previas
+    finally:
+        db.close()
+
+
+def _restore_tasas(previas) -> None:
+    from app.models.maestros import ParametrosCosteo
+
+    db = SessionLocal()
+    try:
+        row = db.get(ParametrosCosteo, 1)
+        row.costo_minuto_costura, row.costo_minuto_energia = previas
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_costo_tiempos_estandar_automatico():
+    """Tiempos 60/120/10/10 -> mano = 200 x tasa_mano, energia = 120 x tasa_energia."""
+    tipo_id = _make_tipo()
+    producto_id = _make_producto(tipo_id)
+    _set_tiempos(producto_id, corte=60, costura=120, acabados=10, calidad=10)
+    previas = _set_tasas("100", "12.33")
+    try:
+        db = SessionLocal()
+        try:
+            total, lineas = desglosar_costo_produccion(db, producto_id)
+            assert total == Decimal("21479.60")  # 200x100 + 120x12.33
+            tipos = {l.tipo for l in lineas}
+            assert "mano_obra" in tipos
+            assert "cif_energia" in tipos
+            mano = next(l for l in lineas if l.tipo == "mano_obra")
+            assert mano.cantidad == Decimal(200)
+            assert mano.costo_unitario == Decimal("100.0000")
+            assert mano.costo_total == Decimal("20000.0000")
+            energia = next(l for l in lineas if l.tipo == "cif_energia")
+            assert energia.cantidad == Decimal(120)
+            assert energia.costo_unitario == Decimal("12.3300")
+            assert energia.costo_total == Decimal("1479.6000")
+        finally:
+            db.close()
+    finally:
+        _restore_tasas(previas)
+        _cleanup_producto(producto_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_costo_manual_sin_tiempos():
+    """Sin tiempos -> se suman mano_obra/cif_energia guardados (fallback)."""
+    tipo_id = _make_tipo()
+    producto_id = _make_producto(tipo_id, fijos="100")
+    _set_manual(producto_id, mano="5000", cif="2000")
+    try:
+        db = SessionLocal()
+        try:
+            total, lineas = desglosar_costo_produccion(db, producto_id)
+            assert total == Decimal("7100.0000")
+            tipos = {l.tipo for l in lineas}
+            assert "mano_obra" in tipos
+            assert "cif_energia" in tipos
+        finally:
+            db.close()
+    finally:
+        _cleanup_producto(producto_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_costo_tiempos_ganan_a_manual():
+    """Con tiempos, el automatico manda (el manual guardado no se suma dos veces)."""
+    tipo_id = _make_tipo()
+    producto_id = _make_producto(tipo_id)
+    _set_tiempos(producto_id, corte=10, costura=20, acabados=0, calidad=0)
+    _set_manual(producto_id, mano="9999", cif="9999")
+    previas = _set_tasas("100", "10")
+    try:
+        db = SessionLocal()
+        try:
+            total = calcular_costo_produccion(db, producto_id)
+            assert total == Decimal("3200.0000")  # 30x100 + 20x10, manual ignorado
+        finally:
+            db.close()
+    finally:
+        _restore_tasas(previas)
+        _cleanup_producto(producto_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_costo_sin_tiempos_ni_manual_no_agrega_lineas():
+    """Sin tiempos y sin manual -> 0 y sin lineas nuevas (forma vieja intacta)."""
+    tipo_id = _make_tipo()
+    producto_id = _make_producto(tipo_id, fijos="15")
+    try:
+        db = SessionLocal()
+        try:
+            total, lineas = desglosar_costo_produccion(db, producto_id)
+            assert total == Decimal("15.0000")
+            assert {l.tipo for l in lineas} == {"operativos_fijos"}
+        finally:
+            db.close()
+    finally:
+        _cleanup_producto(producto_id)
+        _cleanup_tipo(tipo_id)

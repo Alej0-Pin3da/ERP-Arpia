@@ -29,7 +29,6 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import DomainValidationError, EntityNotFoundError
 from app.models.insumos import Insumo
-from app.models.maestros import ParametrosCosteo
 from app.models.produccion import (
     FASES_PRODUCCION_ORDEN,
     FASES_TIEMPO_ORDEN,
@@ -39,7 +38,7 @@ from app.models.produccion import (
     TiempoFase,
 )
 from app.models.productos import Producto
-from app.services.costos import calcular_costo_produccion
+from app.services.costos import calcular_costo_produccion, tasas_costeo
 from app.services.inventory import descontar_stock, explosion_materiales
 
 
@@ -108,21 +107,6 @@ def validar_fase_tiempo(fase_pedido: str | None, fase: str) -> None:
             f"No se puede registrar tiempo de '{fase}': "
             f"el pedido está en '{actual}'"
         )
-
-
-def tasas_costeo(db: Session) -> tuple[Decimal, Decimal]:
-    """Global (mano/min, energia/min) rates. Read-only: never auto-creates.
-
-    Missing singleton row reads as 0/0 so GET endpoints stay side-effect
-    free; the singleton is created by GET/PATCH /maestros/parametros-costeo.
-    """
-    row = db.get(ParametrosCosteo, 1)
-    if row is None:
-        return Decimal("0"), Decimal("0")
-    return (
-        row.costo_minuto_costura or Decimal("0"),
-        row.costo_minuto_energia or Decimal("0"),
-    )
 
 
 def totales_tiempos(db: Session, pedido_id: int) -> dict[str, Decimal]:

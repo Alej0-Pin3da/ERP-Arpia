@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 class CostoLineaRead(BaseModel):
-    tipo: str  # "insumo" | "producto" | "operativos_fijos"
+    tipo: str  # "insumo" | "producto" | "operativos_fijos" | "mano_obra" | "cif_energia"
     id: int
     nombre: str
     cantidad: Decimal

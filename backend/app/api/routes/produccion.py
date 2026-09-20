@@ -33,10 +33,10 @@ from app.schemas.produccion import (
     TiemposListRead,
 )
 from app.services.paginacion import aplicar_orden, paginar
+from app.services.costos import tasas_costeo
 from app.services.produccion import (
     completar_lote,
     pedido_esta_completado,
-    tasas_costeo,
     totales_tiempos,
     validar_avance_fase,
     validar_fase_tiempo,

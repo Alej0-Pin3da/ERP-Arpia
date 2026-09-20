@@ -305,9 +305,9 @@ _CLASIFICACION_FORZADA: dict[str, tuple[str, str]] = {
     clave_normalizada("Cremallera num 3"): ("Telas", "m"),
     clave_normalizada("Sesgo rigido para ojales corset"): ("Telas", "m"),
     clave_normalizada("Tapavarilla negro 10 mts"): ("Telas", "m"),
-    # Cordón satinado por metros (SET OCIPETE 2026-09): insumo continuo que el
-    # keyword genérico 'cordon' mandaría a Herrajes/un como pieza.
-    clave_normalizada("Cordon Satin Rosa"): ("Telas", "m"),
+    # Cordón satinado en CM (convención consumo: se compra en metros totales,
+    # se consume/costea en cm con Unitario tal cual; ver INVERSION VALQUI).
+    clave_normalizada("Cordon Satin Rosa"): ("Telas", "cm"),
 }
 
 
