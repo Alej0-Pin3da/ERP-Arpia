@@ -28,6 +28,14 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 - **4. Fusión:** `Elastico de Contorno` (duplicado creado en la conciliación) → `Elastico de Contorno 1 CM` (id 14); línea de Bralete re-apuntada, duplicado borrado. Insumos 75→74.
 - **Verificación:** snapshot (ventas 21, bom_ins 132, Celeno 3); `pytest` 75/75 (sales, bom, venta_finite, inventory). Sin cambios de código en esta tanda (solo DB dev). Sin commit.
 
+### [2026-09-20] - INVERSION VALQUI: solo ceros + desfusión de Contorno
+
+- **Fuente:** `csv/ARPIA - INVERSION VALQUI.csv` (56 filas; `Unitario` == `valor metro` de BOM en cada material compartido: es la fuente de precios de ficha).
+- **Comparación vs DB:** 6 iguales, 8 en `Unitario×100` exacto, 31 difieren (WAC compras a precio metro realista: Ref159 9.761, Lino 17.000, satines 7.900/8.000), 11 insumos del archivo no existen en DB (casi todos fuera de BOMs: hilaza, tensor 8mm, zeta 2-19, encajes 23/6cm, franela, cordón negro... no se crean).
+- **Aplicado (opción dueña):** `Elastico pitillo rosa` 0→600 y `Cordon Satin Rosa` 0→350 (escala metro `U×100`, cierran exacto: 0.05×600=30, 1.5×350=525). Resto intacto (WAC preservado).
+- **Desfusión:** el archivo trae DOS elásticos de contorno ($20 y $70) como compras distintas → se revierte la fusión: `Elastico de Contorno` vuelve como insumo propio (id 76, 2.000/m) y la línea de Bralete 0.8 apunta a él; id 14 queda solo con Aelo/Ocipete.
+- **Verificación:** costos y re-apunte chequeados por id; `pytest` reutiliza suite previa (sin cambios de código). Solo DB dev. Sin commit.
+
 ### [2026-09-18] - Número de WhatsApp del taller corregido
 
 - **Fix:** fallback hardcodeado `573124567890` → `573217265049` (número real del taller) en `ProduccionView.vue`, `ClientesView.vue` y `FichaTallasClienteModal.vue`. Cero ocurrencias del viejo en `src/`.
