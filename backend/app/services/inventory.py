@@ -353,11 +353,6 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
 
     descontar_stock(db, explosiones)
 
-    # Finished-unit stock moves with the insumo stock in the same transaction:
-    # every sold unit leaves Producto.stock_actual (409 if short).
-    for producto_id, qty in sorted(agregados.items()):
-        _descontar_producto_bloqueado(bloqueados[producto_id], qty)
-
     total_venta = Decimal(sum(lineas_subtotal)) * descuento_factor
     es_regalo = bool(payload.get("es_regalo", False))
     if es_regalo:
@@ -390,6 +385,30 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
                 costo_unitario_aplicado=lineas_costo[i],
             )
         )
+    # Flush to obtain venta.id before linking finished units (0041).
+    # No commit yet — everything below still rolls back atomically.
+    db.flush()
+
+    # Finished units first (Perchero/talla): flip oldest `disponible` rows to
+    # `vendida` linked to this venta; only the remainder leaves
+    # Producto.stock_actual (409 if short). Insumos already deducted above.
+    restos: dict[int, Decimal] = {}
+    for detalle in detalles:
+        resto = _consumir_unidades(
+            db,
+            venta.id,
+            detalle["producto_id"],
+            detalle.get("variante_id"),
+            Decimal(detalle["cantidad"]),
+        )
+        if resto > 0:
+            restos[detalle["producto_id"]] = (
+                restos.get(detalle["producto_id"], Decimal("0")) + resto
+            )
+    # Finished-unit stock moves with the insumo stock in the same transaction:
+    # every sold unit not covered by prendas leaves Producto.stock_actual.
+    for producto_id, qty in sorted(restos.items()):
+        _descontar_producto_bloqueado(bloqueados[producto_id], qty)
 
     try:
         db.commit()
@@ -470,7 +489,19 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
         db, set(agregados_viejos) | set(agregados_nuevos)
     )
     reponer_stock(db, _explosion_venta(db, venta))
-    for producto_id, qty in sorted(agregados_viejos.items()):
+    # Flip back this sale's `vendida` rows first (0041); only the remainder
+    # that originally left Producto.stock_actual is restored there. Old sales
+    # without linked rows return full cantidad (backward compatible).
+    restos_viejos: dict[int, Decimal] = {}
+    for det in list(venta.detalles):
+        resto = _devolver_unidades(
+            db, venta.id, det.producto_id, det.variante_id, Decimal(det.cantidad)
+        )
+        if resto > 0:
+            restos_viejos[det.producto_id] = (
+                restos_viejos.get(det.producto_id, Decimal("0")) + resto
+            )
+    for producto_id, qty in sorted(restos_viejos.items()):
         _reponer_producto_bloqueado(bloqueados[producto_id], qty)
     # A FLUSH (not a commit) is required BEFORE the new deduction: both stock
     # helpers re-read with populate_existing + FOR UPDATE, so without it the
@@ -507,7 +538,20 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
 
     descontar_stock(db, explosiones)
 
-    for producto_id, qty in sorted(agregados_nuevos.items()):
+    restos_nuevos: dict[int, Decimal] = {}
+    for detalle in detalles:
+        resto = _consumir_unidades(
+            db,
+            venta.id,
+            detalle["producto_id"],
+            detalle.get("variante_id"),
+            Decimal(detalle["cantidad"]),
+        )
+        if resto > 0:
+            restos_nuevos[detalle["producto_id"]] = (
+                restos_nuevos.get(detalle["producto_id"], Decimal("0")) + resto
+            )
+    for producto_id, qty in sorted(restos_nuevos.items()):
         _descontar_producto_bloqueado(bloqueados[producto_id], qty)
 
     # 3) Recalculate the total and replace the fields + detail lines.
@@ -578,7 +622,14 @@ def anular_venta(db: Session, venta_id: int) -> Venta:
     agregados = _agregado_por_producto(list(venta.detalles))
     bloqueados = _bloquear_productos(db, agregados.keys())
     reponer_stock(db, _explosion_venta(db, venta))
-    for producto_id, qty in sorted(agregados.items()):
+    restos: dict[int, Decimal] = {}
+    for det in list(venta.detalles):
+        resto = _devolver_unidades(
+            db, venta.id, det.producto_id, det.variante_id, Decimal(det.cantidad)
+        )
+        if resto > 0:
+            restos[det.producto_id] = restos.get(det.producto_id, Decimal("0")) + resto
+    for producto_id, qty in sorted(restos.items()):
         _reponer_producto_bloqueado(bloqueados[producto_id], qty)
     try:
         venta.transition_to(DocumentState.CANCELLED)

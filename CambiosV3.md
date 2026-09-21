@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-21] - Ventas a stock desde Perchero + modal sincronizado
+
+- **Backend:** `registrar/actualizar/anular_venta` ahora consumen/devuelven unidades `disponible/vendida` (0041 `venta_id`) y solo el resto toca `Producto.stock_actual`; insumos siguen con FOR UPDATE atómico. `registrar_devolucion` total/parcial también devuelve unidades de esa venta.
+- **Frontend:** `NuevaVentaModal` variante+talla sincronizados (variante→talla auto, talla libre→variante null si no matchea), stock visible por variante (`📦 N uds en perchero`), precio default del producto (0 si no hay precio, nunca 95000 fijo), validaciones que bloquean talla/variante/precio faltante.
+- **Verificación:** `py_compile` OK, `npm run build` PASS. `pytest fase4` no corre: Postgres `arpia_test` en `localhost:5433` caído (error conexión). Pendiente prueba manual + pytest con DB.
+- **Archivos:** `backend/app/services/inventory.py`, `backend/app/services/devoluciones.py`, `src/components/atelier/NuevaVentaModal.vue`. Sin commit.
+
 ### [2026-09-20] - Conciliación BOM dev contra CSV reales (cantidades y valores)
 
 - **Fuente real:** los 9 CSV de `csv/` ( AELO, BLUSAS, CELENO, ARTEMISIA, GARRAS, Hypatia, EMILY, OSIPETE, TOTEBAG) + `ARPIA - VENTAS (1).csv` renombrado a `csv/ARPIA - VENTAS.csv` (nombre canónico que espera `migrate/sales.py`; el viejo estaba borrado del disco).

@@ -21,6 +21,7 @@ from app.models.ventas import Devolucion, DevolucionItem, DocumentState, Venta
 from app.services.inventory import (
     _agregado_por_producto,
     _bloquear_productos,
+    _devolver_unidades,
     _reponer_producto_bloqueado,
     explosion_materiales,
     reponer_stock,
@@ -160,11 +161,34 @@ def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Dev
     # Finished-unit restock moves with the insumo restock in the same
     # transaction (mirrors anular_venta): lock every touched Producto FIRST
     # (a later locked re-read would wipe pending mutations), then restore
-    # insumos and the already-locked finished units. No commit here — the
-    # single commit below owns everything.
+    # insumos and flip back this sale's `vendida` rows (0041). Only the
+    # remainder not covered by prendas returns to Producto.stock_actual.
+    # No commit here — the single commit below owns everything.
     bloqueados = _bloquear_productos(db, agregados.keys())
     reponer_stock(db, explosiones)
-    for producto_id, qty in sorted(agregados.items()):
+    # Devolver prendas: total flips every line of the venta; parcial flips
+    # only the returned qty per (producto, variante) of this venta_id.
+    lineas_devolver: list[tuple[int, int | None, Decimal]] = []
+    if tipo == "total":
+        for detalle in venta.detalles:
+            lineas_devolver.append(
+                (detalle.producto_id, detalle.variante_id, Decimal(detalle.cantidad))
+            )
+    else:
+        for item in items_payload:
+            lineas_devolver.append(
+                (
+                    item["producto_id"],
+                    item.get("variante_id"),
+                    Decimal(item["cantidad"]),
+                )
+            )
+    restos: dict[int, Decimal] = {}
+    for producto_id, variante_id, cantidad in lineas_devolver:
+        resto = _devolver_unidades(db, venta_id, producto_id, variante_id, cantidad)
+        if resto > 0:
+            restos[producto_id] = restos.get(producto_id, Decimal("0")) + resto
+    for producto_id, qty in sorted(restos.items()):
         _reponer_producto_bloqueado(bloqueados[producto_id], qty)
 
     try:

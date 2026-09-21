@@ -125,6 +125,10 @@ interface LocalItem {
   cantidad: number
   precio_unitario: number
   costo_unitario: number
+  variantes?: { id: number; nombre_variante: string }[]
+  variantesLoading?: boolean
+  stockTexto?: string
+  stockDisponible?: number
 }
 
 const items = ref<LocalItem[]>([])
@@ -278,12 +282,85 @@ function agregarItemVacio() {
     producto_id: null,
     variante_id: null,
     nombre_prenda: '',
-    talla: 'S',
-    color: 'Negro Satín',
+    talla: '',
+    color: '',
     cantidad: 1,
-    precio_unitario: 90000,
-    costo_unitario: 25000,
+    precio_unitario: 0,
+    costo_unitario: 0,
+    variantes: [],
+    stockTexto: '',
+    stockDisponible: 0,
   })
+}
+
+function tallaDeVariante(nombre: string | undefined): string {
+  if (!nombre) return ''
+  return nombre.split(' - ')[0]?.trim() ?? ''
+}
+
+async function cargarVariantesYStock(it: LocalItem, prendaId: number, opts: { preservePrecio?: boolean } = {}) {
+  it.variantesLoading = true
+  try {
+    const vare = await client.get<{ id: number; nombre_variante: string }[]>(`/productos/${prendaId}/variantes`)
+    it.variantes = vare.data ?? []
+  } catch {
+    it.variantes = []
+  }
+  // Stock visible: prendas disponibles de este producto (por talla/variante)
+  try {
+    const stockRes = await client.get<{ items: { producto_id?: number | null; variante_id: number | null; estado: string; talla?: string | null }[] }>(
+      '/prendas-confeccionadas',
+      { params: { estado: 'disponible', limit: 200 } },
+    )
+    const rows = (stockRes.data.items ?? []).filter((r) => r.producto_id === prendaId)
+    const porVariante = new Map<number, number>()
+    let genericas = 0
+    for (const r of rows) {
+      if (r.variante_id != null) porVariante.set(r.variante_id, (porVariante.get(r.variante_id) ?? 0) + 1)
+      else genericas += 1
+    }
+    const total = rows.length
+    it.stockDisponible = total
+    if (it.variantes?.length) {
+      const detalle = it.variantes
+        .map((v) => `${tallaDeVariante(v.nombre_variante)}: ${porVariante.get(v.id) ?? 0}`)
+        .join(' · ')
+      it.stockTexto = total > 0 ? `${total} uds en perchero (${detalle})` : 'Sin stock en perchero'
+    } else {
+      it.stockTexto = total > 0 ? `${total} uds disponibles (genérica)` : 'Sin stock en perchero'
+    }
+  } catch {
+    it.stockTexto = ''
+    it.stockDisponible = 0
+  } finally {
+    it.variantesLoading = false
+  }
+  if (!opts.preservePrecio) {
+    // El llamador ya resolvió precio/costo; aquí solo se asegura sync inicial
+    // cuando hay una única variante o la talla actual no matchea.
+    if (it.variantes?.length === 1 && it.variante_id == null) {
+      it.variante_id = it.variantes[0].id
+      it.talla = tallaDeVariante(it.variantes[0].nombre_variante)
+    }
+  }
+}
+
+function onVarianteChange(it: LocalItem, varianteId: number | null) {
+  it.variante_id = varianteId
+  if (varianteId == null) {
+    if (!it.talla) it.talla = 'Única'
+    return
+  }
+  const v = it.variantes?.find((x) => x.id === varianteId)
+  if (v) it.talla = tallaDeVariante(v.nombre_variante)
+}
+
+function onTallaChange(it: LocalItem, talla: string) {
+  it.talla = talla
+  // Sincroniza variante cuando la talla matchea exactamente una variante;
+  // texto libre => variante null (genérica), evita vender talla errada.
+  const match = (it.variantes ?? []).filter((v) => tallaDeVariante(v.nombre_variante) === talla)
+  it.variante_id = match.length === 1 ? match[0].id : null
 }
 
 async function seleccionarPrendaCatalogo(it: LocalItem, prendaId: number | null) {
@@ -294,32 +371,23 @@ async function seleccionarPrendaCatalogo(it: LocalItem, prendaId: number | null)
     it.producto_id = p.id
     it.nombre_prenda = p.nombre
     const rawPrecio = (p as unknown as { precio_venta?: number | string; precio_venta_sugerido?: number | string }).precio_venta ?? (p as unknown as { precio_venta_sugerido?: number | string }).precio_venta_sugerido
-    // Backend Numeric serializa como string ("83000.0000"): normalizar a number
-    // para que el InputNumber lo muestre. Si no hay precio válido, se conserva
-    // el valor actual del ítem (edición manual).
+    // Backend Numeric serializa como string ("83000.0000"): normalizar a number.
+    // Precio default SIEMPRE del producto (fix 95000 fijo): si no hay precio
+    // válido, queda en 0 para no vender con precio fantasma.
     const numPrecio = Number(rawPrecio ?? NaN)
-    it.precio_unitario = Number.isFinite(numPrecio) && numPrecio > 0 ? numPrecio : it.precio_unitario
+    it.precio_unitario = Number.isFinite(numPrecio) && numPrecio > 0 ? numPrecio : 0
     const rawCosto = (p as unknown as { costo_unitario?: number | string; costos_operativos_fijos?: number | string; costo_insumos?: number | string }).costo_unitario ?? (p as unknown as { costos_operativos_fijos?: number | string }).costos_operativos_fijos ?? (p as unknown as { costo_insumos?: number | string }).costo_insumos
     const numCosto = Number(rawCosto ?? NaN)
-    if (Number.isFinite(numCosto) && numCosto > 0) {
-      it.costo_unitario = numCosto
-    }
-    if ((p as unknown as { variantes?: { talla: string }[] }).variantes?.[0]) {
-      it.talla = (p as unknown as { variantes: { talla: string }[] }).variantes[0].talla
-    }
-    // If product has variantes, fetch and pick first variant
-    try {
-      const vare = await client.get<{ id: number; nombre_variante: string }[]>(`/productos/${prendaId}/variantes`)
-      if (vare.data.length > 0) {
-        it.variante_id = vare.data[0].id
-        // try to map talla from variante nombre (e.g. "S", "M - Rojo")
-        const rawTalla = vare.data[0].nombre_variante?.split(' - ')[0]?.trim()
-        if (rawTalla) it.talla = rawTalla
-      } else {
-        it.variante_id = null
-      }
-    } catch {
+    it.costo_unitario = Number.isFinite(numCosto) && numCosto > 0 ? numCosto : 0
+    await cargarVariantesYStock(it, prendaId)
+    // Sync inicial: primera variante por defecto (antes era auto sin talla
+    // sincronizada); ahora variante+talla quedan atados y con stock visible.
+    if (it.variantes?.length) {
+      it.variante_id = it.variantes[0].id
+      it.talla = tallaDeVariante(it.variantes[0].nombre_variante)
+    } else {
       it.variante_id = null
+      it.talla = 'Única'
     }
   } else {
     it.producto_id = prendaId
@@ -360,7 +428,14 @@ function initForm() {
       cantidad: it.cantidad,
       precio_unitario: it.precio_unitario,
       costo_unitario: it.costo_unitario,
+      variantes: [],
+      stockTexto: '',
+      stockDisponible: 0,
     }))
+    // Carga variantes+stock sin pisar precio/cantidad editados
+    for (const it of items.value) {
+      if (it.producto_id != null) void cargarVariantesYStock(it, it.producto_id, { preservePrecio: true })
+    }
   } else {
     // New sale default (real uses server id)
     codigo.value = ''
@@ -383,11 +458,14 @@ function initForm() {
         producto_id: null,
         variante_id: null,
         nombre_prenda: '',
-        talla: 'S',
-        color: 'Negro Satín',
+        talla: '',
+        color: '',
         cantidad: 1,
-        precio_unitario: 95000,
-        costo_unitario: 25000,
+        precio_unitario: 0,
+        costo_unitario: 0,
+        variantes: [],
+        stockTexto: '',
+        stockDisponible: 0,
       },
     ]
   }
@@ -414,6 +492,23 @@ async function guardar() {
   for (const it of items.value) {
     if (!it.nombre_prenda.trim()) {
       showToast('warn', 'Nombre de prenda requerido', 'Complete el nombre de todas las prendas.')
+      return
+    }
+  }
+
+  // Sincronía variante/talla + precio default: evita vender talla errada o a precio fantasma
+  for (let i = 0; i < items.value.length; i++) {
+    const it = items.value[i]
+    if (it.producto_id != null && !String(it.talla ?? '').trim()) {
+      showToast('warn', 'Talla requerida', `La fila ${i + 1} ("${it.nombre_prenda || 'sin nombre'}") no tiene talla. Elegí variante o talla.`)
+      return
+    }
+    if ((it.variantes?.length ?? 0) > 0 && it.variante_id == null) {
+      showToast('warn', 'Variante requerida', `La fila ${i + 1} ("${it.nombre_prenda}") tiene ${it.variantes?.length} variantes: elegí una para no vender la talla errada.`)
+      return
+    }
+    if (!(it.precio_unitario > 0)) {
+      showToast('warn', 'Precio requerido', `La fila ${i + 1} ("${it.nombre_prenda || 'sin nombre'}") quedó en $0. Elegí el producto del catálogo para traer su precio.`)
       return
     }
   }
@@ -640,15 +735,32 @@ async function guardar() {
                 </div>
               </div>
 
-              <!-- Talla -->
+              <!-- Variante + Talla sincronizadas con stock visible -->
               <div class="sm:col-span-2">
-                <label class="block text-[10px] text-stone-400 mb-0.5">Talla</label>
+                <label class="block text-[10px] text-stone-400 mb-0.5">Variante / Talla</label>
                 <Dropdown
-                  v-model="it.talla"
+                  v-if="it.variantes?.length"
+                  :model-value="it.variante_id"
+                  :options="(it.variantes ?? []).map((v) => ({ label: v.nombre_variante, value: v.id }))"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Elegir variante..."
+                  class="w-full text-xs"
+                  show-clear
+                  :loading="it.variantesLoading"
+                  @update:model-value="(val) => onVarianteChange(it, val)"
+                />
+                <Dropdown
+                  :model-value="it.talla"
                   :options="tallasOptions"
                   editable
-                  class="w-full text-xs"
+                  placeholder="Talla..."
+                  class="w-full text-xs mt-1"
+                  @update:model-value="(val) => onTallaChange(it, val)"
                 />
+                <div v-if="it.stockTexto" class="mt-1 text-[10px] font-mono" :class="(it.stockDisponible ?? 0) > 0 ? 'text-emerald-400' : 'text-rose-400'">
+                  📦 {{ it.stockTexto }}
+                </div>
               </div>
 
               <!-- Color / Detalle -->
