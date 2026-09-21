@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-21] - Fix toast fantasma en NuevaVentaModal (venta 22 no cerraba)
+
+- **Causa:** `VEN-0022` se creaba en backend pero el modal nunca cerraba ni refrescaba la lista porque `showToast` no estaba importado (`ReferenceError` en éxito y en catch).
+- **Fix:** import `showToast` desde `@/utils/toast` (igual que el resto de modales).
+- **Verificación:** `npm run build` PASS. Pendiente reintento manual (recargar front con Vite HMR o `npm run dev`).
+- **Archivos:** `src/components/atelier/NuevaVentaModal.vue`. Sin commit.
+
 ### [2026-09-21] - Venta pura de Perchero sin pedir insumos (fix Cadena totebag)
 
 - **Causa:** vender 1 Tote con prenda disponible igual pedía `Cadena gris delgada totebag` porque se descontaban insumos por la cantidad total aunque el Perchero cubría todo (doble consumo: las unidades ya estaban producidas/cargadas).

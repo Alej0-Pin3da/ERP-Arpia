@@ -13,6 +13,7 @@ import { client } from '@/api/client'
 import type { CanalVenta, MetodoPago, VentaCreatePayload, VentaRead } from '@/services/api/ventas'
 import { updateVenta } from '@/services/api/ventas'
 import { listCanales, listMetodosPago } from '@/services/api/maestros'
+import { showToast } from '@/utils/toast'
 
 /** Minimal venta shape this modal edits (REAL display object from the caller). */
 export interface VentaEditar {
