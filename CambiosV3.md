@@ -115,6 +115,26 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 - **Verificación:** `npm run build` PASS. Pendiente prueba manual.
 - **Archivos:** `src/views/PrendasListasView.vue`, `src/services/api/productos.ts` (`createVariante`). Sin commit.
 
+### [2026-09-20] - Detalle por talla como matriz
+
+- **Cambio:** filas repetidas → matriz productos × tallas (orden de matriz oficial + extras), celda = disponibles (+E exhibición), clic = detalle editable, totales al pie. Una sola tabla con scroll (vale mobile).
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `src/views/PrendasListasView.vue`. Sin commit.
+
+### [2026-09-20] - Revisión profunda: etiqueta stock + coherencia
+
+- **Etiqueta:** `📦 0 en stock +5 uds` confundía → ahora `📦 5 uds en stock (por talla)` (total + desglose en tooltip).
+- **Datos verificados:** precios cargados por dueña (no hay precio-0 con ventas); stocks negativos Lino/Satín/Maya (déficit histórico); 24 insumos muertos costo 0 (nombres viejos/duplicados/typos); desperdicio sin uso; ventas/pedidos/prendas coherentes (5 pedidos en Acabados creados por dueña, 27 prendas); master catprod gestionado por dueña (5 propias, 0 líneas → cubre fallback).
+- **Verificación:** `npm run build` PASS. Sin commit.
+
+### [2026-09-20] - Stock real en tabla de productos (hallazgo auditoría)
+
+- **Hallazgo:** `📦 0 en stock` ignoraba las unitarias (todo `stock_actual` en 0; las terminadas viven en prendas por talla).
+- **Fix:** la etiqueta suma `+N uds` disponibles por talla (API prendas, se refresca al guardar).
+- **Pendiente estructural:** stocks de insumos nunca tuvieron carga inicial real (solo déficit histórico); a criterio dueña.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `src/views/ProductosView.vue`. Sin commit.
+
 ### [2026-09-20] - Tallas de matriz en pedidos + retroceso pendiente
 
 - **Fix:** el select Variante/Talla del pedido une variantes propias + matriz oficial (marca `(nueva)` y la crea sola). Igual que Perchero. Tote sigue Sin talla (genérico).
@@ -174,6 +194,52 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 - **Editar talla:** cada grupo se expande (▼) a sus unidades: talla (select de variantes del producto), estado (5 valores) y ✕ por unidad. Así corregís la que metiste mal sin borrar y recargar.
 - **Verificación:** migración 0038 en dev; test nuevo (exhibición + cambio talla) 7/7 fase4; `npm run build` PASS. Pendiente prueba manual.
 - **Archivos:** migración 0038, `models/produccion.py`, `PrendasListasView.vue`. Sin commit.
+
+### [2026-09-20] - Eliminado Sugerencias de taller
+
+- Era keyword-match con delay fingido y 2 textos fijos, sin tocar datos. Fuera: modal + 3 botones (layout, Dashboard, Productos).
+- **Verificación:** `npm run build` PASS, cero referencias.
+- **Archivos:** borrado `AsistenteIaModal.vue`, `AppLayout.vue`, `DashboardView.vue`, `ProductosView.vue`. Sin commit.
+
+### [2026-09-20] - Saldo Maya 203.316 (tasa $2,58 confirmada)
+
+- **Tasa:** $2,58 validada contra factura ($579.800/225.000cm² exacto). Sin cambios.
+- **Saldo:** compra 225.000 − consumo 21.684 (Caja+2 Blusas; 5 ventas sin talla no descuentan por diseño) = **203.316 cm²** cargados como stock.
+- **Solo DB dev. Sin commit.
+
+### [2026-09-20] - Maya descompuesta (tela + sublimado)
+
+- **Hallazgo dueña:** lote $579.800 = tela $255.800 + sublimación $324.000.
+- **Verificación:** 255.800/225.000 = 1,1369 + 324.000/225.000 = 1,44 → 2,5769 exacto = tasa en uso. Sin cambios (stock 203.316 intacto).
+- 203.316 cm² = 20,33 m² ≈ 13,55 m lineales (ancho 1,5 m).
+
+### [2026-09-20] - Prenda genérica atribuida a producto (0040)
+
+- **Bug:** cargar Tote Sin talla caía en grupo `Sin producto` (la prenda solo se ataba por variante).
+- **Fix:** `prendas_confeccionadas.producto_id` (migración 0040, SET NULL); el form siempre lo envía; el grupo resuelve por producto. Tu fila 39 quedó en Tote (única genérica, asunción explícita).
+- **Verificación:** migración 0040 en dev; test nuevo 8/8 fase4; `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** migración 0040, `models/schemas/routes produccion`, `prendas.ts`, `PrendasListasView.vue`. Sin commit.
+
+### [2026-09-20] - Perchero unificado (fin del cambalache lote/talla)
+
+- **Cambio:** KPIs únicos (Prendas terminadas, Valorización, Precio medio, Exhibición) sumando lote + talla con desglose; sección de lote oculta si vacía (sin reto); buscador filtra la matriz; etiqueta de producto con total + desglose.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `src/views/PrendasListasView.vue`, `src/views/ProductosView.vue`. Sin commit.
+
+### [2026-09-20] - Limpieza auditoría UX (devoluciones, textos, auditoría)
+
+- **Insumos muertos:** 24 borrados (costo 0, sin compras ni BOM; respaldo en `backend/migrate/reports/respaldo_insumos_muertos_20260920.txt`).
+- **Devoluciones:** venta y producto por dropdown (código·cliente·total y nombre); era IDs numéricos. Textos de aviso actualizados.
+- **Textos dev:** fuera los `GET /api/v1/...` de Auditoría (×3), Devoluciones, Omisiones, Productos (era falso: hay botón Nuevo) y Usuarios.
+- **Auditoría:** `Producto #id` → nombre + filtro por dropdown de productos.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `DevolucionesView.vue`, `AuditoriaView.vue`, `ProductosView.vue`, `UsuariosView.vue`. Sin commit.
+
+### [2026-09-20] - TOTE a costo por tote ($25.031)
+
+- **Decisión dueña:** receta por tote (74cm tira etc. son de un bolso; ×6 subcosteaba 6× vs $25.031 del CSV y $25.765 de ventas).
+- **Hecho:** 10 líneas a cantidad cruda (materiales 25.030,06); `TOTEBAG` fuera de `_LOTES_BOM` (era xlsx; mecanismo intacto y testeado con param explícito). BLUSAS queda pendiente de igual revisión.
+- **Verificación:** 110 tests + F7 267/0. Solo DB dev + 1 archivo. Sin commit.
 
 ### [2026-09-20] - Auditoría full + 3 fixes (Perchero, Dashboard, Matriz)
 

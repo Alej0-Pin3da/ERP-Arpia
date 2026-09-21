@@ -13,6 +13,9 @@ from app.models.produccion import (
 
 
 class PrendaConfeccionadaBase(BaseModel):
+    # Direct product link (0040): the attribution for generic (talla-less)
+    # rows; variant-linked rows resolve through their variant.
+    producto_id: int | None = Field(default=None)
     # P2-7: nullable — allows generic/no-size stock ("Sin talla").
     variante_id: int | None = Field(default=None)
     talla: str | None = Field(default=None, max_length=20)
@@ -29,6 +32,7 @@ class PrendaConfeccionadaCreate(PrendaConfeccionadaBase):
 
 
 class PrendaConfeccionadaUpdate(BaseModel):
+    producto_id: int | None = None
     variante_id: int | None = None
     talla: str | None = Field(default=None, max_length=20)
     estado: str | None = Field(default=None, max_length=30)
@@ -43,6 +47,7 @@ class PrendaConfeccionadaRead(PrendaConfeccionadaBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    venta_id: int | None = None
     created_at: datetime
     updated_at: datetime
     nombre_producto: str | None = None

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useProductos } from '@/composables/useProductos'
+import { usePrendas } from '@/composables/usePrendas'
 import { useBom } from '@/composables/useBom'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import FichaTecnicaModal from '@/components/atelier/FichaTecnicaModal.vue'
 import DataSourceBadge from '@/components/DataSourceBadge.vue'
 import NuevaRecetaModal from '@/components/atelier/NuevaRecetaModal.vue'
-import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
 import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 import { showToast } from '@/utils/toast'
 
@@ -56,7 +56,6 @@ interface RecetaDisplay {
 
 const showFichaModal = ref(false)
 const showNuevaModal = ref(false)
-const showIaModal = ref(false)
 const recetaSeleccionada = ref<RecetaDisplay | null>(null)
 const recetaEditar = ref<RecetaDisplay | null>(null)
 const fichaStartEditing = ref(false)
@@ -74,6 +73,21 @@ const categorias = [
 
 const productos = ref<any[]>([])
 const bomCounts = ref<Record<number, number>>({})
+const udsPorProducto = ref<Record<string, number>>({})
+async function cargarUdsPorTalla() {
+  try {
+    const prendasApi = usePrendas()
+    const r = await prendasApi.list({ limit: 200 })
+    const map: Record<string, number> = {}
+    for (const p of (r.items ?? []) as unknown as Record<string, unknown>[]) {
+      if (p.estado !== 'disponible') continue
+      const nombre = String(p.nombre_producto ?? '')
+      if (!nombre) continue
+      map[nombre] = (map[nombre] ?? 0) + 1
+    }
+    udsPorProducto.value = map
+  } catch { udsPorProducto.value = {} }
+}
 async function cargarMargenMeta() {
   try {
     const { getParametros } = await import('@/services/api/maestros')
@@ -102,7 +116,7 @@ async function cargarProductos() {
     } catch { /* ignore BOM counts */ }
   } catch { productos.value = [] }
 }
-onMounted(() => { void cargarProductos(); void cargarMargenMeta() })
+onMounted(() => { void cargarProductos(); void cargarMargenMeta(); void cargarUdsPorTalla() })
 function mapProductoRow(p: any): RecetaDisplay {
   return {
   id: p.id,
@@ -224,6 +238,7 @@ async function handleRecetaGuardada() {
 }
 async function handleFichaGuardada() {
   await cargarProductos()
+  await cargarUdsPorTalla()
   fichaStartEditing.value = false
   // La ficha queda abierta con props.receta: refrescarla desde el servidor
   // para no mostrar valores viejos (precio, tiempos, mano/cif) hasta el F5.
@@ -284,13 +299,6 @@ function solicitarEliminar(r: RecetaDisplay) {
 
       <div class="flex flex-wrap items-center gap-2">
         <Button
-          label="Ver sugerencias de taller"
-          icon="pi pi-lightbulb"
-          size="small"
-          class="p-button-warning text-xs font-semibold"
-          @click="showIaModal = true"
-        />
-        <Button
           label="Nueva Receta Manual"
           icon="pi pi-plus"
           size="small"
@@ -349,7 +357,7 @@ function solicitarEliminar(r: RecetaDisplay) {
         <div v-if="!recetasFiltradas.length" class="text-center py-12 bg-stone-900/40 border border-stone-800 rounded-2xl">
       <i class="pi pi-inbox text-3xl text-stone-500 mb-3 block" />
       <p class="text-sm font-bold text-stone-300">Sin modelos registrados</p>
-      <p class="text-xs text-stone-400 mt-1">Los datos vienen de <code>GET /api/v1/productos</code>. Creá un producto desde el backend.</p>
+      <p class="text-xs text-stone-400 mt-1">Creá tu primer modelo con el botón Nuevo de arriba.</p>
     </div>
     <!-- Recipe Cards Grid -->
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -385,8 +393,8 @@ function solicitarEliminar(r: RecetaDisplay) {
             <span class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono">
               ⏱️ {{ r.tiempo_confeccion_min ?? '—' }}{{ r.tiempo_confeccion_min ? ' min confección' : '' }}
             </span>
-            <span v-if="r.stock_actual !== null && r.stock_actual !== undefined" class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono">
-              📦 {{ Math.round(Number(r.stock_actual)) }} en stock
+            <span v-if="r.stock_actual !== null && r.stock_actual !== undefined" class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono" :title="`Lote: ${Math.round(Number(r.stock_actual))} uds · Por talla: ${udsPorProducto[r.nombre] ?? 0} uds`">
+              📦 {{ Math.round(Number(r.stock_actual)) + (udsPorProducto[r.nombre] ?? 0) }} uds en stock<span v-if="(udsPorProducto[r.nombre] ?? 0) > 0 && Math.round(Number(r.stock_actual)) > 0" class="text-emerald-300"> ({{ Math.round(Number(r.stock_actual)) }} lote + {{ udsPorProducto[r.nombre] }} talla)</span><span v-else-if="(udsPorProducto[r.nombre] ?? 0) > 0" class="text-emerald-300"> (por talla)</span>
             </span>
           </div>
 
@@ -447,7 +455,6 @@ function solicitarEliminar(r: RecetaDisplay) {
     <!-- Modals -->
     <FichaTecnicaModal v-model:visible="showFichaModal" :receta="recetaSeleccionada" :start-editing="fichaStartEditing" @editar="handleFichaEditar" @guardado="handleFichaGuardada" @update:visible="(v:boolean) => { if(!v) fichaStartEditing = false }" />
     <NuevaRecetaModal v-model:visible="showNuevaModal" :receta="recetaEditar" @receta-creada="handleRecetaGuardada" @receta-actualizada="handleRecetaGuardada" @update:visible="(v:boolean) => { if(!v) recetaEditar = null }" />
-    <AsistenteIaModal v-model:visible="showIaModal" />
     <ConfirmActionDialog
       v-model:visible="showEliminarDialog"
       titulo="Eliminar receta"

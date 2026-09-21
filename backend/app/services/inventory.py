@@ -20,6 +20,7 @@ from app.core.exceptions import (
 )
 from app.models.clientes import Cliente
 from app.models.insumos import Insumo
+from app.models.produccion import PrendaConfeccionada
 from app.models.productos import BomInsumo, BomProducto, Producto, VarianteProducto
 from app.models.ventas import DetalleVenta, DocumentState, Venta
 from app.services.costos import _lineas_insumo_efectivas, calcular_costo_produccion
@@ -234,6 +235,58 @@ def _agregado_por_producto(detalles: list) -> dict[int, Decimal]:
             cantidad = Decimal(detalle.cantidad)
         agregado[producto_id] = agregado.get(producto_id, Decimal("0")) + cantidad
     return agregado
+
+
+def _consumir_unidades(
+    db: Session, venta_id: int, producto_id: int, variante_id: int | None, cantidad: Decimal
+) -> Decimal:
+    """Sell finished units first: flip oldest `disponible` rows to `vendida`.
+
+    Exact variante match; generic lines (variante NULL) match producto-linked
+    generic rows. Linked to the sale for reversal. Returns the remainder that
+    must come out of Producto.stock_actual (0 when units cover it).
+    """
+    stmt = select(PrendaConfeccionada).where(PrendaConfeccionada.estado == "disponible")
+    if variante_id is not None:
+        stmt = stmt.where(PrendaConfeccionada.variante_id == variante_id)
+    else:
+        stmt = stmt.where(
+            PrendaConfeccionada.producto_id == producto_id,
+            PrendaConfeccionada.variante_id.is_(None),
+        )
+    rows = list(db.scalars(stmt.order_by(PrendaConfeccionada.id).with_for_update()).all())
+    tomar = min(len(rows), int(cantidad))
+    for r in rows[:tomar]:
+        r.estado = "vendida"
+        r.venta_id = venta_id
+    return cantidad - tomar
+
+
+def _devolver_unidades(
+    db: Session, venta_id: int, producto_id: int, variante_id: int | None, cantidad: Decimal
+) -> Decimal:
+    """Flip back up to `cantidad` of this sale's `vendida` rows to disponible.
+
+    Only rows still marked `vendida` move (owner manual edits are never
+    double-restored); venta_id stays as history. Returns the remainder that
+    must be reponed into Producto.stock_actual.
+    """
+    stmt = select(PrendaConfeccionada).where(
+        PrendaConfeccionada.venta_id == venta_id,
+        PrendaConfeccionada.estado == "vendida",
+    )
+    if variante_id is not None:
+        stmt = stmt.where(PrendaConfeccionada.variante_id == variante_id)
+    else:
+        stmt = stmt.where(
+            PrendaConfeccionada.producto_id == producto_id,
+            PrendaConfeccionada.variante_id.is_(None),
+        )
+    rows = list(db.scalars(stmt.order_by(PrendaConfeccionada.id).with_for_update()).all())
+    tomar = min(len(rows), int(cantidad))
+    for r in rows[:tomar]:
+        r.estado = "disponible"
+    return cantidad - tomar
 
 
 def registrar_venta(db: Session, payload: dict) -> Venta:

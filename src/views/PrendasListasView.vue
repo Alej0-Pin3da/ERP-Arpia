@@ -183,11 +183,24 @@ async function borrarUnidad(u: PrendaRead) {
 }
 
 const gruposTalla = computed<GrupoTalla[]>(() => {
+  const porId: Record<number, string> = {}
+  for (const p of productosParaPrenda.value) porId[p.id] = p.nombre
+  const nombreDe = (u: PrendaRead): string => {
+    const pid = (u as unknown as { producto_id?: number | null }).producto_id
+    if (pid != null && porId[pid]) return porId[pid]
+    return u.nombre_producto ?? (u.variante_id != null ? `Variante #${u.variante_id}` : 'Sin producto')
+  }
+  const claveDe = (u: PrendaRead): string => {
+    const pid = (u as unknown as { producto_id?: number | null }).producto_id
+    if (pid != null) return `p:${pid}`
+    if (u.variante_id != null) return `v:${u.variante_id}`
+    return 'none'
+  }
   const map = new Map<string, GrupoTalla>()
   for (const p of prendas.value) {
-    const producto = p.nombre_producto ?? (p.variante_id != null ? `Variante #${p.variante_id}` : 'Sin producto')
+    const producto = nombreDe(p)
     const talla = p.talla ?? p.nombre_variante ?? 'Sin talla'
-    const key = `${producto}||${talla}`
+    const key = `${claveDe(p)}||${talla}`
     let g = map.get(key)
     if (!g) {
       g = { key, producto, talla, disponible: 0, reservada: 0, vendida: 0, defectuosa: 0, exhibicion: 0, unidades: [] }
@@ -205,6 +218,42 @@ const gruposTalla = computed<GrupoTalla[]>(() => {
 
 const totalUnidades = computed(() => prendas.value.length)
 const totalDisponibles = computed(() => prendas.value.filter((p) => p.estado === 'disponible').length)
+
+// Matriz de stock: filas = productos, columnas = tallas (orden de matriz
+// oficial + extras presentes). Click en celda = detalle editable.
+const tallasColumnas = computed<string[]>(() => {
+  const enDatos = new Set<string>()
+  for (const g of gruposTalla.value) enDatos.add(g.talla)
+  const deMatriz = matrizTallas.value.filter((n) => enDatos.has(n))
+  const extras = [...enDatos].filter((n) => !matrizTallas.value.includes(n)).sort((a, b) => a.localeCompare(b))
+  return [...deMatriz, ...extras]
+})
+interface CeldaMatrix { disponible: number; exhibicion: number; key: string | null }
+const matrizCeldas = computed<Record<string, Record<string, CeldaMatrix>>>(() => {
+  const m: Record<string, Record<string, CeldaMatrix>> = {}
+  for (const p of gruposProducto.value) {
+    m[p.nombre] = {}
+    for (const g of p.tallas) {
+      m[p.nombre][g.talla] = { disponible: g.disponible, exhibicion: g.exhibicion, key: g.key }
+    }
+  }
+  return m
+})
+const matrizTotales = computed(() => {
+  const porTalla: Record<string, number> = {}
+  let granTotal = 0
+  for (const t of tallasColumnas.value) {
+    let s = 0
+    for (const p of gruposProductoFiltrados.value) s += matrizCeldas.value[p.nombre]?.[t]?.disponible ?? 0
+    porTalla[t] = s
+    granTotal += s
+  }
+  return { porTalla, granTotal }
+})
+function grupoDeCelda(producto: string, talla: string): GrupoTalla | null {
+  const p = gruposProducto.value.find((x) => x.nombre === producto)
+  return p?.tallas.find((g) => g.talla === talla) ?? null
+}
 
 interface GrupoProducto {
   nombre: string
@@ -227,15 +276,6 @@ const gruposProducto = computed<GrupoProducto[]>(() => {
   }
   return [...map.values()].sort((a, b) => a.nombre.localeCompare(b.nombre))
 })
-
-const productosExpandidos = ref<Set<string>>(new Set())
-
-function onToggleProducto(nombre: string) {
-  const s = new Set(productosExpandidos.value)
-  if (s.has(nombre)) s.delete(nombre)
-  else s.add(nombre)
-  productosExpandidos.value = s
-}
 
 async function cargarPrendasForm() {
   if (formProductoId.value == null) return
@@ -262,6 +302,7 @@ async function cargarPrendasForm() {
     }
     for (let i = 0; i < cant; i++) {
       await prendasService.create({
+        producto_id: formProductoId.value,
         variante_id: varianteId,
         talla: tallaNombre,
         estado: formEstado.value,
@@ -272,14 +313,6 @@ async function cargarPrendasForm() {
   } finally {
     guardandoPrenda.value = false
   }
-}
-
-async function quitarUnidad(g: GrupoTalla) {
-  const unidad = g.unidades.find((u) => u.estado === 'disponible') ?? g.unidades[0]
-  if (!unidad) return
-  if (!window.confirm(`Quitar 1 ud (${g.producto} · ${g.talla}) del detalle?`)) return
-  await prendasService.remove(unidad.id)
-  await cargarPrendas()
 }
 
 const loteFiltrados = computed(() => {
@@ -295,6 +328,22 @@ const loteFiltrados = computed(() => {
 const loteStockTotal = computed(() => lotes.value.reduce((acc, l) => acc + l.stock, 0))
 const loteValorizacion = computed(() => lotes.value.reduce((acc, l) => acc + l.stock * l.precio, 0))
 const lotePrecioMedio = computed(() => (loteStockTotal.value > 0 ? loteValorizacion.value / loteStockTotal.value : 0))
+// Totales unificados lote + talla (lo que la dueña opera).
+const stockTotalUds = computed(() => loteStockTotal.value + udsDisponibles.value)
+const valorizacionTotal = computed(() => loteValorizacion.value + valorizacionUnitaria.value)
+const precioMedioTotal = computed(() => (stockTotalUds.value > 0 ? valorizacionTotal.value / stockTotalUds.value : 0))
+const udsExhibicion = computed(() => prendas.value.filter((p) => p.estado === 'exhibicion').length)
+const productosConStock = computed(() => {
+  const nombres = new Set<string>()
+  for (const l of lotes.value) nombres.add(l.nombre)
+  for (const p of gruposProducto.value) nombres.add(p.nombre)
+  return nombres.size
+})
+const gruposProductoFiltrados = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  if (!q) return gruposProducto.value
+  return gruposProducto.value.filter((p) => p.nombre.toLowerCase().includes(q))
+})
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
@@ -342,14 +391,11 @@ function onEtiquetaGuardada(payload: { coleccion: string | null; composicion: st
             Inventario de Productos Confeccionados
           </h1>
           <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
-            {{ Math.round(loteStockTotal) }} uds en Stock
-          </span>
-          <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider">
-            +{{ udsDisponibles }} uds por talla
+            {{ Math.round(stockTotalUds) }} uds en Stock
           </span>
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">
-          Unidades terminadas por lote de producción (GET /productos · stock_actual). Se consumen en Venta, no generan filas unitarias.
+          Prendas terminadas listas para vender: por lote de producción y por talla.
         </p>
       </div>
 
@@ -365,56 +411,54 @@ function onEtiquetaGuardada(payload: { coleccion: string | null; composicion: st
       </div>
     </div>
 
-    <!-- 4 KPI Summary Cards (lote) -->
+    <!-- 4 KPI Summary Cards (stock total: lote + talla) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
-        <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Productos con Stock</div>
+        <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Prendas terminadas</div>
         <div class="text-2xl font-extrabold text-stone-100 mt-2 font-mono">
-          {{ lotes.length }} productos
+          {{ Math.round(stockTotalUds) }} uds
         </div>
-        <div class="text-[11px] text-stone-400 mt-1">Lotes con stock_actual &gt; 0</div>
+        <div class="text-[11px] text-stone-400 mt-1">{{ productosConStock }} productos · {{ Math.round(loteStockTotal) }} lote + {{ udsDisponibles }} talla</div>
       </div>
 
       <div class="bg-stone-900/80 border border-sky-500/30 rounded-2xl p-4 shadow-md">
-        <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Stock por Lote</div>
+        <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Valorización</div>
         <div class="text-2xl font-extrabold text-sky-300 mt-2 font-mono">
-          {{ Math.round(loteStockTotal) }} uds
+          {{ formatCOP(valorizacionTotal) }}
         </div>
-        <div class="text-[11px] text-stone-400 mt-1">Unidades en Producto.stock_actual</div>
-        <div class="text-[11px] text-emerald-300 mt-1 font-mono">+{{ udsDisponibles }} uds por talla</div>
-      </div>
-
-      <div class="bg-stone-900/80 border border-sky-500/30 rounded-2xl p-4 shadow-md">
-        <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Valorización Lote</div>
-        <div class="text-2xl font-extrabold text-sky-300 mt-2 font-mono">
-          {{ formatCOP(loteValorizacion) }}
-        </div>
-        <div class="text-[11px] text-stone-400 mt-1">Stock lote × precio sugerido</div>
-        <div class="text-[11px] text-emerald-300 mt-1 font-mono">+{{ formatCOP(valorizacionUnitaria) }} por talla</div>
+        <div class="text-[11px] text-stone-400 mt-1 font-mono">{{ formatCOP(loteValorizacion) }} lote + {{ formatCOP(valorizacionUnitaria) }} talla</div>
       </div>
 
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
         <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">Precio Medio</div>
         <div class="text-2xl font-extrabold text-amber-300 mt-2 font-mono">
-          {{ formatCOP(lotePrecioMedio) }}
+          {{ formatCOP(precioMedioTotal) }}
         </div>
         <div class="text-[11px] text-stone-400 mt-1">Valorización / unidades</div>
       </div>
+
+      <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md">
+        <div class="text-xs text-stone-400 font-bold uppercase tracking-wider">En exhibición</div>
+        <div class="text-2xl font-extrabold text-sky-300 mt-2 font-mono">
+          {{ udsExhibicion }} uds
+        </div>
+        <div class="text-[11px] text-stone-400 mt-1">Fotos y muestra · no vendibles</div>
+      </div>
     </div>
 
-    <!-- Search Input -->
+    <!-- Search Input (filtra matriz por producto) -->
     <div class="w-full md:w-96">
       <span class="p-input-icon-left w-full">
         <InputText
           v-model="search"
-          placeholder="Buscar productos por nombre o código..."
+          placeholder="Buscar productos por nombre..."
           class="w-full text-xs"
         />
       </span>
     </div>
 
-    <!-- Stock por lote (flujo batch: Producto.stock_actual, sin filas por prenda) -->
-    <section aria-label="Stock por lote">
+    <!-- Stock por lote (flujo batch: Producto.stock_actual) -->
+    <section v-if="loteFiltrados.length > 0" aria-label="Stock por lote">
       <div class="flex items-center gap-2.5 flex-wrap mb-3">
         <h2 class="text-base sm:text-lg font-bold font-serif tracking-wide text-stone-100 m-0">
           Stock por lote
@@ -424,11 +468,7 @@ function onEtiquetaGuardada(payload: { coleccion: string | null; composicion: st
         </span>
       </div>
 
-      <div v-if="loteFiltrados.length === 0" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 text-sm text-stone-400">
-        Sin stock por lote — completá un lote en Producción.
-      </div>
-
-      <div v-else class="space-y-4">
+      <div class="space-y-4">
         <!-- Desktop table -->
         <div class="hidden overflow-x-auto md:block bg-stone-900/80 border border-stone-800 rounded-2xl shadow-lg">
           <table class="w-full min-w-[640px] text-left text-xs border-collapse">
@@ -494,6 +534,10 @@ function onEtiquetaGuardada(payload: { coleccion: string | null; composicion: st
         </div>
       </div>
     </section>
+
+    <div v-if="loteFiltrados.length === 0 && gruposProducto.length === 0" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 text-sm text-stone-400">
+      Sin stock todavía — cargá prendas por talla arriba o completá un lote en Producción.
+    </div>
 
     <!-- Detalle por talla (prendas unitarias: disponible/reservada/vendida/defectuosa) -->
     <section aria-label="Detalle por talla">
@@ -563,7 +607,7 @@ function onEtiquetaGuardada(payload: { coleccion: string | null; composicion: st
             </button>
           </div>
         </div>
-        <p class="text-[11px] text-stone-500 mt-2">Sin talla genérica no se atribuye a producto (queda en grupo “Sin producto”).</p>
+        <p class="text-[11px] text-stone-500 mt-2">Sin talla se atribuye igual al producto elegido.</p>
       </div>
 
       <div v-if="gruposProducto.length === 0" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 text-sm text-stone-400">
@@ -571,60 +615,36 @@ function onEtiquetaGuardada(payload: { coleccion: string | null; composicion: st
       </div>
 
       <div v-else class="space-y-4">
-        <div class="hidden overflow-x-auto md:block bg-stone-900/80 border border-stone-800 rounded-2xl shadow-lg">
+        <div class="overflow-x-auto bg-stone-900/80 border border-stone-800 rounded-2xl shadow-lg">
           <table class="w-full min-w-[560px] text-left text-xs border-collapse">
             <thead>
               <tr class="border-b border-stone-800/80 text-stone-400 bg-stone-900/40 uppercase tracking-wider font-semibold">
-                <th class="py-2.5 px-4">Producto / Talla</th>
-                <th class="py-2.5 px-4 text-center whitespace-nowrap">Disponibles</th>
-                <th class="py-2.5 px-4 text-center whitespace-nowrap">R / V / D / E</th>
-                <th class="py-2.5 px-4 text-right whitespace-nowrap">Acciones</th>
+                <th class="py-2.5 px-4 sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Producto</th>
+                <th v-for="t in tallasColumnas" :key="t" class="py-2.5 px-3 text-center whitespace-nowrap">{{ t }}</th>
+                <th class="py-2.5 px-3 text-center whitespace-nowrap">Total</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-stone-800/50 text-stone-200 font-mono">
-              <template v-for="p in gruposProducto" :key="p.nombre">
-              <tr class="bg-stone-900/50 hover:bg-stone-800/30">
-                <td class="py-2.5 px-4 font-bold text-stone-100 font-sans">{{ p.nombre }}</td>
-                <td class="py-2.5 px-4 text-center font-bold text-emerald-300 whitespace-nowrap">{{ p.disponibles }} / {{ p.total }} uds</td>
-                <td class="py-2.5 px-4 text-center text-stone-500 whitespace-nowrap">—</td>
-                <td class="py-2.5 px-4 text-right font-sans whitespace-nowrap">
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-800/70 border border-stone-700/60 text-stone-300 hover:text-amber-300 text-xs font-semibold transition"
-                    :title="`Ver tallas de ${p.nombre}`"
-                    @click="onToggleProducto(p.nombre)"
-                  >
-                    {{ productosExpandidos.has(p.nombre) ? '▲ Tallas' : `▼ ${p.tallas.length} tallas` }}
-                  </button>
-                </td>
-              </tr>
-              <template v-if="productosExpandidos.has(p.nombre)">
-              <template v-for="g in p.tallas" :key="g.key">
+              <template v-for="p in gruposProductoFiltrados" :key="p.nombre">
               <tr class="hover:bg-stone-800/30">
-                <td class="py-2 px-4 pl-8 text-sky-300 whitespace-nowrap">↳ {{ g.talla }}</td>
-                <td class="py-2 px-4 text-center font-bold text-emerald-300 whitespace-nowrap">{{ g.disponible }} uds</td>
-                <td class="py-2 px-4 text-center text-stone-400 whitespace-nowrap">{{ g.reservada }} / {{ g.vendida }} / {{ g.defectuosa }} / {{ g.exhibicion }}</td>
-                <td class="py-2 px-4 text-right font-sans whitespace-nowrap">
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-800/70 border border-stone-700/60 text-stone-300 hover:text-amber-300 text-xs font-semibold transition"
-                    :title="`Ver y editar unidades (${g.producto} · ${g.talla})`"
-                    @click="onToggleGrupo(g)"
-                  >
-                    {{ gruposExpandidos.has(g.key) ? '▲' : '▼' }} {{ g.unidades.length }}
-                  </button>
-                  <button
-                    type="button"
-                    class="ml-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-800/70 border border-stone-700/60 text-stone-400 hover:text-rose-300 text-xs font-semibold transition"
-                    :title="`Quitar 1 ud (${g.producto} · ${g.talla})`"
-                    @click="quitarUnidad(g)"
-                  >
-                    −1
-                  </button>
+                <td class="py-2.5 px-4 font-bold text-stone-100 font-sans sticky left-0 z-10 bg-stone-900/95 min-w-[180px]">{{ p.nombre }}</td>
+                <td
+                  v-for="t in tallasColumnas"
+                  :key="t"
+                  class="py-2 px-3 text-center whitespace-nowrap cursor-pointer hover:bg-amber-950/30"
+                  :class="(matrizCeldas[p.nombre]?.[t]?.disponible ?? 0) > 0 ? 'font-bold text-emerald-300' : 'text-stone-600'"
+                  :title="`Ver unidades: ${p.nombre} · ${t}`"
+                  @click="(() => { const g = grupoDeCelda(p.nombre, t); if (g) onToggleGrupo(g) })()"
+                >
+                  {{ matrizCeldas[p.nombre]?.[t]?.disponible ?? '—' }}
+                  <span v-if="(matrizCeldas[p.nombre]?.[t]?.exhibicion ?? 0) > 0" class="text-[10px] text-sky-400">+{{ matrizCeldas[p.nombre][t].exhibicion }}E</span>
                 </td>
+                <td class="py-2.5 px-3 text-center font-bold text-amber-300 whitespace-nowrap">{{ p.disponibles }}</td>
               </tr>
+              <template v-for="g in p.tallas" :key="g.key">
               <tr v-if="gruposExpandidos.has(g.key)" class="bg-stone-950/60">
-                <td colspan="4" class="py-2 px-4 pl-12">
+                <td class="py-2 px-4 pl-6 text-sky-300 whitespace-nowrap sticky left-0 z-10 bg-stone-950/95">↳ {{ g.talla }} <span class="text-stone-500 font-sans text-[11px]">R{{ g.reservada }}/V{{ g.vendida }}/D{{ g.defectuosa }}/E{{ g.exhibicion }}</span></td>
+                <td :colspan="tallasColumnas.length + 1" class="py-2 px-4">
                   <div class="space-y-1.5">
                     <div v-for="u in g.unidades" :key="u.id" class="flex flex-wrap items-center gap-2 text-xs font-sans">
                       <span class="text-stone-500 font-mono">#{{ u.id }}</span>
@@ -659,79 +679,13 @@ function onEtiquetaGuardada(payload: { coleccion: string | null; composicion: st
               </tr>
               </template>
               </template>
-              </template>
+              <tr class="bg-stone-900/60 font-bold">
+                <td class="py-2.5 px-4 text-stone-100 font-sans sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">TOTAL</td>
+                <td v-for="t in tallasColumnas" :key="t" class="py-2.5 px-3 text-center text-amber-300 whitespace-nowrap">{{ matrizTotales.porTalla[t] }}</td>
+                <td class="py-2.5 px-3 text-center text-amber-300 whitespace-nowrap">{{ matrizTotales.granTotal }}</td>
+              </tr>
             </tbody>
           </table>
-        </div>
-        <div class="space-y-3 md:hidden">
-          <div v-for="p in gruposProducto" :key="p.nombre" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-2 min-w-0">
-            <div class="flex items-start justify-between gap-2 min-w-0">
-              <div class="font-bold text-sm text-stone-100 min-w-0">{{ p.nombre }}</div>
-              <span class="font-mono text-xs text-emerald-300 shrink-0">{{ p.disponibles }} / {{ p.total }}</span>
-            </div>
-            <button
-              type="button"
-              class="w-full min-h-[40px] rounded-lg bg-stone-800/70 border border-stone-700/60 text-stone-300 text-sm font-semibold"
-              @click="onToggleProducto(p.nombre)"
-            >
-              {{ productosExpandidos.has(p.nombre) ? 'Ocultar tallas' : `Ver ${p.tallas.length} tallas` }}
-            </button>
-            <div v-if="productosExpandidos.has(p.nombre)" class="space-y-2 pt-1">
-              <div v-for="g in p.tallas" :key="g.key" class="bg-stone-950/60 border border-stone-800 rounded-xl p-3 space-y-2">
-                <div class="flex items-center justify-between text-sm">
-                  <span class="font-mono font-bold text-sky-300">{{ g.talla }}</span>
-                  <span class="font-mono font-bold text-emerald-300">{{ g.disponible }} uds</span>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                  <span class="text-xs uppercase tracking-wider text-stone-400">R / V / D / E</span>
-                  <span class="font-mono text-stone-400">{{ g.reservada }} / {{ g.vendida }} / {{ g.defectuosa }} / {{ g.exhibicion }}</span>
-                </div>
-                <div class="flex gap-2">
-                  <button
-                    type="button"
-                    class="flex-1 min-h-[40px] rounded-lg bg-stone-800 border border-stone-700 text-stone-300 text-sm font-semibold"
-                    @click="onToggleGrupo(g)"
-                  >
-                    {{ gruposExpandidos.has(g.key) ? 'Ocultar' : `Unidades (${g.unidades.length})` }}
-                  </button>
-                  <button
-                    type="button"
-                    class="min-w-[44px] min-h-[40px] px-3 rounded-lg border border-stone-700 text-stone-400 text-sm font-semibold"
-                    @click="quitarUnidad(g)"
-                  >
-                    −1
-                  </button>
-                </div>
-                <div v-if="gruposExpandidos.has(g.key)" class="space-y-1.5 pt-1">
-                  <div v-for="u in g.unidades" :key="u.id" class="flex flex-wrap items-center gap-2 text-xs">
-                    <span class="text-stone-500 font-mono">#{{ u.id }}</span>
-                    <select
-                      :value="u.variante_id ?? 'none'"
-                      class="flex-1 min-w-[90px] bg-stone-950 border border-stone-700 text-stone-200 rounded-lg px-2 py-1.5 font-mono focus:border-amber-400 focus:outline-none"
-                      @change="guardarUnidad(u, { variante_id: ($event.target as HTMLSelectElement).value === 'none' ? null : Number(($event.target as HTMLSelectElement).value), talla: ($event.target as HTMLSelectElement).selectedOptions[0]?.textContent?.trim() ?? u.talla })"
-                    >
-                      <option value="none">Sin talla</option>
-                      <option v-for="v in (variantesPorGrupo[g.key] ?? [])" :key="v.id" :value="v.id">{{ v.nombre }}</option>
-                    </select>
-                    <select
-                      :value="u.estado"
-                      class="bg-stone-950 border border-stone-700 text-stone-200 rounded-lg px-2 py-1.5 font-mono focus:border-amber-400 focus:outline-none"
-                      @change="guardarUnidad(u, { estado: ($event.target as HTMLSelectElement).value })"
-                    >
-                      <option v-for="e in ESTADOS_PRENDA" :key="e" :value="e">{{ e }}</option>
-                    </select>
-                    <button
-                      type="button"
-                      class="text-stone-500 hover:text-rose-400 font-mono p-1"
-                      @click="borrarUnidad(u)"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </section>

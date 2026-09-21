@@ -7,9 +7,13 @@ import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import { showToast } from '@/utils/toast'
 import { useDevoluciones } from '@/composables/useDevoluciones'
+import { useVentas } from '@/composables/useVentas'
+import { useProductos } from '@/composables/useProductos'
 import type { DevolucionCreatePayload } from '@/services/api/devoluciones'
 
 const devolucionesApi = useDevoluciones()
+const ventasApi = useVentas()
+const productosApi = useProductos()
 const devoluciones = ref<any[]>([])
 async function cargarDevoluciones() {
   try {
@@ -49,7 +53,30 @@ function openCreateDialog() {
   formTipo.value = 'total'
   formMotivo.value = ''
   formItems.value = [{ producto_id: null, cantidad: 1, precio: 0 }]
+  void cargarListasForm()
   showCreateDialog.value = true
+}
+
+const ventasOptions = ref<{ label: string; value: number }[]>([])
+const productosOptions = ref<{ label: string; value: number }[]>([])
+async function cargarListasForm() {
+  try {
+    const [v, p] = await Promise.all([
+      ventasApi.list({ limit: 100 }),
+      productosApi.list({ limit: 100 }),
+    ])
+    ventasOptions.value = ((v as any).items ?? []).map((s: any) => ({
+      label: `${s.codigo ?? `VEN-${s.id}`} · ${s.cliente_nombre ?? '—'} · $${Math.round(Number(s.total_venta ?? 0)).toLocaleString('es-CO')}`,
+      value: s.id,
+    }))
+    productosOptions.value = ((p.items ?? []) as any[]).map((r: any) => ({
+      label: `${r.nombre} (${r.codigo ?? `PRD-${r.id}`})`,
+      value: r.id,
+    }))
+  } catch {
+    ventasOptions.value = []
+    productosOptions.value = []
+  }
 }
 
 function addItem() {
@@ -100,13 +127,13 @@ async function confirmarEliminarDevolucion() {
 
 async function submitCreate() {
   if (!formVentaId.value || formVentaId.value <= 0) {
-    showToast('warn', 'Campo requerido', 'Indicá el ID de la venta a devolver.')
+    showToast('warn', 'Campo requerido', 'Elegí la venta a devolver.')
     return
   }
   if (formTipo.value === 'parcial') {
     const valid = formItems.value.filter((it) => it.producto_id != null && Number(it.producto_id) > 0 && Number(it.cantidad) > 0)
     if (!valid.length) {
-      showToast('warn', 'Campo requerido', 'La devolución parcial requiere al menos un ítem válido (ID de producto y cantidad > 0).')
+      showToast('warn', 'Campo requerido', 'La devolución parcial requiere al menos un ítem válido (producto y cantidad > 0).')
       return
     }
   }
@@ -176,7 +203,6 @@ async function submitCreate() {
                 <td colspan="6" class="py-8 text-center text-stone-500">
                   <i class="pi pi-inbox text-2xl mb-2 block" />
                   Sin garantías registradas.
-                  <span class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/devoluciones</code>.</span>
                 </td>
               </tr>
           <tr v-for="d in devolucionesDisplay" :key="d.id">
@@ -234,8 +260,15 @@ async function submitCreate() {
     >
       <div class="space-y-3 pt-2 text-xs">
         <div class="flex flex-col gap-1">
-          <label class="font-semibold text-stone-300">ID de venta *</label>
-          <InputNumber v-model="formVentaId" mode="decimal" locale="es-CO" :min="1" :step="1" :min-fraction-digits="0" :max-fraction-digits="0" placeholder="Ej. 12" class="text-xs" />
+          <label class="font-semibold text-stone-300">Venta *</label>
+          <Dropdown
+            v-model="formVentaId"
+            :options="ventasOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Elegir venta (código · cliente · total)…"
+            class="text-xs w-full"
+          />
         </div>
         <div class="flex flex-col gap-1">
           <label class="font-semibold text-stone-300">Tipo *</label>
@@ -254,8 +287,15 @@ async function submitCreate() {
         <div v-if="formTipo === 'parcial'" class="space-y-2 border-t border-stone-800 pt-3">
           <div v-for="(it, idx) in formItems" :key="idx" class="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
             <div class="flex flex-col gap-1">
-              <label class="font-semibold text-stone-300">Producto ID *</label>
-              <InputNumber v-model="it.producto_id" mode="decimal" locale="es-CO" :min="1" :step="1" :min-fraction-digits="0" :max-fraction-digits="0" placeholder="Ej. 5" class="text-xs" />
+              <label class="font-semibold text-stone-300">Producto *</label>
+              <Dropdown
+                v-model="it.producto_id"
+                :options="productosOptions"
+                option-label="label"
+                option-value="value"
+                placeholder="Elegir producto…"
+                class="text-xs w-full"
+              />
             </div>
             <div class="flex flex-col gap-1">
               <label class="font-semibold text-stone-300">Cantidad *</label>

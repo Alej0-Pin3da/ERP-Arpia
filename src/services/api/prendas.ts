@@ -7,6 +7,7 @@ import { client } from '@/api/client'
 
 export interface PrendaRead {
   id: number
+  producto_id?: number | null
   // P2-7: null = prenda genérica / sin talla.
   variante_id: number | null
   talla?: string | null
@@ -23,6 +24,7 @@ export interface PrendaRead {
 }
 
 export interface PrendaCreatePayload {
+  producto_id?: number | null
   // P2-7: omitible para prenda genérica / sin talla.
   variante_id?: number | null
   talla?: string | null

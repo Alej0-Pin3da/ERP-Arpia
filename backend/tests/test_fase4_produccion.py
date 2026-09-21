@@ -329,3 +329,47 @@ def test_prenda_exhibicion_y_cambio_talla(client: TestClient, db_session, admin_
         db_session.query(Producto).filter(Producto.id == prod.id).delete()
         db_session.query(TipoProducto).filter(TipoProducto.id == tipo_p.id).delete()
         db_session.commit()
+
+
+def test_prenda_generica_con_producto_id(client: TestClient, db_session, admin_token):
+    """Genérica con producto_id (0040): atribuye nombre; producto inválido 400."""
+    import uuid
+
+    from app.models.productos import TipoProducto
+
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    uniq = uuid.uuid4().hex[:6]
+    tipo_p = TipoProducto(nombre=f"Tipo Gen {uniq}")
+    db_session.add(tipo_p)
+    db_session.commit()
+    prod = Producto(
+        tipo_producto_id=tipo_p.id,
+        nombre=f"Tote Gen {uniq}",
+        costos_operativos_fijos=Decimal("0"),
+    )
+    db_session.add(prod)
+    db_session.commit()
+    try:
+        r = client.post(
+            "/api/v1/prendas-confeccionadas",
+            json={"producto_id": prod.id, "talla": "Sin talla", "estado": "disponible"},
+            headers=headers,
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["producto_id"] == prod.id
+        assert r.json()["nombre_producto"] == prod.nombre
+        pid = r.json()["id"]
+        rbad = client.post(
+            "/api/v1/prendas-confeccionadas",
+            json={"producto_id": 99999999, "talla": "Sin talla"},
+            headers=headers,
+        )
+        assert rbad.status_code == 400, rbad.text
+        client.delete(f"/api/v1/prendas-confeccionadas/{pid}", headers=headers)
+    finally:
+        db_session.query(PrendaConfeccionada).filter(
+            PrendaConfeccionada.producto_id == prod.id
+        ).delete(synchronize_session=False)
+        db_session.query(Producto).filter(Producto.id == prod.id).delete()
+        db_session.query(TipoProducto).filter(TipoProducto.id == tipo_p.id).delete()
+        db_session.commit()

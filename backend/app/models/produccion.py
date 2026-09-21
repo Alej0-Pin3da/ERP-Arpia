@@ -193,6 +193,9 @@ class PrendaConfeccionada(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    producto_id: Mapped[int | None] = mapped_column(
+        ForeignKey("Productos.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     variante_id: Mapped[int | None] = mapped_column(
         ForeignKey("Variantes_Producto.id", ondelete="CASCADE"), nullable=True, index=True
     )
@@ -205,6 +208,9 @@ class PrendaConfeccionada(Base):
     pedido_id: Mapped[int | None] = mapped_column(
         ForeignKey("pedidos_produccion.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    venta_id: Mapped[int | None] = mapped_column(
+        ForeignKey("Ventas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -213,9 +219,10 @@ class PrendaConfeccionada(Base):
     )
 
     variante: Mapped[VarianteProducto | None] = relationship(lazy="selectin")
+    producto: Mapped[Producto | None] = relationship(lazy="selectin")
     pedido: Mapped[PedidoProduccion | None] = relationship(
         back_populates="prendas", lazy="selectin"
     )
 
     def __repr__(self) -> str:
-        return f"<PrendaConfeccionada id={self.id} variante_id={self.variante_id} estado={self.estado!r}>"
+        return f"<PrendaConfeccionada id={self.id} producto_id={self.producto_id} variante_id={self.variante_id} estado={self.estado!r}>"

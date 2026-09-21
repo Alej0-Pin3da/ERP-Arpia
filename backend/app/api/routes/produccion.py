@@ -68,6 +68,8 @@ def _prenda_to_read(prenda: PrendaConfeccionada) -> PrendaConfeccionadaRead:
         res.nombre_variante = prenda.variante.nombre_variante
         if prenda.variante.producto is not None:
             res.nombre_producto = prenda.variante.producto.nombre
+    if res.nombre_producto is None and prenda.producto is not None:
+        res.nombre_producto = prenda.producto.nombre
     return res
 
 
@@ -140,6 +142,8 @@ def create_prenda(
     # P2-7: variante_id nullable (generic stock); only validate when given.
     if payload.variante_id is not None and db.get(VarianteProducto, payload.variante_id) is None:
         raise HTTPException(status_code=400, detail="Variante de producto no existe")
+    if payload.producto_id is not None and db.get(Producto, payload.producto_id) is None:
+        raise HTTPException(status_code=400, detail="Producto no existe")
     if payload.pedido_id is not None and db.get(PedidoProduccion, payload.pedido_id) is None:
         raise HTTPException(status_code=400, detail="Pedido de producción no existe")
 
@@ -168,6 +172,8 @@ def update_prenda(
 
     if payload.variante_id is not None and db.get(VarianteProducto, payload.variante_id) is None:
         raise HTTPException(status_code=400, detail="Variante de producto no existe")
+    if payload.producto_id is not None and db.get(Producto, payload.producto_id) is None:
+        raise HTTPException(status_code=400, detail="Producto no existe")
     if payload.pedido_id is not None and db.get(PedidoProduccion, payload.pedido_id) is None:
         raise HTTPException(status_code=400, detail="Pedido de producción no existe")
 

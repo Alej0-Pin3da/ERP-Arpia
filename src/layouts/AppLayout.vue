@@ -13,7 +13,6 @@ import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import SidebarMenu from '@/components/layout/SidebarMenu.vue'
-import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
 import NotificacionesModal from '@/components/atelier/NotificacionesModal.vue'
 import ApiModeBadge from '@/components/ApiModeBadge.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -37,7 +36,6 @@ const hasAlertas = computed(() => (insumosList.value as any[]).some((i: any) => 
 const router = useRouter()
 const route = useRoute()
 const sidebarOpen = ref(false)
-const showIaModal = ref(false)
 const showNotifModal = ref(false)
 
 /** es-CO role name for the header badge (Administrador/Operador/Consulta). */
@@ -151,15 +149,6 @@ function closeSidebar(): void {
       </div>
 
       <div class="header-right">
-        <!-- AI Assistant Fast Trigger -->
-        <Button
-          label="Sugerencias de taller"
-          icon="pi pi-lightbulb"
-          size="small"
-          class="p-button-warning text-xs font-semibold hidden sm:inline-flex"
-          @click="showIaModal = true"
-        />
-
         <!-- Notifications button with alert badge -->
         <button
           type="button"
@@ -208,7 +197,6 @@ function closeSidebar(): void {
     </main>
 
     <!-- Global Atelier Modals -->
-    <AsistenteIaModal v-model:visible="showIaModal" />
     <NotificacionesModal v-model:visible="showNotifModal" @ir-insumos="router.push('/insumos')" />
   </div>
 </template>

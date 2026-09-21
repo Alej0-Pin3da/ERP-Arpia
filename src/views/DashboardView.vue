@@ -9,7 +9,6 @@ import { useVentas } from '@/composables/useVentas'
 import { useAnaliticos } from '@/composables/useAnaliticos'
 import { useSocios } from '@/composables/useSocios'
 import { useFinanzas } from '@/composables/useFinanzas'
-import AsistenteIaModal from '@/components/atelier/AsistenteIaModal.vue'
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
 
@@ -120,7 +119,6 @@ const distribucion = computed(() => {
 })
 
 
-const showIaModal = ref(false)
 const showNuevoPedidoModal = ref(false)
 const showSugerirModal = ref(false)
 
@@ -166,13 +164,6 @@ function getEstadoBadgeClass(estado: string) {
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <Button
-            label="Ver sugerencias de taller"
-            icon="pi pi-lightbulb"
-            size="small"
-            class="p-button-warning text-xs font-semibold"
-            @click="showIaModal = true"
-          />
           <Button
             label="Cotizador Rápido"
             icon="pi pi-calculator"
@@ -510,7 +501,6 @@ function getEstadoBadgeClass(estado: string) {
     </div>
 
     <!-- Modals -->
-    <AsistenteIaModal v-model:visible="showIaModal" />
     <NuevoPedidoModal v-model:visible="showNuevoPedidoModal" />
     <SugerirOrdenModal v-model:visible="showSugerirModal" />
   </div>

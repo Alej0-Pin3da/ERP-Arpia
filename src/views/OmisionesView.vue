@@ -68,7 +68,6 @@ async function marcarResuelta(o: { id: number }) {
                 <td colspan="5" class="py-8 text-center text-stone-500">
                   <i class="pi pi-inbox text-2xl mb-2 block" />
                   Sin omisiones registradas.
-                  <span class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/omisiones</code>.</span>
                 </td>
               </tr>
           <tr v-for="o in omisionesDisplay" :key="o.id">

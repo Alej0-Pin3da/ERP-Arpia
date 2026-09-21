@@ -75,15 +75,14 @@ BLOQUES_BOM: dict[str, tuple[str, str | None]] = {
 }
 
 # Recipe-sheet BATCH sizes (consumption rows are for the WHOLE batch, not per
-# unit). Verified against ARPIA.xlsx 2026-08: 'TOTEBAG' declares 'UNIDAD |
-# TOTAL 6 totebag', 'BLUSAS' 'TOTAL 12 Prendas' (left) / 'TOTAL 15 Prendas'
-# (right), 'Noche y Dia' 'TOTAL 8 Prendas'. Sheets without a batch marker are
-# per-unit (batch 1). Before this fix the BOM of Tote Bag was 6x inflated
-# (Cadena gris 53 cm -> 0.53 m per totebag instead of 8.83 cm), the F5
-# destock requested ~6x the real material and failed with
-# InsufficientStockError; F7 N7d diverged by the same factor.
+# unit). Verified against ARPIA.xlsx 2026-08: 'BLUSAS' 'TOTAL 12 Prendas'
+# (left) / 'TOTAL 15 Prendas' (right), 'Noche y Dia' 'TOTAL 8 Prendas'.
+# TOTEBAG was listed here (marker 'UNIDAD | TOTAL 6 totebag') but the 2026-09
+# CSV recipe is per-tote (owner-confirmed: 74 cm straps etc. are single-bag
+# quantities; ×6 would undercost 6x vs the $25,031 sheet total and the
+# $25,765 sale snapshots). DB lines are raw per-tote; the /6 mechanism itself
+# is still covered by test_migrate_bom (explicit _lotes param).
 _LOTES_BOM: dict[str, tuple[int | None, int | None]] = {
-    "TOTEBAG": (6, None),
     "BLUSAS": (12, 15),
     "Noche y Dia": (8, None),
     "Noche y Dia CACHETERO": (8, None),

@@ -186,7 +186,7 @@ async function submitPassword() {
     <div v-if="!usuarios.length" class="text-center py-12 bg-stone-900/40 border border-stone-800 rounded-2xl">
       <i class="pi pi-inbox text-3xl text-stone-500 mb-3 block" />
       <p class="text-sm font-bold text-stone-300">Sin usuarios registrados</p>
-      <p class="text-xs text-stone-400 mt-1">Los datos vienen de <code>GET /api/v1/usuarios</code> (solo admin).</p>
+      <p class="text-xs text-stone-400 mt-1">Gestión de accesos (solo admin).</p>
     </div>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4">

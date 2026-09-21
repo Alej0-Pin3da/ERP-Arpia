@@ -5,6 +5,23 @@ import InputText from 'primevue/inputtext'
 import { showToast } from '@/utils/toast'
 import * as auditoriaApi from '@/services/api/auditoria'
 import type { PrecioVersionRead, CostoVersionRead, CierreMensualRead } from '@/services/api/auditoria'
+import { useProductos } from '@/composables/useProductos'
+
+const productosApi = useProductos()
+const nombresProductos = ref<Record<number, string>>({})
+async function cargarNombresProductos() {
+  try {
+    const r = await productosApi.list({ limit: 100 })
+    const map: Record<number, string> = {}
+    for (const p of (r.items ?? []) as unknown as Record<string, unknown>[]) {
+      map[Number(p.id)] = String(p.nombre ?? '')
+    }
+    nombresProductos.value = map
+  } catch { nombresProductos.value = {} }
+}
+function nombreProducto(id: number): string {
+  return nombresProductos.value[id] || `Producto #${id}`
+}
 
 type Tab = 'precios' | 'costos' | 'cierres'
 const activeTab = ref<Tab>('precios')
@@ -66,7 +83,7 @@ function limpiarFiltro() {
   void cargarAuditoria()
 }
 
-onMounted(() => { void cargarAuditoria() })
+onMounted(() => { void cargarAuditoria(); void cargarNombresProductos() })
 </script>
 
 <template>
@@ -97,14 +114,14 @@ onMounted(() => { void cargarAuditoria() })
       </div>
 
       <div v-if="activeTab !== 'cierres'" class="flex flex-wrap items-center gap-2">
-        <InputText
+        <select
           v-model="filtroProductoId"
-          placeholder="Filtrar por producto_id"
-          inputmode="numeric"
-          class="w-52"
-          @keyup.enter="aplicarFiltro"
-        />
-        <Button label="Filtrar" size="small" :loading="loading" @click="aplicarFiltro" />
+          class="bg-stone-950 border border-stone-700 text-stone-200 text-xs rounded-lg px-3 py-2 font-mono focus:border-amber-400 focus:outline-none w-64"
+          @change="aplicarFiltro"
+        >
+          <option value="">Todos los productos</option>
+          <option v-for="(nombre, id) in nombresProductos" :key="id" :value="String(id)">{{ nombre }}</option>
+        </select>
         <Button label="Limpiar" size="small" severity="secondary" text :disabled="loading" @click="limpiarFiltro" />
       </div>
 
@@ -130,12 +147,11 @@ onMounted(() => { void cargarAuditoria() })
             <td colspan="5" class="py-8 text-center text-stone-500">
               <i class="pi pi-inbox text-2xl mb-2 block" />
               Sin versiones de precio registradas.
-              <span class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/audit-fiscal/precio-versions</code>.</span>
             </td>
           </tr>
           <tr v-for="p in precios" :key="p.id">
             <td class="py-3 px-3 text-stone-500 sticky left-0 z-10 bg-stone-900/95 whitespace-nowrap">{{ p.id }}</td>
-            <td class="py-3 px-3 text-amber-300 font-bold whitespace-nowrap">#{{ p.producto_id }}</td>
+            <td class="py-3 px-3 text-amber-300 font-bold whitespace-nowrap">{{ nombreProducto(p.producto_id) }}</td>
             <td class="py-3 px-3 text-stone-400 whitespace-nowrap">{{ p.variante_id ?? '—' }}</td>
             <td class="py-3 px-3 text-right text-stone-300 font-semibold whitespace-nowrap">${{ p.precio }}</td>
             <td class="py-3 px-3 text-stone-400 whitespace-nowrap">{{ p.fecha_desde }}</td>
@@ -148,7 +164,7 @@ onMounted(() => { void cargarAuditoria() })
         <div v-if="!precios.length" class="text-center py-8 text-sm text-stone-500">Sin versiones de precio registradas.</div>
         <div v-for="p in precios" :key="p.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-1 min-w-0">
           <div class="flex items-start justify-between gap-2 min-w-0">
-            <div class="font-bold text-sm text-amber-300">Producto #{{ p.producto_id }}</div>
+            <div class="font-bold text-sm text-amber-300">Producto {{ nombreProducto(p.producto_id) }}</div>
             <span class="text-xs font-mono text-stone-500 shrink-0">ID {{ p.id }}</span>
           </div>
           <div class="text-sm text-stone-300">Variante: {{ p.variante_id ?? '—' }}</div>
@@ -177,12 +193,11 @@ onMounted(() => { void cargarAuditoria() })
             <td colspan="4" class="py-8 text-center text-stone-500">
               <i class="pi pi-inbox text-2xl mb-2 block" />
               Sin versiones de costo registradas.
-              <span class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/audit-fiscal/costo-versions</code>.</span>
             </td>
           </tr>
           <tr v-for="c in costos" :key="c.id">
             <td class="py-3 px-3 text-stone-500 sticky left-0 z-10 bg-stone-900/95 whitespace-nowrap">{{ c.id }}</td>
-            <td class="py-3 px-3 text-amber-300 font-bold whitespace-nowrap">#{{ c.producto_id }}</td>
+            <td class="py-3 px-3 text-amber-300 font-bold whitespace-nowrap">{{ nombreProducto(c.producto_id) }}</td>
             <td class="py-3 px-3 text-right text-stone-300 font-semibold whitespace-nowrap">${{ c.costo }}</td>
             <td class="py-3 px-3 text-stone-400 whitespace-nowrap">{{ c.fecha_desde }}</td>
           </tr>
@@ -194,7 +209,7 @@ onMounted(() => { void cargarAuditoria() })
         <div v-if="!costos.length" class="text-center py-8 text-sm text-stone-500">Sin versiones de costo registradas.</div>
         <div v-for="c in costos" :key="c.id" class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 space-y-1 min-w-0">
           <div class="flex items-start justify-between gap-2 min-w-0">
-            <div class="font-bold text-sm text-amber-300">Producto #{{ c.producto_id }}</div>
+            <div class="font-bold text-sm text-amber-300">Producto {{ nombreProducto(c.producto_id) }}</div>
             <span class="text-xs font-mono text-stone-500 shrink-0">ID {{ c.id }}</span>
           </div>
           <div class="flex items-center justify-between text-sm">
@@ -221,7 +236,6 @@ onMounted(() => { void cargarAuditoria() })
             <td colspan="3" class="py-8 text-center text-stone-500">
               <i class="pi pi-inbox text-2xl mb-2 block" />
               Sin cierres mensuales registrados.
-              <span class="block text-[11px] mt-1">Los datos vienen de <code>GET /api/v1/audit-fiscal/cierres</code>.</span>
             </td>
           </tr>
           <tr v-for="s in cierres" :key="s.id">
