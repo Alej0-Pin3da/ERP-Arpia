@@ -5,6 +5,7 @@ import type {
   CanalRead,
   MetodoRead,
   CategoriaRead,
+  CategoriaProductoRead,
   UbicacionRead,
   TallaRead,
   ProductoSinTallaRead,
@@ -22,6 +23,7 @@ const proveedoresList = ref<ProveedorRead[]>([])
 const canalesList = ref<CanalRead[]>([])
 const metodosList = ref<MetodoRead[]>([])
 const categoriasList = ref<CategoriaRead[]>([])
+const catProdList = ref<CategoriaProductoRead[]>([])
 const ubicacionesList = ref<UbicacionRead[]>([])
 const tallasList = ref<TallaRead[]>([])
 const sinTallaList = ref<ProductoSinTallaRead[]>([])
@@ -122,18 +124,20 @@ function sanitizeMetodoPayload(form: Record<string, unknown>): Record<string, un
 
 async function cargarDatos() {
   try {
-    const [prov, cat, ub, can, met, tal, sin, par] = await Promise.all([
-      maestros.listProveedores({ limit: 100 }),
-      maestros.listCategorias({ limit: 100 }),
-      maestros.listUbicaciones({ limit: 100 }),
-      maestros.listCanales({ limit: 100 }),
-      maestros.listMetodosPago({ limit: 100 }),
-      maestros.listTallas({ limit: 100, sort_by: 'orden' }),
-      maestros.listProductosSinTalla({ limit: 100 }),
-      maestros.getParametros(),
-    ])
-    proveedoresList.value = (prov.items as unknown as ProveedorRead[]) ?? []
-    categoriasList.value = (cat.items as unknown as CategoriaRead[]) ?? []
+  const [prov, cat, ub, can, met, tal, sin, par, catprod] = await Promise.all([
+    maestros.listProveedores({ limit: 100 }),
+    maestros.listCategorias({ limit: 100 }),
+    maestros.listUbicaciones({ limit: 100 }),
+    maestros.listCanales({ limit: 100 }),
+    maestros.listMetodosPago({ limit: 100 }),
+    maestros.listTallas({ limit: 100, sort_by: 'orden' }),
+    maestros.listProductosSinTalla({ limit: 100 }),
+    maestros.getParametros(),
+    maestros.listCategoriasProducto({ limit: 100 }),
+  ])
+  proveedoresList.value = (prov.items as unknown as ProveedorRead[]) ?? []
+  categoriasList.value = (cat.items as unknown as CategoriaRead[]) ?? []
+  catProdList.value = (catprod.items as unknown as CategoriaProductoRead[]) ?? []
     ubicacionesList.value = (ub.items as unknown as UbicacionRead[]) ?? []
     canalesList.value = (can.items as unknown as CanalRead[]) ?? []
     metodosList.value = (met.items as unknown as MetodoRead[]) ?? []
@@ -152,7 +156,7 @@ onMounted(() => {
 })
 
 // Tab active
-type TabType = 'proveedores' | 'canales' | 'pagos' | 'categorias' | 'ubicaciones' | 'costeo' | 'tallas'
+type TabType = 'proveedores' | 'canales' | 'pagos' | 'categorias' | 'catprod' | 'ubicaciones' | 'costeo' | 'tallas'
 const tabActiva = ref<TabType>('proveedores')
 
 // ==========================================
@@ -507,6 +511,39 @@ async function eliminarSinTallaWrapper(id: number) {
 async function eliminarCategoriaWrapper(id: number) {
   await maestros.removeCategoria(id); await cargarDatos()
 }
+async function eliminarCatProdWrapper(id: number) {
+  await maestros.removeCategoriaProducto(id); await cargarDatos()
+}
+
+// ==========================================
+// 7b. CATEGORÍAS & LÍNEAS DE PRODUCTO (inline CRUD)
+// ==========================================
+const nuevoCatProd = ref<Record<string, string>>({ CATEGORIA: '', LINEA: '' })
+const catProdPorTipo = (tipo: string) => catProdList.value.filter((c) => c.tipo === tipo)
+async function agregarCatProd(tipo: string) {
+  const nombre = (nuevoCatProd.value[tipo] ?? '').trim()
+  if (!nombre) {
+    showToast('warn', 'Campo requerido', 'Escribí el nombre primero.')
+    return
+  }
+  try {
+    await maestros.createCategoriaProducto({ nombre, tipo })
+    nuevoCatProd.value[tipo] = ''
+    await cargarDatos()
+    showToast('success', 'Guardado', `${nombre} agregado a ${tipo === 'CATEGORIA' ? 'Categorías' : 'Líneas'}.`)
+  } catch (e: unknown) {
+    const detail = (e as any)?.response?.data?.detail ?? (e as Error)?.message ?? 'Error al guardar'
+    showToast('error', 'No se pudo guardar', typeof detail === 'string' ? detail : '¿Nombre duplicado?')
+  }
+}
+async function toggleCatProdActivo(item: CategoriaProductoRead) {
+  try {
+    await maestros.updateCategoriaProducto(item.id, { activo: !item.activo })
+    await cargarDatos()
+  } catch (e: unknown) {
+    showToast('error', 'Error', 'No se pudo cambiar el estado.')
+  }
+}
 async function eliminarUbicacionWrapper(id: number) {
   await maestros.removeUbicacion(id); await cargarDatos()
 }
@@ -531,6 +568,7 @@ async function confirmarEliminar() {
     else if (t.tipo === 'talla') await eliminarTallaWrapper(t.id)
     else if (t.tipo === 'sintalla') await eliminarSinTallaWrapper(t.id)
     else if (t.tipo === 'categoria') await eliminarCategoriaWrapper(t.id)
+    else if (t.tipo === 'catprod') await eliminarCatProdWrapper(t.id)
     else if (t.tipo === 'ubicacion') await eliminarUbicacionWrapper(t.id)
     showToast('info', 'Eliminado', `${t.nombre} eliminado del catálogo.`)
   } catch (e: unknown) {
@@ -591,6 +629,7 @@ const totalMetodos = computed(() => metodosList.value.length)
 const totalTallas = computed(() => tallasList.value.length)
 const totalSinTalla = computed(() => sinTallaList.value.length)
 const totalCategorias = computed(() => categoriasList.value.length)
+const totalCatProd = computed(() => catProdList.value.length)
 const totalUbicaciones = computed(() => ubicacionesList.value.length)
 
 // Filter for suppliers
@@ -702,6 +741,17 @@ function formatoCOP(val: number) {
             : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900/60'"
         >
           <span>👗</span> Familias de Colección ({{ totalCategorias }})
+        </button>
+
+        <button
+          id="btn-tab-catprod"
+          @click="tabActiva = 'catprod'"
+          class="px-4 py-2 text-xs font-mono font-medium rounded-t-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+          :class="tabActiva === 'catprod'
+            ? 'bg-stone-800 text-amber-300 border-t-2 border-amber-400 shadow-inner'
+            : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900/60'"
+        >
+          <span>🏷️</span> Categorías & Líneas ({{ totalCatProd }})
         </button>
 
         <button
@@ -1032,11 +1082,8 @@ function formatoCOP(val: number) {
               <thead class="bg-stone-950/80 text-stone-400 uppercase tracking-wider border-b border-stone-800">
                 <tr>
                   <th class="py-3 px-4 sticky left-0 z-10 bg-stone-950/95">Talla</th>
-                  <th class="py-3 px-4 text-center whitespace-nowrap">Contorno Busto</th>
-                  <th class="py-3 px-4 text-center whitespace-nowrap">Contorno Cintura</th>
-                  <th class="py-3 px-4 text-center whitespace-nowrap">Contorno Cadera</th>
-                  <th class="py-3 px-4 whitespace-nowrap">Reducción Corset</th>
-                  <th class="py-3 px-4 min-w-[180px]">Descripción de Silueta</th>
+                  <th class="py-3 px-4 text-center whitespace-nowrap">Pecho</th>
+                  <th class="py-3 px-4 text-center whitespace-nowrap">Cintura</th>
                   <th class="py-3 px-4 text-right whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
@@ -1052,9 +1099,6 @@ function formatoCOP(val: number) {
                   </td>
                   <td class="py-3.5 px-4 whitespace-nowrap">{{ t.busto }}</td>
                   <td class="py-3.5 px-4 whitespace-nowrap">{{ t.cintura }}</td>
-                  <td class="py-3.5 px-4 whitespace-nowrap">{{ t.cadera }}</td>
-                  <td class="py-3.5 px-4 text-emerald-400 whitespace-nowrap">{{ t.reduccion_corset }}</td>
-                  <td class="py-3.5 px-4 text-stone-400 min-w-[180px]">{{ t.descripcion }}</td>
                   <td class="py-3.5 px-4 text-right whitespace-nowrap">
                     <div class="flex items-center justify-end gap-2">
                       <button
@@ -1085,13 +1129,10 @@ function formatoCOP(val: number) {
                 <span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
                 <div class="font-bold text-sm text-amber-400">Talla {{ t.talla }}</div>
               </div>
-              <div class="grid grid-cols-3 gap-2 text-sm">
-                <div><div class="text-xs uppercase tracking-wider text-stone-400">Busto</div><div class="font-mono text-stone-100">{{ t.busto }}</div></div>
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                <div><div class="text-xs uppercase tracking-wider text-stone-400">Pecho</div><div class="font-mono text-stone-100">{{ t.busto }}</div></div>
                 <div><div class="text-xs uppercase tracking-wider text-stone-400">Cintura</div><div class="font-mono text-stone-100">{{ t.cintura }}</div></div>
-                <div><div class="text-xs uppercase tracking-wider text-stone-400">Cadera</div><div class="font-mono text-stone-100">{{ t.cadera }}</div></div>
               </div>
-              <div class="text-sm text-emerald-400">{{ t.reduccion_corset }}</div>
-              <div class="text-sm text-stone-400">{{ t.descripcion }}</div>
               <div class="flex gap-2 pt-1">
                 <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-stone-800 text-stone-200 text-sm font-semibold" @click="abrirEditarTalla(t)">Editar</button>
                 <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg border border-stone-700 text-stone-500" title="Eliminar Talla" @click="solicitarEliminar('talla', t.id, `Talla ${t.talla}`)">✕</button>
@@ -1248,6 +1289,63 @@ function formatoCOP(val: number) {
                 ✕
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5b: CATEGORÍAS & LÍNEAS DE PRODUCTO (listas de la Ficha) -->
+    <div v-if="tabActiva === 'catprod'" class="space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-900/50 p-4 rounded-xl border border-stone-800">
+        <div>
+          <h2 class="text-lg font-serif font-bold text-stone-100">Categorías & Líneas de Producto</h2>
+          <p class="text-xs text-stone-400 font-mono">Opciones de los selects de la Ficha BOM. Desactivar oculta sin borrar historia.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div v-for="grupo in [{ tipo: 'CATEGORIA', titulo: 'Categorías' }, { tipo: 'LINEA', titulo: 'Líneas' }]" :key="grupo.tipo" class="bg-stone-900/60 border border-stone-800 rounded-xl p-4">
+          <h3 class="text-sm font-bold text-stone-100 mb-3">{{ grupo.titulo }}</h3>
+          <div class="space-y-2">
+            <div v-for="item in catProdPorTipo(grupo.tipo)" :key="item.id" class="flex items-center justify-between gap-2 bg-stone-950/60 border border-stone-800 rounded-lg px-3 py-2">
+              <span class="text-sm text-stone-200" :class="{ 'line-through text-stone-500': !item.activo }">{{ item.nombre }}</span>
+              <div class="flex items-center gap-2">
+                <button
+                  :id="`btn-toggle-catprod-${item.id}`"
+                  @click="toggleCatProdActivo(item)"
+                  class="text-[11px] font-mono px-2 py-0.5 rounded border transition-colors"
+                  :class="item.activo ? 'text-emerald-300 border-emerald-700/60 bg-emerald-950/40' : 'text-stone-500 border-stone-700'"
+                  :title="item.activo ? 'Ocultar de la Ficha' : 'Mostrar en la Ficha'"
+                >
+                  {{ item.activo ? 'Activa' : 'Oculta' }}
+                </button>
+                <button
+                  :id="`btn-eliminar-catprod-${item.id}`"
+                  @click="solicitarEliminar('catprod', item.id, item.nombre)"
+                  class="text-xs text-stone-500 hover:text-rose-400 font-mono p-1 transition-colors"
+                  :title="`Eliminar ${item.nombre}`"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div v-if="!catProdPorTipo(grupo.tipo).length" class="text-xs text-stone-500 text-center py-2">Sin valores.</div>
+          </div>
+          <div class="flex items-center gap-2 mt-3">
+            <input
+              :id="`input-nuevo-catprod-${grupo.tipo}`"
+              v-model="nuevoCatProd[grupo.tipo]"
+              :placeholder="`Nueva ${grupo.titulo.toLowerCase().slice(0, -1)}…`"
+              class="flex-1 bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-sm text-stone-200 placeholder:text-stone-600 focus:border-amber-400 focus:outline-none"
+              @keyup.enter="agregarCatProd(grupo.tipo)"
+            />
+            <button
+              :id="`btn-agregar-catprod-${grupo.tipo}`"
+              @click="agregarCatProd(grupo.tipo)"
+              class="bg-amber-400 hover:bg-amber-300 text-stone-950 font-mono text-xs font-semibold px-3 py-2 rounded-lg transition-colors whitespace-nowrap"
+            >
+              + Agregar
+            </button>
           </div>
         </div>
       </div>
@@ -1906,28 +2004,29 @@ function formatoCOP(val: number) {
                 v-model="tallaForm.talla"
                 required
                 class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-amber-300 font-bold focus:border-amber-400 focus:outline-none"
-                placeholder="Ej: XXL, 3XL, XXS"
+                placeholder="Ej: XXS, 38, 42"
               />
             </div>
             <div>
-              <label class="block text-stone-300 mb-1">Reducción Corset:</label>
+              <label class="block text-stone-300 mb-1 text-[11px]">Orden:</label>
               <input
-                id="input-talla-reduccion"
-                v-model="tallaForm.reduccion_corset"
-                class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 focus:border-amber-400 focus:outline-none"
-                placeholder="Ej: -6 cm a -8 cm"
+                id="input-talla-orden"
+                v-model.number="tallaForm.orden"
+                type="number"
+                min="1"
+                class="w-full bg-stone-950 border border-stone-700 rounded-lg px-2 py-1.5 text-stone-100 focus:border-amber-400 focus:outline-none"
               />
             </div>
           </div>
 
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block text-stone-300 mb-1 text-[11px]">Busto:</label>
+              <label class="block text-stone-300 mb-1 text-[11px]">Pecho:</label>
               <input
                 id="input-talla-busto"
                 v-model="tallaForm.busto"
                 class="w-full bg-stone-950 border border-stone-700 rounded-lg px-2 py-1.5 text-stone-100 focus:border-amber-400 focus:outline-none"
-                placeholder="86 – 90 cm"
+                placeholder="78 cm"
               />
             </div>
             <div>
@@ -1936,28 +2035,9 @@ function formatoCOP(val: number) {
                 id="input-talla-cintura"
                 v-model="tallaForm.cintura"
                 class="w-full bg-stone-950 border border-stone-700 rounded-lg px-2 py-1.5 text-stone-100 focus:border-amber-400 focus:outline-none"
-                placeholder="66 – 70 cm"
+                placeholder="60 cm"
               />
             </div>
-            <div>
-              <label class="block text-stone-300 mb-1 text-[11px]">Cadera:</label>
-              <input
-                id="input-talla-cadera"
-                v-model="tallaForm.cadera"
-                class="w-full bg-stone-950 border border-stone-700 rounded-lg px-2 py-1.5 text-stone-100 focus:border-amber-400 focus:outline-none"
-                placeholder="92 – 96 cm"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-stone-300 mb-1">Descripción de Silueta:</label>
-            <input
-              id="input-talla-desc"
-              v-model="tallaForm.descripcion"
-              class="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 focus:border-amber-400 focus:outline-none"
-              placeholder="Ej: Silueta intermedia de alta rotación"
-            />
           </div>
 
           <div class="flex items-center justify-end gap-3 pt-3 border-t border-stone-800">

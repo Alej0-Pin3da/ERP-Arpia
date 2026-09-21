@@ -48,8 +48,14 @@ class Venta(Base):
             name="ck_ventas_estado",
         ),
         CheckConstraint(
-            "canal_venta IN ('web', 'whatsapp', 'instagram', 'feria', 'showroom_pereira')",
+            "canal_venta IN ('web', 'whatsapp', 'instagram', 'feria', "
+            "'showroom_pereira')",
             name="ck_ventas_canal_venta",
+        ),
+        CheckConstraint(
+            "motivo_descuento IS NULL OR motivo_descuento IN "
+            "('bono','aniversario','lanzamiento','rotacion','otro')",
+            name="ck_ventas_motivo_descuento",
         ),
     )
 
@@ -67,6 +73,9 @@ class Venta(Base):
     descuento_porcentaje: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
+    # Discount code as-typed (bono) + reason (0039). NULL = no discount info.
+    codigo_descuento: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    motivo_descuento: Mapped[str | None] = mapped_column(String(30), nullable=True)
     estado: Mapped[str] = mapped_column(
         String(20), nullable=False, default=DocumentState.CONFIRMED.value, index=True
     )

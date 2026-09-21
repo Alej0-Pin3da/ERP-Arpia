@@ -192,6 +192,31 @@ export async function deleteCategoria(id: number): Promise<void> {
   await client.delete(`/maestros/categorias-coleccion/${id}`)
 }
 
+// Categorias de producto (master Categoría/Línea de la Ficha, 0037)
+export interface CategoriaProductoRead {
+  id: number
+  nombre: string
+  tipo: string
+  activo: boolean
+  created_at: string
+  updated_at: string
+}
+export async function listCategoriasProducto(params: ListParams = {}): Promise<Paginated<CategoriaProductoRead>> {
+  const { data } = await client.get<Paginated<CategoriaProductoRead>>('/maestros/categorias-producto', { params })
+  return data
+}
+export async function createCategoriaProducto(payload: Record<string, unknown>): Promise<CategoriaProductoRead> {
+  const { data } = await client.post<CategoriaProductoRead>('/maestros/categorias-producto', payload)
+  return data
+}
+export async function updateCategoriaProducto(id: number, payload: Record<string, unknown>): Promise<CategoriaProductoRead> {
+  const { data } = await client.patch<CategoriaProductoRead>(`/maestros/categorias-producto/${id}`, payload)
+  return data
+}
+export async function deleteCategoriaProducto(id: number): Promise<void> {
+  await client.delete(`/maestros/categorias-producto/${id}`)
+}
+
 // Ubicaciones
 export async function listUbicaciones(params: ListParams = {}): Promise<Paginated<UbicacionRead>> {
   const { data } = await client.get<Paginated<UbicacionRead>>('/maestros/ubicaciones-taller', { params })

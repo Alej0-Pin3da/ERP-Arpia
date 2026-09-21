@@ -51,10 +51,14 @@ def pedido_esta_completado(pedido: PedidoProduccion) -> bool:
 
 
 def validar_avance_fase(fase_actual: str | None, fase_nueva: str) -> None:
-    """Enforce sequential forward phase advance (422 unknown, 400 jump/back).
+    """Enforce phase moves on the workshop order (422 unknown).
 
-    Same-phase PATCH is a no-op (allowed). Anything else must step exactly one
-    position forward in ``FASES_PRODUCCION_ORDEN``.
+    Same-phase PATCH is a no-op (allowed). Forward must step exactly one
+    position in ``FASES_PRODUCCION_ORDEN`` (no skips). Backward (devolución
+    por reproceso, e.g. calidad -> costura) may target ANY earlier phase.
+    'listo' is terminal: the lot was already credited by completar_lote, so
+    nothing moves out of it. Rework time is EDITED onto the existing
+    TiempoFase row (uq_tiempos_pedido_fase: one row per phase).
     """
     if fase_nueva not in FASES_PRODUCCION_ORDEN:
         raise DomainValidationError(
@@ -70,10 +74,12 @@ def validar_avance_fase(fase_actual: str | None, fase_nueva: str) -> None:
         else 0
     )
     idx_nueva = FASES_PRODUCCION_ORDEN.index(fase_nueva)
-    if idx_nueva < idx_actual:
+    if actual == PedidoProduccionFase.LISTO:
         raise DomainValidationError(
-            f"No se puede retroceder de fase '{actual}' a '{fase_nueva}'"
+            f"El pedido ya está '{actual}' (lote acreditado): sin movimientos"
         )
+    if idx_nueva < idx_actual:
+        return  # devolución por reproceso a cualquier fase anterior
     if idx_nueva > idx_actual + 1:
         siguiente = FASES_PRODUCCION_ORDEN[idx_actual + 1]
         raise DomainValidationError(

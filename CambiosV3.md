@@ -64,6 +64,160 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 - **Nota:** TOTE solo-insumos también quedaron a escala archivo (líneas batch/6 pendientes). Escala absoluta del archivo (pesos vs miles) queda como pregunta abierta: la consistencia interna BOM↔ventas↔INVERSION es total.
 - **Verificación:** rebuild CHECKs verdes post-apply; backup en `backend/migrate/reports/`. Solo DB dev (44 costos). Sin commit.
 
+### [2026-09-20] - Ficha refresca sola tras guardar (sin F5)
+
+- **Bug:** al guardar la ficha (precio, tiempos, mano/cif...), la tabla se recargaba pero el modal seguía mostrando el objeto viejo (`recetaSeleccionada` nunca se actualizaba; el `mapped` emitido se ignoraba). Precio y campos viejos hasta F5.
+- **Fix (`ProductosView`):** `handleFichaGuardada` re-fetchea el producto (`GET /productos/{id}` autoritativo) y reemplaza `recetaSeleccionada`; mapper de fila extraído a `mapProductoRow` (reusado por la grilla) + 4 tiempos estándar incluidos en `RecetaDisplay` (antes la barra de fases en lectura nunca podía mostrarse).
+- **Detalle:** se usó `productosApi.get` (el composable expone `get`, no `getProducto`; el build de vite no hace typecheck y no lo atajaba).
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual: editar precio en ficha → al guardar se ve el nuevo sin recargar.
+- **Archivos:** `src/views/ProductosView.vue`. Sin commit.
+
+### [2026-09-20] - Botón Imprimir de la ficha sí imprime
+
+- **Bug:** `Imprimir` llamaba a `window.print()` pelado, sin CSS: volcaba toda la app oscura (sidebar + fondos) en el papel. Inútil.
+- **Fix:** aislamiento de impresión como el de etiquetas (`#ficha-tecnica-print` visible, resto oculto, A4 claro, botones/ tabs con `no-print`) + título del documento con nombre del modelo para el nombre de archivo.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual: Imprimir → vista previa con solo la ficha en claro.
+- **Archivos:** `src/components/atelier/FichaTecnicaModal.vue`. Sin commit.
+
+### [2026-09-20] - Sin botón Imprimir + Tiempo único desde fases
+
+- **Imprimir:** eliminado a pedido (botón, función y CSS). Si se necesita, reimplementar con aislamiento desde cero.
+- **Tiempo (min):** era fuente duplicada (manual 60 vs suma de fases). Ahora en edición sale de Corte+Costura+Acabados+Calidad cuando hay tiempos (solo lectura con tooltip), manual solo sin tiempos; al guardar persiste la suma. Una sola fuente.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `src/components/atelier/FichaTecnicaModal.vue`. Sin commit.
+
+### [2026-09-20] - Selects editables por uso + margen en pesos
+
+- **Categoría/Línea:** los Dropdown dejan de ser lista cerrada: son editables y suman automáticamente los valores que la dueña ya usó en otros productos (maestro por uso, sin tabla nueva; las colecciones de Maestros son otra cosa). Escribís uno nuevo, se guarda con la ficha y aparece en la lista.
+- **Margen en pesos:** `Margen real: 60% ($X)` al lado del porcentaje (precio − costo, en vivo también editando).
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `src/components/atelier/FichaTecnicaModal.vue`. Sin commit.
+
+### [2026-09-20] - Cabecera BOM limpia (sin semáforo ni filas $0)
+
+- **Fuera:** badge semáforo (`Alto +191%` sin correlato abajo; el margen real ya está en la tarjeta) y texto estático "Ficha Técnica Oficial...". Cabecera: etiqueta de línea + `BOM: N renglones` (+ tabs y acciones).
+- **Filas $0:** Mano/CIF se ocultan en lectura cuando valen 0 (caso 0 min); en edición siguen (carga manual o auto).
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `src/components/atelier/FichaTecnicaModal.vue`. Sin commit.
+
+### [2026-09-20] - Perchero: detalle por talla + pedidos de ejemplo
+
+- **Datos reales cargados:** variante `38` en Corset Artemisia; 6 prendas disponibles (Blusa MC: 2×M, S, XS; Set Aelo: 2×S); 2 pedidos en Acabados (Tote ×2, Artemisa 38 ×1).
+- **UI nueva en Perchero & Stock:** sección Detalle por talla (agrupado producto×talla con D/R/V/D, alta por producto+talla+cantidad, quitar −1) usando la API `/prendas-confeccionadas` existente (sin uso hasta hoy). En producción ya estaba el kanban: los pedidos se ven ahí.
+- **Límites honestos:** prenda genérica sin talla no se atribuye a producto (queda en grupo Sin producto); el flujo batch (stock_actual) convive sin tocarse.
+- **Verificación:** `npm run build` PASS; filas verificadas en DB. Sin cambios backend. Pendiente prueba manual.
+- **Archivos:** `src/views/PrendasListasView.vue`, `src/services/api/productos.ts` (`listVariantes`). Sin commit.
+
+### [2026-09-20] - Tallas de matriz en carga de Perchero
+
+- **Causa:** el select mostraba solo variantes creadas del producto (Artemisia → solo 38), no la matriz oficial.
+- **Fix:** el select une variantes propias + matriz de Maestros (marca `(nueva)`); al guardar con una de matriz se crea la variante sola y después las prendas. Sin talla sigue genérico.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `src/views/PrendasListasView.vue`, `src/services/api/productos.ts` (`createVariante`). Sin commit.
+
+### [2026-09-20] - Tallas de matriz en pedidos + retroceso pendiente
+
+- **Fix:** el select Variante/Talla del pedido une variantes propias + matriz oficial (marca `(nueva)` y la crea sola). Igual que Perchero. Tote sigue Sin talla (genérico).
+- **Pendiente (pedido tuyo anterior):** devolución de fases en el tablero (calidad → costura): investigado (backend lo prohíbe 400, tiempos se editan por fila única), falta implementar.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `src/components/atelier/NuevoPedidoModal.vue`, `src/services/api/productos.ts`. Sin commit.
+
+### [2026-09-20] - Pedidos Para stock (cliente opcional)
+
+- **Cambio:** la producción es a stock (1–2 por talla, se repone al vender), no por clienta. El modal trae modo `Para stock` por defecto (cliente queda NULL); Existente/Nuevo siguen para encargos.
+- **Verificación:** `npm run build` PASS (backend ya aceptaba NULL). Pendiente prueba manual.
+- **Archivos:** `src/components/atelier/NuevoPedidoModal.vue`. Sin commit.
+
+### [2026-09-20] - Descuentos con código y motivo en ventas
+
+- **Nuevos campos:** `codigo_descuento` (texto libre: ANIV2026…) + `motivo_descuento` (bono/aniversario/lanzamiento/rotacion/otro, con CHECK) en Ventas (migración 0039, histórico en NULL). Creación y edición (PUT) los persisten.
+- **UI:** modal de venta con Código + Motivo; lista con badge (código · motivo) y columnas en el CSV.
+- **Verificación:** migración 0039 en dev; 3 tests nuevos + suites ventas/inventario/migrate (85+53); `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** migración 0039, `models/ventas.py`, `schemas/venta.py`, `services/inventory.py`, `ventas.ts`, `NuevaVentaModal.vue`, `VentasView.vue`, `tests/test_ventas_api.py`. Sin commit.
+
+### [2026-09-20] - KPIs de ventas en $0 + nombres de tarjetas
+
+- **Causa:** las métricas filtraban `COMPLETADA` pero el backend devuelve `confirmed` (draft/cancelled/reversed): cero coincidencias, todo $0. Mismo descalce en filtro y etiquetas.
+- **Fix:** `mapEstado` en el borde (confirmed→COMPLETADA, draft→PENDIENTE, resto→ANULADA). Tarjetas renombradas a `Ventas Totales` y `Utilidad Total`.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual (debería mostrar ~$1.63M y 21+ prendas).
+- **Archivos:** `src/views/VentasView.vue`. Sin commit.
+
+### [2026-09-20] - Variaciones por producto independiente (Negra/Rosado/Vino)
+
+- **Decisión:** telas y precios distintos → productos independientes (no variantes).
+- **Hecho:** `Set Ocipete` → `Set Ocipete Rosado` (misma receta: encaje negro 39m/$410.000 + satín rosa 10m/$80.000, calza con WAC); insumos `Tela noche de viena negra` (cm 1.00) y `Encaje vino` (cm 105.00 = 588.000/56); `Falda Emily Negra` (id 17, 4 líneas, materiales 25.755,43).
+- **Pendiente:** receta completa de Vino (una sola tela: ¿qué nociones y cantidades?) + precios de venta de Negra/Vino.
+- **Nota:** alias viejos del pipeline (`bustier`→Ocipete) quedan apuntando al nombre anterior (workbook en desuso).
+- **Verificación:** desglose chequeado; solo DB dev. Sin commit.
+
+### [2026-09-20] - Set Ocipete Vino (regla P/100/W)
+
+- **Regla descubierta:** tasa ficha = precio_factura_por_metro / 100 / ancho_cm (tul 10512/100/24=4.38, satín 8000/100/150=0.5333, vino 10500/100/30=3.50). El 105/cm inicial daba $289k absurdo; con ancho 30 cierra.
+- **Hecho:** `Encaje vino` 105→3.50; `Set Ocipete Vino` (id 19, 26 líneas con 6 swap a vino + 6 variantes); materiales 25.151,33 (tela 9.100 + nociones).
+- **Pendiente:** precio de venta de Negra y Vino.
+- **Verificación:** desglose chequeado; solo DB dev. Sin commit.
+
+### [2026-09-20] - Precios Negra 80.000 y Vino 95.000
+
+- Negra = precio Falda Cuadros ($80.000, ticket sin descuento). Vino = lista $95.000 (tickets Ocipete a $71.250 con 25% off).
+- Solo DB dev. Sin commit.
+
+### [2026-09-20] - Detalle por talla agrupado por producto
+
+- **Cambio:** la tabla repetía el producto por talla; ahora es Producto (total/disponibles) → tallas → unidades. Mismo en mobile.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `src/views/PrendasListasView.vue`. Sin commit.
+
+### [2026-09-20] - Exhibición + editar talla por prenda
+
+- **Estado nuevo:** `exhibicion` (migración 0038 + enum): cuenta en inventario pero NO en disponibles para venta. Tu ejemplo queda tal cual: 2 XS en inventario, 1 disponible.
+- **Editar talla:** cada grupo se expande (▼) a sus unidades: talla (select de variantes del producto), estado (5 valores) y ✕ por unidad. Así corregís la que metiste mal sin borrar y recargar.
+- **Verificación:** migración 0038 en dev; test nuevo (exhibición + cambio talla) 7/7 fase4; `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** migración 0038, `models/produccion.py`, `PrendasListasView.vue`. Sin commit.
+
+### [2026-09-20] - Auditoría full + 3 fixes (Perchero, Dashboard, Matriz)
+
+- **Perchero $0:** correcto por batch (todo stock_actual en 0), pero ignoraba las unitarias. KPIs suman ahora `+N uds por talla` y valorización unitaria.
+- **Dashboard:** badge de fase mapeaba `en_produccion→COSTURA` (ignora `fase` real). Ahora usa `fase` + terminales.
+- **Exportar Matriz:** era solo-toast. Ahora descarga CSV real del escandallo.
+- **Revisado sin cambios:** Finanzas (agregados backend), Cotizador (costo backend + inputs manuales), Inventario (live), Devoluciones (enums nuevos OK), Clientes, Omisiones, Auditoría, Ventas (tras fix estados), Optimizador, Maestros, Usuarios (changeRole solo en store, documentado).
+- **Notas (no se tocan):** FichaTallas usa tabla propia (no el master); Análisis solo batch por diseño; Ventas mobile sin badge descuento.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `PrendasListasView.vue`, `DashboardView.vue`, `FichaTecnicaModal.vue`. Sin commit.
+
+### [2026-09-20] - Devolución de fases por reproceso
+
+- **Cambio:** el tablero solo avanzaba (backend 400 ante retroceso). Ahora se puede devolver a cualquier fase anterior (calidad → costura); Listo congelado (lote ya acreditado). Tiempos de reproceso se editan sobre la fila existente (única por fase).
+- **UI:** selector `◀ Devolver a…` + botón en kanban, tabla y mobile.
+- **Verificación:** test nuevo (devolución + listo congelado) 14/14 lote+tiempos; `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `services/produccion.py`, `routes/produccion.py`, `tests/test_produccion_lote.py`, `ProduccionView.vue`. Sin commit.
+
+### [2026-09-20] - Estado en el form de carga de Perchero
+
+- **Fix:** el form crea con estado elegible (disponible por defecto, incluye exhibicion). Antes siempre disponible y había que corregirlo después.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `src/views/PrendasListasView.vue`. Sin commit.
+
+### [2026-09-20] - Fix: ▼ de detalle no abría
+
+- **Causa:** `onToggleGrupo` pasaba el objeto grupo donde se esperaba la clave (`g.key`); el `has()` nunca coincidía.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `src/views/PrendasListasView.vue`. Sin commit.
+
+### [2026-09-20] - Matriz de tallas simple (Talla/Pecho/Cintura)
+
+- **Simplificada:** la matriz pedía cadera, reducción corset, descripción y orden manual que no se usan en ningún lado (la ficha de tallas de clienta usa su propia tabla). Queda Talla + Pecho + Cintura (+ orden editable por si reordenás). Tus 32–42 vacías se llenan igual: ej `38 / 78 cm / 60 cm`.
+- **Backend intacto** (columnas siguen nulables por compatibilidad).
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** `src/views/MaestrosView.vue`. Sin commit.
+
+### [2026-09-20] - Colecciones en ficha + master Categorías/Líneas
+
+- **Colección:** la ficha muestra, elige (Dropdown desde Maestros) y guarda `coleccion` (cabecera + payload + refresco; backend ya lo aceptaba, la UI lo ignoraba).
+- **Master nuevo:** `maestros_categorias_producto` (migración 0037 + seed 8+5, CRUD `/maestros/categorias-producto`, tab `Categorías & Líneas` en Maestros con alta/baja/activar). Borrar no rompe historia (Productos guarda texto). La ficha consume el master (respaldo local si falla); el valor guardado siempre elegible.
+- **Verificación:** migración 0037 aplicada en dev (8+5 seed); 4 tests CRUD nuevos + suites (60/60 con costos y productos); `npm run build` PASS. Pendiente prueba manual.
+- **Archivos:** migración 0037, `models/schemas/services/routes maestros`, `tests/test_maestros_cat_producto.py`, `maestros.ts`, `useMaestros.ts`, `MaestrosView.vue`, `FichaTecnicaModal.vue`, `ProductosView.vue`. Sin commit.
+
 ### [2026-09-18] - Número de WhatsApp del taller corregido
 
 - **Fix:** fallback hardcodeado `573124567890` → `573217265049` (número real del taller) en `ProduccionView.vue`, `ClientesView.vue` y `FichaTallasClienteModal.vue`. Cero ocurrencias del viejo en `src/`.

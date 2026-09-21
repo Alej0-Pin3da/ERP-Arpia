@@ -24,6 +24,8 @@ export interface VentaCreatePayload {
   canal_venta: CanalVentaInput
   metodo_pago?: MetodoPagoInput | null
   descuento_porcentaje?: number | string
+  codigo_descuento?: string | null
+  motivo_descuento?: string | null
   es_regalo?: boolean
   detalles: DetalleVentaCreate[]
 }
@@ -52,6 +54,8 @@ export interface VentaRead {
   canal_venta: string
   metodo_pago: string | null
   descuento_porcentaje: string | number
+  codigo_descuento?: string | null
+  motivo_descuento?: string | null
   estado: string
   total_venta: string | number
   subtotal?: string | number | null

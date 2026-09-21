@@ -38,6 +38,8 @@ interface VentaDisplay {
   subtotal: number
   descuento_porcentaje: number
   descuento_valor: number
+  codigo_descuento?: string | null
+  motivo_descuento?: string | null
   total_venta: number
   costo_total: number
   ganancia_neta: number
@@ -52,6 +54,25 @@ interface VentaDisplay {
 const ventas = ref<VentaDisplay[]>([])
 const cargandoVentas = ref(false)
 
+// El backend habla draft/confirmed/cancelled/reversed y la vista
+// COMPLETADA/PENDIENTE/ANULADA: se mapea en el borde para que métricas,
+// filtros y etiquetas coincidan. Reversed cae en ANULADA (fuera de métricas).
+
+const MOTIVO_DESCUENTO_LABEL: Record<string, string> = {
+  bono: 'Bono',
+  aniversario: 'Aniversario',
+  lanzamiento: 'Lanzamiento',
+  rotacion: 'Rotación',
+  otro: 'Otro',
+}
+
+function mapEstado(raw: unknown): string {
+  const e = String(raw ?? '').toLowerCase()
+  if (e === 'confirmed' || e === 'completada' || e === 'completado') return 'COMPLETADA'
+  if (e === 'draft' || e === 'pendiente' || e === 'pending') return 'PENDIENTE'
+  return 'ANULADA'
+}
+
 function normalizeVenta(raw: Record<string, unknown>): VentaDisplay {
   return {
     id: raw.id as number,
@@ -61,7 +82,7 @@ function normalizeVenta(raw: Record<string, unknown>): VentaDisplay {
     fecha: (raw.fecha as string) ?? new Date().toISOString().split('T')[0],
     canal: (raw.canal_venta as string) ?? (raw.canal as string) ?? '—',
     metodo_pago: (raw.metodo_pago as string) ?? '—',
-    estado: (raw.estado as string) ?? 'COMPLETADA',
+    estado: mapEstado(raw.estado),
     items: (raw.detalles as unknown[] ?? raw.items as unknown[] ?? []).map((it: unknown) => {
       const d = it as Record<string, unknown>
       return {
@@ -80,6 +101,8 @@ function normalizeVenta(raw: Record<string, unknown>): VentaDisplay {
     subtotal: Number(raw.subtotal ?? (Number(raw.total_venta ?? 0) + Number(raw.descuento_valor ?? 0)) ?? 0),
     descuento_porcentaje: Number(raw.descuento_porcentaje ?? 0),
     descuento_valor: Number(raw.descuento_valor ?? 0),
+    codigo_descuento: (raw.codigo_descuento as string) ?? null,
+    motivo_descuento: (raw.motivo_descuento as string) ?? null,
     total_venta: Number(raw.total_venta ?? 0),
     costo_total: Number(raw.costo_total ?? 0),
     ganancia_neta: Number(raw.ganancia_neta ?? (Number(raw.total_venta ?? 0) - Number(raw.costo_total ?? 0))),
@@ -276,6 +299,8 @@ function exportarCSV() {
     'Subtotal',
     'Descuento_Pct',
     'Descuento_Valor',
+    'Codigo_Descuento',
+    'Motivo_Descuento',
     'Total_Facturado',
     'Costo_Produccion',
     'Ganancia_Neta',
@@ -297,6 +322,8 @@ function exportarCSV() {
     v.subtotal,
     v.descuento_porcentaje,
     v.descuento_valor,
+    `"${v.codigo_descuento ?? ''}"`,
+    `"${v.motivo_descuento ?? ''}"`,
     v.total_venta,
     v.costo_total,
     v.ganancia_neta,
@@ -360,9 +387,9 @@ function exportarCSV() {
 
     <!-- 5 KPI Summary Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-      <!-- Total Facturado -->
+      <!-- Ventas Totales -->
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md flex flex-col justify-between">
-        <div class="text-[11px] text-stone-400 font-bold uppercase tracking-wider font-mono">Total Facturado</div>
+        <div class="text-[11px] text-stone-400 font-bold uppercase tracking-wider font-mono">Ventas Totales</div>
         <div class="text-2xl font-extrabold text-amber-300 mt-2 font-mono">
           {{ formatCOP(metricasFiltradas.totalFacturado) }}
         </div>
@@ -371,9 +398,9 @@ function exportarCSV() {
         </div>
       </div>
 
-      <!-- Ganancia Neta -->
+      <!-- Utilidad Total -->
       <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-4 shadow-md flex flex-col justify-between">
-        <div class="text-[11px] text-stone-400 font-bold uppercase tracking-wider font-mono">Ganancia Neta</div>
+        <div class="text-[11px] text-stone-400 font-bold uppercase tracking-wider font-mono">Utilidad Total</div>
         <div class="text-2xl font-extrabold text-emerald-400 mt-2 font-mono">
           {{ formatCOP(metricasFiltradas.totalGanancia) }}
         </div>
@@ -558,7 +585,15 @@ function exportarCSV() {
                   -{{ formatCOP(v.descuento_valor) }}
                   <div class="text-[10px] text-rose-500">({{ v.descuento_porcentaje }}%)</div>
                 </div>
+                <div v-else-if="v.descuento_porcentaje > 0" class="text-rose-400 font-bold">
+                  {{ v.descuento_porcentaje }}%
+                </div>
                 <div v-else class="text-stone-600">—</div>
+                <div v-if="v.codigo_descuento || v.motivo_descuento" class="mt-1">
+                  <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono bg-indigo-950 text-indigo-300 border border-indigo-600/30">
+                    {{ v.codigo_descuento ?? '' }}{{ v.codigo_descuento && v.motivo_descuento ? ' · ' : '' }}{{ MOTIVO_DESCUENTO_LABEL[v.motivo_descuento ?? ''] ?? v.motivo_descuento ?? '' }}
+                  </span>
+                </div>
               </td>
 
               <!-- Total Venta -->

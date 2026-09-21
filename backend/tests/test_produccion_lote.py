@@ -206,14 +206,44 @@ def test_avance_secuencial_y_rechazos(client, admin_token):
         # Skipping acabados straight to calidad is rejected.
         resp = _avanzar(client, headers, pedido_id, "calidad")
         assert resp.status_code == 400, resp.text
-        # Backwards is rejected.
+        # Backwards (devolución) is allowed to any earlier phase.
         resp = _avanzar(client, headers, pedido_id, "corte")
-        assert resp.status_code == 400, resp.text
+        assert resp.status_code == 200, resp.text
         # Unknown fase is rejected.
         resp = _avanzar(client, headers, pedido_id, "planchado")
         assert resp.status_code == 422, resp.text
-        # Still on costura, nothing consumed.
+        # Back on corte, nothing consumed.
         assert _read_insumo_stock(insumo_id) == Decimal("100")
+    finally:
+        _cleanup(producto_id, insumo_id, tipo_id, cat_id)
+
+
+def test_devolucion_calidad_a_costura_y_listo_congelado(client, admin_token):
+    """calidad -> costura (reproceso) OK; desde listo no hay movimientos."""
+    cat_id, insumo_id, tipo_id, producto_id = _setup_lote()
+    try:
+        headers = _auth(admin_token)
+        pedido_id = client.post(
+            "/api/v1/pedidos-produccion",
+            json={"producto_id": producto_id, "cantidad": 2},
+            headers=headers,
+        ).json()["id"]
+        for fase in ("costura", "acabados", "calidad"):
+            assert _avanzar(client, headers, pedido_id, fase).status_code == 200
+        # Devolución dos pasos atrás: calidad -> costura.
+        resp = _avanzar(client, headers, pedido_id, "costura")
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["fase"] == "costura"
+        assert _read_insumo_stock(insumo_id) == Decimal("100")
+        # Re-avance normal hasta listo: acredita una sola vez.
+        for fase in ("acabados", "calidad", "listo"):
+            assert _avanzar(client, headers, pedido_id, fase).status_code == 200
+        assert _read_producto_stock(producto_id) == Decimal("2")
+        # Listo congelado: ni atrás ni a otra fase.
+        resp = _avanzar(client, headers, pedido_id, "costura")
+        assert resp.status_code == 400, resp.text
+        assert _read_producto_stock(producto_id) == Decimal("2")
+        assert _read_insumo_stock(insumo_id) == Decimal("96")
     finally:
         _cleanup(producto_id, insumo_id, tipo_id, cat_id)
 

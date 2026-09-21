@@ -60,12 +60,14 @@ const insumosCriticos = computed(() => (insumos.value as any[]).filter((i: any) 
 const pedidosTabla = computed(() => {
   return (pedidos.value as any[]).map((p: any) => {
     const rawEstado = String(p.estado ?? '')
+    const fase = String(p.fase || 'corte')
     return {
       ...p,
       codigo: `ORD-${p.id}`,
       cliente_nombre: p.cliente_nombre || p.nombre_variante || p.nombre_producto || '—',
       prenda_nombre: p.nombre_producto || (p.producto_id ? `Producto #${p.producto_id}` : '—'),
-      estado: rawEstado === 'pendiente' ? 'CORTE' : rawEstado === 'en_produccion' ? 'COSTURA' : rawEstado === 'completado' ? 'LISTO' : (rawEstado.toUpperCase() || 'COTIZADO'),
+      // La fase real viene del campo fase; el estado solo distingue terminales.
+      estado: rawEstado === 'cancelado' ? 'CANCELADO' : rawEstado === 'completado' ? 'LISTO' : fase.toUpperCase(),
       precio_venta: Number(p.precio_venta ?? 0),
       utilidad_neta: Number(p.utilidad_neta ?? 0),
       margen_pct: Number(p.margen_pct ?? 0),

@@ -45,6 +45,13 @@ interface RecetaDisplay {
   fases: unknown[]
   // Quantity stock (backend migración 0030, lote slice); null when absent.
   stock_actual?: number | string | null
+  // Colección de Maestros (Familias & Categorías de Colección).
+  coleccion?: string | null
+  // Per-phase STANDARD estimates (0036); null when unset.
+  tiempo_corte_min?: number | null
+  tiempo_costura_min?: number | null
+  tiempo_acabados_min?: number | null
+  tiempo_calidad_min?: number | null
 }
 
 const showFichaModal = ref(false)
@@ -96,7 +103,8 @@ async function cargarProductos() {
   } catch { productos.value = [] }
 }
 onMounted(() => { void cargarProductos(); void cargarMargenMeta() })
-const recetasDisplay = computed(() => productos.value.map((p: any) => ({
+function mapProductoRow(p: any): RecetaDisplay {
+  return {
   id: p.id,
   codigo: p.codigo ?? `PRD-${p.id}`,
   nombre: p.nombre,
@@ -106,6 +114,10 @@ const recetasDisplay = computed(() => productos.value.map((p: any) => ({
   categoria: p.categoria ?? 'General',
   items: [],
   tiempo_confeccion_min: p.tiempo_confeccion_min ?? 60,
+  tiempo_corte_min: p.tiempo_corte_min ?? null,
+  tiempo_costura_min: p.tiempo_costura_min ?? null,
+  tiempo_acabados_min: p.tiempo_acabados_min ?? null,
+  tiempo_calidad_min: p.tiempo_calidad_min ?? null,
   costo_insumos: (() => {
     if (p.costo_insumos != null) return Number(p.costo_insumos)
     const total = Number(p.costos_operativos_fijos ?? 0)
@@ -132,7 +144,10 @@ const recetasDisplay = computed(() => productos.value.map((p: any) => ({
   recomendaciones_taller: p.recomendaciones_taller ?? '',
   fases: p.fases ?? [],
   stock_actual: p.stock_actual ?? null,
-})))
+  coleccion: p.coleccion ?? null,
+  }
+}
+const recetasDisplay = computed(() => productos.value.map((p: any) => mapProductoRow(p)))
 const recetasFiltradas = computed(() => {
   let list = recetasDisplay.value.filter((r) => {
     const q = search.value.trim().toLowerCase()
@@ -210,6 +225,15 @@ async function handleRecetaGuardada() {
 async function handleFichaGuardada() {
   await cargarProductos()
   fichaStartEditing.value = false
+  // La ficha queda abierta con props.receta: refrescarla desde el servidor
+  // para no mostrar valores viejos (precio, tiempos, mano/cif) hasta el F5.
+  try {
+    const id = recetaSeleccionada.value?.id
+    if (id != null) {
+      const fresh = await productosApi.get(id)
+      if (fresh) recetaSeleccionada.value = mapProductoRow(fresh)
+    }
+  } catch { /* la tabla ya quedó recargada */ }
 }
 
 async function eliminarReceta(r: RecetaDisplay) {

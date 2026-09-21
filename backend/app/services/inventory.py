@@ -241,7 +241,8 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
 
     Payload is a plain dict mirroring the future VentaCreate schema field names
     (so a pydantic schema can be passed via ``.model_dump()`` by the routes):
-    ``cliente_id``, ``canal_venta``, ``descuento_porcentaje`` and ``detalles``
+    ``cliente_id``, ``canal_venta``, ``descuento_porcentaje``,
+    ``codigo_descuento``, ``motivo_descuento`` and ``detalles``
     (a list of ``{producto_id, variante_id, cantidad, precio_unitario}``).
 
     Per line it snapshots ``costo_unitario_aplicado`` = the product's current
@@ -313,6 +314,10 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
         canal_venta=canal_venta,
         metodo_pago=metodo_pago,
         descuento_porcentaje=descuento,
+        codigo_descuento=(str(payload.get("codigo_descuento")).strip() or None)
+        if payload.get("codigo_descuento") is not None
+        else None,
+        motivo_descuento=payload.get("motivo_descuento"),
         total_venta=total_venta,
         es_regalo=es_regalo,
         # Document-state domain (ck_ventas_estado): a new sale is confirmed.
@@ -462,6 +467,12 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
     venta.canal_venta = canal_venta
     venta.metodo_pago = metodo_pago
     venta.descuento_porcentaje = descuento
+    venta.codigo_descuento = (
+        (str(payload.get("codigo_descuento")).strip() or None)
+        if payload.get("codigo_descuento") is not None
+        else None
+    )
+    venta.motivo_descuento = payload.get("motivo_descuento")
     venta.es_regalo = es_regalo
     venta.total_venta = total_venta
     # fecha is deliberately NOT touched.

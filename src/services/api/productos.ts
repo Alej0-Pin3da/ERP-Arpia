@@ -129,3 +129,20 @@ export async function listTiposProducto(params?: { q?: string; limit?: number; o
   const { data } = await client.get<Paginated<TipoProductoRead>>('/tipos-producto', { params })
   return data
 }
+
+export interface VarianteRead {
+  id: number
+  producto_id: number
+  nombre_variante: string
+  precio_venta?: number | string | null
+}
+
+export async function listVariantes(productoId: number): Promise<VarianteRead[]> {
+  const { data } = await client.get<VarianteRead[]>(`/productos/${productoId}/variantes`)
+  return data
+}
+
+export async function createVariante(productoId: number, nombre: string): Promise<VarianteRead> {
+  const { data } = await client.post<VarianteRead>(`/productos/${productoId}/variantes`, { nombre_variante: nombre })
+  return data
+}

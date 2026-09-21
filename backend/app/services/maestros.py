@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.models.maestros import (
     CanalVentaMaestro,
     CategoriaColeccion,
+    CategoriaProducto,
     MetodoPagoMaestro,
     ParametrosCosteo,
     ProductoSinTalla,
@@ -93,6 +94,26 @@ def eliminar_categoria(db: Session, cid: int) -> None:
     obj = db.get(CategoriaColeccion, cid)
     if not obj:
         raise HTTPException(status_code=404, detail="Categoria no encontrada")
+    db.delete(obj)
+    db.commit()
+
+
+# CategoriaProducto (master de categorías + líneas, 0037)
+def crear_categoria_producto(db: Session, payload: dict) -> CategoriaProducto:
+    return _create(db, CategoriaProducto(**payload))
+
+
+def actualizar_categoria_producto(db: Session, cid: int, data: dict) -> CategoriaProducto:
+    obj = db.get(CategoriaProducto, cid)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Categoria de producto no encontrada")
+    return _update(db, obj, data)
+
+
+def eliminar_categoria_producto(db: Session, cid: int) -> None:
+    obj = db.get(CategoriaProducto, cid)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Categoria de producto no encontrada")
     db.delete(obj)
     db.commit()
 

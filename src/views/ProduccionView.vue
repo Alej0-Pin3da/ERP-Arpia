@@ -155,9 +155,9 @@ function getPedidosPorEstado(est: string) {
 
 // Avance secuencial de fase (PATCH /pedidos-produccion/{id} {fase}):
 // corte → costura → acabados → calidad → listo. El backend valida el paso
-// (422 fase inválida, 400 salto/retroceso) y al entrar a 'listo' corre el
-// lote UNA vez (409 atómico con detalle por-insumo). Los mensajes del
-// backend se muestran tal cual, sin reescritura.
+// (422 fase inválida, 400 salto adelante o salida de listo). Devolución por
+// reproceso a cualquier fase anterior permitida (tiempos se editan por fila).
+// Los mensajes del backend se muestran tal cual, sin reescritura.
 const FASE_DISPLAY: Record<string, string> = {
   corte: 'CORTE',
   costura: 'COSTURA',
@@ -186,6 +186,36 @@ async function avanzarEstado(pedido: PedidoDisplay) {
   }
 }
 
+// Devolución por reproceso (ej: calidad → costura): cualquier fase anterior,
+// nunca desde 'listo' (lote ya acreditado) ni en la primera fase.
+function fasesAnteriores(fase: string | null | undefined): string[] {
+  const idx = FASES_PRODUCCION.indexOf(fase ?? '')
+  if (idx <= 0) return []
+  return FASES_PRODUCCION.slice(0, idx)
+}
+function puedeDevolver(p: PedidoDisplay): boolean {
+  if (esTerminal(p)) return false
+  const f = (p.fase || 'corte').toLowerCase()
+  return f !== 'corte' && f !== 'listo'
+}
+const devolverSel = ref<Record<number, string>>({})
+async function devolverEstado(pedido: PedidoDisplay) {
+  if (transicionandoId.value === pedido.id) return
+  const previas = fasesAnteriores((pedido.fase || 'corte').toLowerCase())
+  const destino = devolverSel.value[pedido.id] || previas[previas.length - 1]
+  if (!destino) return
+  transicionandoId.value = pedido.id
+  try {
+    await produccionService.update(pedido.id, { fase: destino })
+    await cargarPedidos()
+    showToast('success', 'Fase devuelta', `Orden ${pedido.codigo} devuelta a ${FASE_DISPLAY[destino] ?? destino} para reproceso.`)
+  } catch (e: unknown) {
+    showToast('error', 'No se pudo devolver', extractApiDetail(e))
+  } finally {
+    transicionandoId.value = null
+  }
+}
+
 function abrirWhatsApp(p: PedidoDisplay) {
   const msg = encodeURIComponent(`¡Hola ${p.cliente_nombre}! Te escribimos de Atelier Arpía sobre tu pedido *${p.codigo}* (${p.prenda_nombre}). Estado actual: *${p.estado}*. ✨`)
   window.open(`https://wa.me/573217265049?text=${msg}`, '_blank')
@@ -206,7 +236,7 @@ function abrirWhatsApp(p: PedidoDisplay) {
           </span>
         </div>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-2xl">
-          Tablero por fases de confección: Corte, Costura, Acabados, Calidad y Listo. El avance es secuencial, una fase por vez.
+          Tablero por fases de confección: Corte, Costura, Acabados, Calidad y Listo. Avance de a una fase; devolución a cualquier fase anterior por reproceso (Listo no se mueve).
         </p>
       </div>
 
@@ -368,8 +398,26 @@ function abrirWhatsApp(p: PedidoDisplay) {
 
                 <!-- Price & Profit: la API no trae montos de venta, no se muestran -->
 
-                <!-- Stage Movement: solo avance secuencial (el backend 400 ante retrocesos) -->
-                <div class="flex justify-end items-center pt-2 border-t border-stone-800/60">
+                <!-- Stage Movement: avance + devolución por reproceso -->
+                <div class="flex justify-end items-center gap-2 pt-2 border-t border-stone-800/60">
+                  <select
+                    v-if="puedeDevolver(p)"
+                    v-model="devolverSel[p.id]"
+                    class="bg-stone-950 border border-stone-700 text-stone-300 text-[11px] rounded-lg px-2 py-1 font-mono focus:border-amber-400 focus:outline-none"
+                    :title="`Devolver ${p.codigo} a una fase anterior`"
+                  >
+                    <option :value="undefined" disabled selected>◀ Devolver a…</option>
+                    <option v-for="f in fasesAnteriores((p.fase || 'corte').toLowerCase())" :key="f" :value="f">{{ FASE_DISPLAY[f] ?? f }}</option>
+                  </select>
+                  <button
+                    v-if="puedeDevolver(p)"
+                    type="button"
+                    class="text-[11px] text-sky-400 hover:text-sky-300 font-bold transition disabled:opacity-30 disabled:cursor-not-allowed"
+                    :disabled="!devolverSel[p.id] || transicionandoId === p.id"
+                    @click="devolverEstado(p)"
+                  >
+                    Devolver
+                  </button>
                   <button
                     type="button"
                     class="text-[11px] text-amber-400 hover:text-amber-300 font-bold transition disabled:opacity-30 disabled:cursor-not-allowed"
@@ -424,6 +472,24 @@ function abrirWhatsApp(p: PedidoDisplay) {
               </td>
               <td class="py-3 px-4 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-2">
+                  <select
+                    v-if="puedeDevolver(p)"
+                    v-model="devolverSel[p.id]"
+                    class="bg-stone-950 border border-stone-700 text-stone-300 text-[11px] rounded-lg px-2 py-1 font-mono focus:border-amber-400 focus:outline-none"
+                    :title="`Devolver ${p.codigo} a una fase anterior`"
+                  >
+                    <option :value="undefined" disabled selected>◀ Devolver a…</option>
+                    <option v-for="f in fasesAnteriores((p.fase || 'corte').toLowerCase())" :key="f" :value="f">{{ FASE_DISPLAY[f] ?? f }}</option>
+                  </select>
+                  <button
+                    v-if="puedeDevolver(p)"
+                    type="button"
+                    class="text-sky-400 hover:underline font-bold text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+                    :disabled="!devolverSel[p.id] || transicionandoId === p.id"
+                    @click="devolverEstado(p)"
+                  >
+                    Devolver
+                  </button>
                   <button
                     type="button"
                     class="text-amber-400 hover:underline font-bold text-xs disabled:opacity-30 disabled:cursor-not-allowed"
@@ -460,6 +526,16 @@ function abrirWhatsApp(p: PedidoDisplay) {
           <div class="font-bold text-sm text-stone-100">{{ p.prenda_nombre }}</div>
           <div class="text-sm text-stone-300">{{ p.cliente_nombre }}</div>
           <div class="text-xs text-stone-500 font-mono">{{ p.cantidad_producida }}/{{ p.cantidad }} uds<span v-if="tieneCostoSnapshot(p)" class="text-emerald-400"> · {{ formatCOP(Number(p.costo_unitario_snapshot)) }}/ud</span><span v-if="tieneCostosReales(p)" class="text-sky-300"> · MO {{ p.mano_obra_real !== null && p.mano_obra_real !== undefined ? formatCOP(Number(p.mano_obra_real)) : '—' }}</span></div>
+          <div v-if="puedeDevolver(p)" class="flex gap-2 pt-1">
+            <select
+              v-model="devolverSel[p.id]"
+              class="flex-1 min-h-[40px] bg-stone-950 border border-stone-700 text-stone-300 text-sm rounded-lg px-2 font-mono focus:border-amber-400 focus:outline-none"
+            >
+              <option :value="undefined" disabled selected>◀ Devolver a…</option>
+              <option v-for="f in fasesAnteriores((p.fase || 'corte').toLowerCase())" :key="f" :value="f">{{ FASE_DISPLAY[f] ?? f }}</option>
+            </select>
+            <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-sky-400 text-sm font-bold disabled:opacity-30" :disabled="!devolverSel[p.id] || transicionandoId === p.id" @click="devolverEstado(p)">OK</button>
+          </div>
           <div class="flex gap-2 pt-1">
             <button type="button" class="flex-1 min-h-[40px] rounded-lg bg-amber-500 text-stone-950 text-sm font-bold disabled:opacity-30" :disabled="transicionandoId === p.id || esTerminal(p)" @click="avanzarEstado(p)">Avanzar Fase</button>
             <button type="button" class="min-w-[44px] min-h-[40px] px-3 rounded-lg bg-stone-800 text-emerald-400" title="WhatsApp" @click="abrirWhatsApp(p)"><i class="pi pi-whatsapp text-xs" /></button>

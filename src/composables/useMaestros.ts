@@ -108,6 +108,20 @@ export function useMaestros() {
     return api.deleteProductoSinTalla(id)
   }
 
+  // Categorias de producto (master Categoría/Línea de la Ficha, 0037)
+  async function listCategoriasProducto(params: api.ListParams = {}) {
+    return api.listCategoriasProducto(params)
+  }
+  async function createCategoriaProducto(payload: Record<string, unknown>) {
+    return api.createCategoriaProducto(payload)
+  }
+  async function updateCategoriaProducto(id: number, payload: Record<string, unknown>) {
+    return api.updateCategoriaProducto(id, payload)
+  }
+  async function removeCategoriaProducto(id: number) {
+    return api.deleteCategoriaProducto(id)
+  }
+
   // Parametros singleton
   async function getParametros() {
     return api.getParametros()
@@ -129,6 +143,11 @@ export function useMaestros() {
     createCategoria,
     updateCategoria,
     removeCategoria,
+    // categorias de producto
+    listCategoriasProducto,
+    createCategoriaProducto,
+    updateCategoriaProducto,
+    removeCategoriaProducto,
     // ubicaciones
     listUbicaciones,
     createUbicacion,

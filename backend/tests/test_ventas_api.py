@@ -1307,3 +1307,103 @@ def test_post_venta_sigue_funcionando_despues_de_editar_y_anular(client, operado
         _cleanup_insumo(ins_id)
         _cleanup_categoria(cat_id)
         _cleanup_tipo(tipo_id)
+
+
+# ---------------------------------------------------------------------------
+# Discount code + reason (0039)
+# ---------------------------------------------------------------------------
+
+
+def test_create_venta_con_codigo_y_motivo(client, admin_token):
+    """201 con codigo_descuento + motivo_descuento persistidos y visibles."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        payload = _venta_payload(prod_id)
+        payload["codigo_descuento"] = "ANIV2026"
+        payload["motivo_descuento"] = "aniversario"
+        resp = client.post(
+            "/api/v1/ventas",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["codigo_descuento"] == "ANIV2026"
+        assert body["motivo_descuento"] == "aniversario"
+        vid = body["id"]
+        rget = client.get(f"/api/v1/ventas?producto_id={prod_id}", headers={"Authorization": f"Bearer {admin_token}"})
+        assert rget.status_code == 200
+        vista = next(it for it in rget.json()["items"] if it["id"] == vid)
+        assert vista["codigo_descuento"] == "ANIV2026"
+        assert vista["motivo_descuento"] == "aniversario"
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_create_venta_motivo_invalido_422(client, admin_token):
+    """motivo fuera del dominio -> 422 (nada escrito)."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="10")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="1")
+    try:
+        payload = _venta_payload(prod_id)
+        payload["motivo_descuento"] = "cumpleanos"
+        resp = client.post(
+            "/api/v1/ventas",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 422, resp.text
+        assert _read_stock(ins_id) == Decimal("10")
+    finally:
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)
+
+
+def test_put_venta_actualiza_codigo_y_motivo(client, operador_token):
+    """PUT reescribe codigo/motivo junto al resto (rebalance íntegro)."""
+    cat_id = _make_categoria()
+    ins_id = _make_insumo(cat_id, stock="100")
+    tipo_id = _make_tipo()
+    prod_id = _make_producto(tipo_id)
+    _make_linea_insumo(prod_id, ins_id, cantidad="10")
+    try:
+        resp = client.post(
+            "/api/v1/ventas",
+            json=_venta_payload(prod_id, cantidad="2", precio="10"),
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 201
+        venta_id = resp.json()["id"]
+        assert resp.json()["codigo_descuento"] is None
+
+        payload = _venta_payload(prod_id, cantidad="2", precio="10")
+        payload["codigo_descuento"] = "ROTA-JUL"
+        payload["motivo_descuento"] = "rotacion"
+        resp = client.put(
+            f"/api/v1/ventas/{venta_id}",
+            json=payload,
+            headers={"Authorization": f"Bearer {operador_token}"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["codigo_descuento"] == "ROTA-JUL"
+        assert resp.json()["motivo_descuento"] == "rotacion"
+        assert _read_stock(ins_id) == Decimal("80")
+    finally:
+        _cleanup_ventas_for_producto(prod_id)
+        _cleanup_producto(prod_id)
+        _cleanup_insumo(ins_id)
+        _cleanup_categoria(cat_id)
+        _cleanup_tipo(tipo_id)

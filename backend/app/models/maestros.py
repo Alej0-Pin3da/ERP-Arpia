@@ -71,6 +71,33 @@ class CategoriaColeccion(Base):
         return f"<CategoriaColeccion id={self.id} nombre={self.nombre!r} tipo={self.tipo_talla!r}>"
 
 
+class CategoriaProducto(Base):
+    """Owner-managed product categories + lines (Ficha dropdowns, 0037).
+
+    Single master with tipo discriminator (CATEGORIA|LINEA). Productos keep
+    free-text snapshots (categoria/linea), so deactivating/deleting a master
+    row never breaks history.
+    """
+
+    __tablename__ = "maestros_categorias_producto"
+    __table_args__ = (
+        CheckConstraint("tipo IN ('CATEGORIA','LINEA')", name="ck_catprod_tipo"),
+        UniqueConstraint("nombre", "tipo", name="uq_catprod_nombre_tipo"),
+        Index("ix_catprod_tipo", "tipo"),
+        Index("ix_catprod_activo", "activo"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(100), nullable=False)
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False)
+    activo: Mapped[bool] = mapped_column(nullable=False, server_default=text("true"), default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<CategoriaProducto id={self.id} nombre={self.nombre!r} tipo={self.tipo!r}>"
+
+
 class UbicacionTaller(Base):
     __tablename__ = "maestros_ubicaciones_taller"
     __table_args__ = (

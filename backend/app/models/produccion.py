@@ -28,6 +28,7 @@ class PrendaEstado(StrEnum):
     RESERVADA = "reservada"
     VENDIDA = "vendida"
     DEFECTUOSA = "defectuosa"
+    EXHIBICION = "exhibicion"
 
 
 class PedidoProduccionEstado(StrEnum):
@@ -186,7 +187,7 @@ class PrendaConfeccionada(Base):
     __tablename__ = "prendas_confeccionadas"
     __table_args__ = (
         CheckConstraint(
-            "estado IN ('disponible', 'reservada', 'vendida', 'defectuosa')",
+            "estado IN ('disponible', 'reservada', 'vendida', 'defectuosa', 'exhibicion')",
             name="ck_prendas_confeccionadas_estado",
         ),
     )

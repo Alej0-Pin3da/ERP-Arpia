@@ -360,8 +360,9 @@ def update_pedido(
         raise HTTPException(status_code=400, detail="Cliente no existe")
 
     data = payload.model_dump(exclude_unset=True)
-    # Sequential phase advance is validated BEFORE mutating (422 unknown fase,
-    # 400 skip/back), so a rejected PATCH leaves the session untouched.
+    # Phase moves validated BEFORE mutating (422 unknown fase, 400 skip
+    # forward / out of listo; backward to any earlier phase is devolución),
+    # so a rejected PATCH leaves the session untouched.
     if "fase" in data and data["fase"] is not None and data["fase"] != pedido.fase:
         validar_avance_fase(pedido.fase, data["fase"])
 

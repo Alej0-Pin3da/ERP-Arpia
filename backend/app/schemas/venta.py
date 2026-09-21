@@ -34,6 +34,8 @@ class VentaCreate(BaseModel):
     canal_venta: str = Field(min_length=1, max_length=50)
     metodo_pago: str | None = Field(default=None, max_length=50)
     descuento_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
+    codigo_descuento: str | None = Field(default=None, max_length=50)
+    motivo_descuento: Literal["bono", "aniversario", "lanzamiento", "rotacion", "otro"] | None = None
     es_regalo: bool = False
     detalles: list[DetalleVentaCreate] = Field(min_length=1)
 
@@ -81,6 +83,8 @@ class VentaRead(BaseModel):
     canal_venta: str
     metodo_pago: str | None = None
     descuento_porcentaje: Decimal
+    codigo_descuento: str | None = None
+    motivo_descuento: str | None = None
     estado: str
     total_venta: Decimal
     es_regalo: bool

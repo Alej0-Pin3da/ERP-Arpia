@@ -275,3 +275,57 @@ def test_prendas_y_pedidos_not_found_404(client: TestClient, admin_token):
     assert client.get("/api/v1/pedidos-produccion/999999", headers=headers).status_code == 404
     assert client.patch("/api/v1/pedidos-produccion/999999", json={"cantidad": 10}, headers=headers).status_code == 404
     assert client.delete("/api/v1/pedidos-produccion/999999", headers=headers).status_code == 404
+
+
+def test_prenda_exhibicion_y_cambio_talla(client: TestClient, db_session, admin_token):
+    """Exhibición (0038) + corrección de talla por unidad."""
+    import uuid
+
+    from app.models.productos import TipoProducto
+
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    uniq = uuid.uuid4().hex[:6]
+    tipo_p = TipoProducto(nombre=f"Tipo Exhib {uniq}")
+    db_session.add(tipo_p)
+    db_session.commit()
+    prod = Producto(
+        tipo_producto_id=tipo_p.id,
+        nombre=f"Corset Exhib {uniq}",
+        costos_operativos_fijos=Decimal("0"),
+    )
+    db_session.add(prod)
+    db_session.commit()
+    var_s = VarianteProducto(producto_id=prod.id, nombre_variante="S")
+    var_xs = VarianteProducto(producto_id=prod.id, nombre_variante="XS")
+    db_session.add_all([var_s, var_xs])
+    db_session.commit()
+    try:
+        r = client.post(
+            "/api/v1/prendas-confeccionadas",
+            json={"variante_id": var_s.id, "talla": "S", "estado": "exhibicion"},
+            headers=headers,
+        )
+        assert r.status_code == 201, r.text
+        pid = r.json()["id"]
+        assert r.json()["estado"] == "exhibicion"
+        # filtro por estado la encuentra
+        rl = client.get("/api/v1/prendas-confeccionadas?estado=exhibicion", headers=headers)
+        assert any(p["id"] == pid for p in rl.json()["items"])
+        # corrección de talla: XS (mueve variante + texto)
+        ru = client.patch(
+            f"/api/v1/prendas-confeccionadas/{pid}",
+            json={"variante_id": var_xs.id, "talla": "XS", "estado": "disponible"},
+            headers=headers,
+        )
+        assert ru.status_code == 200, ru.text
+        assert ru.json()["talla"] == "XS"
+        assert ru.json()["estado"] == "disponible"
+        client.delete(f"/api/v1/prendas-confeccionadas/{pid}", headers=headers)
+    finally:
+        db_session.query(PrendaConfeccionada).filter(
+            PrendaConfeccionada.variante_id.in_([var_s.id, var_xs.id])
+        ).delete(synchronize_session=False)
+        db_session.query(VarianteProducto).filter(VarianteProducto.producto_id == prod.id).delete()
+        db_session.query(Producto).filter(Producto.id == prod.id).delete()
+        db_session.query(TipoProducto).filter(TipoProducto.id == tipo_p.id).delete()
+        db_session.commit()

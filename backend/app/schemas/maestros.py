@@ -81,6 +81,32 @@ class CategoriaRead(BaseModel):
     updated_at: datetime
 
 
+# CategoriaProducto (master de categorías + líneas de producto, 0037)
+TipoCategoriaProducto = Literal["CATEGORIA", "LINEA"]
+
+
+class CategoriaProductoCreate(BaseModel):
+    nombre: str = Field(max_length=100)
+    tipo: TipoCategoriaProducto
+    activo: bool | None = True
+
+
+class CategoriaProductoUpdate(BaseModel):
+    nombre: str | None = Field(default=None, max_length=100)
+    tipo: TipoCategoriaProducto | None = None
+    activo: bool | None = None
+
+
+class CategoriaProductoRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    nombre: str
+    tipo: str
+    activo: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 # Ubicacion
 TipoUbicacion = Literal["ROLLOS_TELAS", "GAVETAS_HERRAJES", "PERCHERO_SHOWROOM", "ACCESORIOS_BODEGA"]
 

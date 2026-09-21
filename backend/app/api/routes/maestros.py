@@ -12,6 +12,7 @@ from app.core.limiter import user_limiter
 from app.models.maestros import (
     CanalVentaMaestro,
     CategoriaColeccion,
+    CategoriaProducto,
     MetodoPagoMaestro,
     ParametrosCosteo,
     ProductoSinTalla,
@@ -25,6 +26,9 @@ from app.schemas.maestros import (
     CanalRead,
     CanalUpdate,
     CategoriaCreate,
+    CategoriaProductoCreate,
+    CategoriaProductoRead,
+    CategoriaProductoUpdate,
     CategoriaRead,
     CategoriaUpdate,
     MetodoCreate,
@@ -48,6 +52,7 @@ from app.schemas.maestros import (
 from app.services.maestros import (
     actualizar_canal,
     actualizar_categoria,
+    actualizar_categoria_producto,
     actualizar_metodo,
     actualizar_producto_sin_talla,
     actualizar_proveedor,
@@ -55,6 +60,7 @@ from app.services.maestros import (
     actualizar_ubicacion,
     crear_canal,
     crear_categoria,
+    crear_categoria_producto,
     crear_metodo,
     crear_producto_sin_talla,
     crear_proveedor,
@@ -62,6 +68,7 @@ from app.services.maestros import (
     crear_ubicacion,
     eliminar_canal,
     eliminar_categoria,
+    eliminar_categoria_producto,
     eliminar_metodo,
     eliminar_producto_sin_talla,
     eliminar_proveedor,
@@ -80,6 +87,7 @@ audited_user = require_roles("admin", "operador", "consulta")
 
 _SORT_PROV = {"id": ProveedorMaestro.id, "nombre": ProveedorMaestro.nombre, "categoria": ProveedorMaestro.categoria}
 _SORT_CAT = {"id": CategoriaColeccion.id, "nombre": CategoriaColeccion.nombre, "tipo_talla": CategoriaColeccion.tipo_talla}
+_SORT_CATPROD = {"id": CategoriaProducto.id, "nombre": CategoriaProducto.nombre, "tipo": CategoriaProducto.tipo}
 _SORT_UB = {"id": UbicacionTaller.id, "codigo": UbicacionTaller.codigo, "nombre": UbicacionTaller.nombre, "tipo": UbicacionTaller.tipo}
 _SORT_CANAL = {"id": CanalVentaMaestro.id, "nombre": CanalVentaMaestro.nombre, "tipo": CanalVentaMaestro.tipo}
 _SORT_MET = {"id": MetodoPagoMaestro.id, "nombre": MetodoPagoMaestro.nombre, "tipo": MetodoPagoMaestro.tipo}
@@ -176,6 +184,47 @@ def patch_categoria(request: Request, cid: int, payload: CategoriaUpdate, db: Se
 @_critical_limiter.limit("30/minute")
 def delete_categoria(request: Request, cid: int, db: Session = Depends(get_db), _: object = Depends(mutation_user)):
     eliminar_categoria(db, cid)
+
+
+# Categorias de producto (master de categorías + líneas de la Ficha, 0037)
+@router.get("/categorias-producto", response_model=Paginated[CategoriaProductoRead])
+def list_categorias_producto(q: str | None = None, tipo: str | None = None, activo: bool | None = None, limit: int = 50, offset: int = 0, sort_by: str | None = None, order: Literal["asc", "desc"] = "asc", db: Session = Depends(get_db), _: object = Depends(audited_user)):
+    stmt = select(CategoriaProducto).order_by(CategoriaProducto.id.asc())
+    if q:
+        stmt = stmt.where(CategoriaProducto.nombre.ilike(f"%{q}%"))
+    if tipo:
+        stmt = stmt.where(CategoriaProducto.tipo == tipo)
+    if activo is not None:
+        stmt = stmt.where(CategoriaProducto.activo == activo)
+    stmt = aplicar_orden(stmt, sort_by, order, _SORT_CATPROD)
+    rows, total = paginar(db, stmt, limit, offset)
+    return Paginated[CategoriaProductoRead](items=rows, total=total)
+
+
+@router.post("/categorias-producto", response_model=CategoriaProductoRead, status_code=status.HTTP_201_CREATED)
+@_critical_limiter.limit("30/minute")
+def create_categoria_producto(request: Request, payload: CategoriaProductoCreate, db: Session = Depends(get_db), _: object = Depends(mutation_user)):
+    return crear_categoria_producto(db, payload.model_dump())
+
+
+@router.get("/categorias-producto/{cid}", response_model=CategoriaProductoRead)
+def get_categoria_producto(cid: int, db: Session = Depends(get_db), _: object = Depends(audited_user)):
+    obj = db.get(CategoriaProducto, cid)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Categoria de producto no encontrada")
+    return obj
+
+
+@router.patch("/categorias-producto/{cid}", response_model=CategoriaProductoRead)
+@_critical_limiter.limit("30/minute")
+def patch_categoria_producto(request: Request, cid: int, payload: CategoriaProductoUpdate, db: Session = Depends(get_db), _: object = Depends(mutation_user)):
+    return actualizar_categoria_producto(db, cid, payload.model_dump(exclude_unset=True))
+
+
+@router.delete("/categorias-producto/{cid}", status_code=status.HTTP_204_NO_CONTENT)
+@_critical_limiter.limit("30/minute")
+def delete_categoria_producto(request: Request, cid: int, db: Session = Depends(get_db), _: object = Depends(mutation_user)):
+    eliminar_categoria_producto(db, cid)
 
 
 # Ubicaciones

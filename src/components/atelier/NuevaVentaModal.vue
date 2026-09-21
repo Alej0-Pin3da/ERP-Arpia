@@ -101,6 +101,16 @@ const metodoPago = ref('Transferencia Bancolombia')
 const estado = ref<string>('COMPLETADA')
 const descuentoPct = ref<number>(0)
 const descuentoValManual = ref<number | null>(null)
+const codigoDescuento = ref<string>('')
+const motivoDescuento = ref<string>('')
+const MOTIVOS_DESCUENTO = [
+  { value: '', label: 'Sin motivo' },
+  { value: 'bono', label: 'Bono' },
+  { value: 'aniversario', label: 'Aniversario' },
+  { value: 'lanzamiento', label: 'Lanzamiento' },
+  { value: 'rotacion', label: 'Rotación' },
+  { value: 'otro', label: 'Otro' },
+]
 const observaciones = ref('')
 const descontarInventario = ref(true)
 
@@ -336,6 +346,8 @@ function initForm() {
     estado.value = v.estado
     descuentoPct.value = v.descuento_porcentaje
     descuentoValManual.value = v.descuento_valor
+    codigoDescuento.value = (v as unknown as Record<string, unknown>).codigo_descuento as string ?? ''
+    motivoDescuento.value = (v as unknown as Record<string, unknown>).motivo_descuento as string ?? ''
     observaciones.value = v.observaciones || ''
     descontarInventario.value = v.descontar_inventario ?? true
     items.value = v.items.map((it) => ({
@@ -361,6 +373,8 @@ function initForm() {
     estado.value = 'COMPLETADA'
     descuentoPct.value = 0
     descuentoValManual.value = null
+    codigoDescuento.value = ''
+    motivoDescuento.value = ''
     observaciones.value = ''
     descontarInventario.value = true
     items.value = [
@@ -433,6 +447,8 @@ async function guardar() {
     canal_venta: canalToCodigo(canal.value),
     metodo_pago: metodoToCodigo(metodoPago.value),
     descuento_porcentaje: Number(descuentoPct.value) || 0,
+    codigo_descuento: codigoDescuento.value.trim() || null,
+    motivo_descuento: motivoDescuento.value || null,
     es_regalo: false,
     detalles: items.value.map((it) => ({
       producto_id: it.producto_id as number,
@@ -717,6 +733,30 @@ async function guardar() {
               <div class="p-2 bg-stone-950 border border-stone-800 rounded font-mono text-amber-400 font-bold text-right">
                 -{{ formatCOP(valorDescuento) }}
               </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-1">
+                Código descuento
+              </label>
+              <InputText
+                v-model="codigoDescuento"
+                placeholder="Ej: ANIV2026"
+                class="w-full text-xs font-mono"
+              />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-1">
+                Motivo
+              </label>
+              <select
+                v-model="motivoDescuento"
+                class="w-full bg-stone-950 border border-stone-700 text-stone-200 text-xs rounded-lg px-2 py-2 font-mono focus:border-amber-400 focus:outline-none"
+              >
+                <option v-for="m in MOTIVOS_DESCUENTO" :key="m.value" :value="m.value">{{ m.label }}</option>
+              </select>
             </div>
           </div>
 

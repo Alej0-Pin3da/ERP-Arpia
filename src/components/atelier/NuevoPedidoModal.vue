@@ -10,6 +10,8 @@ import Textarea from 'primevue/textarea'
 import { useClientes } from '@/composables/useClientes'
 import { useProductos } from '@/composables/useProductos'
 import { useProduccion } from '@/composables/useProduccion'
+import { useMaestros } from '@/composables/useMaestros'
+import { listVariantes, createVariante } from '@/services/api/productos'
 import type { PedidoProduccionRead } from '@/services/api/pedidos-produccion'
 import { client } from '@/api/client'
 import { showToast } from '@/utils/toast'
@@ -26,14 +28,15 @@ const emit = defineEmits<{
 const clientesApi = useClientes()
 const productosApi = useProductos()
 const produccionService = useProduccion()
+const maestrosApi = useMaestros()
 
 const clienteSeleccionado = ref<number | null>(null)
 const nuevoClienteNombre = ref('')
-const modoCliente = ref<'existente' | 'nuevo'>('existente')
+const modoCliente = ref<'existente' | 'nuevo' | 'stock'>('stock')
 const recetaSeleccionada = ref<number | null>(null)
 const observaciones = ref('')
 // POST /pedidos-produccion: producto + variante + cantidad + enums del backend.
-const varianteId = ref<number | null>(null)
+// varianteKey: 'none' | 'v:<id>' (propia) | 'm:<nombre>' (matriz, se crea sola).
 const cantidad = ref<number>(1)
 const estado = ref<string>('pendiente')
 const prioridad = ref<string>('normal')
@@ -42,6 +45,17 @@ const fechaEntrega = ref<string>('')
 const clientes = ref<any[]>([])
 const productos = ref<any[]>([])
 const variantes = ref<{ id: number; nombre_variante: string }[]>([])
+const matrizTallas = ref<string[]>([])
+
+async function cargarMatrizTallas() {
+  try {
+    const r = await maestrosApi.listTallas({ limit: 100 })
+    matrizTallas.value = ((r.items ?? []) as unknown as Record<string, unknown>[])
+      .filter((t) => t.activo !== false)
+      .map((t) => String(t.talla ?? '').trim())
+      .filter((n) => n.length > 0)
+  } catch { matrizTallas.value = [] }
+}
 const guardando = ref(false)
 
 async function cargarDatos() {
@@ -57,7 +71,7 @@ async function cargarDatos() {
     productos.value = []
   }
 }
-onMounted(() => { void cargarDatos() })
+onMounted(() => { void cargarDatos(); void cargarMatrizTallas() })
 
 const estadosOptions = [
   { label: 'Pendiente', value: 'pendiente' },
@@ -71,10 +85,15 @@ const prioridadesOptions = [
   { label: 'Urgente', value: 'urgente' },
 ]
 
-const variantesOptions = computed(() => [
-  { label: 'Sin variante (genérico)', value: null },
-  ...variantes.value.map((v) => ({ label: v.nombre_variante, value: v.id })),
-])
+const variantesOptions = computed(() => {
+  const propias = variantes.value.map((v) => ({ label: v.nombre_variante, value: `v:${v.id}` }))
+  const nombres = new Set(variantes.value.map((v) => v.nombre_variante))
+  const deMatriz = matrizTallas.value
+    .filter((n) => !nombres.has(n))
+    .map((n) => ({ label: `${n} (nueva)`, value: `m:${n}` }))
+  return [{ label: 'Sin variante (genérico)', value: 'none' }, ...propias, ...deMatriz]
+})
+const varianteKey = ref<string>('none')
 
 const clientesOptions = computed(() => {
   return (clientes.value as any[]).map((c) => ({
@@ -92,10 +111,9 @@ const recetasOptions = computed(() => {
 
 async function onRecetaChange() {
   if (recetaSeleccionada.value) {
-    varianteId.value = null
+    varianteKey.value = 'none'
     try {
-      const { data } = await client.get<{ id: number; nombre_variante: string }[]>(`/productos/${recetaSeleccionada.value}/variantes`)
-      variantes.value = data ?? []
+      variantes.value = await listVariantes(recetaSeleccionada.value)
     } catch { variantes.value = [] }
   }
 }
@@ -134,10 +152,28 @@ async function guardarPedidoReal() {
   }
   guardando.value = true
   try {
+    // Talla de matriz que el producto aún no tiene: se crea como variante.
+    let varianteIdFinal: number | null = null
+    if (varianteKey.value !== 'none') {
+      if (varianteKey.value.startsWith('m:')) {
+        try {
+          const creada = await createVariante(
+            recetaSeleccionada.value as number,
+            varianteKey.value.slice(2),
+          )
+          varianteIdFinal = creada.id
+        } catch (e: unknown) {
+          showToast('error', 'No se pudo crear la talla', extractDetail(e))
+          return
+        }
+      } else if (varianteKey.value.startsWith('v:')) {
+        varianteIdFinal = Number(varianteKey.value.slice(2)) || null
+      }
+    }
     const creado = await produccionService.create({
       producto_id: recetaSeleccionada.value,
       cliente_id: clienteIdFinal,
-      variante_id: varianteId.value,
+      variante_id: varianteIdFinal,
       cantidad: Math.max(1, Math.round(Number(cantidad.value) || 1)),
       estado: estado.value,
       prioridad: prioridad.value,
@@ -148,8 +184,9 @@ async function guardarPedidoReal() {
     emit('pedido-creado', creado)
     emit('update:visible', false)
     recetaSeleccionada.value = null
-    varianteId.value = null
+    varianteKey.value = 'none'
     cantidad.value = 1
+    modoCliente.value = 'stock'
     clienteSeleccionado.value = null
     nuevoClienteNombre.value = ''
     observaciones.value = ''
@@ -177,8 +214,17 @@ async function guardarPedido() {
       <!-- Client Selector -->
       <div>
         <div class="flex items-center justify-between mb-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wider text-stone-400">Cliente / Destinatario</label>
+          <label class="text-xs font-semibold uppercase tracking-wider text-stone-400">Cliente / Destinatario <span class="normal-case font-normal">(opcional: producción a stock)</span></label>
           <div class="text-xs space-x-2">
+            <button
+              type="button"
+              class="hover:underline"
+              :class="modoCliente === 'stock' ? 'text-amber-400 font-bold' : 'text-stone-400'"
+              @click="modoCliente = 'stock'"
+            >
+              Para stock
+            </button>
+            <span class="text-stone-600">|</span>
             <button
               type="button"
               class="hover:underline"
@@ -199,6 +245,9 @@ async function guardarPedido() {
           </div>
         </div>
 
+        <div v-if="modoCliente === 'stock'" class="text-[11px] text-stone-500 bg-stone-900/60 border border-stone-800 rounded-lg px-3 py-2">
+          Se produce para stock (1–2 por talla): al venderse se repone. Sin clienta asociada.
+        </div>
         <Dropdown
           v-if="modoCliente === 'existente'"
           v-model="clienteSeleccionado"
@@ -209,7 +258,7 @@ async function guardarPedido() {
           class="w-full"
         />
         <InputText
-          v-else
+          v-else-if="modoCliente === 'nuevo'"
           v-model="nuevoClienteNombre"
           placeholder="Nombre completo de la clienta..."
           class="w-full"
@@ -233,9 +282,9 @@ async function guardarPedido() {
       <!-- Variante + Cantidad (payload de POST /pedidos-produccion) -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Variante / Talla</label>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Variante / Talla (matriz + propias)</label>
           <Dropdown
-            v-model="varianteId"
+            v-model="varianteKey"
             :options="variantesOptions"
             option-label="label"
             option-value="value"
