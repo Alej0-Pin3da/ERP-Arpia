@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-21] - Venta pura de Perchero sin pedir insumos (fix Cadena totebag)
+
+- **Causa:** vender 1 Tote con prenda disponible igual pedía `Cadena gris delgada totebag` porque se descontaban insumos por la cantidad total aunque el Perchero cubría todo (doble consumo: las unidades ya estaban producidas/cargadas).
+- **Fix:** fast-path puro-stock en `registrar/actualizar`: si cada línea está cubierta por `disponible`, solo se mueven prendas (`disponible→vendida` + `venta_id`), sin tocar insumos ni `Producto.stock`. Restauraciones (`actualizar/anular/devoluciones`) ahora devuelven prendas primero y solo reponen insumos/producto por el resto no cubierto (simétrico, compatible con ventas viejas sin link).
+- **Verificación:** `py_compile` OK, `npm run build` PASS. Requiere reiniciar backend (uvicorn) para que tome el cambio. Pendiente reintento manual + pytest con DB.
+- **Archivos:** `backend/app/services/inventory.py`, `backend/app/services/devoluciones.py`. Sin commit.
+
 ### [2026-09-21] - Ventas a stock desde Perchero + modal sincronizado
 
 - **Backend:** `registrar/actualizar/anular_venta` ahora consumen/devuelven unidades `disponible/vendida` (0041 `venta_id`) y solo el resto toca `Producto.stock_actual`; insumos siguen con FOR UPDATE atómico. `registrar_devolucion` total/parcial también devuelve unidades de esa venta.

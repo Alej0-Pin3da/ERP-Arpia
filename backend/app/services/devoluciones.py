@@ -160,12 +160,12 @@ def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Dev
 
     # Finished-unit restock moves with the insumo restock in the same
     # transaction (mirrors anular_venta): lock every touched Producto FIRST
-    # (a later locked re-read would wipe pending mutations), then restore
-    # insumos and flip back this sale's `vendida` rows (0041). Only the
-    # remainder not covered by prendas returns to Producto.stock_actual.
+    # (a later locked re-read would wipe pending mutations), flip back this
+    # sale's `vendida` rows (0041) first, then restore insumos + Producto.stock
+    # only for the remainder not covered by prendas. Pure-stock returns skip
+    # raw moves (symmetric with registrar_venta fast path).
     # No commit here — the single commit below owns everything.
     bloqueados = _bloquear_productos(db, agregados.keys())
-    reponer_stock(db, explosiones)
     # Devolver prendas: total flips every line of the venta; parcial flips
     # only the returned qty per (producto, variante) of this venta_id.
     lineas_devolver: list[tuple[int, int | None, Decimal]] = []
@@ -184,10 +184,20 @@ def registrar_devolucion(db: Session, user_id: int | None, payload: dict) -> Dev
                 )
             )
     restos: dict[int, Decimal] = {}
+    restos_lineas: list[tuple[int, int | None, Decimal]] = []
     for producto_id, variante_id, cantidad in lineas_devolver:
         resto = _devolver_unidades(db, venta_id, producto_id, variante_id, cantidad)
         if resto > 0:
             restos[producto_id] = restos.get(producto_id, Decimal("0")) + resto
+            restos_lineas.append((producto_id, variante_id, resto))
+    from app.services.inventory import _explosion_para_cantidad as _exp_resto
+
+    resto_explosion: dict[int, Decimal] = {}
+    for producto_id, variante_id, resto in restos_lineas:
+        for insumo_id, qty in _exp_resto(db, producto_id, variante_id, resto).items():
+            resto_explosion[insumo_id] = resto_explosion.get(insumo_id, Decimal("0")) + qty
+    if resto_explosion:
+        reponer_stock(db, resto_explosion)
     for producto_id, qty in sorted(restos.items()):
         _reponer_producto_bloqueado(bloqueados[producto_id], qty)
 

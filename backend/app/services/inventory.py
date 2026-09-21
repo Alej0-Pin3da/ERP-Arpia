@@ -262,6 +262,40 @@ def _consumir_unidades(
     return cantidad - tomar
 
 
+def _contar_prendas_disponibles(
+    db: Session, producto_id: int, variante_id: int | None
+) -> int:
+    """Count `disponible` prendas for a (producto, variante) without locking.
+
+    Read-only availability probe used to decide whether a sale is pure-stock
+    (Perchero covers everything → no insumos moves) or needs raw consumption.
+    """
+    from sqlalchemy import func as _func
+
+    stmt = (
+        select(_func.count())
+        .select_from(PrendaConfeccionada)
+        .where(PrendaConfeccionada.estado == "disponible")
+    )
+    if variante_id is not None:
+        stmt = stmt.where(PrendaConfeccionada.variante_id == variante_id)
+    else:
+        stmt = stmt.where(
+            PrendaConfeccionada.producto_id == producto_id,
+            PrendaConfeccionada.variante_id.is_(None),
+        )
+    return int(db.scalar(stmt) or 0)
+
+
+def _explosion_para_cantidad(
+    db: Session, producto_id: int, variante_id: int | None, cantidad: Decimal
+) -> dict[int, Decimal]:
+    """Material explosion for an exact quantity (empty when cantidad <= 0)."""
+    if cantidad <= 0:
+        return {}
+    return explosion_materiales(db, producto_id, variante_id, cantidad)
+
+
 def _devolver_unidades(
     db: Session, venta_id: int, producto_id: int, variante_id: int | None, cantidad: Decimal
 ) -> Decimal:
@@ -342,8 +376,28 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
         lineas_costo.append(costo_unitario)
         lineas_subtotal.append(cantidad * precio_unitario)
 
-        for insumo_id, qty in explosion_materiales(db, producto_id, variante_id, cantidad).items():
-            explosiones[insumo_id] = explosiones.get(insumo_id, Decimal("0")) + qty
+    # Pure-stock fast path (Perchero): when every line is fully covered by
+    # `disponible` prendas, the sale moves finished units only — insumos were
+    # already consumed when those units were produced/loaded, so deducting
+    # them again 409s on real sales (e.g. Tote with 0 raw stock). Mixed or
+    # uncovered sales keep the legacy strict path (insumos full).
+    cubre_todo = True
+    for detalle in detalles:
+        disp = _contar_prendas_disponibles(
+            db, detalle["producto_id"], detalle.get("variante_id")
+        )
+        if disp < int(Decimal(detalle["cantidad"])):
+            cubre_todo = False
+            break
+    if not cubre_todo:
+        for detalle in detalles:
+            for insumo_id, qty in explosion_materiales(
+                db,
+                detalle["producto_id"],
+                detalle.get("variante_id"),
+                Decimal(detalle["cantidad"]),
+            ).items():
+                explosiones[insumo_id] = explosiones.get(insumo_id, Decimal("0")) + qty
 
     # Lock finished-stock rows BEFORE any mutation (see _bloquear_productos):
     # a locked re-read after descontar_stock would cascade-refresh the selectin
@@ -351,7 +405,8 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
     agregados = _agregado_por_producto(detalles)
     bloqueados = _bloquear_productos(db, agregados.keys())
 
-    descontar_stock(db, explosiones)
+    if explosiones:
+        descontar_stock(db, explosiones)
 
     total_venta = Decimal(sum(lineas_subtotal)) * descuento_factor
     es_regalo = bool(payload.get("es_regalo", False))
@@ -488,11 +543,12 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
     bloqueados = _bloquear_productos(
         db, set(agregados_viejos) | set(agregados_nuevos)
     )
-    reponer_stock(db, _explosion_venta(db, venta))
     # Flip back this sale's `vendida` rows first (0041); only the remainder
-    # that originally left Producto.stock_actual is restored there. Old sales
-    # without linked rows return full cantidad (backward compatible).
+    # not covered by prendas restores insumos + Producto.stock. Old sales
+    # without linked rows return full cantidad (backward compatible); pure-stock
+    # sales return 0 remainder (no raw moves, symmetric with registrar).
     restos_viejos: dict[int, Decimal] = {}
+    restos_viejos_lineas: list[tuple[int, int | None, Decimal]] = []
     for det in list(venta.detalles):
         resto = _devolver_unidades(
             db, venta.id, det.producto_id, det.variante_id, Decimal(det.cantidad)
@@ -501,6 +557,15 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
             restos_viejos[det.producto_id] = (
                 restos_viejos.get(det.producto_id, Decimal("0")) + resto
             )
+            restos_viejos_lineas.append((det.producto_id, det.variante_id, resto))
+    resto_explosion: dict[int, Decimal] = {}
+    for producto_id, variante_id, resto in restos_viejos_lineas:
+        for insumo_id, qty in _explosion_para_cantidad(
+            db, producto_id, variante_id, resto
+        ).items():
+            resto_explosion[insumo_id] = resto_explosion.get(insumo_id, Decimal("0")) + qty
+    if resto_explosion:
+        reponer_stock(db, resto_explosion)
     for producto_id, qty in sorted(restos_viejos.items()):
         _reponer_producto_bloqueado(bloqueados[producto_id], qty)
     # A FLUSH (not a commit) is required BEFORE the new deduction: both stock
@@ -533,10 +598,28 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
         lineas_costo.append(costo_unitario)
         lineas_subtotal.append(cantidad * precio_unitario)
 
-        for insumo_id, qty in explosion_materiales(db, producto_id, variante_id, cantidad).items():
-            explosiones[insumo_id] = explosiones.get(insumo_id, Decimal("0")) + qty
+    # Pure-stock fast path (mirrors registrar_venta): post-restore disponibles
+    # cover everything → skip raw moves.
+    cubre_nuevo = True
+    for detalle in detalles:
+        disp = _contar_prendas_disponibles(
+            db, detalle["producto_id"], detalle.get("variante_id")
+        )
+        if disp < int(Decimal(detalle["cantidad"])):
+            cubre_nuevo = False
+            break
+    if not cubre_nuevo:
+        for detalle in detalles:
+            for insumo_id, qty in explosion_materiales(
+                db,
+                detalle["producto_id"],
+                detalle.get("variante_id"),
+                Decimal(detalle["cantidad"]),
+            ).items():
+                explosiones[insumo_id] = explosiones.get(insumo_id, Decimal("0")) + qty
 
-    descontar_stock(db, explosiones)
+    if explosiones:
+        descontar_stock(db, explosiones)
 
     restos_nuevos: dict[int, Decimal] = {}
     for detalle in detalles:
@@ -621,14 +704,23 @@ def anular_venta(db: Session, venta_id: int) -> Venta:
 
     agregados = _agregado_por_producto(list(venta.detalles))
     bloqueados = _bloquear_productos(db, agregados.keys())
-    reponer_stock(db, _explosion_venta(db, venta))
     restos: dict[int, Decimal] = {}
+    restos_lineas: list[tuple[int, int | None, Decimal]] = []
     for det in list(venta.detalles):
         resto = _devolver_unidades(
             db, venta.id, det.producto_id, det.variante_id, Decimal(det.cantidad)
         )
         if resto > 0:
             restos[det.producto_id] = restos.get(det.producto_id, Decimal("0")) + resto
+            restos_lineas.append((det.producto_id, det.variante_id, resto))
+    resto_explosion: dict[int, Decimal] = {}
+    for producto_id, variante_id, resto in restos_lineas:
+        for insumo_id, qty in _explosion_para_cantidad(
+            db, producto_id, variante_id, resto
+        ).items():
+            resto_explosion[insumo_id] = resto_explosion.get(insumo_id, Decimal("0")) + qty
+    if resto_explosion:
+        reponer_stock(db, resto_explosion)
     for producto_id, qty in sorted(restos.items()):
         _reponer_producto_bloqueado(bloqueados[producto_id], qty)
     try:
