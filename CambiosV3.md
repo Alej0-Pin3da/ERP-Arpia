@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-21] - LOTE alimenta Perchero: completar crea prendas (fin doble stock)
+
+- **Modelo final:** STOCK = prendas terminadas (única verdad, lo que se vende); LOTE = fabricación (consume insumos por fases); al llegar a LISTO el lote crea N prendas `disponible` (con variante/talla, costo snapshot y `pedido_id`) en vez de acreditar cantidad en `Producto.stock_actual` (legacy, ya no se toca). La venta sigue Perchero-primero, así los insumos se descuentan una sola vez, al fabricar.
+- **Idempotencia:** guarda en servicio por `cantidad_producida` además del guarda de transición en ruta (reintentos no duplican prendas ni insumos).
+- **Datos dev:** el 1 uds huérfano de Corset Garras (pedido 8, talla 36) convertido a prenda 42 `disponible` (costo snapshot 30.645,89) y lote en 0. Los 4 pedidos en piso (4,5,6,7) entrarán solos al Perchero al llegar a LISTO. Matriz esperada: Corset Garras 36: 1.
+- **Deploy:** `arpia-api` reconstruido (`docker compose up -d --build api`, BD intacta).
+- **Verificación:** `test_produccion_lote` 7/7 + vecinas (fase4, tiempos, devoluciones, ventas_api, inventory) 84/84 PASS en `arpia_test`; `npm run build` PASS.
+- **Archivos:** `backend/app/services/produccion.py`, `backend/tests/test_produccion_lote.py`, `test_produccion_tiempos.py`. Sin migración (sin cambio de schema).
+
 ### [2026-09-21] - Clienta inline + limpieza de campos muertos en modal venta
 
 - **Clienta inline:** botón `+ Nueva` junto al selector (CRM/Manual) que abre `NuevoClienteModal` anidado; al guardar refresca la lista y deja la clienta seleccionada sin salir de la venta.

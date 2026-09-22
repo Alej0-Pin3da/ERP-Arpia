@@ -25,6 +25,7 @@ from app.models import (
     CategoriaInsumo,
     Insumo,
     PedidoProduccion,
+    PrendaConfeccionada,
     Producto,
     TiempoFase,
     TipoProducto,
@@ -125,6 +126,9 @@ def _setup(stock_insumo: str = "100"):
 def _cleanup(producto_id: int, insumo_id: int, tipo_id: int, cat_id: int) -> None:
     db = SessionLocal()
     try:
+        db.query(PrendaConfeccionada).filter(
+            PrendaConfeccionada.producto_id == producto_id
+        ).delete(synchronize_session=False)
         db.query(PedidoProduccion).filter(
             PedidoProduccion.producto_id == producto_id
         ).delete(synchronize_session=False)
@@ -435,7 +439,16 @@ def test_cierre_incluye_totales_reales_sin_tocar_estimados(client, admin_token):
             assert prod is not None
             assert prod.mano_obra == Decimal("111")
             assert prod.cif_energia == Decimal("222")
-            assert prod.stock_actual == Decimal("10")
+            assert prod.stock_actual == Decimal("0")
+            assert (
+                db.query(PrendaConfeccionada)
+                .filter(
+                    PrendaConfeccionada.producto_id == producto_id,
+                    PrendaConfeccionada.estado == "disponible",
+                )
+                .count()
+                == 10
+            )
         finally:
             db.close()
         # Totals also ride on plain GET.

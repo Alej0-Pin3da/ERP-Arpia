@@ -1,4 +1,4 @@
-"""Production lot completion — quantity stock with workshop phases.
+"""Production lot completion — unit stock with workshop phases.
 
 A production order manufactures ``cantidad`` finished units of a product.
 When the order reaches the end of the line (``fase == 'listo'`` or
@@ -8,7 +8,10 @@ When the order reaches the end of the line (``fase == 'listo'`` or
 2. Per-insumo availability check with FULL detail (every short insumo with
    required vs. available) -> 409, nothing touched.
 3. ``descontar_stock`` (FOR UPDATE, all-or-nothing) for the insumos.
-4. ``Producto.stock_actual += N`` (NULL treated as 0 for legacy rows).
+4. Create N ``PrendaConfeccionada`` rows in ``disponible`` (linked to the
+   pedido, with the unit-cost snapshot) — the lot FEEDS the Perchero stock,
+   which is the single source of truth for sales. ``Producto.stock_actual``
+   is legacy quantity stock and is NOT credited.
 5. Unit-cost snapshot via ``calcular_costo_produccion`` into the lot record
    (``pedido.costo_unitario_snapshot``) + ``cantidad_producida = cantidad``.
 6. Additive real-cost info (``mano_obra_real`` from all TiempoFase rows and
@@ -17,12 +20,12 @@ When the order reaches the end of the line (``fase == 'listo'`` or
     are never overwritten.
 
 No commit here — the caller (PATCH /pedidos-produccion/{id}) owns the single
-commit, mirroring the ``descontar_stock`` convention. No per-garment
-``PrendaConfeccionada`` rows are created: stock is by quantity (agreed
-decision), so a phantom garment row would double-count finished units.
+commit, mirroring the ``descontar_stock`` convention. Re-running on an
+already-completed lot is a no-op (guarded by ``cantidad_producida``).
 """
 
 from decimal import Decimal
+from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -35,9 +38,11 @@ from app.models.produccion import (
     PedidoProduccion,
     PedidoProduccionEstado,
     PedidoProduccionFase,
+    PrendaConfeccionada,
+    PrendaEstado,
     TiempoFase,
 )
-from app.models.productos import Producto
+from app.models.productos import Producto, VarianteProducto
 from app.services.costos import calcular_costo_produccion, tasas_costeo
 from app.services.inventory import descontar_stock, explosion_materiales
 
@@ -141,10 +146,11 @@ def totales_tiempos(db: Session, pedido_id: int) -> dict[str, Decimal]:
 
 
 def completar_lote(db: Session, pedido: PedidoProduccion) -> dict[str, Decimal]:
-    """Complete a production lot: consume insumos, credit finished stock.
+    """Complete a production lot: consume insumos, feed Perchero stock.
 
-    Idempotency is the caller's job: invoke only when transitioning INTO
-    listo/completado (guard with ``pedido_esta_completado`` before mutating).
+    Idempotency is two-layered: the route only invokes on the transition INTO
+    listo/completado, and this service no-ops when ``cantidad_producida``
+    already covers ``cantidad`` (409 detail and 0 double-credit on retry).
     Raises 409 with per-insumo required-vs-available detail on shortage, 404
     on missing producto/insumo. No commit — caller owns the transaction.
 
@@ -154,12 +160,22 @@ def completar_lote(db: Session, pedido: PedidoProduccion) -> dict[str, Decimal]:
     overwritten here — manual estimates stay; the totals let a later slice
     propose updating them.
     """
+    if (pedido.cantidad_producida or 0) >= pedido.cantidad and pedido.cantidad_producida:
+        totales = totales_tiempos(db, pedido.id)
+        return {
+            "costo_unitario": pedido.costo_unitario_snapshot
+            or calcular_costo_produccion(db, pedido.producto_id, pedido.variante_id),
+            "minutos_totales": totales["minutos_totales"],
+            "mano_obra_real": totales["mano_obra_real"],
+            "energia_real": totales["energia_real"],
+        }
+
     cantidad = Decimal(pedido.cantidad)
     # Lock the producto FIRST, before any stock mutation. A locked re-read
     # with populate_existing=True cascades refresh through the selectin chain
     # (producto -> bom_insumos -> insumo) and would wipe a pending insumo
-    # deduction if done after descontar_stock — so the lock lives here and
-    # the bump below mutates the already-locked instance with no re-read.
+    # deduction if done after descontar_stock — so the lock lives here even
+    # though the lot no longer mutates Producto.stock_actual (legacy).
     producto = db.get(
         Producto, pedido.producto_id, with_for_update=True, populate_existing=True
     )
@@ -192,11 +208,32 @@ def completar_lote(db: Session, pedido: PedidoProduccion) -> dict[str, Decimal]:
 
     descontar_stock(db, explosion)
 
-    producto.stock_actual = (producto.stock_actual or Decimal("0")) + cantidad
-
     costo_unitario = calcular_costo_produccion(
         db, pedido.producto_id, pedido.variante_id
     )
+    # The lot feeds the Perchero: one `disponible` row per finished unit, so
+    # sales always move finished stock and never re-consume raw insumos.
+    # Talla mirrors the variante naming convention ("M - Rojo" -> "M");
+    # generic lots (no variante) stay talla-less like manual generic loads.
+    talla: str | None = None
+    if pedido.variante_id is not None:
+        variante = db.get(VarianteProducto, pedido.variante_id)
+        if variante is not None:
+            talla = (variante.nombre_variante.split(" - ")[0].strip() or None)
+    hoy = date.today()
+    for _ in range(int(cantidad)):
+        db.add(
+            PrendaConfeccionada(
+                producto_id=pedido.producto_id,
+                variante_id=pedido.variante_id,
+                talla=talla,
+                estado=PrendaEstado.DISPONIBLE,
+                costo_real=costo_unitario,
+                fecha_confeccion=hoy,
+                pedido_id=pedido.id,
+            )
+        )
+
     pedido.costo_unitario_snapshot = costo_unitario
     pedido.cantidad_producida = pedido.cantidad
     totales = totales_tiempos(db, pedido.id)

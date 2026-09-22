@@ -1,12 +1,13 @@
-"""Lote por cantidad: fases Corte->Listo, completar_lote y stock por cantidad.
+"""Lote alimenta Perchero: fases Corte->Listo, completar_lote y stock unitario.
 
 - POST /pedidos-produccion defaults fase='corte', snapshot None.
 - PATCH fase advances one step (400 skip/back, 422 unknown).
-- Reaching 'listo' explodes the BOM (N=cantidad), deducts insumos, credits
-  Producto.stock_actual += N, snapshots unit cost; 409 names every short
-  insumo with required vs. available and persists nothing.
+- Reaching 'listo' explodes the BOM (N=cantidad), deducts insumos, creates N
+  prendas `disponible` (the lot FEEDS the Perchero), snapshots unit cost;
+  409 names every short insumo with required vs. available and persists
+  nothing. Producto.stock_actual (legacy) is NOT credited.
 - Completion runs once (idempotent on later PATCHes).
-- POST /ventas consumes Producto.stock_actual (409 if short); anular restores.
+- POST /ventas consumes Perchero units first (409 if short); anular restores.
 """
 
 import uuid
@@ -19,6 +20,7 @@ from app.models import (
     DetalleVenta,
     Insumo,
     PedidoProduccion,
+    PrendaConfeccionada,
     Producto,
     TipoProducto,
     Venta,
@@ -73,7 +75,7 @@ def _make_tipo() -> int:
 
 
 def _make_producto(tipo_id: int) -> int:
-    """Product WITHOUT variants and zero finished stock (completion credits it)."""
+    """Product WITHOUT variants and zero finished stock (completion feeds Perchero)."""
     db = SessionLocal()
     try:
         prod = Producto(
@@ -116,6 +118,21 @@ def _read_producto_stock(producto_id: int) -> Decimal:
         db.close()
 
 
+def _read_prendas_disponibles(producto_id: int) -> int:
+    db = SessionLocal()
+    try:
+        return (
+            db.query(PrendaConfeccionada)
+            .filter(
+                PrendaConfeccionada.producto_id == producto_id,
+                PrendaConfeccionada.estado == "disponible",
+            )
+            .count()
+        )
+    finally:
+        db.close()
+
+
 def _read_insumo_stock(insumo_id: int) -> Decimal:
     db = SessionLocal()
     try:
@@ -152,6 +169,9 @@ def _cleanup(producto_id: int, insumo_id: int, tipo_id: int, cat_id: int) -> Non
             db.query(Venta).filter(Venta.id.in_(ven_ids)).delete(
                 synchronize_session=False
             )
+        db.query(PrendaConfeccionada).filter(
+            PrendaConfeccionada.producto_id == producto_id
+        ).delete(synchronize_session=False)
         db.query(PedidoProduccion).filter(
             PedidoProduccion.producto_id == producto_id
         ).delete(synchronize_session=False)
@@ -235,14 +255,14 @@ def test_devolucion_calidad_a_costura_y_listo_congelado(client, admin_token):
         assert resp.status_code == 200, resp.text
         assert resp.json()["fase"] == "costura"
         assert _read_insumo_stock(insumo_id) == Decimal("100")
-        # Re-avance normal hasta listo: acredita una sola vez.
+        # Re-avance normal hasta listo: acredita una sola vez (al Perchero).
         for fase in ("acabados", "calidad", "listo"):
             assert _avanzar(client, headers, pedido_id, fase).status_code == 200
-        assert _read_producto_stock(producto_id) == Decimal("2")
+        assert _read_prendas_disponibles(producto_id) == 2
         # Listo congelado: ni atrás ni a otra fase.
         resp = _avanzar(client, headers, pedido_id, "costura")
         assert resp.status_code == 400, resp.text
-        assert _read_producto_stock(producto_id) == Decimal("2")
+        assert _read_prendas_disponibles(producto_id) == 2
         assert _read_insumo_stock(insumo_id) == Decimal("96")
     finally:
         _cleanup(producto_id, insumo_id, tipo_id, cat_id)
@@ -269,7 +289,8 @@ def test_completar_lote_acredita_stock_y_snapshot(client, admin_token):
         assert body["cantidad_producida"] == 10
         # 2 m/u x 5 $/m = 10 $/u snapshot.
         assert Decimal(str(body["costo_unitario_snapshot"])) == Decimal("10")
-        assert _read_producto_stock(producto_id) == Decimal("10")
+        assert _read_prendas_disponibles(producto_id) == 10
+        assert _read_producto_stock(producto_id) == Decimal("0")
         assert _read_insumo_stock(insumo_id) == Decimal("80")
     finally:
         _cleanup(producto_id, insumo_id, tipo_id, cat_id)
@@ -303,6 +324,7 @@ def test_completar_lote_faltante_409_atomico(client, admin_token):
         ).json()
         assert pedido["fase"] == "calidad"
         assert _read_producto_stock(producto_id) == Decimal("0")
+        assert _read_prendas_disponibles(producto_id) == 0
         assert _read_insumo_stock(insumo_id) == Decimal("1")
     finally:
         _cleanup(producto_id, insumo_id, tipo_id, cat_id)
@@ -319,7 +341,7 @@ def test_completar_lote_idempotente(client, admin_token):
         ).json()["id"]
         for fase in ("costura", "acabados", "calidad", "listo"):
             assert _avanzar(client, headers, pedido_id, fase).status_code == 200
-        assert _read_producto_stock(producto_id) == Decimal("10")
+        assert _read_prendas_disponibles(producto_id) == 10
 
         # A later PATCH must NOT complete (and credit) twice.
         resp = client.patch(
@@ -328,7 +350,7 @@ def test_completar_lote_idempotente(client, admin_token):
             headers=headers,
         )
         assert resp.status_code == 200, resp.text
-        assert _read_producto_stock(producto_id) == Decimal("10")
+        assert _read_prendas_disponibles(producto_id) == 10
         assert _read_insumo_stock(insumo_id) == Decimal("80")
     finally:
         _cleanup(producto_id, insumo_id, tipo_id, cat_id)
@@ -360,18 +382,23 @@ def test_venta_consume_y_anular_repone_stock_producto(client, admin_token):
                 ],
             }
 
-        # 11 > 10 finished units -> 409 naming the product.
+        # 11 > 10 Perchero units -> 409 naming the product (all-or-nothing).
         resp = client.post("/api/v1/ventas", json=_payload("11"), headers=headers)
         assert resp.status_code == 409, resp.text
         assert "Producto Lote" in resp.json()["detail"]
+        assert _read_prendas_disponibles(producto_id) == 10
+        assert _read_insumo_stock(insumo_id) == Decimal("80")
 
         resp = client.post("/api/v1/ventas", json=_payload("4"), headers=headers)
         assert resp.status_code == 201, resp.text
         venta_id = resp.json()["id"]
-        assert _read_producto_stock(producto_id) == Decimal("6")
+        assert _read_prendas_disponibles(producto_id) == 6
+        assert _read_producto_stock(producto_id) == Decimal("0")
+        assert _read_insumo_stock(insumo_id) == Decimal("80")
 
         resp = client.delete(f"/api/v1/ventas/{venta_id}", headers=headers)
         assert resp.status_code == 200, resp.text
-        assert _read_producto_stock(producto_id) == Decimal("10")
+        assert _read_prendas_disponibles(producto_id) == 10
+        assert _read_insumo_stock(insumo_id) == Decimal("80")
     finally:
         _cleanup(producto_id, insumo_id, tipo_id, cat_id)
