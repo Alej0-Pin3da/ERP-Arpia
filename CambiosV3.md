@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-21] - Stock legacy escondido de Productos (decisión: esconder, no borrar)
+
+- **Decisión:** esconder, no borrar. Borrar la columna `Producto.stock_actual` sería irreversible y el backend la sigue usando como fallback (resto no cubierto + ventas viejas); esconder en UI es seguro y reversible.
+- **Cambio:** la etiqueta de Productos muestra solo Perchero (`N uds en stock`, tooltip única verdad); fuera la suma lote+talla y el desglose.
+- **Verificación:** `npm run build` PASS. Pendiente recargar front y verificar etiqueta del Corset (1 uds).
+- **Archivos:** `src/views/ProductosView.vue`. Sin commit.
+
 ### [2026-09-21] - LOTE alimenta Perchero: completar crea prendas (fin doble stock)
 
 - **Modelo final:** STOCK = prendas terminadas (única verdad, lo que se vende); LOTE = fabricación (consume insumos por fases); al llegar a LISTO el lote crea N prendas `disponible` (con variante/talla, costo snapshot y `pedido_id`) en vez de acreditar cantidad en `Producto.stock_actual` (legacy, ya no se toca). La venta sigue Perchero-primero, así los insumos se descuentan una sola vez, al fabricar.

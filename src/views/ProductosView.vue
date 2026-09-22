@@ -393,8 +393,8 @@ function solicitarEliminar(r: RecetaDisplay) {
             <span class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono">
               ⏱️ {{ r.tiempo_confeccion_min ?? '—' }}{{ r.tiempo_confeccion_min ? ' min confección' : '' }}
             </span>
-            <span v-if="r.stock_actual !== null && r.stock_actual !== undefined" class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono" :title="`Lote: ${Math.round(Number(r.stock_actual))} uds · Por talla: ${udsPorProducto[r.nombre] ?? 0} uds`">
-              📦 {{ Math.round(Number(r.stock_actual)) + (udsPorProducto[r.nombre] ?? 0) }} uds en stock<span v-if="(udsPorProducto[r.nombre] ?? 0) > 0 && Math.round(Number(r.stock_actual)) > 0" class="text-emerald-300"> ({{ Math.round(Number(r.stock_actual)) }} lote + {{ udsPorProducto[r.nombre] }} talla)</span><span v-else-if="(udsPorProducto[r.nombre] ?? 0) > 0" class="text-emerald-300"> (por talla)</span>
+            <span class="px-2 py-0.5 rounded bg-stone-950 border border-stone-800 text-[11px] text-stone-300 font-mono" title="Unidades disponibles en Perchero (por talla) — única verdad de stock">
+              📦 {{ udsPorProducto[r.nombre] ?? 0 }} uds en stock
             </span>
           </div>
 
