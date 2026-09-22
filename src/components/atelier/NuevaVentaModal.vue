@@ -6,9 +6,9 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
-import Textarea from 'primevue/textarea'
 import { useVentas } from '@/composables/useVentas'
 import { useClientes } from '@/composables/useClientes'
+import NuevoClienteModal from '@/components/atelier/NuevoClienteModal.vue'
 import { client } from '@/api/client'
 import type { CanalVenta, MetodoPago, VentaCreatePayload, VentaRead } from '@/services/api/ventas'
 import { updateVenta } from '@/services/api/ventas'
@@ -89,6 +89,19 @@ async function cargarOpciones() {
   }
 }
 
+async function onClienteGuardado(c: { id: number; nombre: string }) {
+  // La clienta creada inline queda seleccionada sin salir del modal de venta
+  try {
+    const res = await clientesApi.list({ limit: 100, offset: 0 })
+    clientes.value = (res.items as unknown as typeof clientes.value) ?? []
+  } catch {
+    // si falla el refresh, igual se selecciona con los datos del evento
+  }
+  modoCliente.value = 'existente'
+  clienteId.value = c.id
+  showNuevoCliente.value = false
+}
+
 const isEditing = computed(() => !!props.ventaEditar)
 
 // Form fields
@@ -104,6 +117,7 @@ const descuentoPct = ref<number>(0)
 const descuentoValManual = ref<number | null>(null)
 const codigoDescuento = ref<string>('')
 const motivoDescuento = ref<string>('')
+const showNuevoCliente = ref(false)
 const MOTIVOS_DESCUENTO = [
   { value: '', label: 'Sin motivo' },
   { value: 'bono', label: 'Bono' },
@@ -112,8 +126,6 @@ const MOTIVOS_DESCUENTO = [
   { value: 'rotacion', label: 'Rotación' },
   { value: 'otro', label: 'Otro' },
 ]
-const observaciones = ref('')
-const descontarInventario = ref(true)
 
 // Line items
 interface LocalItem {
@@ -122,7 +134,6 @@ interface LocalItem {
   variante_id?: number | null
   nombre_prenda: string
   talla: string
-  color: string
   cantidad: number
   precio_unitario: number
   costo_unitario: number
@@ -284,7 +295,6 @@ function agregarItemVacio() {
     variante_id: null,
     nombre_prenda: '',
     talla: '',
-    color: '',
     cantidad: 1,
     precio_unitario: 0,
     costo_unitario: 0,
@@ -417,15 +427,12 @@ function initForm() {
     descuentoValManual.value = v.descuento_valor
     codigoDescuento.value = (v as unknown as Record<string, unknown>).codigo_descuento as string ?? ''
     motivoDescuento.value = (v as unknown as Record<string, unknown>).motivo_descuento as string ?? ''
-    observaciones.value = v.observaciones || ''
-    descontarInventario.value = v.descontar_inventario ?? true
     items.value = v.items.map((it) => ({
       id: it.id,
       producto_id: it.producto_id,
       variante_id: (it as unknown as { variante_id?: number }).variante_id ?? null,
       nombre_prenda: it.nombre_prenda,
       talla: it.talla,
-      color: it.color,
       cantidad: it.cantidad,
       precio_unitario: it.precio_unitario,
       costo_unitario: it.costo_unitario,
@@ -451,8 +458,6 @@ function initForm() {
     descuentoValManual.value = null
     codigoDescuento.value = ''
     motivoDescuento.value = ''
-    observaciones.value = ''
-    descontarInventario.value = true
     items.value = [
       {
         id: Date.now(),
@@ -460,7 +465,6 @@ function initForm() {
         variante_id: null,
         nombre_prenda: '',
         talla: '',
-        color: '',
         cantidad: 1,
         precio_unitario: 0,
         costo_unitario: 0,
@@ -587,25 +591,25 @@ async function guardar() {
     @update:visible="(v) => emit('update:visible', v)"
   >
     <div class="space-y-5 pt-1 text-xs text-stone-200">
-      <!-- Row 1: Code, Date, Status -->
+      <!-- Row 1: Code, Date, Status (solo lectura: los define el backend) -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-stone-900/60 p-3.5 rounded-xl border border-stone-800">
         <div>
           <label class="block text-[11px] font-bold text-amber-300 uppercase tracking-wider mb-1">
-            Código Venta
+            Código Venta · auto
           </label>
-          <InputText v-model="codigo" class="w-full text-xs font-mono" placeholder="VEN-ARP-021" />
+          <InputText v-model="codigo" class="w-full text-xs font-mono" placeholder="Se genera al guardar (VEN-...)" disabled />
         </div>
 
         <div>
           <label class="block text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-1">
-            Fecha de Venta
+            Fecha de Venta · auto
           </label>
-          <InputText v-model="fecha" type="date" class="w-full text-xs font-mono" />
+          <InputText v-model="fecha" type="date" class="w-full text-xs font-mono" disabled title="La pone el servidor al guardar" />
         </div>
 
         <div>
           <label class="block text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-1">
-            Estado
+            Estado · auto
           </label>
           <Dropdown
             v-model="estado"
@@ -613,6 +617,8 @@ async function guardar() {
             option-label="label"
             option-value="value"
             class="w-full text-xs"
+            disabled
+            title="Toda venta nueva nace confirmada; anular es otra acción"
           />
         </div>
       </div>
@@ -638,6 +644,15 @@ async function guardar() {
                 @click="modoCliente = 'manual'"
               >
                 Manual
+              </button>
+              <span class="text-stone-600">|</span>
+              <button
+                type="button"
+                class="text-emerald-400 font-bold"
+                title="Crear clienta sin salir de la venta"
+                @click="showNuevoCliente = true"
+              >
+                + Nueva
               </button>
             </div>
           </div>
@@ -689,6 +704,13 @@ async function guardar() {
         </div>
       </div>
 
+      <!-- Alta de clienta inline: sin salir de la venta -->
+      <NuevoClienteModal
+        :visible="showNuevoCliente"
+        @update:visible="(v) => (showNuevoCliente = v)"
+        @cliente-guardado="onClienteGuardado"
+      />
+
       <!-- Row 3: Items Table & Line Builder -->
       <div class="bg-stone-900/90 p-4 rounded-xl border border-stone-800 space-y-3">
         <div class="flex items-center justify-between">
@@ -737,7 +759,7 @@ async function guardar() {
               </div>
 
               <!-- Variante + Talla sincronizadas con stock visible -->
-              <div class="sm:col-span-2">
+              <div class="sm:col-span-4">
                 <label class="block text-[10px] text-stone-400 mb-0.5">Variante / Talla</label>
                 <Dropdown
                   v-if="it.variantes?.length"
@@ -762,12 +784,6 @@ async function guardar() {
                 <div v-if="it.stockTexto" class="mt-1 text-[10px] font-mono" :class="(it.stockDisponible ?? 0) > 0 ? 'text-emerald-400' : 'text-rose-400'">
                   📦 {{ it.stockTexto }}
                 </div>
-              </div>
-
-              <!-- Color / Detalle -->
-              <div class="sm:col-span-2">
-                <label class="block text-[10px] text-stone-400 mb-0.5">Color / Acabado</label>
-                <InputText v-model="it.color" placeholder="Ej: Negro Satín" class="w-full text-xs" />
               </div>
 
               <!-- Cantidad -->
@@ -796,18 +812,9 @@ async function guardar() {
 
             <!-- Item Footer with Cost & Subtotal info -->
             <div class="mt-2 pt-2 border-t border-stone-800/60 flex flex-wrap items-center justify-between text-[11px] text-stone-400 font-mono">
-              <div class="flex items-center gap-2">
-                <span>Costo Unitario Taller:</span>
-                <InputNumber
-                  v-model="it.costo_unitario"
-                  mode="currency"
-                  currency="COP"
-                  locale="es-CO"
-                  :min="0"
-                  :min-fraction-digits="0"
-                  :max-fraction-digits="2"
-                  class="w-28 text-[11px]"
-                />
+              <div class="flex items-center gap-2" title="Lo calcula el backend al guardar (snapshot de costo)">
+                <span>Costo Taller:</span>
+                <strong class="text-stone-100">{{ formatCOP(it.costo_unitario) }}</strong>
               </div>
               <div class="flex items-center gap-3">
                 <span>Subtotal: <strong class="text-stone-100">{{ formatCOP(it.cantidad * it.precio_unitario) }}</strong></span>
@@ -871,18 +878,6 @@ async function guardar() {
                 <option v-for="m in MOTIVOS_DESCUENTO" :key="m.value" :value="m.value">{{ m.label }}</option>
               </select>
             </div>
-          </div>
-
-          <div>
-            <label class="block text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-1">
-              Observaciones & Notas
-            </label>
-            <Textarea
-              v-model="observaciones"
-              rows="2"
-              placeholder="Ej: Descuento 25% socia, empaque regalo cumpleaños, entrega personalizada..."
-              class="w-full text-xs"
-            />
           </div>
         </div>
 

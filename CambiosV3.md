@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-21] - Clienta inline + limpieza de campos muertos en modal venta
+
+- **Clienta inline:** botón `+ Nueva` junto al selector (CRM/Manual) que abre `NuevoClienteModal` anidado; al guardar refresca la lista y deja la clienta seleccionada sin salir de la venta.
+- **Limpieza (campos que el backend ignora):** código/fecha/estado a solo lectura (los define el servidor); fuera color por ítem (lo cubre el nombre de variante), costo editable → lectura (el backend hace snapshot), fuera observaciones (sin columna en BD) y `descontar_inventario` muerto. Quedan: clienta, canal, método, prendas con variante/talla/stock, cantidad, precio, descuento %, código/motivo.
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual (crear clienta inline + vender).
+- **Archivos:** `src/components/atelier/NuevaVentaModal.vue`. Sin commit.
+
 ### [2026-09-21] - Fix toast fantasma en NuevaVentaModal (venta 22 no cerraba)
 
 - **Causa:** `VEN-0022` se creaba en backend pero el modal nunca cerraba ni refrescaba la lista porque `showToast` no estaba importado (`ReferenceError` en éxito y en catch).
