@@ -4,11 +4,9 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
-import Textarea from 'primevue/textarea'
 import { type ClienteRead } from '@/services/api/clientes'
 import { showToast } from '@/utils/toast'
 import { useClientes } from '@/composables/useClientes'
-import { toTallaCode } from '@/utils/tallas'
 
 const props = defineProps<{
   visible: boolean
@@ -30,11 +28,24 @@ const telefono = ref('')
 const email = ref('')
 const ciudad = ref('Pereira')
 const direccion = ref('')
-const tallaHabitual = ref('S')
-const tallaSuperior = ref('S')
-const tallaInferior = ref('S')
-const categoriaPreferida = ref('Corsetería & Tops')
-const notas = ref('')
+// Valores fuera del modal (tallas/notas): en edición se conservan tal cual
+// para no borrar datos existentes; en alta van null (la talla real queda en
+// cada venta y un regalo no debe dejar datos falsos en la ficha).
+const conservar = ref<{
+  talla_habitual: string | null
+  talla_superior: string | null
+  talla_inferior: string | null
+  categoria_preferida: string | null
+  tipo_producto_frecuente: string | null
+  notas: string | null
+}>({
+  talla_habitual: null,
+  talla_superior: null,
+  talla_inferior: null,
+  categoria_preferida: null,
+  tipo_producto_frecuente: null,
+  notas: null,
+})
 
 const tiposClientaOptions = [
   { label: 'Clienta Habitual', value: 'Clienta Habitual' },
@@ -42,24 +53,6 @@ const tiposClientaOptions = [
   { label: 'Compradora Showroom Pereira', value: 'Clienta Showroom' },
   { label: 'Feria / Stand Mayorista', value: 'Feria / Stand Mayorista' },
   { label: 'Clienta Online / Envíos', value: 'Clienta Online' },
-]
-
-const tallasPrenda = [
-  { label: 'XXS', value: 'XXS' },
-  { label: 'XS', value: 'XS' },
-  { label: 'S', value: 'S' },
-  { label: 'M', value: 'M' },
-  { label: 'L', value: 'L' },
-  { label: 'XL', value: 'XL' },
-  { label: 'Sin Talla', value: 'Sin Talla' },
-]
-
-const categoriasOptions = [
-  { label: 'Corsetería & Tops (Con Talla: XXS-XL)', value: 'Corsetería & Tops' },
-  { label: 'Faldas & Prendas Inferiores (Con Talla: XXS-XL)', value: 'Faldas & Conjuntos' },
-  { label: 'Sets & Colecciones Completas', value: 'Sets & Corsets' },
-  { label: '👜 Tote Bags Ilustradas (Sin Talla)', value: 'Tote Bags de Lona' },
-  { label: '🎀 Accesorios & Joyería Textil (Sin Talla)', value: 'Accesorios & Merch' },
 ]
 
 watch(
@@ -72,11 +65,14 @@ watch(
       email.value = c.email || ''
       ciudad.value = c.ciudad || 'Pereira'
       direccion.value = c.direccion || ''
-      tallaHabitual.value = c.talla_habitual || 'S'
-      tallaSuperior.value = c.talla_superior || c.talla_habitual || 'S'
-      tallaInferior.value = c.talla_inferior || c.talla_habitual || 'S'
-      categoriaPreferida.value = c.categoria_preferida || 'Corsetería & Tops'
-      notas.value = c.notas || ''
+      conservar.value = {
+        talla_habitual: c.talla_habitual ?? null,
+        talla_superior: c.talla_superior ?? null,
+        talla_inferior: c.talla_inferior ?? null,
+        categoria_preferida: c.categoria_preferida ?? null,
+        tipo_producto_frecuente: (c as unknown as { tipo_producto_frecuente?: string }).tipo_producto_frecuente ?? null,
+        notas: c.notas ?? null,
+      }
     } else {
       nombre.value = ''
       tipo.value = 'Clienta Habitual'
@@ -84,23 +80,18 @@ watch(
       email.value = ''
       ciudad.value = 'Pereira'
       direccion.value = ''
-      tallaHabitual.value = 'S'
-      tallaSuperior.value = 'S'
-      tallaInferior.value = 'S'
-      categoriaPreferida.value = 'Corsetería & Tops'
-      notas.value = ''
+      conservar.value = {
+        talla_habitual: null,
+        talla_superior: null,
+        talla_inferior: null,
+        categoria_preferida: null,
+        tipo_producto_frecuente: null,
+        notas: null,
+      }
     }
   },
   { immediate: true },
 )
-
-function seleccionarTallaRapida(talla: string) {
-  tallaHabitual.value = talla
-  if (talla !== 'Sin Talla (Tote Bags)' && talla !== 'Talla Única / Surtido') {
-    tallaSuperior.value = talla
-    tallaInferior.value = talla
-  }
-}
 
 async function guardar() {
   if (guardando.value) return
@@ -109,9 +100,9 @@ async function guardar() {
     return
   }
 
-  const esSinTalla = tallaHabitual.value.includes('Sin Talla') || categoriaPreferida.value.includes('Tote Bags')
-  const tipoFrecuente = esSinTalla ? 'PRODUCTOS_SIN_TALLA' : 'PRENDAS_TALLAS'
-
+  // Sin sección de tallas/notas en el modal: la talla real queda en cada
+  // venta (un regalo no deja datos falsos en la ficha) y en edición se
+  // conservan los valores existentes sin mostrarlos.
   const apiPayload = {
     nombre: nombre.value.trim(),
     tipo: tipo.value,
@@ -119,13 +110,12 @@ async function guardar() {
     email: email.value.trim() || null,
     ciudad: ciudad.value.trim() || null,
     direccion: direccion.value.trim() || null,
-    // Backend talla_* max_length=10: se persiste el código corto.
-    talla_habitual: toTallaCode(tallaHabitual.value),
-    talla_superior: toTallaCode(tallaSuperior.value),
-    talla_inferior: toTallaCode(tallaInferior.value),
-    categoria_preferida: categoriaPreferida.value || null,
-    tipo_producto_frecuente: tipoFrecuente,
-    notas: notas.value.trim() || null,
+    talla_habitual: conservar.value.talla_habitual,
+    talla_superior: conservar.value.talla_superior,
+    talla_inferior: conservar.value.talla_inferior,
+    categoria_preferida: conservar.value.categoria_preferida,
+    tipo_producto_frecuente: conservar.value.tipo_producto_frecuente,
+    notas: conservar.value.notas,
   }
   guardando.value = true
   try {
@@ -206,116 +196,6 @@ async function guardar() {
           </label>
           <InputText v-model="direccion" placeholder="Cra 15 # 12-45, Barrio / Sector" class="w-full text-xs" />
         </div>
-      </div>
-
-      <!-- Sizing & Products Section -->
-      <div class="border border-amber-500/30 rounded-xl p-4 bg-amber-950/20 space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-300 font-mono">
-            <i class="pi pi-tag" />
-            Talla Estándar de la Marca (Prendas XXS a XL & Productos Sin Talla)
-          </div>
-          <span class="text-[10px] text-amber-400/80 font-mono">Sin medidas a medida</span>
-        </div>
-
-        <div>
-          <label class="block text-[11px] text-stone-300 font-bold mb-1.5">
-            Seleccionar Talla Estándar Principal:
-          </label>
-          <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            <button
-              v-for="t in ['XXS', 'XS', 'S', 'M', 'L', 'XL']"
-              :key="t"
-              type="button"
-              class="py-2 px-1 text-center font-mono font-bold rounded-lg border text-xs transition cursor-pointer"
-              :class="tallaHabitual === t
-                ? 'bg-amber-400 text-stone-950 border-amber-300 shadow-md font-extrabold'
-                : 'bg-stone-900/80 text-stone-300 border-stone-800 hover:border-amber-500/50'"
-              @click="seleccionarTallaRapida(t)"
-            >
-              {{ t }}
-            </button>
-          </div>
-
-          <!-- Non-sized products selector button -->
-          <div class="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              class="flex-1 py-1.5 px-3 rounded-lg border text-xs font-mono transition text-center cursor-pointer"
-              :class="tallaHabitual.includes('Sin Talla')
-                ? 'bg-amber-500/20 text-amber-300 border-amber-400 font-bold'
-                : 'bg-stone-900/60 text-stone-400 border-stone-800 hover:text-stone-200'"
-              @click="seleccionarTallaRapida('Sin Talla (Tote Bags)')"
-            >
-              👜 Sin Talla (Solo Tote Bags / Accesorios)
-            </button>
-
-            <button
-              type="button"
-              class="py-1.5 px-3 rounded-lg border text-xs font-mono transition text-center cursor-pointer"
-              :class="tallaHabitual.includes('Talla Única')
-                ? 'bg-amber-500/20 text-amber-300 border-amber-400 font-bold'
-                : 'bg-stone-900/60 text-stone-400 border-stone-800 hover:text-stone-200'"
-              @click="seleccionarTallaRapida('Talla Única / Surtido')"
-            >
-              ✨ Surtido / Talla Única
-            </button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-amber-500/20">
-          <div>
-            <label class="block text-[10px] uppercase font-bold text-stone-400 mb-1">
-              Talla Superior (Tops / Corsets)
-            </label>
-            <Dropdown
-              v-model="tallaSuperior"
-              :options="tallasPrenda"
-              option-label="label"
-              option-value="value"
-              class="w-full text-xs"
-            />
-          </div>
-
-          <div>
-            <label class="block text-[10px] uppercase font-bold text-stone-400 mb-1">
-              Talla Inferior (Faldas / Pantalones)
-            </label>
-            <Dropdown
-              v-model="tallaInferior"
-              :options="tallasPrenda"
-              option-label="label"
-              option-value="value"
-              class="w-full text-xs"
-            />
-          </div>
-
-          <div>
-            <label class="block text-[10px] uppercase font-bold text-stone-400 mb-1">
-              Categoría de Interés Principal
-            </label>
-            <Dropdown
-              v-model="categoriaPreferida"
-              :options="categoriasOptions"
-              option-label="label"
-              option-value="value"
-              class="w-full text-xs"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Notes / Delivery details -->
-      <div class="bg-stone-900/60 p-3.5 rounded-xl border border-stone-800">
-        <label class="block text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-1">
-          Notas de Preferencias, Calce de Prenda o Envíos
-        </label>
-        <Textarea
-          v-model="notas"
-          rows="2"
-          class="w-full text-xs"
-          placeholder="Ej: Prefiere corsets ajustados en talla S, fan de las Tote Bags ilustradas, envíos por Interrapidísimo..."
-        />
       </div>
 
       <div class="flex justify-end gap-2 pt-2 border-t border-stone-800">

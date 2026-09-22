@@ -3,6 +3,12 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-21] - Modal clienta sin tallas ni notas (la talla vive en la venta)
+
+- **Cambio:** fuera la sección `Talla Estándar de la Marca` y el textarea de notas. La talla real queda en cada venta (un regalo no contamina la ficha con datos falsos). En alta van null; en edición se conservan los valores existentes sin mostrarlos (no se borra nada).
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual (alta inline + edición).
+- **Archivos:** `src/components/atelier/NuevoClienteModal.vue`. Sin commit.
+
 ### [2026-09-21] - Stock legacy escondido de Productos (decisión: esconder, no borrar)
 
 - **Decisión:** esconder, no borrar. Borrar la columna `Producto.stock_actual` sería irreversible y el backend la sigue usando como fallback (resto no cubierto + ventas viejas); esconder en UI es seguro y reversible.
