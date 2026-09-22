@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-21] - Notas por venta persistidas + layout Prendas sin solapes
+
+- **Notas:** nueva columna `Ventas.observaciones` (migración 0042, TEXT null) + schemas/services passthrough en registrar/actualizar; vuelve el textarea al modal (empaque regalo, entregas) y ya se muestra en detalle/lista (ya lo leían).
+- **Layout Prendas & Artículos:** la fila única de 12 columnas apretaba cantidad (~45px) y precio con formato moneda hasta solaparse; ahora dos filas (prenda+variante arriba, cantidad+precio+borrar abajo).
+- **Verificación:** migración 0042 en dev; `test_produccion_lote` 7/7 (con round-trip de observaciones) + `test_ventas_api`/`test_devoluciones` 50/50; `npm run build` PASS. API reconstruido.
+- **Archivos:** migración 0042, `models/schemas/venta`, `services/inventory`, `NuevaVentaModal.vue`, `ventas.ts`, tests lote.
+
 ### [2026-09-21] - Modal clienta sin tallas ni notas (la talla vive en la venta)
 
 - **Cambio:** fuera la sección `Talla Estándar de la Marca` y el textarea de notas. La talla real queda en cada venta (un regalo no contamina la ficha con datos falsos). En alta van null; en edición se conservan los valores existentes sin mostrarlos (no se borra nada).

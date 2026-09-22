@@ -26,6 +26,7 @@ export interface VentaCreatePayload {
   descuento_porcentaje?: number | string
   codigo_descuento?: string | null
   motivo_descuento?: string | null
+  observaciones?: string | null
   es_regalo?: boolean
   detalles: DetalleVentaCreate[]
 }

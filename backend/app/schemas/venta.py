@@ -36,6 +36,7 @@ class VentaCreate(BaseModel):
     descuento_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
     codigo_descuento: str | None = Field(default=None, max_length=50)
     motivo_descuento: Literal["bono", "aniversario", "lanzamiento", "rotacion", "otro"] | None = None
+    observaciones: str | None = Field(default=None, max_length=2000)
     es_regalo: bool = False
     detalles: list[DetalleVentaCreate] = Field(min_length=1)
 
@@ -85,6 +86,7 @@ class VentaRead(BaseModel):
     descuento_porcentaje: Decimal
     codigo_descuento: str | None = None
     motivo_descuento: str | None = None
+    observaciones: str | None = None
     estado: str
     total_venta: Decimal
     es_regalo: bool

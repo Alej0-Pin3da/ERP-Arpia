@@ -372,6 +372,7 @@ def test_venta_consume_y_anular_repone_stock_producto(client, admin_token):
             return {
                 "canal_venta": "feria",
                 "descuento_porcentaje": "0",
+                "observaciones": "Empaque regalo cumpleaños",
                 "detalles": [
                     {
                         "producto_id": producto_id,
@@ -392,6 +393,7 @@ def test_venta_consume_y_anular_repone_stock_producto(client, admin_token):
         resp = client.post("/api/v1/ventas", json=_payload("4"), headers=headers)
         assert resp.status_code == 201, resp.text
         venta_id = resp.json()["id"]
+        assert resp.json()["observaciones"] == "Empaque regalo cumpleaños"
         assert _read_prendas_disponibles(producto_id) == 6
         assert _read_producto_stock(producto_id) == Decimal("0")
         assert _read_insumo_stock(insumo_id) == Decimal("80")

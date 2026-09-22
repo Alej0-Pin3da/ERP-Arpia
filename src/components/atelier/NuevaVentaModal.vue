@@ -6,6 +6,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
+import Textarea from 'primevue/textarea'
 import { useVentas } from '@/composables/useVentas'
 import { useClientes } from '@/composables/useClientes'
 import NuevoClienteModal from '@/components/atelier/NuevoClienteModal.vue'
@@ -118,6 +119,7 @@ const descuentoValManual = ref<number | null>(null)
 const codigoDescuento = ref<string>('')
 const motivoDescuento = ref<string>('')
 const showNuevoCliente = ref(false)
+const observaciones = ref('')
 const MOTIVOS_DESCUENTO = [
   { value: '', label: 'Sin motivo' },
   { value: 'bono', label: 'Bono' },
@@ -427,6 +429,7 @@ function initForm() {
     descuentoValManual.value = v.descuento_valor
     codigoDescuento.value = (v as unknown as Record<string, unknown>).codigo_descuento as string ?? ''
     motivoDescuento.value = (v as unknown as Record<string, unknown>).motivo_descuento as string ?? ''
+    observaciones.value = v.observaciones || ''
     items.value = v.items.map((it) => ({
       id: it.id,
       producto_id: it.producto_id,
@@ -458,6 +461,7 @@ function initForm() {
     descuentoValManual.value = null
     codigoDescuento.value = ''
     motivoDescuento.value = ''
+    observaciones.value = ''
     items.value = [
       {
         id: Date.now(),
@@ -549,6 +553,7 @@ async function guardar() {
     descuento_porcentaje: Number(descuentoPct.value) || 0,
     codigo_descuento: codigoDescuento.value.trim() || null,
     motivo_descuento: motivoDescuento.value || null,
+    observaciones: observaciones.value.trim() || null,
     es_regalo: false,
     detalles: items.value.map((it) => ({
       producto_id: it.producto_id as number,
@@ -735,9 +740,9 @@ async function guardar() {
             :key="it.id"
             class="bg-stone-950/80 p-3 rounded-lg border border-stone-800/80 relative group"
           >
-            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
               <!-- Quick Select from Inventory (Optional) -->
-              <div class="sm:col-span-4">
+              <div class="sm:col-span-6">
                 <label class="block text-[10px] text-stone-400 mb-0.5">Prenda / Modelo</label>
                 <div class="space-y-1">
                   <Dropdown
@@ -759,7 +764,7 @@ async function guardar() {
               </div>
 
               <!-- Variante + Talla sincronizadas con stock visible -->
-              <div class="sm:col-span-4">
+              <div class="sm:col-span-6">
                 <label class="block text-[10px] text-stone-400 mb-0.5">Variante / Talla</label>
                 <Dropdown
                   v-if="it.variantes?.length"
@@ -785,21 +790,23 @@ async function guardar() {
                   📦 {{ it.stockTexto }}
                 </div>
               </div>
+            </div>
 
+            <div class="grid grid-cols-2 sm:grid-cols-12 gap-2.5 items-end mt-2.5">
               <!-- Cantidad -->
-              <div class="sm:col-span-1">
+              <div class="sm:col-span-2">
                 <label class="block text-[10px] text-stone-400 mb-0.5">Cant.</label>
                 <InputNumber v-model="it.cantidad" mode="decimal" locale="es-CO" :min="1" :min-fraction-digits="0" :max-fraction-digits="0" class="w-full text-xs font-mono" />
               </div>
 
               <!-- Precio Unitario -->
-              <div class="sm:col-span-2">
+              <div class="sm:col-span-4">
                 <label class="block text-[10px] text-stone-400 mb-0.5">Precio Venta ($)</label>
                 <InputNumber v-model="it.precio_unitario" mode="currency" currency="COP" locale="es-CO" :min="0" :min-fraction-digits="0" :max-fraction-digits="0" class="w-full text-xs font-mono" />
               </div>
 
-              <!-- Actions & Cost -->
-              <div class="sm:col-span-1 flex items-center justify-end gap-1">
+              <!-- Actions -->
+              <div class="sm:col-span-6 flex items-center justify-end gap-1">
                 <Button
                   icon="pi pi-trash"
                   size="small"
@@ -878,6 +885,18 @@ async function guardar() {
                 <option v-for="m in MOTIVOS_DESCUENTO" :key="m.value" :value="m.value">{{ m.label }}</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-1">
+              Observaciones & Notas
+            </label>
+            <Textarea
+              v-model="observaciones"
+              rows="2"
+              placeholder="Ej: empaque regalo cumpleaños, entrega personalizada..."
+              class="w-full text-xs"
+            />
           </div>
         </div>
 

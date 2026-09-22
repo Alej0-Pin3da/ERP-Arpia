@@ -76,6 +76,8 @@ class Venta(Base):
     # Discount code as-typed (bono) + reason (0039). NULL = no discount info.
     codigo_descuento: Mapped[str | None] = mapped_column(String(50), nullable=True)
     motivo_descuento: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Free notes per sale (gift wrap, delivery, discount context). NULL = none.
+    observaciones: Mapped[str | None] = mapped_column(Text, nullable=True)
     estado: Mapped[str] = mapped_column(
         String(20), nullable=False, default=DocumentState.CONFIRMED.value, index=True
     )

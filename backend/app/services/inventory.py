@@ -421,6 +421,9 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
         if payload.get("codigo_descuento") is not None
         else None,
         motivo_descuento=payload.get("motivo_descuento"),
+        observaciones=(str(payload.get("observaciones")).strip() or None)
+        if payload.get("observaciones") is not None
+        else None,
         total_venta=total_venta,
         es_regalo=es_regalo,
         # Document-state domain (ck_ventas_estado): a new sale is confirmed.
@@ -653,6 +656,11 @@ def actualizar_venta(db: Session, venta_id: int, payload: dict) -> Venta:
         else None
     )
     venta.motivo_descuento = payload.get("motivo_descuento")
+    venta.observaciones = (
+        (str(payload.get("observaciones")).strip() or None)
+        if payload.get("observaciones") is not None
+        else None
+    )
     venta.es_regalo = es_regalo
     venta.total_venta = total_venta
     # fecha is deliberately NOT touched.
