@@ -175,7 +175,7 @@ def test_get_cotizacion_404_inexistente(client, admin_token):
 def test_patch_estado_consulta_forbidden(client, consulta_token, admin_token):
     row = _crear_cotizacion(client, admin_token)
     resp = client.patch(
-        f"/api/v1/cotizaciones/{row['id']}",
+        f"/api/v1/cotizaciones/{row['id']}/estado",
         json={"estado": "enviada"},
         headers=_auth(consulta_token),
     )
@@ -185,7 +185,7 @@ def test_patch_estado_consulta_forbidden(client, consulta_token, admin_token):
 def test_patch_estado_operador_ok(client, operador_token, admin_token):
     row = _crear_cotizacion(client, admin_token)
     resp = client.patch(
-        f"/api/v1/cotizaciones/{row['id']}",
+        f"/api/v1/cotizaciones/{row['id']}/estado",
         json={"estado": "aprobada"},
         headers=_auth(operador_token),
     )
@@ -196,7 +196,7 @@ def test_patch_estado_operador_ok(client, operador_token, admin_token):
 def test_patch_estado_invalido_422(client, admin_token):
     row = _crear_cotizacion(client, admin_token)
     resp = client.patch(
-        f"/api/v1/cotizaciones/{row['id']}",
+        f"/api/v1/cotizaciones/{row['id']}/estado",
         json={"estado": "facturada"},
         headers=_auth(admin_token),
     )
@@ -205,6 +205,6 @@ def test_patch_estado_invalido_422(client, admin_token):
 
 def test_patch_estado_404_inexistente(client, admin_token):
     resp = client.patch(
-        "/api/v1/cotizaciones/999999", json={"estado": "enviada"}, headers=_auth(admin_token)
+        "/api/v1/cotizaciones/999999/estado", json={"estado": "enviada"}, headers=_auth(admin_token)
     )
     assert resp.status_code == 404
