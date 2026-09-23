@@ -1,6 +1,6 @@
-# Manual Operativo & Guía Financiera - Arpía Atelier ERP
+# Manual Operativo & Guía Financiera - Arpía ERP
 
-Este documento contiene la guía operativa detallada para la gestión integral del taller de alta costura y corsetería **Arpía Atelier**, incluyendo la administración de inventario, recetas BOM, pedidos a medida, ventas realizadas y el modelo estatutario de reparto de utilidades entre socias.
+Este documento contiene la guía operativa detallada para la gestión integral del taller de alta costura y corsetería **Arpía**, incluyendo la administración de inventario, recetas BOM, pedidos a medida, ventas realizadas y el modelo estatutario de reparto de utilidades entre socias.
 
 ---
 
@@ -120,7 +120,7 @@ A continuación se detalla el registro de ventas con su desglose de costo de fab
 
 ## 7. Modelo y Ejemplos de Reparto de Socias
 
-El estatuto financiero de **Arpía Atelier** establece la distribución de la **Utilidad Neta** bajo la siguiente regla proporcional:
+El estatuto financiero de **Arpía** establece la distribución de la **Utilidad Neta** bajo la siguiente regla proporcional:
 
 ```
                                     ┌─── [40%] Fondo de Reinversión Taller : $283.200 COP
@@ -142,4 +142,4 @@ Utilidad Neta Total ($708.000 COP) ─┼─── [30%] Ganancia Socia Margara 
    * **Concepto**: Retribución por diseño creativo de colecciones, patronaje y graduación de moldes, pruebas de calce con clientas y gestión de ventas.
 
 ---
-*Manual generado y actualizado para la versión 1.2 del ERP de Arpía Atelier.*
+*Manual generado y actualizado para la versión 1.2 del ERP de Arpía.*

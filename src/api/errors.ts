@@ -1,6 +1,6 @@
 import { AxiosError } from 'axios'
 
-export const FORBIDDEN_MESSAGE = 'No tiene permisos suficientes para realizar esta acción en el Atelier.'
+export const FORBIDDEN_MESSAGE = 'No tiene permisos suficientes para realizar esta acción.'
 
 export function isUnauthorized(error: unknown): boolean {
   if (error instanceof AxiosError) {

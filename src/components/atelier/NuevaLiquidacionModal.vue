@@ -114,7 +114,7 @@ async function cargarPreview() {
     sociasPreview.value = ((s as any).items ?? []).map((x: any) => ({
       id: x.id,
       nombre: x.nombre,
-      rol: x.rol ?? 'Socia Atelier',
+      rol: x.rol ?? 'Socia',
       porcentaje: Number(x.porcentaje_participacion ?? x.porcentaje ?? 0),
       banco: x.banco,
       numero_cuenta: x.numero_cuenta,

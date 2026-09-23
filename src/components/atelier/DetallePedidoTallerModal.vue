@@ -629,7 +629,7 @@ function formatCOP(val: number) {
       <!-- Fitting Sessions (Pruebas de Calce) -->
       <div class="space-y-3">
         <div class="text-xs font-mono font-bold text-stone-300 uppercase">
-          Historial de Pruebas de Calce en Atelier
+          Historial de Pruebas de Calce en Taller
         </div>
         <div class="border border-stone-800 rounded-xl bg-stone-900/40 p-6 text-center text-xs text-stone-400 font-mono">
           Sin pruebas de calce registradas — pendiente.

@@ -167,7 +167,7 @@ async function submitPassword() {
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-800 pb-4">
       <div>
         <h1 class="text-2xl font-serif font-bold text-amber-300 tracking-wide">
-          Gestión de Usuarios & Roles de Atelier
+          Gestión de Usuarios & Roles
         </h1>
         <p class="text-xs text-stone-400 mt-1 font-mono">
           Control de accesos y permisos por rol (Administrador, Operador de Taller, Auditor/Consulta).

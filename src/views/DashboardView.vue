@@ -324,7 +324,7 @@ function getEstadoBadgeClass(estado: string) {
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-800/80 pb-3">
         <div class="flex items-center gap-2 flex-wrap">
           <h3 class="text-sm font-bold uppercase tracking-wider text-amber-300 m-0 flex items-center gap-2">
-            <i class="pi pi-wallet" /> Liquidación & Reparto de Utilidades Atelier Arpía
+            <i class="pi pi-wallet" /> Liquidación & Reparto de Utilidades Arpía
           </h3>
           <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
             Según liquidaciones registradas

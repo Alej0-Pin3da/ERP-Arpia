@@ -198,7 +198,7 @@ async function guardar() {
 
         <div>
           <label class="block text-[11px] font-bold text-stone-300 uppercase tracking-wider mb-1">
-            Rol en el Atelier
+            Rol en el taller
           </label>
           <InputText v-model="rol" class="w-full text-xs" placeholder="Ej: Jefa de Confección & Moldería" />
         </div>

@@ -56,7 +56,7 @@ function getBorderClass(sev: string) {
   <div id="arpia-app" class="min-h-screen bg-stone-950 text-stone-100 antialiased selection:bg-amber-500/30 selection:text-amber-200">
     <router-view />
 
-    <!-- Atelier Floating Toasts -->
+    <!-- Floating Toasts -->
     <div
       v-if="activeToasts.length"
       class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-[calc(100vw-3rem)] sm:max-w-sm"

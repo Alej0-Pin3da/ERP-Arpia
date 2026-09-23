@@ -39,7 +39,7 @@ const tallasPrenda = [
   { label: '✨ Talla Única / Surtido', value: 'Talla Única / Surtido' },
 ]
 
-// Guía oficial de medidas de referencia de las tallas estándar Atelier Arpía
+// Guía oficial de medidas de referencia de las tallas estándar Arpía
 const tablaTallasEstandar = [
   { talla: 'XXS', busto: '78 - 82', cintura: '58 - 62', cadera: '84 - 88', tipo: 'Prendas Petite / Confección reducida' },
   { talla: 'XS', busto: '82 - 86', cintura: '62 - 66', cadera: '88 - 92', tipo: 'Talla estándar pequeña' },
@@ -118,7 +118,7 @@ function enviarGuiaWhatsApp() {
   if (!props.cliente) return
   const cleanPhone = (props.cliente.telefono || '').replace(/\D/g, '')
   const msg = encodeURIComponent(
-    `¡Hola ${props.cliente.nombre}! Te compartimos la Guía Oficial de Tallas de Atelier Arpía ✨:\n\n` +
+    `¡Hola ${props.cliente.nombre}! Te compartimos la Guía Oficial de Tallas de Arpía ✨:\n\n` +
     `• Tallas Estándar: XXS, XS, S, M, L, XL\n` +
     `• Tu talla registrada: ${tallaSeleccionada.value}\n` +
     `• Productos Sin Talla: Tote Bags ilustradas y accesorios\n\n` +
@@ -147,7 +147,7 @@ function enviarGuiaWhatsApp() {
             <span class="font-bold text-amber-300">Confección por Tallas de Marca</span>
           </div>
           <p class="text-[11px] text-stone-300 m-0">
-            En Atelier Arpía las prendas se confeccionan exclusivamente en tallas estándar (<strong>XXS, XS, S, M, L, XL</strong>).
+            En Arpía las prendas se confeccionan exclusivamente en tallas estándar (<strong>XXS, XS, S, M, L, XL</strong>).
             Los productos de merch y accesorios (como las <strong>TOTE BAGS</strong>) son <em>Sin Talla</em>.
           </p>
         </div>
@@ -245,7 +245,7 @@ function enviarGuiaWhatsApp() {
         <div class="flex items-center justify-between">
           <div class="text-[11px] font-bold uppercase tracking-wider text-stone-300 font-mono flex items-center gap-2">
             <i class="pi pi-table text-amber-400" />
-            Tabla de Equivalencias Estándar Atelier Arpía (cm de referencia)
+            Tabla de Equivalencias Estándar Arpía (cm de referencia)
           </div>
           <span class="text-[10px] text-stone-500 font-mono">Para guía de confección</span>
         </div>

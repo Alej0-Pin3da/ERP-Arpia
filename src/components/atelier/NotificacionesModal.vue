@@ -76,7 +76,7 @@ watch(() => props.visible, (v) => { if (v) void cargarAlertas() })
   <Dialog
     :visible="visible"
     modal
-    header="🔔 Notificaciones de Operaciones • Atelier"
+    header="🔔 Notificaciones de Operaciones"
     :style="{ width: '90vw', maxWidth: '480px' }"
     @update:visible="(v) => emit('update:visible', v)"
   >

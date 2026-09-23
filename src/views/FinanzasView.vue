@@ -88,7 +88,7 @@ function normalizeSocia(raw: Record<string, unknown>): SociaDisplay {
   return {
     id: raw.id as number,
     nombre: raw.nombre as string,
-    rol: (raw.rol as string) ?? 'Socia Atelier',
+    rol: (raw.rol as string) ?? 'Socia',
     porcentaje: Number(raw.porcentaje_participacion ?? raw.porcentaje ?? 0),
     es_fondo_taller: Boolean(raw.es_fondo_taller),
     telefono: raw.telefono as string | undefined,
@@ -507,22 +507,16 @@ async function confirmarEliminarAnticipo() {
   }
 }
 
-function imprimirBalance() {
-  showToast('info', 'Balance', 'Abriendo diálogo de impresión del navegador.')
-  if (typeof window !== 'undefined') {
-    window.print()
-  }
-}
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div id="print-balance" class="space-y-6">
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-800 pb-4">
       <div>
         <div class="flex items-center gap-2">
           <h1 class="text-2xl font-serif font-bold text-amber-300 tracking-wide m-0">
-            Reparto de Socias & Finanzas Atelier
+            Reparto de Socias & Finanzas
           </h1>
           <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] font-bold">
             Reparto según socias registradas
@@ -535,15 +529,6 @@ function imprimirBalance() {
 
       <!-- Main Quick Actions -->
       <div class="flex flex-wrap items-center gap-2">
-        <Button
-          label="Imprimir Balance"
-          icon="pi pi-print"
-          size="small"
-          severity="secondary"
-          outlined
-          class="text-xs"
-          @click="imprimirBalance"
-        />
         <Button
           label="Nuevo Anticipo"
           icon="pi pi-dollar"

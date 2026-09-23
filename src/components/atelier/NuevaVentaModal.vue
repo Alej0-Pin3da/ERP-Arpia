@@ -932,7 +932,7 @@ async function guardar() {
               Liquidación Socias (40% / 30% / 30% — estimado, no oficial)
             </div>
             <div class="flex justify-between text-stone-300">
-              <span>🏛️ Fondo Reinversión Atelier (40% estimado):</span>
+              <span>🏛️ Fondo de Reinversión (40% estimado):</span>
               <span class="font-bold text-amber-400">{{ formatCOP(distribucion403030.reinversion40) }}</span>
             </div>
             <div class="flex justify-between text-stone-300">

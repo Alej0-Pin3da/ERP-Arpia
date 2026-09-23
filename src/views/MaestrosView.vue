@@ -665,7 +665,7 @@ function formatoCOP(val: number) {
             </span>
           </div>
           <p class="text-xs text-stone-400 mt-1 font-mono">
-            Configuración global de Atelier Arpía: Gestión integral (Crear, Editar, Eliminar) de proveedores, canales comerciales, pasarelas, tabla de tallas, merch sin talla, colecciones y tarifas de costeo.
+            Configuración global de Arpía: Gestión integral (Crear, Editar, Eliminar) de proveedores, canales comerciales, pasarelas, tabla de tallas, merch sin talla, colecciones y tarifas de costeo.
           </p>
         </div>
 
@@ -1063,7 +1063,7 @@ function formatoCOP(val: number) {
           <div>
             <h2 class="text-lg font-serif font-bold text-stone-100">Matriz Oficial de Tallas Estándar</h2>
             <p class="text-xs text-stone-400 font-mono mt-0.5">
-              Definición y escalado de medidas anatómicas estándar para la corsetería y prendas de Atelier Arpía.
+              Definición y escalado de medidas anatómicas estándar para la corsetería y prendas de Arpía.
             </p>
           </div>
 
@@ -1627,7 +1627,7 @@ function formatoCOP(val: number) {
                 />
               </div>
             </div>
-            <p class="text-[11px] text-stone-400">Estatuto de reparto mensual de utilidades netas del Atelier.</p>
+            <p class="text-[11px] text-stone-400">Estatuto de reparto mensual de utilidades netas del taller.</p>
           </div>
         </div>
 

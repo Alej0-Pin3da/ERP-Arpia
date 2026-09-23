@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import { useClientes } from '@/composables/useClientes'
+import arpiaEmblem from '@/assets/arpia-emblem.png'
 
 /** Minimal venta shape this modal reads (REAL display object from the caller). */
 export interface VentaDetalleItem {
@@ -81,10 +82,6 @@ function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
 }
 
-function imprimirRecibo() {
-  window.print()
-}
-
 function compartirWhatsApp() {
   if (!props.venta) return
   const v = props.venta
@@ -92,7 +89,7 @@ function compartirWhatsApp() {
     .map((it) => `• ${it.cantidad}x ${it.nombre_prenda} (${it.talla}, ${it.color}) - ${formatCOP(it.subtotal)}`)
     .join('%0A')
 
-  const msg = `*ATELIER ARPÍA - COMPROBANTE DE COMPRA*%0A%0A` +
+  const msg = `*ARPÍA - COMPROBANTE DE COMPRA*%0A%0A` +
     `*Código:* ${v.codigo}%0A` +
     `*Fecha:* ${v.fecha}%0A` +
     `*Cliente:* ${v.cliente_nombre}%0A` +
@@ -101,7 +98,7 @@ function compartirWhatsApp() {
     (v.descuento_valor > 0 ? `*Descuento:* -${formatCOP(v.descuento_valor)} (${v.descuento_porcentaje}%)%0A` : '') +
     `*TOTAL FACTURADO:* ${formatCOP(v.total_venta)}%0A` +
     `*Método de Pago:* ${v.metodo_pago}%0A%0A` +
-    `¡Gracias por apoyar la corsetería y confección de autor de Atelier Arpía! ✨🖤`
+    `¡Gracias por apoyar la corsetería y confección de autor de Arpía! ✨🖤`
 
   const phone = telefonoLimpio.value
   if (!phone) return
@@ -118,18 +115,18 @@ function compartirWhatsApp() {
     :style="{ width: '92vw', maxWidth: '680px' }"
     @update:visible="(v) => emit('update:visible', v)"
   >
-    <div v-if="venta" class="space-y-6 pt-1 text-stone-200">
+    <div v-if="venta" id="print-recibo-venta" class="space-y-6 pt-1 text-stone-200">
       <!-- Luxury Brand Header -->
       <div class="bg-gradient-to-b from-stone-900 to-stone-950 p-5 rounded-2xl border border-amber-500/30 text-center relative overflow-hidden shadow-xl">
         <div class="absolute -top-12 -right-12 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl"></div>
         <div class="flex items-center justify-center gap-2 mb-2">
-          <img src="/arpia-05-1-100x100.png" alt="Arpía Emblem" class="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(217,119,6,0.5)]" />
+          <img :src="arpiaEmblem" alt="Arpía Emblem" class="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(217,119,6,0.5)]" />
           <span class="font-serif text-xl font-bold tracking-widest text-amber-300 uppercase">
-            Atelier Arpía
+            Arpía
           </span>
         </div>
         <p class="text-[11px] text-stone-400 font-serif italic tracking-wide m-0">
-          Alta Corsetería & Lencería de Autor • Pereira, Colombia
+          Corsetería & Lencería de Autor • Pereira, Colombia
         </p>
 
         <div class="mt-4 pt-3 border-t border-stone-800/80 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
@@ -269,14 +266,14 @@ function compartirWhatsApp() {
           </div>
 
           <div class="flex justify-between text-emerald-400 font-bold">
-            <span>Ganancia Neta Atelier:</span>
+            <span>Ganancia Neta del Taller:</span>
             <span>{{ formatCOP(venta.ganancia_neta) }} ({{ margenPct }}%)</span>
           </div>
 
           <div class="mt-3 pt-2 border-t border-stone-800/80 space-y-1.5 text-[11px]">
             <div class="text-[10px] text-stone-500 uppercase tracking-wider">Reparto estimado (no oficial — solo las liquidaciones de Finanzas son oficiales)</div>
             <div class="flex justify-between text-amber-300 font-semibold">
-              <span>🏛️ Fondo Reinversión Atelier (40% estimado):</span>
+              <span>🏛️ Fondo de Reinversión (40% estimado):</span>
               <span>{{ formatCOP(reinversion40) }}</span>
             </div>
             <div class="flex justify-between text-stone-300">
@@ -293,15 +290,7 @@ function compartirWhatsApp() {
     </div>
 
     <template #footer>
-      <div class="flex items-center justify-between gap-2 pt-3 border-t border-stone-800 w-full">
-        <Button
-          label="Imprimir Recibo"
-          icon="pi pi-print"
-          size="small"
-          class="p-button-outlined p-button-secondary text-xs"
-          @click="imprimirRecibo"
-        />
-
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-stone-800 w-full">
         <div class="flex items-center gap-2">
           <Button
             label="Editar Venta"

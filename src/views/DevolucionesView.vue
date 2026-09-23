@@ -28,7 +28,7 @@ const devolucionesDisplay = computed(() => devoluciones.value.map((d: any) => ({
   // Nombres reales resueltos por el backend (sin inventar "Cliente N").
   prenda: d.prenda_nombre || `Venta #${d.venta_id}`,
   cliente: d.cliente_nombre || '—',
-  motivo: d.motivo || 'Ajuste Atelier',
+  motivo: d.motivo || 'Ajuste de taller',
   tipo: d.tipo || 'Garantía',
   estado: d.estado || 'draft',
   // DevolucionRead manda `fecha` (no `creado_en`); se aceptan alias por compat.

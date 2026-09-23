@@ -104,7 +104,7 @@ Guía práctica para operar el sistema día a día: qué hace cada módulo, cóm
 
 1. **Nueva Receta Manual** → modal **Crear Nueva Receta / Ficha Técnica (BOM)** → nombre, código, categoría, tiempos, insumos del BOM → **Guardar Ficha Técnica** (al editar: **Actualizar Ficha Técnica**).
 2. **Ver sugerencias de taller** → modal de ejemplos → describir la prenda para ver una sugerencia de referencia (solo lectura).
-3. **Ver Ficha Técnica >** sobre una tarjeta → modal de ficha: ver costos, BOM, tiempos estándar y precio. Para modificar, pulsar **Editar** → editar campos → **Guardar** (también puede **Imprimir** o **Exportar Planilla** desde la pestaña de matriz).
+3. **Ver Ficha Técnica >** sobre una tarjeta → modal de ficha: ver costos, BOM, tiempos estándar y precio. Para modificar, pulsar **Editar** → editar campos → **Guardar** (también puede **Exportar Planilla** desde la pestaña de matriz).
 4. En el BOM, cada renglón puede llevar **Pieza / Detalle** (ej. torso, manga): el mismo insumo puede repetirse en varias piezas y los costos se suman.
 5. Filtrar por buscador (*nombre, código o material*), categorías (Corsetería, Blusas y Tops, Conjuntos y Sets, Vestidos, Pantalones, Accesorios, Alta Costura), margen (**Pérdida / Por debajo / En meta / Alto**) y ordenar por Nombre, Margen, Precio o Costo.
 6. Eliminar con el icono de papelera → confirmar en **Eliminar receta**.

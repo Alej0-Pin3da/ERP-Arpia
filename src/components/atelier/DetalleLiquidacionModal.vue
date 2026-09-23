@@ -68,19 +68,12 @@ function confirmarPagoSocia() {
   modalPagoVisible.value = false
 }
 
-function imprimirActa() {
-  showToast('info', 'Impresión de Acta', 'Generando formato imprimible del Acta de Reparto de Socias.')
-  if (typeof window !== 'undefined') {
-    window.print()
-  }
-}
-
 function compartirWhatsApp() {
   if (!props.liquidacion) return
   const l = props.liquidacion
   const fecha = l.fecha_cierre
 
-  let mensaje = `*ACTA DE LIQUIDACIÓN Y REPARTO DE UTILIDADES - ATELIER ARPÍA*\n`
+  let mensaje = `*ACTA DE LIQUIDACIÓN Y REPARTO DE UTILIDADES - ARPÍA*\n`
   mensaje += `📜 *Código:* ${l.codigo}\n`
   mensaje += `📅 *Periodo:* ${l.periodo} (Cierre: ${fecha})\n`
   mensaje += `💰 *Ventas Totales:* ${formatCOP(l.total_ventas_brutas)}\n`
@@ -104,7 +97,7 @@ function compartirWhatsApp() {
   })
 
   mensaje += `\n------------------------------------\n`
-  mensaje += `Atelier Arpía • Corsetería & Alta Costura de Autor`
+  mensaje += `Arpía • Corsetería & Lencería de Autor`
 
   const url = `https://wa.me/?text=${encodeURIComponent(mensaje)}`
   window.open(url, '_blank')
@@ -119,12 +112,12 @@ function compartirWhatsApp() {
     :style="{ width: '92vw', maxWidth: '820px' }"
     @update:visible="(v) => emit('update:visible', v)"
   >
-    <div v-if="liquidacion" class="space-y-6 pt-1 text-xs text-stone-200 printable-area">
+    <div v-if="liquidacion" id="print-acta-liquidacion" class="space-y-6 pt-1 text-xs text-stone-200">
       <!-- Header Banner / Luxury Branding -->
       <div class="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-stone-900 via-stone-950 to-stone-900 p-6 text-center relative overflow-hidden">
         <div class="absolute -right-8 -bottom-8 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
         <div class="text-[10px] font-mono tracking-widest uppercase text-amber-400 font-bold">
-          Atelier Arpía • Alta Costura & Corsetería
+          Arpía • Corsetería & Lencería de Autor
         </div>
         <h2 class="text-xl sm:text-2xl font-serif font-bold text-stone-100 mt-1">
           Acta de Liquidación y Reparto de Utilidades
@@ -294,13 +287,6 @@ function compartirWhatsApp() {
             size="small"
             class="p-button-success text-xs font-semibold"
             @click="compartirWhatsApp"
-          />
-          <Button
-            label="Imprimir Acta"
-            icon="pi pi-print"
-            size="small"
-            class="p-button-secondary text-xs"
-            @click="imprimirActa"
           />
           <Button
             label="Cerrar"

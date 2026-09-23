@@ -142,7 +142,7 @@ async function guardar() {
   <Dialog
     :visible="visible"
     modal
-    :header="clienteEditar ? `✏️ Editar Ficha • ${clienteEditar.nombre}` : '✨ Registrar Nueva Clienta (CRM Atelier)'"
+    :header="clienteEditar ? `✏️ Editar Ficha • ${clienteEditar.nombre}` : '✨ Registrar Nueva Clienta'"
     :style="{ width: '90vw', maxWidth: '680px' }"
     @update:visible="(v) => emit('update:visible', v)"
   >

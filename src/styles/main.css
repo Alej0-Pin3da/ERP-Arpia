@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Global styles — ERP ARPIA Luxury Atelier Theme.
+ * Global styles — ERP ARPIA Luxury Theme.
  *
  * Inspired by Arpía (arpia.com.co) — Haute couture corsetry & autor lingerie.
  * Palette: Deep Noir & Velvet Obsidian, Champagne Gold & Burnished Brass accents,
@@ -19,7 +19,7 @@
   color-scheme: dark;
 
   /* ---------------------------------------------------------------------
-   * ARPIA Atelier Design Tokens (arpia.com.co)
+   * ARPIA Design Tokens (arpia.com.co)
    * ------------------------------------------------------------------- */
   --arpia-font-display: 'Cinzel', serif;
   --arpia-font-serif: 'Cormorant Garamond', Georgia, serif;
@@ -41,7 +41,7 @@
   --arpia-secondary-hover: #be123c;
   --arpia-secondary-soft: #fecdd3;
 
-  /* Luxury Atelier Surfaces (Deep Noir & Velvet Charcoal) */
+  /* Luxury Surfaces (Deep Noir & Velvet Charcoal) */
   --arpia-dark-bg: #08080a;
   --arpia-dark: #0f0f13;
   --arpia-dark-elevated: #15151b;
@@ -143,7 +143,7 @@ body {
 }
 
 /* ---------------------------------------------------------------------
-   Typography & Atelier Headings
+   Typography & Headings
  * ------------------------------------------------------------------- */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--arpia-font-heading);
@@ -230,7 +230,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ---------------------------------------------------------------------
-   PrimeVue Enterprise Enhancements & Luxury Atelier Palette
+   PrimeVue Enterprise Enhancements & Luxury Palette
  * ------------------------------------------------------------------- */
 .p-button {
   font-family: var(--arpia-font-button);
@@ -593,5 +593,121 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--arpia-text-primary);
   min-width: 0;
   overflow-wrap: break-word;
+}
+
+/* ---------------------------------------------------------------------
+   Print isolation for A4 documents (receipt, acta, balance) + 80mm tag.
+   Hide everything, reveal ONLY the active printable area, and force a
+   light ink-saving theme on A4 docs: the app is dark, and browsers don't
+   print dark backgrounds, which would leave near-white text invisible.
+   Page size is injected dynamically by utils/print (printWithPage):
+   a static @page must NOT live here or it would leak across documents
+   (e.g. the 80mm thermal size shrinking an A4 receipt).
+
+   Single-active-document rule: several print areas can coexist in the DOM
+   (Finanzas always renders #print-balance and keeps #print-acta-liquidacion
+   while its object is set, even with the modal closed). printWithPage sets
+   body[data-print-active="<id>"] so only the requested document prints;
+   revealing all of them used to stack overlapping docs across pages.
+ * ------------------------------------------------------------------- */
+@media print {
+  /* Only isolate when a JS print is in flight (body[data-print-active]);
+     a manual Ctrl+P without it prints the app normally instead of blank. */
+  body[data-print-active] * {
+    visibility: hidden !important;
+  }
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta,
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta *,
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion,
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion *,
+  body[data-print-active='print-balance'] #print-balance,
+  body[data-print-active='print-balance'] #print-balance *,
+  body[data-print-active='luxury-garment-tag'] #luxury-garment-tag,
+  body[data-print-active='luxury-garment-tag'] #luxury-garment-tag * {
+    visibility: visible !important;
+  }
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta,
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion,
+  body[data-print-active='print-balance'] #print-balance {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+  /* Screen scroll containers would clip/paginate content on paper. */
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta [class*='overflow-'],
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion [class*='overflow-'],
+  body[data-print-active='print-balance'] #print-balance [class*='overflow-'] {
+    overflow: visible !important;
+  }
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta [class*='max-h-'],
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion [class*='max-h-'],
+  body[data-print-active='print-balance'] #print-balance [class*='max-h-'] {
+    max-height: none !important;
+  }
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta [class*='sticky'],
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion [class*='sticky'],
+  body[data-print-active='print-balance'] #print-balance [class*='sticky'] {
+    position: static !important;
+  }
+  /* Table rows never split across pages; thead repeats per page natively. */
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta tr,
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion tr,
+  body[data-print-active='print-balance'] #print-balance tr {
+    break-inside: avoid !important;
+  }
+  /* Decorative blur orbs are screen-only. */
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta [class*='blur-'],
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion [class*='blur-'],
+  body[data-print-active='print-balance'] #print-balance [class*='blur-'] {
+    display: none !important;
+  }
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta *,
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion *,
+  body[data-print-active='print-balance'] #print-balance * {
+    background: transparent !important;
+    background-image: none !important;
+    color: #1c1917 !important;
+    border-color: #d6d3d1 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+  }
+  /* Action buttons and form controls never belong on paper. */
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta button,
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion button,
+  body[data-print-active='print-balance'] #print-balance button,
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta input,
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion input,
+  body[data-print-active='print-balance'] #print-balance input,
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta select,
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion select,
+  body[data-print-active='print-balance'] #print-balance select,
+  body[data-print-active='print-recibo-venta'] #print-recibo-venta textarea,
+  body[data-print-active='print-acta-liquidacion'] #print-acta-liquidacion textarea,
+  body[data-print-active='print-balance'] #print-balance textarea {
+    display: none !important;
+  }
+  /* Thermal tag keeps its exact dark luxury design on the roll. */
+  body[data-print-active='luxury-garment-tag'] #luxury-garment-tag,
+  body[data-print-active='luxury-garment-tag'] #luxury-garment-tag * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body[data-print-active='luxury-garment-tag'] #luxury-garment-tag {
+    position: absolute !important;
+    left: 4mm !important;
+    top: 4mm !important;
+    width: 72mm !important;
+    max-width: 72mm !important;
+    margin: 0 !important;
+    padding: 5mm !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
 

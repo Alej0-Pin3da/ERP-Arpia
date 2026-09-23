@@ -98,16 +98,6 @@ async function guardarEnProducto() {
   }
 }
 
-function imprimirEtiqueta() {
-  if (!datosCompletos.value) {
-    showToast('warn', 'Sin datos', 'La etiqueta requiere la prenda real.')
-    return
-  }
-  showToast('info', 'Vista previa de etiqueta', 'Abriendo diálogo de impresión del navegador.')
-  if (typeof window !== 'undefined') {
-    window.print()
-  }
-}
 </script>
 
 <template>
@@ -166,13 +156,13 @@ function imprimirEtiqueta() {
           <div class="w-1.5 h-1.5 rounded-full bg-stone-950" />
         </div>
 
-        <!-- Atelier Brand Emblem -->
+        <!-- Brand Emblem -->
         <div class="space-y-1">
           <div class="text-xs font-mono tracking-[0.3em] uppercase text-amber-400 font-bold">
             A R P Í A
           </div>
           <div class="text-[10px] font-serif italic text-stone-400">
-            Atelier de Alta Costura & Corsetería
+            Corsetería & Lencería de Autor
           </div>
         </div>
 
@@ -243,7 +233,7 @@ function imprimirEtiqueta() {
     </div>
 
     <template #footer>
-      <div class="flex items-center justify-between w-full pt-3 border-t border-stone-800">
+      <div class="flex items-center justify-start w-full pt-3 border-t border-stone-800">
         <Button
           label="Cerrar"
           icon="pi pi-times"
@@ -253,49 +243,8 @@ function imprimirEtiqueta() {
           class="text-xs"
           @click="emit('update:visible', false)"
         />
-        <Button
-          label="Imprimir Etiqueta Térmica / PDF"
-          icon="pi pi-print"
-          size="small"
-          class="p-button-warning text-xs font-semibold"
-          :disabled="!datosCompletos"
-          @click="imprimirEtiqueta"
-        />
       </div>
     </template>
   </Dialog>
 </template>
 
-<style>
-/* Print isolation (unscoped): bare window.print() used to dump the whole
-   /prendas page behind the dialog. Hide everything except the tag mockup
-   so only ONE tag prints on ONE page. */
-@media print {
-  /* Rollo térmico 80mm continuo: la página es la etiqueta, no una hoja normal. */
-  @page {
-    size: 80mm auto;
-    margin: 0;
-  }
-  body * {
-    visibility: hidden !important;
-  }
-  #luxury-garment-tag,
-  #luxury-garment-tag * {
-    visibility: visible !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-  #luxury-garment-tag {
-    position: absolute !important;
-    left: 4mm !important;
-    top: 4mm !important;
-    width: 72mm !important;
-    max-width: 72mm !important;
-    margin: 0 !important;
-    padding: 5mm !important;
-    box-shadow: none !important;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-}
-</style>

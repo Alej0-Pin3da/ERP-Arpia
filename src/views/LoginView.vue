@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Executive Atelier Login view.
+ * Executive Login view.
  *
  * Implements Arpía (arpia.com.co) luxury aesthetic:
  * - Haute couture corset & wings emblem with burnished gold gradients
@@ -90,7 +90,7 @@ async function onSubmit(): Promise<void> {
 
     <div class="login-card">
       <div class="login-header">
-        <!-- Luxury Golden Arpía Atelier Crest -->
+        <!-- Luxury Golden Arpía Crest -->
         <div class="login-brand-icon">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="login-brand-svg">
             <path d="M16 2L5 8V16C5 22.8 9.7 29.2 16 31C22.3 29.2 27 22.8 27 16V8L16 2Z" fill="url(#gold-grad-bg)" fill-opacity="0.2" stroke="url(#gold-grad)" stroke-width="1.6" />
@@ -184,7 +184,7 @@ async function onSubmit(): Promise<void> {
           type="submit"
           :loading="loading"
           :disabled="loading"
-          label="Ingresar al Atelier"
+          label="Ingresar"
           icon="pi pi-arrow-right"
           icon-pos="right"
         />

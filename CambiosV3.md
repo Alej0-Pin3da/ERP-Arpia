@@ -1,7 +1,38 @@
 # Registro de Cambios y Evolución - Versión 3 (V3)
-## Atelier Arpía — ERP & Sistema Integral de Confección de Autor
+## Arpía — ERP & Sistema Integral de Confección de Autor
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
+
+### [2026-09-22] - Impresiones reparadas: recibo, acta y balance aíslan documento en A4
+
+- **Mapa:** había 4 impresiones. Solo la etiqueta térmica funcionaba (aislamiento `@media print`). Recibo (`DetalleVentaModal`), acta (`DetalleLiquidacionModal`) y balance (`FinanzasView`) usaban `window.print()` pelado: volcaban toda la app oscura (sidebar + fondos) al papel. La ficha técnica no tiene botón Imprimir (el manual lo mencionaba por error).
+- **Cambio:** nuevo `src/utils/print.ts` (`printDocument` A4 / `printThermal80mm` con `@page` inyectado dinámico + limpieza en `afterprint`) + aislamiento print en `src/styles/main.css` (solo el área `#print-*` visible, tema claro forzado para tinta, botones ocultos). IDs en los 3 documentos; la etiqueta migró su `@page 80mm` al helper.
+- **Por qué `@page` dinámico:** un `@page` estático no se puede scopear por documento; una vez cargado el CSS de la etiqueta en el SPA, sus 80mm achicarían cualquier A4 impreso después. Inyectado al imprimir y removido después, cada documento impone su tamaño y no hay fuga.
+- **Manual:** `MANUAL_USUARIO.md` ya no promete Imprimir en ficha (solo Exportar Planilla, que sí descarga CSV real).
+- **Verificación:** `npm run build` PASS. Pendiente prueba manual en navegador: vista previa de cada impresión (recibo, acta, balance, etiqueta).
+- **Archivos:** `src/utils/print.ts` (nuevo), `src/styles/main.css`, `DetalleVentaModal.vue`, `DetalleLiquidacionModal.vue`, `EtiquetaPrendaModal.vue`, `FinanzasView.vue`, `MANUAL_USUARIO.md`. Sin commit.
+
+### [2026-09-22] - Nuevo logo emblema + marca solo "Arpía"
+
+- **Logo:** el emblema pasa a ser `arpia-05-1-909x1024.bk.png` (PNG válido, firma `89 50 4E 47` verificada, 34 KB), copiado binario a `src/assets/arpia-emblem.png` (import bundlado en sidebar y comprobante) y `public/arpia-emblem.png` (favicon). Fuera el JPG fotográfico y los restos del PNG corrupto.
+- **Marca:** en toda la app y manuales ya no dice "Atelier Arpía" / "Arpía Atelier" en ningún lado; solo "Arpía" (sidebar, comprobante, liquidación, mensajes de WhatsApp, cotizador, login, manuales). Se deja intacto `ERP-V4.md` por ser auditoría histórica congelada.
+- **Verificación:** `npm run build` PASS; `dist/assets/arpia-emblem-*.png` presente.
+- **Archivos:** `AppLayout.vue`, `DetalleVentaModal.vue`, `DetalleLiquidacionModal.vue`, `FichaTallasClienteModal.vue`, `Clientes/Cotizador/Dashboard/Maestros/Produccion/Login views`, `index.html`, `MANUAL_OPERATIVO_ARPIA.md`. Sin commit.
+
+### [2026-09-22] - Logo emblema restaurado (PNG corrupto → JPG válido) + marca "Arpía" en sidebar
+
+- **Causa raíz:** `arpia-05-1-100x100.png` (en `public/` y `src/assets/`) estaba corrupto en disco y en git: sus primeros bytes son `EF BF BD` (carácter de reemplazo UTF-8) en vez de la firma JPEG `FF D8 FF E0`. Era un JPEG renombrado a `.png` cuyos bytes altos se reemplazaron al guardarlo en modo texto. Por eso no cargaba en NINGUNA parte, ni por `public/` ni por import bundlado (el fix anterior solo cambió la forma de referenciarlo, no el contenido).
+- **Cambio:** todo apunta al JPG válido existente `src/assets/images/arpia_logo_emblem_1787499417987.jpg` (firma `FF D8 FF E0` verificada): import bundlado en `AppLayout.vue` (sidebar) y `DetalleVentaModal.vue` (comprobante); copia binaria a `public/arpia-emblem.jpg` para el favicon de `index.html`. Sidebar muestra logo + texto `Arpía` (dorado, antes solo imagen sin texto). Eliminados los dos PNG corruptos (3,3 MB muertos).
+- **Nota:** si tenés el `100x100.png` original, pasámelo y restauro los nombres exactos; mientras tanto el emblema JPG es el válido.
+- **Verificación:** `npm run build` PASS; `dist/arpia-emblem.jpg` + `dist/assets/arpia_logo_emblem_*-*.jpg` presentes.
+- **Archivos:** `src/layouts/AppLayout.vue`, `src/components/atelier/DetalleVentaModal.vue`, `index.html`, `public/arpia-emblem.jpg` (nuevo). Sin commit.
+
+### [2026-09-22] - Fix logo emblema en DetalleVentaModal (import bundlado)
+
+- **Causa:** `DetalleVentaModal.vue` usaba `src="/arpia-05-1-100x100.png"` (ruta absoluta a `public/`), frágil en dev/prod vs `AppLayout.vue` que ya importa desde `@/assets` (bundlado con hash y siempre resuelto por Vite).
+- **Cambio:** import `arpiaEmblem from '@/assets/arpia-05-1-100x100.png'` + `:src="arpiaEmblem"` en el header del comprobante.
+- **Verificación:** `npm run build` PASS.
+- **Archivos:** `src/components/atelier/DetalleVentaModal.vue`. Sin commit.
 
 ### [2026-09-21] - Notas por venta persistidas + layout Prendas sin solapes
 
@@ -1872,3 +1903,55 @@ A partir de esta versión (V3), cada cambio, ajuste de lógica, nuevo componente
 - **Verificación:** `npx vitest run src/utils/costeo.test.ts src/composables/useProduccion.test.ts src/composables/usePrendas.test.ts` 9/9; `npm run build` OK (vite 3.32s + server bundle); `eslint` en los 4 archivos tocados limpio salvo 2 errores + 2 warnings pre-existentes en HEAD (verificado con `git stash`: `pruebasCalce`/`generarReciboAnticipo` sin uso, `eslint-disable` sobrantes). Sin commit (árbol dirty).
 - **Archivos:** `src/utils/costeo.ts` (nuevo), `src/utils/costeo.test.ts` (nuevo), `src/components/atelier/DetallePedidoTallerModal.vue`, `src/views/ProduccionView.vue`.
 - **Rollback:** `git checkout -- src/components/atelier/DetallePedidoTallerModal.vue src/views/ProduccionView.vue` + `git clean -f src/utils/costeo.ts src/utils/costeo.test.ts`.
+
+### [2026-09-23] - Impresiones: un solo documento activo + CSS papel (fix todas horribles/multi-página, ruta directa, sin commit)
+
+- **Causa verificada:** el CSS global revelaba `#print-recibo-venta + #print-acta-liquidacion + #print-balance` A LA VEZ; en Finanzas `#print-balance` vive siempre en el DOM (raíz de la vista, sin `v-if`) y `#print-acta-liquidacion` persiste mientras su objeto está seteado aunque el modal esté cerrado — ambos `absolute top-0` superpuestos y fragmentados en varias páginas. Además los contenedores con scroll (`max-h-72 overflow-y-auto`, `overflow-x-auto`, `sticky`) recortaban/rompían la paginación en papel.
+- **`src/utils/print.ts`:** `printWithPage(pageRule, activeId)` ahora setea `body[data-print-active="<id>"]` y lo limpia en `afterprint` (+ fallback 60s); `printDocument(activeId)`, `printThermal80mm(activeId='luxury-garment-tag')`.
+- **`src/styles/main.css`:** el `@media print` solo revela el documento activo; linealiza papel (overflow visible, sin max-h, sticky→static), `tr{break-inside:avoid}`, oculta botones/inputs/selects/textarea y orbes `blur`, mantiene tema claro en A4 y diseño exacto oscuro en la etiqueta 72mm (reglas mudadas desde el modal).
+- **Call sites:** `DetalleVentaModal→printDocument('print-recibo-venta')`, `DetalleLiquidacionModal→printDocument('print-acta-liquidacion')`, `FinanzasView→printDocument('print-balance')`; `EtiquetaPrendaModal` pierde su bloque `<style>` print (unificado en main.css).
+- **Verificación:** `npm run build` OK (vite 3.31s + server bundle). Sin commit (árbol dirty). Pendiente prueba visual del usuario en vista previa de impresión (Ctrl+P) de los 4 documentos.
+- **Archivos:** `src/utils/print.ts`, `src/styles/main.css`, `src/components/atelier/DetalleVentaModal.vue`, `src/components/atelier/DetalleLiquidacionModal.vue`, `src/components/atelier/EtiquetaPrendaModal.vue`, `src/views/FinanzasView.vue`.
+- **Rollback:** `git checkout -- src/utils/print.ts src/styles/main.css src/components/atelier/DetalleVentaModal.vue src/components/atelier/DetalleLiquidacionModal.vue src/components/atelier/EtiquetaPrendaModal.vue src/views/FinanzasView.vue`.
+
+### [2026-09-23] - Impresiones desactivadas: se retiran los 4 botones Imprimir (ruta directa, sin commit)
+
+- **Decisión del dueño:** tras el fix de documento-único+CSS papel, la salida seguía viéndose horrible en su impresora; si no se puede dejar bien, se quita la opción en vez de ofrecer impresiones rotas.
+- **Retirado:** botón "Imprimir Recibo" (`DetalleVentaModal` footer, queda Editar+Cerrar), "Imprimir Acta" (`DetalleLiquidacionModal` footer, queda WhatsApp+Cerrar), "Imprimir Balance" (`FinanzasView` header de acciones), "Imprimir Etiqueta Térmica/PDF" (`EtiquetaPrendaModal` footer, queda solo Cerrar). Se eliminan sus handlers (`imprimirRecibo/imprimirActa/imprimirBalance/imprimirEtiqueta`) e imports muertos.
+- **Infra intacta y dormida:** `src/utils/print.ts` + el `@media print` de `main.css` quedan sin llamadas; el hide global ahora solo rige con `body[data-print-active]` para que un Ctrl+P manual no salga en blanco. Reactivar = reponer los 4 botones con su `printDocument('<id>')`.
+- **Verificación:** `npm run build` OK (vite 3.48s + server bundle). Sin commit (árbol dirty).
+- **Archivos:** `src/components/atelier/DetalleVentaModal.vue`, `src/components/atelier/DetalleLiquidacionModal.vue`, `src/components/atelier/EtiquetaPrendaModal.vue`, `src/views/FinanzasView.vue`, `src/styles/main.css`.
+- **Rollback:** `git checkout -- src/components/atelier/DetalleVentaModal.vue src/components/atelier/DetalleLiquidacionModal.vue src/components/atelier/EtiquetaPrendaModal.vue src/views/FinanzasView.vue src/styles/main.css`.
+
+### [2026-09-23] - Barrido total de copy: fuera "Alta Costura" donde no aplica + marca solo Arpía (ruta directa, sin commit)
+
+- **Reportado:** `AnalisisView` rotulaba la métrica de pedidos de taller como "Pedidos de Alta Costura Entregados" → "Pedidos Entregados" (la card hermana dice "Prendas en Confección Activa"; esos pedidos son del taller, no de una línea couture).
+- **Unificación de marca** (descriptor único "Corsetería & Lencería de Autor", igual que el recibo y el título): etiqueta `EtiquetaPrendaModal` ("Atelier de Alta Costura & Corsetería"→ nuevo), `index.html` title (fuera "Atelier de"), `DetalleLiquidacionModal` header + WhatsApp ("Arpía • Alta Costura & Corsetería" / "Corsetería & Alta Costura de Autor" → nuevo), `DetalleVentaModal` ("Alta Corsetería & Lencería de Autor" → nuevo). Grep final: cero restos de `Atelier de` / `Alta Costura &` / `Alta Corsetería` en `src/`.
+- **Deliberadamente intacto:** taxonomía de datos 'Alta Costura' (`ProductosView`, `FichaTecnicaModal` fallbacks, `NuevaRecetaModal` options — van con maestros/backend, no se tocan), tagline "Moda Lenta & Alta Costura" (`LoginView`, es su lema slow-fashion), "Telas de alta costura" y badge "80%+ (Alta Costura)" (`CotizadorView`, describen materiales/margen), "Atelier" genérico = taller (`Ingresar al Atelier`, `Ganancia Neta Atelier`, `Socia Atelier`...), fases de producción (`Costura`) y estados (`Completada / Entregada`).
+- **Extra:** favicon `/arpia-emblem.png` verificado presente en `public/`.
+- **Verificación:** `npm run build` OK. Sin commit (árbol dirty).
+- **Archivos:** `src/views/AnalisisView.vue`, `src/components/atelier/EtiquetaPrendaModal.vue`, `index.html`, `src/components/atelier/DetalleLiquidacionModal.vue`, `src/components/atelier/DetalleVentaModal.vue`.
+- **Rollback:** `git checkout -- src/views/AnalisisView.vue src/components/atelier/EtiquetaPrendaModal.vue index.html src/components/atelier/DetalleLiquidacionModal.vue src/components/atelier/DetalleVentaModal.vue`.
+
+### [2026-09-23] - Barrido final 'Atelier': cero menciones en todo src (ruta directa, sin commit)
+
+- **Decisión del dueño:** sacar también los 'Atelier' sueltos. Grep final: **cero** ocurrencias de `Atelier` en `src/` (antes 29 en 17 archivos).
+- **UI:** `AnalisisView` ("Análisis de Rendimiento de Arpía"), `LoginView` ("Ingresar"), `UsuariosView` ("Gestión de Usuarios & Roles"), `FinanzasView` ("Reparto de Socias & Finanzas", fallback rol 'Socia'), `NuevaLiquidacionModal` (fallback 'Socia'), `DetalleVentaModal` ("Ganancia Neta del Taller", "Fondo de Reinversión (40% estimado)"), `NuevaVentaModal` (mismo fondo), `DetallePedidoTallerModal` ("...en Taller"), `FichaTecnicaModal` ("Venta Sugerida"), `MaestrosView` ("...del taller"), `GestionSociasModal` ("Rol en el taller"), `NotificacionesModal` (header sin coletilla), `NuevoClienteModal` ("Registrar Nueva Clienta"), `DevolucionesView` (fallback motivo 'Ajuste de taller'), `errors.ts` (FORBIDDEN sin coletilla).
+- **Comentarios:** `App.vue`, `AppLayout.vue` (2), `LoginView`, `EtiquetaPrendaModal`, `main.css` (5) — solo higiene, sin efecto en runtime.
+- **Verificación:** `npm run build` OK (EXIT:0, vite 3.14s + server bundle). Sin commit (árbol dirty).
+- **Archivos:** 17 archivos en `src/` (ver lista arriba + `src/styles/main.css`).
+- **Rollback:** `git checkout -- src/App.vue src/layouts/AppLayout.vue src/api/errors.ts src/views/AnalisisView.vue src/views/DevolucionesView.vue src/views/FinanzasView.vue src/views/LoginView.vue src/views/UsuariosView.vue src/views/MaestrosView.vue src/components/atelier/DetalleVentaModal.vue src/components/atelier/DetallePedidoTallerModal.vue src/components/atelier/EtiquetaPrendaModal.vue src/components/atelier/FichaTecnicaModal.vue src/components/atelier/GestionSociasModal.vue src/components/atelier/NotificacionesModal.vue src/components/atelier/NuevaLiquidacionModal.vue src/components/atelier/NuevaVentaModal.vue src/components/atelier/NuevoClienteModal.vue src/styles/main.css`.
+
+### [2026-09-23] - Auditoría total + 7 puntos: cotizador persiste, optimizador fuera del menú, badge muerto fuera, pager piloto, TODO LOTE cerrado (ruta directa)
+
+- **Push previo:** 9 commits (`dd0f3cf..b52eb8a`) pusheados a `origin/main`.
+- **P1 Cotizador persiste (0043):** tabla `Cotizaciones` (inputs snapshot + resultados calculados en servidor con la misma matemática del front, `codigo` derivado `COT-0001`, `estado` CHECK borrador/enviada/aprobada/descartada); endpoints POST/GET/GET{id}/PATCH estado con roles (lectura/crear todos, estado admin+operador); migración `0043_cotizaciones` (head único, guard idempotente, FK SET NULL); test `test_cotizaciones_api.py` (13 tests: math 43000→107500/64500, margen≥100 ×2.2, 401/404/422, filtros, roles). Front: `services/api/cotizaciones.ts` + botones "Guardar Cotización" y "Llevar precio al producto" (`precio_venta_sugerido` vía `updateProducto`, requiere receta). Revierte decisión P2-6 de AnalisisFull (sin persistencia) por orden explícita de la dueña.
+- **P2 Optimizador fuera del menú:** sale de `menu.ts` + título; ruta `/optimizador` viva + link de Dashboard intactos.
+- **P3 Mock muerto:** `ApiModeBadge` fuera de `AppLayout` (siempre decía REAL); archivo huérfano a borrar con `git rm`. Plumbing `useMode/isMock` queda como contrato testeado (ninguna vista lo consume; quitarlo = churn 20+ archivos sin efecto runtime).
+- **P4 Docs:** se dejan quietos — `ERP-V4` y auditorías están referenciados como historia congelada desde openspec/specs y `CambiosV3`; moverlos rompe referencias normativas.
+- **P5 Pager piloto:** `OmisionesView` con `Paginator` PrimeVue (25/pág, `limit/offset` real, rebote si la página queda vacía). Patrón a replicar en las demás listas `limit:100`.
+- **P6 LOTE Análisis:** el TODO estaba rancio — el Σ `stock_actual` ya estaba implementado; solo se borró el comentario.
+- **God components:** evaluado y DIFERIDO con razón técnica — `MaestrosView` (102KB/2362 líneas) y `FinanzasView` (64KB) no tienen tests de vista ni verificación visual disponible; partirlos a ciegas es cómo nacen las regresiones. Plan: tests de componente primero, extracción por tabs después.
+- **Ruff:** mis archivos pasan `ruff check + format`; `router.py`/`models/__init__.py` (I001) y `omisiones.py` (F401) ya fallaban en HEAD — preexistente, no tocado.
+- **Verificación:** `py_compile` OK, `configure_mappers` OK, `alembic heads` único `0043`, `npm run build` OK (3.20s), `npx vitest run` 41/41. **Pendiente con DB:** `alembic upgrade head` en dev + `pytest backend/tests/test_cotizaciones_api.py` (Postgres local caído; lo corre el CI).
+- **Commits:** C1 `feat(cotizaciones)` / C2 `feat(nav)` / C3 `refactor(brand)` (ver log).
