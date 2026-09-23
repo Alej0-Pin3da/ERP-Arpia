@@ -1,6 +1,7 @@
 from app.db.base import Base
 from app.models.audit import AuditLog
 from app.models.clientes import Cliente
+from app.models.cotizacion import Cotizacion
 from app.models.finanzas import (
     Anticipo,
     AnticipoEstado,
@@ -48,6 +49,7 @@ __all__ = [
     "AuditLog",
     "Usuario",
     "Cliente",
+    "Cotizacion",
     "RefreshToken",
     "CategoriaInsumo",
     "Insumo",

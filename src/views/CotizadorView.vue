@@ -9,6 +9,8 @@ import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Slider from 'primevue/slider'
 import { showToast } from '@/utils/toast'
+import { createCotizacion } from '@/services/api/cotizaciones'
+import { updateProducto } from '@/services/api/productos'
 
 const router = useRouter()
 const productosApi = useProductos()
@@ -135,10 +137,56 @@ function formatCOP(val: number) {
 }
 
 function copiarPresupuestoWhatsApp() {
-  const text = `✨ *PRESUPUESTO DE CONFECCIÓN • ATELIER ARPÍA* ✨\n\n👗 *Prenda:* ${nombrePrenda.value}\n🧵 *Tiempo estimado de confección:* ${tiempoConfeccionMin.value} min\n📦 *Incluye:* Telas de alta costura, forros anatómicos, herrajes reforzados y empaque de lujo.\n\n💎 *Valor Total de la Prenda:* ${formatCOP(precioVentaSugerido.value)} COP\n\n_Para apartar cupo en el taller requerimos un abono del 50%._ 🖤`
+  const text = `✨ *PRESUPUESTO DE CONFECCIÓN • ARPÍA* ✨\n\n👗 *Prenda:* ${nombrePrenda.value}\n🧵 *Tiempo estimado de confección:* ${tiempoConfeccionMin.value} min\n📦 *Incluye:* Telas de alta costura, forros anatómicos, herrajes reforzados y empaque de lujo.\n\n💎 *Valor Total de la Prenda:* ${formatCOP(precioVentaSugerido.value)} COP\n\n_Para apartar cupo en el taller requerimos un abono del 50%._ 🖤`
 
   navigator.clipboard.writeText(text)
   showToast('success', 'Copiado al Portapapeles', 'El presupuesto formateado para WhatsApp se ha copiado con éxito.')
+}
+
+const guardando = ref(false)
+
+async function guardarCotizacion() {
+  if (!nombrePrenda.value.trim()) {
+    showToast('warn', 'Sin nombre', 'Poné nombre a la prenda antes de guardar.')
+    return
+  }
+  guardando.value = true
+  try {
+    const saved = await createCotizacion({
+      producto_id: recetaSeleccionada.value,
+      nombre_prenda: nombrePrenda.value.trim(),
+      metros_tela: metrosTela.value,
+      precio_metro_tela: precioMetroTela.value,
+      metros_forro: metrosForro.value,
+      precio_metro_forro: precioMetroForro.value,
+      costo_avios: costoAvios.value,
+      costo_empaque: costoEmpaque.value,
+      tiempo_confeccion_min: Math.round(tiempoConfeccionMin.value),
+      tarifa_hora: tarifaHora.value,
+      costo_cif: costoCif.value,
+      margen_pct: margenPct.value,
+    })
+    showToast('success', 'Cotización guardada', `${saved.codigo ?? 'COT'} · ${formatCOP(Number(saved.precio_sugerido))}`)
+  } catch (e) {
+    console.error('Error guardando cotización:', e)
+    showToast('error', 'No se pudo guardar', 'Revisá la conexión con el backend e intentá de nuevo.')
+  } finally {
+    guardando.value = false
+  }
+}
+
+async function llevarPrecioAProducto() {
+  if (!recetaSeleccionada.value) {
+    showToast('warn', 'Sin receta', 'Cargá la cotización desde una receta BOM para llevarle el precio.')
+    return
+  }
+  try {
+    await updateProducto(recetaSeleccionada.value, { precio_venta_sugerido: Math.round(precioVentaSugerido.value) })
+    showToast('success', 'Precio actualizado', `Precio sugerido llevado al producto (${formatCOP(precioVentaSugerido.value)}).`)
+  } catch (e) {
+    console.error('Error llevando precio al producto:', e)
+    showToast('error', 'No se pudo actualizar', 'Revisá la conexión con el backend e intentá de nuevo.')
+  }
 }
 </script>
 
@@ -345,6 +393,26 @@ function copiarPresupuestoWhatsApp() {
               <i class="pi pi-whatsapp text-sm" />
               <span>Copiar Presupuesto para WhatsApp</span>
             </button>
+
+            <Button
+              label="Guardar Cotización"
+              icon="pi pi-save"
+              class="w-full text-xs font-semibold p-button-warning"
+              :loading="guardando"
+              :disabled="guardando"
+              @click="guardarCotizacion"
+            />
+
+            <Button
+              label="Llevar precio al producto"
+              icon="pi pi-tag"
+              severity="secondary"
+              outlined
+              class="w-full text-xs font-semibold"
+              :disabled="!recetaSeleccionada"
+              title="Requiere receta BOM cargada"
+              @click="llevarPrecioAProducto"
+            />
 
             <Button
               label="Ir a Gestión de Pedidos"
