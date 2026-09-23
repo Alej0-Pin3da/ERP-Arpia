@@ -52,7 +52,6 @@ const esEnProceso = (e: unknown) =>
 const metricas = computed(() => {
   const pedidosCompletados = pedidosSrc.value.filter((p: any) => esCompletado(p.estado)).length
   const pedidosEnProceso = pedidosSrc.value.filter((p: any) => esEnProceso(p.estado)).length
-  // TODO LOTE: stock = Σ Producto.stock_actual (productosAnalisis ya cargado); las filas unitarias no alimentan nada.
   const stockPrendas = productosAnalisis.value.reduce((acc: number, p: any) => acc + (Number(p.stock_actual ?? 0) || 0), 0)
   const insumosAlertas = insumosAlertasCount.value
 
@@ -73,7 +72,7 @@ function formatCOP(v: number): string {
   <div class="space-y-6">
     <div class="border-b border-stone-800 pb-4">
       <h1 class="text-2xl font-serif font-bold text-amber-300 tracking-wide">
-        Análisis de Rendimiento del Atelier
+        Análisis de Rendimiento de Arpía
       </h1>
       <p class="text-xs text-stone-400 mt-1 font-mono">
         Métricas de productividad de costura, rotación de insumos y márgenes por tipo de prenda.
@@ -86,7 +85,7 @@ function formatCOP(v: number): string {
         <div class="text-2xl font-serif font-bold text-amber-400 mt-1">{{ metricas.pedidosEnProceso }}</div>
       </div>
       <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-4">
-        <div class="text-xs font-mono text-stone-400">Pedidos de Alta Costura Entregados</div>
+        <div class="text-xs font-mono text-stone-400">Pedidos Entregados</div>
         <div class="text-2xl font-serif font-bold text-emerald-400 mt-1">{{ metricas.pedidosCompletados }}</div>
       </div>
       <div class="rounded-xl border border-stone-800 bg-stone-900/60 p-4">

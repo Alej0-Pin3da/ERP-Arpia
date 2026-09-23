@@ -1,17 +1,32 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
+import Paginator from 'primevue/paginator'
 import { useOmisiones } from '@/composables/useOmisiones'
 import { showToast } from '@/utils/toast'
 
 const omisionesApi = useOmisiones()
 
+const PAGE_SIZE = 25
+const total = ref(0)
+const first = ref(0)
 const omisiones = ref<any[]>([])
 async function cargarOmisiones() {
   try {
-    const r = await omisionesApi.list({ limit: 100 })
+    const r = await omisionesApi.list({ limit: PAGE_SIZE, offset: first.value })
     omisiones.value = (r as any).items ?? []
+    total.value = Number((r as any).total ?? 0)
+    if (!omisiones.value.length && first.value > 0) {
+      first.value = Math.max(0, first.value - PAGE_SIZE)
+      const r2 = await omisionesApi.list({ limit: PAGE_SIZE, offset: first.value })
+      omisiones.value = (r2 as any).items ?? []
+      total.value = Number((r2 as any).total ?? 0)
+    }
   } catch { omisiones.value = [] }
+}
+function onPage(e: { first: number }) {
+  first.value = e.first
+  void cargarOmisiones()
 }
 onMounted(() => { void cargarOmisiones() })
 const omisionesDisplay = computed(() => omisiones.value.map((o: any) => ({
@@ -116,6 +131,14 @@ async function marcarResuelta(o: { id: number }) {
           </div>
         </div>
       </div>
+      <Paginator
+        v-if="total > PAGE_SIZE"
+        :rows="PAGE_SIZE"
+        :total-records="total"
+        :first="first"
+        class="mt-1"
+        @page="onPage"
+      />
     </div>
   </div>
 </template>

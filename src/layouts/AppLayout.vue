@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * Persistent Enterprise Atelier Layout.
+ * Persistent Enterprise Layout.
  *
  * Implements Arpía (arpia.com.co) luxury aesthetic:
- * - Golden Arpía Atelier emblem with refined Cinzel typography
+ * - Golden Arpía emblem with refined Cinzel typography
  * - Clean Noir and Gold sidebar with categorized luxury navigation
- * - Atelier status chip ("Taller Activo • Pereira, Colombia")
+ * - Status chip ("Taller Activo • Pereira, Colombia")
  * - Role-aware access and top-bar actions
  */
 import { computed, ref, onMounted } from 'vue'
@@ -14,11 +14,10 @@ import { useRoute, useRouter } from 'vue-router'
 
 import SidebarMenu from '@/components/layout/SidebarMenu.vue'
 import NotificacionesModal from '@/components/atelier/NotificacionesModal.vue'
-import ApiModeBadge from '@/components/ApiModeBadge.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useInsumos } from '@/composables/useInsumos'
 import { roleLabel } from '@/utils/menu'
-import arpiaBrandLogo from '@/assets/arpia-05-1-100x100.png'
+import arpiaBrandLogo from '@/assets/arpia-emblem.png'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 
@@ -51,8 +50,7 @@ const routeTitle = computed(() => {
     recetas: 'Recetas de Confección & Fichas BOM',
     prendas: 'Perchero & Prendas Confeccionadas',
     clientes: 'Gestión de Clientas (Tallas Estándar & CRM)',
-    cotizador: 'Cotizador Rápido de Costura',
-    optimizador: 'Optimizador Textil & Retazos',
+    cotizador: 'Cotizador Rápido',
     analisis: 'Análisis & Rentabilidad',
     ventas: 'Ventas Realizadas',
     devoluciones: 'Garantías & Devoluciones',
@@ -64,7 +62,7 @@ const routeTitle = computed(() => {
     usuarios: 'Gestión de Usuarios & Roles',
   }
   const name = String(route.name || '')
-  return map[name] || 'Atelier Arpía'
+  return map[name] || 'Arpía'
 })
 
 const userInitials = computed(() => {
@@ -101,12 +99,13 @@ function closeSidebar(): void {
     <!-- Sidebar Navigation -->
     <aside class="app-layout__aside" :class="{ 'app-layout__aside--open': sidebarOpen }">
       <div class="app-layout__brand">
-        <router-link to="/" class="app-layout__brand-link" aria-label="Inicio Atelier Arpía">
+        <router-link to="/" class="app-layout__brand-link" aria-label="Inicio Arpía">
           <img
             :src="arpiaBrandLogo"
-            alt="Arpía Atelier"
+            alt="Arpía"
             class="brand-image"
           />
+          <span class="brand-name">Arpía</span>
         </router-link>
       </div>
 
@@ -169,9 +168,6 @@ function closeSidebar(): void {
           <span class="status-chip-text">Taller Pereira • Activo</span>
         </div>
 
-        <!-- API Mode Indicator (MOCK vs REAL backend) -->
-        <ApiModeBadge />
-
         <div class="app-layout__user">
           <Tag class="app-layout__role" severity="secondary" :aria-label="rolLabel">{{ rolLabel }}</Tag>
         </div>
@@ -196,7 +192,7 @@ function closeSidebar(): void {
       </div>
     </main>
 
-    <!-- Global Atelier Modals -->
+    <!-- Global Modals -->
     <NotificacionesModal v-model:visible="showNotifModal" @ir-insumos="router.push('/insumos')" />
   </div>
 </template>
@@ -243,8 +239,20 @@ function closeSidebar(): void {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.6rem;
   text-decoration: none;
   width: 100%;
+}
+
+.brand-name {
+  font-family: var(--arpia-font-display);
+  font-weight: 800;
+  font-size: 1.35rem;
+  letter-spacing: 0.22em;
+  background: var(--arpia-gold-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .brand-image {

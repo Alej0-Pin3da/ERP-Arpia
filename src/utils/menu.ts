@@ -32,7 +32,6 @@ export const MENU_ITEMS: MenuItem[] = [
   { name: 'prendas', path: '/prendas', label: 'Perchero & Stock', icon: 'pi-shopping-bag', roles: ['admin', 'operador', 'consulta'] },
   { name: 'clientes', path: '/clientes', label: 'Clientes CRM', icon: 'pi-users', roles: ['admin', 'operador', 'consulta'] },
   { name: 'cotizador', path: '/cotizador', label: 'Cotizador Rápido', icon: 'pi-calculator', roles: ['admin', 'operador', 'consulta'] },
-  { name: 'optimizador', path: '/optimizador', label: 'Optimizador Textil', icon: 'pi-sparkles', roles: ['admin', 'operador', 'consulta'] },
   { name: 'ventas', path: '/ventas', label: 'Ventas Realizadas', icon: 'pi-shopping-cart', roles: ['admin', 'operador', 'consulta'] },
   { name: 'devoluciones', path: '/devoluciones', label: 'Devoluciones', icon: 'pi-undo', roles: ['admin', 'operador', 'consulta'] },
   { name: 'finanzas', path: '/finanzas', label: 'Reparto de Socias', icon: 'pi-wallet', roles: ['admin', 'operador', 'consulta'] },
