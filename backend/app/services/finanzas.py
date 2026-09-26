@@ -604,7 +604,10 @@ def crear_anticipo(
 def descontar_anticipo(db: Session, anticipo_id: int, liquidacion_id: int) -> Anticipo:
     """Atomically link an anticipo to a liquidacion and transition to DESCONTADO
     (ANT-2/ANT-3). Double-discount of the same anticipo -> 409 (partial unique +
-    FOR UPDATE). ANULADO cannot be discounted (422)."""
+    FOR UPDATE). ANULADO cannot be discounted (422). The matching
+    LiquidacionDistribucion row is updated in the same transaction:
+    deduccion_anticipos += monto, monto_neto = bruto - deduccion (same formula
+    as crear_liquidacion, so manual discount and auto-discount agree)."""
     anticipo = db.scalar(
         select(Anticipo).where(Anticipo.id == anticipo_id).with_for_update()
     )
@@ -620,6 +623,19 @@ def descontar_anticipo(db: Session, anticipo_id: int, liquidacion_id: int) -> An
     try:
         anticipo.transition_to(AnticipoEstado.DESCONTADO)
         anticipo.liquidacion_id = liquidacion_id
+        fila = db.scalar(
+            select(LiquidacionDistribucion).where(
+                LiquidacionDistribucion.liquidacion_id == liquidacion_id,
+                LiquidacionDistribucion.socia_id == anticipo.socia_id,
+            ).with_for_update()
+        )
+        if fila is None:
+            raise HTTPException(
+                status_code=422,
+                detail="La socia no tiene fila de distribución en esta liquidación",
+            )
+        fila.deduccion_anticipos = (Decimal(fila.deduccion_anticipos) + Decimal(anticipo.monto)).quantize(Decimal("0.01"))
+        fila.monto_neto = (Decimal(fila.monto_bruto) - Decimal(fila.deduccion_anticipos)).quantize(Decimal("0.01"))
         db.commit()
         db.refresh(anticipo)
         return anticipo

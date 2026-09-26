@@ -264,7 +264,7 @@ class Anticipo(Base):
         Index("ix_anticipos_socia_fecha", "socia_id", "fecha"),
         Index("ix_anticipos_estado", "estado"),
         Index("ix_anticipos_liquidacion_id", "liquidacion_id"),
-        Index("ix_anticipos_socia_liquidacion", "socia_id", "liquidacion_id", unique=True, postgresql_where=text("liquidacion_id IS NOT NULL")),
+        Index("ix_anticipos_socia_liquidacion", "socia_id", "liquidacion_id", postgresql_where=text("liquidacion_id IS NOT NULL")),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

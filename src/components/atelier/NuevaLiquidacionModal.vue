@@ -132,7 +132,10 @@ async function cargarPreview() {
 }
 
 function recalcularDistribucion() {
-  const util = utilidadNetaCalculada.value
+  // Preview must mirror the server (crear_liquidacion): bruto over the
+  // REPARTIBLE (neta - 40% fondo), ded = full pending sum (no cap), neto
+  // = bruto - ded (may go negative, same as the server).
+  const util = utilidadRepartibleSocias.value
   const activas = sociasPreview.value.filter((s) => s.activo)
 
   distribucionLocal.value = activas.map((s) => {
@@ -143,7 +146,7 @@ function recalcularDistribucion() {
       .reduce((sum, a) => sum + a.monto, 0)
 
     const existingItem = props.liquidacionEditar?.distribucion.find((d) => d.socia_id === s.id)
-    const ded = existingItem ? existingItem.deduccion_anticipos : Math.min(montoBruto, antPending)
+    const ded = existingItem ? existingItem.deduccion_anticipos : antPending
 
     return {
       socia_id: s.id,
@@ -152,7 +155,7 @@ function recalcularDistribucion() {
       porcentaje: s.porcentaje,
       monto_bruto: montoBruto,
       deduccion_anticipos: ded,
-      monto_neto_pagar: Math.max(0, montoBruto - ded),
+      monto_neto_pagar: montoBruto - ded,
       estado_pago: existingItem?.estado_pago || (estado.value === 'PAGADA' ? 'PAGADO' : 'PENDIENTE'),
       fecha_pago: existingItem?.fecha_pago,
       comprobante_transferencia: existingItem?.comprobante_transferencia,

@@ -3,6 +3,16 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-24] - Reparto socias: anticipos mal descontados (descuento manual + multi-anticipo + preview)
+
+- **Causa 1 (la que veías):** `PATCH /anticipos/{id}/descuento` (`descontar_anticipo`) solo marcaba el anticipo DESCONTADO y lo linkeaba, pero NUNCA tocaba la fila `liquidacion_distribucion`. El reparto seguía mostrando bruto/deducción/neto viejos aunque el anticipo figurara descontado.
+- **Causa 2:** el índice parcial `ix_anticipos_socia_liquidacion UNIQUE (socia_id, liquidacion_id)` (mig 0013) permite UN solo anticipo por socia por liquidación, pero `crear_liquidacion` linkea TODOS los pendientes de cada socia a la nueva liquidación. Socia con 2 anticipos pendientes → 409 engañoso "Conflicto al crear la liquidación".
+- **Causa 3 (preview):** `recalcularDistribucion` calculaba el bruto sobre la utilidad NETA total en vez de la REPARTIBLE (neta − fondo 40%) y capeaba la deducción con `Math.min(bruto, pendientes)`. El servidor suma todo sin cap: preview inflado y distinto a lo guardado.
+- **Cambio:** `descontar_anticipo` actualiza la distribución en la misma transacción (`deduccion += monto`, `neto = bruto − deduccion`, misma fórmula que crear; 422 si la socia no tiene fila en esa liquidación). Migración 0044 reemplaza el UNIQUE por índice no-único (mismo nombre, downgrade restaura solo sin duplicados) + modelo `Anticipo` actualizado para que `create_all` no recree el unique. Preview usa repartible sin cap y neto sin piso, igual que el servidor.
+- **Cotizador:** la ruta `/cotizador` y `CotizadorView.vue` seguían existiendo pero el menú los había sacado (cambios sin commitear en `menu.ts`/`AppLayout.vue` que dejaban la ruta huérfana). Restauradas las 2 entradas para que no quede ruta sin acceso.
+- **Verificación:** `test_finanzas_api_v4` 15/15 + `test_finanzas_servicios`/`test_finanzas_schemas` 30/30 PASS; `npm run build` PASS; mig 0044 parse OK. Pendiente: `alembic upgrade head` en dev y prueba manual (crear liquidación con 2 anticipos en una socia + descontar manual y ver distribución moverse).
+- **Archivos:** `backend/app/services/finanzas.py`, `backend/app/models/finanzas.py`, `backend/alembic/versions/0044_anticipos_multi_descuento.py` (nueva), `src/components/atelier/NuevaLiquidacionModal.vue`, `src/utils/menu.ts`, `src/layouts/AppLayout.vue`. Sin commit.
+
 ### [2026-09-22] - Impresiones reparadas: recibo, acta y balance aíslan documento en A4
 
 - **Mapa:** había 4 impresiones. Solo la etiqueta térmica funcionaba (aislamiento `@media print`). Recibo (`DetalleVentaModal`), acta (`DetalleLiquidacionModal`) y balance (`FinanzasView`) usaban `window.print()` pelado: volcaban toda la app oscura (sidebar + fondos) al papel. La ficha técnica no tiene botón Imprimir (el manual lo mencionaba por error).
