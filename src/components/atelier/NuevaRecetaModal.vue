@@ -152,7 +152,8 @@ async function guardar() {
       requiere_fabricacion: true,
       codigo: codigo.value.trim() || null,
       categoria: categoria.value || null,
-      linea: linea.value || null,
+      // Línea fuera de UI: se conserva el valor existente al editar, null al crear.
+      linea: isEditing.value ? (linea.value || null) : null,
       descripcion: descripcion.value.trim() || null,
       tiempo_confeccion_min: Number(tiempoConfeccion.value ?? 0),
       costo_insumos: Number(costoInsumos.value ?? 0),
@@ -232,7 +233,7 @@ async function guardar() {
     @update:visible="(v) => emit('update:visible', v)"
   >
     <div class="space-y-4 pt-1">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Código Referencia</label>
           <InputText v-model="codigo" placeholder="Ej: REC-ARP-09" class="w-full font-mono" />
@@ -242,10 +243,7 @@ async function guardar() {
           <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Categoría</label>
           <Dropdown v-model="categoria" :options="categoriasOptions" class="w-full" />
         </div>
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-stone-400 mb-1.5">Línea</label>
-          <Dropdown v-model="linea" :options="lineasOptions" class="w-full" />
-        </div>
+        <!-- Línea oculta de UI (esconder-no-borrar): el backend la conserva nullable. -->
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">

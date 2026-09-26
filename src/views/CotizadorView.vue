@@ -39,6 +39,20 @@ const precioMetroForro = ref<number>(12000)
 const costoAvios = ref<number>(6500)
 const costoEmpaque = ref<number>(4500)
 
+// Estimación de hilos por dimensiones de tela (aproximada y transparente).
+// Heurística de taller: ~120 m de hilo por metro lineal de tela+forro
+// (overlock + recta + remates). El costo por metro es editable porque
+// depende del cono que compre el taller. No se suma sola al total:
+// se muestra y se aplica a Avíos con un botón para no duplicar.
+const costoHiloMetro = ref<number>(8)
+const metrosTotalesTela = computed(() => Number(metrosTela.value ?? 0) + Number(metrosForro.value ?? 0))
+const metrosHiloEstimado = computed(() => Math.round(metrosTotalesTela.value * 120))
+const costoHilosEstimado = computed(() => Math.round(metrosHiloEstimado.value * Number(costoHiloMetro.value ?? 0)))
+function aplicarEstimacionHilos() {
+  costoAvios.value = Number(costoAvios.value ?? 0) + costoHilosEstimado.value
+  showToast('success', 'Estimación aplicada', `${metrosHiloEstimado.value} m de hilo ≈ ${formatCOP(costoHilosEstimado.value)} sumados a Avíos.`)
+}
+
 // Section 3: Mano de Obra & Costos Fijos
 const tiempoConfeccionMin = ref<number>(120)
 const tarifaHora = ref<number>(8000)
@@ -280,6 +294,19 @@ async function llevarPrecioAProducto() {
               <label class="block text-[11px] text-stone-400 mb-1">Empaque, Bolsa & Etiquetas ($)</label>
               <InputNumber v-model="costoEmpaque" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" class="w-full font-mono text-xs" />
             </div>
+          </div>
+
+          <div class="rounded-xl border border-stone-800 bg-stone-950/60 p-3 text-xs space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold uppercase tracking-wider text-stone-400 text-[11px]">Estimación hilos por tela (aprox.)</span>
+              <span class="font-mono text-stone-300">{{ metrosTotalesTela.toFixed(2) }} m tela → {{ metrosHiloEstimado }} m hilo ≈ {{ formatCOP(costoHilosEstimado) }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-[11px] text-stone-400">Costo hilo $/m</label>
+              <InputNumber v-model="costoHiloMetro" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" class="w-32 font-mono text-xs" />
+              <button type="button" class="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/30" @click="aplicarEstimacionHilos">Sumar a Avíos</button>
+            </div>
+            <p class="text-[10px] text-stone-500 m-0">Heurística: 120 m hilo por metro de tela+forro (overlock+recta+remates). Ajustá el $/m según tu cono.</p>
           </div>
         </div>
 

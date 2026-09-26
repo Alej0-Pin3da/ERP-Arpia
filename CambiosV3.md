@@ -3,6 +3,14 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-26] - Análisis con data real + hilos estimados + Línea fuera de UI
+
+- **Análisis (estaba pobre):** `AnalisisView.vue` solo mostraba 4 contadores locales + rentabilidad teórica por receta, ignorando los 6 endpoints reales del backend (`/analiticos/resumen`, `ventas-mensuales`, `top-productos`, `top-insumos`, `finanzas-mensuales`, `margen-por-producto`, `insumos-bajo-stock`). Ahora cablea los 7 con fallback silencioso: resumen del período (ventas/ticket/margen/gastos/resultado neto), ventas por mes (últimos 6), ingresos vs gastos por mes, top 5 productos e insumos, margen real snapshot por producto y detalle de stock crítico. Nada se fabrica: si un endpoint falla, la sección queda vacía.
+- **Hilos (no estabas pensando de más):** no hay insumo hilo en stock (54 insumos, ninguno es hilo), así que el Cotizador estima transparente: metros tela+forro × 120 m hilo/m (overlock+recta+remates) con $/m editable (default 8) y botón "Sumar a Avíos". No se suma solo para no duplicar: la decisión queda en tu mano y el backend no cambia.
+- **Línea (sobraba):** escondida de UI con patrón esconder-no-borrar (backend `productos.linea` nullable intacto). `NuevaRecetaModal` ya no pide Línea (crea con null, edita conserva), `FichaTecnicaModal` ya no muestra tag ni dropdown (categoría queda como única verdad, `editLinea` pasa passthrough), `ProductosView` muestra categoría en el badge. Maestros conserva Categorías & Líneas para no romper datos existentes.
+- **Verificación:** `npm run build` PASS; `test_finanzas_api_v4` 15/15 PASS. Sin migrar (solo frontend).
+- **Archivos:** `src/views/AnalisisView.vue`, `src/views/CotizadorView.vue`, `src/views/ProductosView.vue`, `src/components/atelier/NuevaRecetaModal.vue`, `src/components/atelier/FichaTecnicaModal.vue`. Sin commit.
+
 ### [2026-09-24] - Reparto socias: anticipos mal descontados (descuento manual + multi-anticipo + preview)
 
 - **Causa 1 (la que veías):** `PATCH /anticipos/{id}/descuento` (`descontar_anticipo`) solo marcaba el anticipo DESCONTADO y lo linkeaba, pero NUNCA tocaba la fila `liquidacion_distribucion`. El reparto seguía mostrando bruto/deducción/neto viejos aunque el anticipo figurara descontado.

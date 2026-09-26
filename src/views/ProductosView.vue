@@ -370,7 +370,7 @@ function solicitarEliminar(r: RecetaDisplay) {
         <div class="space-y-3">
           <div class="flex items-center justify-between">
             <span class="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-950/70 text-amber-300 border border-amber-500/30">
-              {{ r.linea }}
+              {{ r.categoria }}
             </span>
             <span class="font-mono text-xs font-bold text-stone-400">{{ r.codigo }}</span>
           </div>

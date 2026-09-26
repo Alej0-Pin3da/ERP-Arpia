@@ -5,7 +5,6 @@ import Button from 'primevue/button'
 import Dropdown from 'primevue/dropdown'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import Tag from 'primevue/tag'
 import { showToast } from '@/utils/toast'
 import * as bomApi from '@/services/api/bom'
 import * as insumosApi from '@/services/api/insumos'
@@ -732,8 +731,8 @@ function exportarMatriz() {
     <div v-if="receta" class="space-y-5 pt-1">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-800 pb-3">
         <div class="flex items-center gap-2">
-          <Tag severity="warning" class="font-bold tracking-wider text-xs uppercase">{{ isEditing ? editLinea || receta.linea : receta.linea }}</Tag>
-              <span v-if="isDirty" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">• sin guardar</span>
+          <!-- Tag de Línea oculto de UI (esconder-no-borrar): el backend lo conserva. -->
+          <span v-if="isDirty" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">• sin guardar</span>
           <span class="text-xs text-stone-400 font-medium">{{ loadingBom ? 'Cargando BOM...' : `BOM: ${bomReal.length} renglones` }}</span>
         </div>
         <div class="flex items-center gap-2">
@@ -752,7 +751,7 @@ function exportarMatriz() {
       <div v-if="activeTab === 'ficha'" class="space-y-5 animate-fade-in">
         <div v-if="!isEditing" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 bg-stone-900/90 border border-stone-800 rounded-xl p-3.5 text-center">
           <div><div class="text-[11px] uppercase font-bold text-stone-400">Código Referencia</div><div class="text-sm font-mono font-bold text-amber-400 mt-0.5">{{ receta.codigo }}</div></div>
-          <div><div class="text-[11px] uppercase font-bold text-stone-400">Línea / Categoría</div><div class="text-sm font-semibold text-stone-200 mt-0.5">{{ receta.categoria }}</div></div>
+          <div><div class="text-[11px] uppercase font-bold text-stone-400">Categoría</div><div class="text-sm font-semibold text-stone-200 mt-0.5">{{ receta.categoria }}</div></div>
           <div><div class="text-[11px] uppercase font-bold text-stone-400">Colección</div><div class="text-sm font-semibold text-stone-200 mt-0.5">{{ receta.coleccion || '—' }}</div></div>
           <div><div class="text-[11px] uppercase font-bold text-stone-400">Tiempo Estimado</div><div class="text-sm font-semibold text-stone-200 mt-0.5">{{ receta.tiempo_confeccion_min }} min</div></div>
           <div><div class="text-[11px] uppercase font-bold text-stone-400">Costo Unitario</div><div class="text-sm font-bold text-emerald-400 mt-0.5">{{ formatCOP(costoTotalCalculado) }}</div></div>
@@ -760,7 +759,7 @@ function exportarMatriz() {
         <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 bg-stone-900/90 border border-amber-500/30 rounded-xl p-3.5">
           <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Código</label><input v-model="editCodigo" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-amber-400" placeholder="PRD-..." /></div>
           <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Categoría</label><Dropdown v-model="editCategoria" :options="categoriasOptions" placeholder="Elegir (Maestros → Categorías & Líneas)" class="w-full" /></div>
-          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Línea</label><Dropdown v-model="editLinea" :options="lineasOptions" placeholder="Elegir (Maestros → Categorías & Líneas)" class="w-full" /></div>
+          <!-- Línea oculta de UI (esconder-no-borrar): editLinea se conserva passthrough al guardar. -->
           <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Colección</label><Dropdown v-model="editColeccion" :options="coleccionesOptions" placeholder="—" showClear class="w-full" /></div>
           <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Tiempo (min)</label><input v-if="!tieneTiemposEstandar" v-model.number="editTiempo" type="number" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-stone-200" /><div v-else class="w-full bg-stone-950/50 border border-stone-800 rounded px-2 py-1.5 text-sm font-mono text-stone-200" title="Sale de Corte+Costura+Acabados+Calidad">{{ totalEstandarMin }}</div></div>
         </div>
