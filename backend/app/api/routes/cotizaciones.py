@@ -39,11 +39,13 @@ def _calcular(payload: CotizacionCreate) -> tuple[Decimal, Decimal, Decimal]:
     Regla visible (igual en el frontend): margen normal -> costo/(1-margen);
     margen >=100% -> x2.2 fijo; margen que deje menos de 5% de factor -> x2
     (tope anti-margen-cero para no dividir por ~0).
+    Las telas llevan % desperdicio (merma de corte, como el BOM); los hilos
+    son informativos y entran al costo vía costo_avios cuando se aplican.
     """
     subtotal_telas = (
         payload.metros_tela * payload.precio_metro_tela
         + payload.metros_forro * payload.precio_metro_forro
-    )
+    ) * (Decimal(1) + payload.desperdicio_pct / Decimal(100))
     subtotal_avios = payload.costo_avios + payload.costo_empaque
     subtotal_mano_obra = (
         Decimal(payload.tiempo_confeccion_min) / Decimal(60)
@@ -89,6 +91,9 @@ def create_cotizacion(
         tarifa_hora=payload.tarifa_hora,
         costo_cif=payload.costo_cif,
         margen_pct=payload.margen_pct,
+        desperdicio_pct=payload.desperdicio_pct,
+        costo_hilo_m=payload.costo_hilo_m,
+        metros_hilo=payload.metros_hilo,
         costo_total=costo,
         precio_sugerido=precio,
         ganancia_neta=ganancia,

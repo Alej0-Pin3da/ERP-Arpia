@@ -24,6 +24,9 @@ export interface CotizacionCreatePayload {
   tarifa_hora?: number
   costo_cif?: number
   margen_pct?: number
+  desperdicio_pct?: number
+  costo_hilo_m?: number
+  metros_hilo?: number
   observaciones?: string | null
 }
 
@@ -44,6 +47,9 @@ export interface CotizacionRead {
   tarifa_hora: string | number
   costo_cif: string | number
   margen_pct: string | number
+  desperdicio_pct: string | number
+  costo_hilo_m: string | number
+  metros_hilo: string | number
   costo_total: string | number
   precio_sugerido: string | number
   ganancia_neta: string | number

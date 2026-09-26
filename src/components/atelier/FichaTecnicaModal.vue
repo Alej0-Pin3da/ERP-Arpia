@@ -688,17 +688,16 @@ function formatCOP(val: number) {
 }
 
 function exportarMatriz() {
-  // Descarga real: escandallo de la matriz en CSV (componente, medidas,
-  // consumo, valor metro, total). Nada de solo-toast.
+  // Descarga real: escandallo de la matriz en CSV (componente, consumo,
+  // valor metro, total). Sin columnas de medidas: el BOM no guarda
+  // dimensiones por insumo y mostrarlas sería inventar datos.
   try {
     const nombre = (props.receta as unknown as { nombre?: string })?.nombre ?? 'matriz'
     const codigo = (props.receta as unknown as { codigo?: string })?.codigo ?? ''
-    const filas: string[] = ['Componente,Ancho (m),Alto (m),Cant. Cms,Valor Metro,Valor Total']
+    const filas: string[] = ['Componente,Cant. Cms,Valor Metro,Valor Total']
     for (const it of displayItems.value as unknown as Record<string, unknown>[]) {
       const celdas = [
         String(it.nombre ?? ''),
-        Number((it as { ancho?: number }).ancho ?? 0.24).toFixed(2),
-        Number((it as { alto?: number }).alto ?? 0.85).toFixed(2),
         String(Math.round(Number((it as { consumo_unitario?: number }).consumo_unitario ?? 1) * 100)),
         String(Number((it as { costo_unitario?: number }).costo_unitario ?? 0)),
         String(Number((it as { subtotal?: number }).subtotal ?? 0)),
@@ -758,7 +757,7 @@ function exportarMatriz() {
         </div>
         <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 bg-stone-900/90 border border-amber-500/30 rounded-xl p-3.5">
           <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Código</label><input v-model="editCodigo" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-amber-400" placeholder="PRD-..." /></div>
-          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Categoría</label><Dropdown v-model="editCategoria" :options="categoriasOptions" placeholder="Elegir (Maestros → Categorías & Líneas)" class="w-full" /></div>
+          <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Categoría</label><Dropdown v-model="editCategoria" :options="categoriasOptions" placeholder="Elegir (Maestros → Categorías)" class="w-full" /></div>
           <!-- Línea oculta de UI (esconder-no-borrar): editLinea se conserva passthrough al guardar. -->
           <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Colección</label><Dropdown v-model="editColeccion" :options="coleccionesOptions" placeholder="—" showClear class="w-full" /></div>
           <div><label class="block text-[11px] uppercase font-bold text-stone-400 mb-1">Tiempo (min)</label><input v-if="!tieneTiemposEstandar" v-model.number="editTiempo" type="number" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-mono text-stone-200" /><div v-else class="w-full bg-stone-950/50 border border-stone-800 rounded px-2 py-1.5 text-sm font-mono text-stone-200" title="Sale de Corte+Costura+Acabados+Calidad">{{ totalEstandarMin }}</div></div>
@@ -990,23 +989,21 @@ function exportarMatriz() {
 
       <div v-else-if="activeTab === 'matriz'" class="space-y-4 animate-fade-in">
           <div class="bg-stone-900/80 border border-stone-800 rounded-xl p-3 flex items-center justify-between text-xs">
-          <div class="text-stone-300"><strong class="text-amber-400">Matriz de Dimensiones & Consumo Textil</strong> • Escandallo tipo planilla de cálculo</div>
+          <div class="text-stone-300"><strong class="text-amber-400">Matriz de Consumo Textil</strong> • Escandallo tipo planilla de cálculo</div>
           <Button label="Exportar Planilla" icon="pi pi-file-excel" size="small" severity="warning" outlined @click="exportarMatriz" />
         </div>
         <div class="border border-stone-800 rounded-xl overflow-hidden bg-stone-950/80">
           <div class="hidden overflow-x-auto max-h-72 overflow-y-auto sm:block">
           <table class="w-full min-w-[760px] text-left text-xs border-collapse font-mono">
-            <thead><tr class="bg-stone-900 border-b border-stone-800 text-stone-400 font-sans"><th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Componente</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Ancho (m)</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Alto (m)</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Cant. Cms</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Valor Metro</th><th class="py-2.5 px-3 text-right text-amber-400 whitespace-nowrap">Valor Total</th></tr></thead>
+            <thead><tr class="bg-stone-900 border-b border-stone-800 text-stone-400 font-sans"><th class="py-2.5 px-3 sticky left-0 z-10 bg-stone-950/95 min-w-[180px]">Componente</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Cant. Cms</th><th class="py-2.5 px-3 text-right whitespace-nowrap">Valor Metro</th><th class="py-2.5 px-3 text-right text-amber-400 whitespace-nowrap">Valor Total</th></tr></thead>
             <tbody class="divide-y divide-stone-800/50 text-stone-200">
               <tr v-for="it in displayItems" :key="(it as any).id" class="hover:bg-stone-900/40 font-mono">
                 <td class="py-2 px-3 font-sans text-stone-100 sticky left-0 z-10 bg-stone-900/95 min-w-[180px]">{{ (it as any).nombre }}</td>
-                <td class="py-2 px-3 text-right text-stone-400 whitespace-nowrap">{{ ((it as any).ancho || 0.24).toFixed(2) }}</td>
-                <td class="py-2 px-3 text-right text-stone-400 whitespace-nowrap">{{ ((it as any).alto || 0.85).toFixed(2) }}</td>
                 <td class="py-2 px-3 text-right text-stone-300 whitespace-nowrap">{{ Math.round(((it as any).consumo_unitario || 1) * 100) }} cm</td>
                 <td class="py-2 px-3 text-right whitespace-nowrap">{{ formatCOP((it as any).costo_unitario) }}</td>
                 <td class="py-2 px-3 text-right font-bold text-amber-300 whitespace-nowrap">{{ formatCOP((it as any).subtotal) }}</td>
               </tr>
-              <tr v-if="!displayItems.length"><td colspan="6" class="py-6 text-center text-stone-500">Sin insumos para matriz</td></tr>
+              <tr v-if="!displayItems.length"><td colspan="4" class="py-6 text-center text-stone-500">Sin insumos para matriz</td></tr>
             </tbody>
           </table>
           </div>
@@ -1015,10 +1012,6 @@ function exportarMatriz() {
             <div v-if="!displayItems.length" class="text-center py-6 text-sm text-stone-500">Sin insumos para matriz</div>
             <div v-for="it in displayItems" :key="(it as any).id" class="border border-stone-800 rounded-2xl p-4 space-y-1 min-w-0">
               <div class="font-bold text-sm text-stone-100">{{ (it as any).nombre }}</div>
-              <div class="flex items-center justify-between text-sm">
-                <span class="text-xs uppercase tracking-wider text-stone-400">Medidas</span>
-                <span class="font-mono text-stone-300">{{ ((it as any).ancho || 0.24).toFixed(2) }} × {{ ((it as any).alto || 0.85).toFixed(2) }} m</span>
-              </div>
               <div class="flex items-center justify-between text-sm">
                 <span class="text-xs uppercase tracking-wider text-stone-400">Consumo</span>
                 <span class="font-mono text-stone-300">{{ Math.round(((it as any).consumo_unitario || 1) * 100) }} cm</span>

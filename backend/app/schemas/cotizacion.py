@@ -30,6 +30,9 @@ class CotizacionCreate(BaseModel):
     tarifa_hora: Decimal = Field(default=Decimal("0"), ge=0)
     costo_cif: Decimal = Field(default=Decimal("0"), ge=0)
     margen_pct: Decimal = Field(default=Decimal("0"), ge=0)
+    desperdicio_pct: Decimal = Field(default=Decimal("0"), ge=0, le=100)
+    costo_hilo_m: Decimal = Field(default=Decimal("0"), ge=0)
+    metros_hilo: Decimal = Field(default=Decimal("0"), ge=0)
     observaciones: str | None = None
 
 
@@ -52,6 +55,9 @@ class CotizacionRead(BaseModel):
     tarifa_hora: Decimal
     costo_cif: Decimal
     margen_pct: Decimal
+    desperdicio_pct: Decimal
+    costo_hilo_m: Decimal
+    metros_hilo: Decimal
     costo_total: Decimal
     precio_sugerido: Decimal
     ganancia_neta: Decimal

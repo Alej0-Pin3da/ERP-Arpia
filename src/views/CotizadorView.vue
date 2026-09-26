@@ -237,6 +237,9 @@ async function guardarCotizacion() {
       tarifa_hora: tarifaHora.value,
       costo_cif: costoCif.value,
       margen_pct: margenPct.value,
+      desperdicio_pct: Number(desperdicioPct.value ?? 0),
+      costo_hilo_m: Number(costoHiloMetro.value ?? 0),
+      metros_hilo: metrosHiloEstimado.value,
       observaciones: observaciones.value.trim() || null,
     })
     showToast('success', 'Cotización guardada', `${saved.codigo ?? 'COT'} · ${formatCOP(Number(saved.precio_sugerido))}`)

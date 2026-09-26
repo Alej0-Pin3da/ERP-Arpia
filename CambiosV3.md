@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-26] - Paridad desperdicio + hilos persistidos + Líneas ocultas + matriz honesta
+
+- **Paridad desperdicio (divergencia cerrada):** el front sumaba % desperdicio pero `_calcular` no. Mig 0045 agrega `desperdicio_pct` a Cotizaciones (default 0, existentes intactas) y el servidor lo aplica a telas igual que el front. Nota: revisión `0045_cotizaciones_hilos` (24 chars) porque `alembic_version.version_num` es varchar(32).
+- **Hilos persistidos:** la estimación vivía solo en pantalla. Mig 0045 agrega `costo_hilo_m` + `metros_hilo` (informativos, no entran al costo; el costo entra vía avíos). El front los manda al guardar y el historial los conserva.
+- **Líneas fuera de Maestros:** el tab `catprod` mostraba Categorías y Líneas; ahora solo Categorías (backend intacto, datos LINEA conservados). Placeholders de la Ficha actualizados.
+- **Matriz honesta:** el BOM no guarda dimensiones por insumo (`BomInsumoRead` no tiene ancho/alto), así que el `0.24 × 0.85` era ficción en tabla, cards y CSV. Columnas eliminadas: la matriz muestra consumo y valores reales. Si algún día se modelan medidas, vuelven con datos de verdad.
+- **Verificación:** `npm run build` PASS; `test_cotizaciones_api` + `test_finanzas_api_v4` 30/30 PASS; `alembic upgrade head` → 0045 en dev.
+- **Archivos:** `backend/alembic/versions/0045_cotizaciones_hilos.py` (nueva), `backend/app/models/cotizacion.py`, `backend/app/schemas/cotizacion.py`, `backend/app/api/routes/cotizaciones.py`, `src/services/api/cotizaciones.ts`, `src/views/CotizadorView.vue`, `src/views/MaestrosView.vue`, `src/components/atelier/FichaTecnicaModal.vue`. Sin commit.
+
 ### [2026-09-26] - Cotizador: 7 flojos auditados y corregidos
 
 - **No pisar valores:** `onRecetaChange` cargaba nombre/tiempos/CIF/margen pero además pisaba metros (1.0/0.5), precios (split 70/30 de costo_insumos) y avíos fijos (4000/3500). Ahora solo trae nombre, tiempos, CIF y margen; telas/precios/avíos son decisión de la cotización.

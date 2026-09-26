@@ -66,6 +66,17 @@ class Cotizacion(Base):
     margen_pct: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
+    # Merma de corte sobre telas (%, como el BOM) + estimación de hilos
+    # (informativa: el costo de hilos entra vía costo_avios si se aplica).
+    desperdicio_pct: Mapped[Decimal] = mapped_column(
+        Numeric(15, 4), nullable=False, default=Decimal("0")
+    )
+    costo_hilo_m: Mapped[Decimal] = mapped_column(
+        Numeric(15, 4), nullable=False, default=Decimal("0")
+    )
+    metros_hilo: Mapped[Decimal] = mapped_column(
+        Numeric(15, 4), nullable=False, default=Decimal("0")
+    )
     # Server-computed results (single source of truth, mirrors the frontend).
     costo_total: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")

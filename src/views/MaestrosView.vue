@@ -1294,17 +1294,17 @@ function formatoCOP(val: number) {
       </div>
     </div>
 
-    <!-- TAB 5b: CATEGORÍAS & LÍNEAS DE PRODUCTO (listas de la Ficha) -->
+    <!-- TAB 5b: CATEGORÍAS DE PRODUCTO (lista de la Ficha; Líneas ocultas, esconder-no-borrar) -->
     <div v-if="tabActiva === 'catprod'" class="space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-900/50 p-4 rounded-xl border border-stone-800">
         <div>
-          <h2 class="text-lg font-serif font-bold text-stone-100">Categorías & Líneas de Producto</h2>
-          <p class="text-xs text-stone-400 font-mono">Opciones de los selects de la Ficha BOM. Desactivar oculta sin borrar historia.</p>
+          <h2 class="text-lg font-serif font-bold text-stone-100">Categorías de Producto</h2>
+          <p class="text-xs text-stone-400 font-mono">Opciones del select de la Ficha BOM. Desactivar oculta sin borrar historia.</p>
         </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div v-for="grupo in [{ tipo: 'CATEGORIA', titulo: 'Categorías' }, { tipo: 'LINEA', titulo: 'Líneas' }]" :key="grupo.tipo" class="bg-stone-900/60 border border-stone-800 rounded-xl p-4">
+        <div v-for="grupo in [{ tipo: 'CATEGORIA', titulo: 'Categorías' }]" :key="grupo.tipo" class="bg-stone-900/60 border border-stone-800 rounded-xl p-4">
           <h3 class="text-sm font-bold text-stone-100 mb-3">{{ grupo.titulo }}</h3>
           <div class="space-y-2">
             <div v-for="item in catProdPorTipo(grupo.tipo)" :key="item.id" class="flex items-center justify-between gap-2 bg-stone-950/60 border border-stone-800 rounded-lg px-3 py-2">
