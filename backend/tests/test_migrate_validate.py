@@ -41,6 +41,8 @@ from app.models import (
     Cliente,
     CompraInsumo,
     DetalleVenta,
+    Devolucion,
+    DevolucionItem,
     Insumo,
     MovimientoFinanciero,
     Producto,
@@ -229,8 +231,23 @@ def _borrar_productos_canonicales(db) -> None:
     db.commit()
 
 
+def _limpiar_ledger_ajeno(db) -> None:
+    """Vacía el ledger que los checks N7 escanean entero (otras suites dejan
+    compras/movimientos/ventas/devoluciones). Orden FK: items, devoluciones,
+    detalles, ventas, compras, movimientos. Las suites previas ya asertaron;
+    las posteriores crean lo suyo."""
+    db.query(DevolucionItem).delete(synchronize_session=False)
+    db.query(Devolucion).delete(synchronize_session=False)
+    db.query(DetalleVenta).delete(synchronize_session=False)
+    db.query(Venta).delete(synchronize_session=False)
+    db.query(CompraInsumo).delete(synchronize_session=False)
+    db.query(MovimientoFinanciero).delete(synchronize_session=False)
+    db.commit()
+
+
 def _borrar_test(db) -> None:
     """Borra SOLO filas de test por nombre exacto/parejas exactas."""
+    _limpiar_ledger_ajeno(db)
     _borrar_detalles_ventas_p(db)
     db.query(MovimientoFinanciero).filter(MovimientoFinanciero.descripcion == P_MOV).delete(
         synchronize_session=False

@@ -75,20 +75,13 @@ const precioOverride = ref(false)
 const snapshot = ref<Record<string, unknown> | null>(null)
 
 const CATEGORIAS_FALLBACK = ['Corsetería','Blusas y Tops','Conjuntos y Sets','Vestidos','Pantalones','Accesorios','Alta Costura','General']
-const LINEAS_FALLBACK = ['Corsetería', 'Prêt-à-Porter', 'Lencería Fina', 'Alta Costura', 'General']
-// Listas oficiales desde Maestros (Categorías & Líneas, 0037). Si el backend
-// no responde, se usan las de respaldo. El valor ya guardado siempre se
-// incluye aunque se haya desactivado después.
+// Lista oficial desde Maestros (Categorías). Si el backend no responde, se
+// usa la de respaldo. El valor ya guardado siempre se incluye aunque se haya
+// desactivado después. (Línea fuera de UI: editLinea pasa passthrough.)
 const categoriasMaster = ref<string[]>([])
-const lineasMaster = ref<string[]>([])
 const categoriasOptions = computed(() => {
   const base = categoriasMaster.value.length ? categoriasMaster.value : CATEGORIAS_FALLBACK
   const actual = String(isEditing.value ? editCategoria.value : (props.receta as unknown as Record<string, unknown>)?.categoria ?? '').trim()
-  return [...new Set([...base, ...(actual ? [actual] : [])])]
-})
-const lineasOptions = computed(() => {
-  const base = lineasMaster.value.length ? lineasMaster.value : LINEAS_FALLBACK
-  const actual = String(isEditing.value ? editLinea.value : (props.receta as unknown as Record<string, unknown>)?.linea ?? '').trim()
   return [...new Set([...base, ...(actual ? [actual] : [])])]
 })
 async function cargarListasProducto() {
@@ -96,7 +89,6 @@ async function cargarListasProducto() {
     const r = await maestrosApi.listCategoriasProducto({ limit: 100 })
     const items = ((r.items ?? []) as unknown as Record<string, unknown>[])
     categoriasMaster.value = items.filter((i) => i.tipo === 'CATEGORIA' && i.activo !== false).map((i) => String(i.nombre ?? '').trim()).filter((n) => n.length > 0)
-    lineasMaster.value = items.filter((i) => i.tipo === 'LINEA' && i.activo !== false).map((i) => String(i.nombre ?? '').trim()).filter((n) => n.length > 0)
   } catch { /* respaldo local */ }
 }
 // Colecciones de Maestros (Familias & Categorías de Colección): la ficha las

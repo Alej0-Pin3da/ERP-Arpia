@@ -3,6 +3,14 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-26] - Suite en verde 847/847: higiene de tests + muertos + spec contacto
+
+- **Higiene de tests (14 → 0 en corrida completa):** la causa era una sola enfermedad — asserts absolutos sobre DB compartida sin limpieza. `test_audit` hardcodeaba `insumo_id: 1` (analiticos borra sus filas y el autoincremental avanza → 404); ahora usa el id real. `test_devoluciones` y `test_migrate_sales` (6) contaban todas las filas; ahora aíslan por identidad propia (`_ventas_id_de_test`, `>=`). `test_audit` usaba `@test.local` que el validador de email rechaza al leer Clientes → `@arpia-test.com`. `test_ventas_api` asumía vacíos globales; ahora scopea por producto. Seeder y claves canónicas: `==` → `>=` + subset. `test_migrate_validate` (N7a/f/g escanean toda la DB): `_preparar_entorno` vacía el ledger ajeno en orden FK antes de sembrar.
+- **Muertos:** `lineasOptions`/`LINEAS_FALLBACK`/`lineasMaster` fuera de Ficha y NuevaReceta (el passthrough `editLinea`/`linea` queda).
+- **Specs:** `contacto.test.ts` nuevo (waUrl: fallback, saneado, respeto de número). Vitest 44/44 (era 41), doc de "0 specs" desactualizado.
+- **Verificación:** backend 847/847 en corrida completa; `npm test` 44/44; `npm run build` PASS.
+- **Archivos:** `backend/tests/test_audit.py`, `test_devoluciones.py`, `test_migrate_sales.py`, `test_migrate_validate.py`, `test_ventas_api.py`, `test_pr2_backend_api.py`, `src/components/atelier/FichaTecnicaModal.vue`, `NuevaRecetaModal.vue`, `src/utils/contacto.test.ts` (nuevo). Sin commit.
+
 ### [2026-09-26] - Auditoría vista por vista: password policy, WhatsApp centralizado, confirm en Prendas
 
 - **Password policy (fallaba de verdad):** el front prometía mín. 6 pero `change_password` exige 12+ con complejidad → 400 confuso; y `create/update` ni validaban (hueco vs lo declarado en MEJORAS). Ahora crear/editar validan con mensaje de política (400) y el front pide 12 + complejidad. Tests con passwords débiles actualizados a valores que pasan (`TallerArpia9!Q`, etc.).

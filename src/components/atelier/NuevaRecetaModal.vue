@@ -67,8 +67,6 @@ const categoriasOptions = [
   'Alta Costura',
 ]
 
-const lineasOptions = ['Corsetería', 'Prêt-à-Porter', 'Lencería Fina', 'Alta Costura']
-
 async function cargarTipos() {
   try {
     const r = await productosApi.listTiposProducto({ limit: 50 })

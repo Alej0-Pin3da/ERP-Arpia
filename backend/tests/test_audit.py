@@ -1,5 +1,6 @@
 """Tests for audit core: audit table, audit triggers/services, audit query API."""
 
+import uuid
 from datetime import date
 from decimal import Decimal
 
@@ -28,7 +29,7 @@ def _ensure_audit_fixtures():
         if db.get(Cliente, 1) is None:
             try:
                 c = Cliente(
-                    nombre="Audit Cliente", email="audit-cliente@test.local", telefono="3000000000"
+                    nombre="Audit Cliente", email="audit-cliente@arpia-test.com", telefono="3000000000"
                 )
                 db.add(c)
                 db.flush()
@@ -114,7 +115,7 @@ def _create_audit_venta_fixtures():
     try:
         cliente = Cliente(
             nombre=f"Audit Cliente {uuid.uuid4().hex[:6]}",
-            email=f"audit-{uuid.uuid4().hex[:8]}@test.local",
+            email=f"audit-{uuid.uuid4().hex[:8]}@arpia-test.com",
             telefono="3000000000",
         )
         db.add(cliente)
@@ -412,31 +413,35 @@ class TestAuditTriggers:
 
         db2 = SessionLocal()
         try:
-            if db2.get(Insumo, 1) is None:
+            insumo = db2.get(Insumo, 1)
+            if insumo is None:
                 cat = db2.query(CategoriaInsumo).first()
                 if cat is None:
                     cat = CategoriaInsumo(nombre="Audit Cat")
                     db2.add(cat)
                     db2.flush()
-                ins = Insumo(
-                    nombre="Audit Insumo",
+                insumo = Insumo(
+                    nombre=f"Audit Insumo {uuid.uuid4().hex[:6]}",
                     categoria_id=cat.id,
                     unidad_medida="kg",
                     stock_actual=Decimal("100"),
                     stock_minimo=Decimal("10"),
                     costo_promedio_actual=Decimal("10"),
                 )
-                db2.add(ins)
+                db2.add(insumo)
                 db2.commit()
+                db2.refresh(insumo)
+            insumo_id = insumo.id
         except Exception:
             db2.rollback()
+            raise
         finally:
             db2.close()
         headers = {"Authorization": f"Bearer {admin_token}"}
         resp = client.post(
             "/api/v1/compras-insumos",
             headers=headers,
-            json={"insumo_id": 1, "cantidad_comprada": 10, "precio_unitario_compra": 50},
+            json={"insumo_id": insumo_id, "cantidad_comprada": 10, "precio_unitario_compra": 50},
         )
         assert resp.status_code == 201
         compra_id = resp.json()["id"]

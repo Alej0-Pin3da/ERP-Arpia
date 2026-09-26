@@ -26,6 +26,8 @@ Fecha: 2026-08-09
 - Los cambios en `backend/tests/conftest.py` y los tests (aislamiento/limpieza).
 - Si lo apruebas: correr `python -m pytest backend/tests -q` (debe quedar ≥385 green), luego merge a main.
 
+**VEREDICTO 2026-09-26 (rechazada con evidencia, no se mergea):** se levantó la rama en worktree y se corrió `test_migrate_validate + test_migrate_sales + test_migrate_purchases` en ambos lados con la misma DB: main 70/70 PASS, fix3 38 FAILED + 2 ERROR. La rama rompe el pipeline que dice arreglar y no se puede rescatar sin reescribirla (el N7a por clave natural viene atado a cambios en conftest + 12 archivos de tests). La migración ya corrió y la DB opera; N7g valida la idempotencia real y pasa OK. La rama se conserva para referencia pero queda fuera de main. Rehacer N7a solo si una futura re-migración lo exige.
+
 ---
 
 ## 3. PENDIENTES / NO SUBIBLES (para tu revisión)

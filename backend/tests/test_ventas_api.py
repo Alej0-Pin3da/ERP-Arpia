@@ -309,10 +309,11 @@ def test_get_ventas_paginado_filtros(client, operador_token):
         assert body["total"] >= 3
         assert all(v["canal_venta"] == "feria" for v in body["items"])
 
-        # empty filter -> {items: [], total: 0}
+        # empty filter -> {items: [], total: 0} (scoped to own product: other
+        # suites leave cancelled rows in the shared session DB)
         resp = client.get(
             "/api/v1/ventas",
-            params={"estado": "cancelled"},
+            params={"estado": "cancelled", "producto_id": prod_id},
             headers={"Authorization": f"Bearer {operador_token}"},
         )
         assert resp.status_code == 200
@@ -323,7 +324,7 @@ def test_get_ventas_paginado_filtros(client, operador_token):
         # must be filterable, so the Literal-422 filter contract is gone.
         resp = client.get(
             "/api/v1/ventas",
-            params={"canal_venta": "tienda"},
+            params={"canal_venta": "tienda", "producto_id": prod_id},
             headers={"Authorization": f"Bearer {operador_token}"},
         )
         assert resp.status_code == 200
@@ -417,13 +418,16 @@ def test_get_ventas_filtro_producto(client, operador_token):
         assert ids == {venta_b, venta_ab}
         assert body["total"] == 2
 
-        # No filter -> all three.
+        # No filter -> at least our three (other suites leave rows behind).
         resp = client.get(
             "/api/v1/ventas",
+            params={"limit": 100},
             headers={"Authorization": f"Bearer {operador_token}"},
         )
         assert resp.status_code == 200
-        assert resp.json()["total"] == 3
+        body = resp.json()
+        assert body["total"] >= 3
+        assert {venta_a, venta_b, venta_ab}.issubset({v["id"] for v in body["items"]})
     finally:
         _cleanup_ventas_for_producto(prod_a)
         _cleanup_ventas_for_producto(prod_b)

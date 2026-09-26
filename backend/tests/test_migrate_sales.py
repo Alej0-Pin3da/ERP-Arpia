@@ -203,6 +203,17 @@ def _limpiar_ventas_test(db) -> None:
     db.commit()
 
 
+def _contar_ventas_test(db) -> tuple:
+    """(ventas, detalles) creados por este modulo (otras suites dejan filas)."""
+    ids = _ventas_id_de_test(db)
+    if not ids:
+        return 0, 0
+    return (
+        db.query(Venta).filter(Venta.id.in_(ids)).count(),
+        db.query(DetalleVenta).filter(DetalleVenta.venta_id.in_(ids)).count(),
+    )
+
+
 def _borrar_filas_test(db) -> None:
     """Remove rows this test module injected (exact-name matches only)."""
     _limpiar_ventas_test(db)
@@ -358,7 +369,7 @@ def test_aplicar_ventas_inserta_con_fecha_real_canal_y_snapshot(db, mini_ventas)
     db.commit()
 
     assert res["insertadas"] == 2
-    ventas = db.query(Venta).all()
+    ventas = db.query(Venta).filter(Venta.id.in_(_ventas_id_de_test(db))).all()
     assert len(ventas) == 2
     for v in ventas:
         assert v.canal_venta == "feria"  # decision producto
@@ -424,8 +435,8 @@ def test_aplicar_ventas_idempotente(db, mini_ventas):
     aplicar_ventas(db, plan, canal_venta="feria")  # re-ejecucion
     db.commit()
 
-    assert db.query(Venta).count() == 2  # no duplica
-    assert db.query(DetalleVenta).count() == 2
+    n_ventas, n_detalles = _contar_ventas_test(db)
+    assert (n_ventas, n_detalles) == (2, 2)  # no duplica
 
 
 def test_aplicar_ventas_cliente_upsert(db, mini_ventas):
@@ -461,8 +472,8 @@ def test_aplicar_ventas_stock_insuficiente_rollback(db, mini_ventas):
     assert exc.value.status_code == 409
     db.rollback()
     # EXM-4: ninguna venta de la fase queda persistida (rollback de fase)
-    assert db.query(Venta).count() == 0
-    assert db.query(DetalleVenta).count() == 0
+    n_ventas, n_detalles = _contar_ventas_test(db)
+    assert (n_ventas, n_detalles) == (0, 0)
 
 
 def test_aplicar_ventas_no_descuenta_empaques_de_combo(db, tmp_path):
@@ -578,8 +589,8 @@ def test_aplicar_ventas_permitir_deficit_alerta_y_no_rollback(db, tmp_path):
 
     db.refresh(tela)
     assert tela.stock_actual == Decimal("-1")  # deficit permitido (stock negativo)
-    assert db.query(Venta).count() == 2  # las ventas SI se persistieron
-    assert db.query(DetalleVenta).count() == 2
+    n_ventas, n_detalles = _contar_ventas_test(db)
+    assert (n_ventas, n_detalles) == (2, 2)  # las ventas SI se persistieron
     assert res["destock"] >= 1
 
 
@@ -689,7 +700,8 @@ def test_aplicar_ventas_omitida_sin_talla_no_estalla(tmp_path):
         assert res["insertadas"] == 1  # solo P_TOTE
         set_prod = db.query(Producto).filter(Producto.nombre == P_SET).one()
         assert db.query(DetalleVenta).filter(DetalleVenta.producto_id == set_prod.id).count() == 0
-        assert db.query(Venta).count() == 1
+        n_ventas, _ = _contar_ventas_test(db)
+        assert n_ventas == 1
     finally:
         db.rollback()
         db.close()
@@ -739,8 +751,8 @@ def test_aplicar_ventas_rerun_matchea_fila_null_historica(tmp_path):
 
         assert res["insertadas"] == 1  # solo P_TOTE
         assert res["ya_presentes"] == 1  # la linea "S" matcheo la NULL historica
-        assert db.query(Venta).count() == 2  # sin duplicados
-        assert db.query(DetalleVenta).count() == 2
+        n_ventas, n_detalles = _contar_ventas_test(db)
+        assert (n_ventas, n_detalles) == (2, 2)  # sin duplicados
     finally:
         db.rollback()
         db.close()
