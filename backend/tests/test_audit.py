@@ -469,7 +469,7 @@ class TestAuditTriggers:
             json={
                 "nombre": "Test User",
                 "email": "test@test.com",
-                "password": "Pass123!",
+                "password": "Auditoria7!Qx",
                 "rol": "operador",
             },
         )

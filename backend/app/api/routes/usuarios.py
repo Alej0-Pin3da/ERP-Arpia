@@ -65,6 +65,10 @@ def create_usuario(
             status_code=400,
             detail="Email already registered",
         )
+    try:
+        validate_password_strength(payload.password)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     data = payload.model_dump(exclude={"password"})
     usuario = Usuario(**data, password_hash=hash_password(payload.password))
     db.add(usuario)
@@ -100,6 +104,10 @@ def update_usuario(
     for field, value in changes.items():
         setattr(usuario, field, value)
     if password is not None:
+        try:
+            validate_password_strength(password)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
         usuario.password_hash = hash_password(password)
     db.commit()
     db.refresh(usuario)

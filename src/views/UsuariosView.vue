@@ -85,8 +85,8 @@ async function submitForm() {
     showToast('warn', 'Campos requeridos', 'Nombre y email son obligatorios.')
     return
   }
-  if (!isEditing.value && formPassword.value.length < 6) {
-    showToast('warn', 'Contraseña requerida', 'La contraseña debe tener al menos 6 caracteres.')
+  if (!isEditing.value && formPassword.value.length < 12) {
+    showToast('warn', 'Contraseña requerida', 'Mínimo 12 caracteres, con mayúscula, minúscula, dígito y especial.')
     return
   }
   saving.value = true
@@ -147,8 +147,8 @@ function openPassword(u: { id: number; nombre: string }) {
 
 async function submitPassword() {
   if (!passTarget.value) return
-  if (passNew.value.length < 6) {
-    showToast('warn', 'Contraseña inválida', 'La nueva contraseña debe tener al menos 6 caracteres.')
+  if (passNew.value.length < 12) {
+    showToast('warn', 'Contraseña inválida', 'Mínimo 12 caracteres, con mayúscula, minúscula, dígito y especial.')
     return
   }
   try {
@@ -228,7 +228,7 @@ async function submitPassword() {
           <Dropdown v-model="formRol" :options="formRolOptions" option-label="label" option-value="value" class="text-xs w-full" />
         </div>
         <div class="flex flex-col gap-1">
-          <label class="font-semibold text-stone-300">{{ isEditing ? 'Nueva contraseña (vacío = no cambia)' : 'Contraseña * (mín. 6)' }}</label>
+          <label class="font-semibold text-stone-300">{{ isEditing ? 'Nueva contraseña (vacío = no cambia)' : 'Contraseña * (mín. 12, mayúscula + minúscula + dígito + especial)' }}</label>
           <InputText v-model="formPassword" type="password" placeholder="••••••" class="text-xs" />
         </div>
       </div>

@@ -113,27 +113,27 @@ def test_patch_password_changes_login(client, admin_token):
         json={
             "nombre": "Patch Me",
             "email": _unique_email("patch"),
-            "password": "OldPass123!",
+            "password": "TallerArpia9!Q",
             "rol": "operador",
         },
         headers=_auth(admin_token),
     ).json()
     patch = client.patch(
         f"/api/v1/usuarios/{created['id']}",
-        json={"password": "NewPass123!"},
+        json={"password": "TallerArpia8!Q"},
         headers=_auth(admin_token),
     )
     assert patch.status_code == 200
 
     old = client.post(
         "/api/v1/auth/login",
-        json={"email": created["email"], "password": "OldPass123!"},
+        json={"email": created["email"], "password": "TallerArpia9!Q"},
     )
     assert old.status_code == 401
 
     new = client.post(
         "/api/v1/auth/login",
-        json={"email": created["email"], "password": "NewPass123!"},
+        json={"email": created["email"], "password": "TallerArpia8!Q"},
     )
     assert new.status_code == 200
 

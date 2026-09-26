@@ -8,6 +8,7 @@ import type { ProductoRead } from '@/services/api/productos'
 import { listVariantes, createVariante } from '@/services/api/productos'
 import type { PrendaRead } from '@/services/api/prendas'
 import EtiquetaPrendaModal from '@/components/atelier/EtiquetaPrendaModal.vue'
+import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 import type { EtiquetaPrenda, EtiquetaVariante } from '@/components/atelier/EtiquetaPrendaModal.vue'
 
 const productosService = useProductos()
@@ -176,10 +177,30 @@ async function guardarUnidad(u: PrendaRead, patch: Record<string, unknown>) {
   await cargarPrendas()
 }
 
+const unidadAEliminar = ref<PrendaRead | null>(null)
+const showEliminarDialog = ref(false)
+const eliminandoUnidad = ref(false)
+
+function solicitarBorrarUnidad(u: PrendaRead) {
+  unidadAEliminar.value = u
+  showEliminarDialog.value = true
+}
+
+async function confirmarBorrarUnidad() {
+  if (!unidadAEliminar.value) return
+  eliminandoUnidad.value = true
+  try {
+    await prendasService.remove(unidadAEliminar.value.id)
+    await cargarPrendas()
+    unidadAEliminar.value = null
+    showEliminarDialog.value = false
+  } finally {
+    eliminandoUnidad.value = false
+  }
+}
+
 async function borrarUnidad(u: PrendaRead) {
-  if (!window.confirm(`Eliminar la unidad #${u.id} (${u.talla ?? 'Sin talla'})?`)) return
-  await prendasService.remove(u.id)
-  await cargarPrendas()
+  solicitarBorrarUnidad(u)
 }
 
 const gruposTalla = computed<GrupoTalla[]>(() => {
@@ -698,6 +719,14 @@ function onEtiquetaGuardada(payload: { coleccion: string | null; composicion: st
       :producto-id="selectedProductoId"
       :cantidad="selectedCantidad"
       @guardado="onEtiquetaGuardada"
+    />
+    <ConfirmActionDialog
+      v-model:visible="showEliminarDialog"
+      titulo="Eliminar unidad"
+      mensaje="¿Eliminar la unidad del Perchero? Esta acción no se puede deshacer."
+      :detalle="unidadAEliminar ? `#${unidadAEliminar.id} (${unidadAEliminar.talla ?? 'Sin talla'})` : null"
+      :loading="eliminandoUnidad"
+      @confirmar="confirmarBorrarUnidad"
     />
   </div>
 </template>

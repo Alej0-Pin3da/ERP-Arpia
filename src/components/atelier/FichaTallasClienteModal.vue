@@ -8,6 +8,7 @@ import { type ClienteRead, type ClienteUpdatePayload } from '@/services/api/clie
 import { useClientes } from '@/composables/useClientes'
 import { toTallaCode, fromTallaCode } from '@/utils/tallas'
 import { showToast } from '@/utils/toast'
+import { waUrl } from '@/utils/contacto'
 
 const props = defineProps<{
   visible: boolean
@@ -116,7 +117,6 @@ async function guardarFicha() {
 
 function enviarGuiaWhatsApp() {
   if (!props.cliente) return
-  const cleanPhone = (props.cliente.telefono || '').replace(/\D/g, '')
   const msg = encodeURIComponent(
     `¡Hola ${props.cliente.nombre}! Te compartimos la Guía Oficial de Tallas de Arpía ✨:\n\n` +
     `• Tallas Estándar: XXS, XS, S, M, L, XL\n` +
@@ -124,7 +124,7 @@ function enviarGuiaWhatsApp() {
     `• Productos Sin Talla: Tote Bags ilustradas y accesorios\n\n` +
     `¿Deseas encargar alguna prenda de nuestra colección? 🪡`
   )
-  window.open(`https://wa.me/${cleanPhone || '573217265049'}?text=${msg}`, '_blank')
+  window.open(waUrl(props.cliente.telefono, msg), '_blank')
 }
 </script>
 

@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-26] - Auditoría vista por vista: password policy, WhatsApp centralizado, confirm en Prendas
+
+- **Password policy (fallaba de verdad):** el front prometía mín. 6 pero `change_password` exige 12+ con complejidad → 400 confuso; y `create/update` ni validaban (hueco vs lo declarado en MEJORAS). Ahora crear/editar validan con mensaje de política (400) y el front pide 12 + complejidad. Tests con passwords débiles actualizados a valores que pasan (`TallerArpia9!Q`, etc.).
+- **WhatsApp centralizado:** el número del taller hardcodeado en 3 archivos. Nuevo `src/utils/contacto.ts` (`ARPIA_WHATSAPP` + `waUrl`) usado por Clientes, Producción y FichaTallas.
+- **Prendas sin confirm nativo:** `borrarUnidad` usaba `window.confirm`; ahora `ConfirmActionDialog` como el resto de la app.
+- **Auditoría completa:** backend 833 pass; 14 fallos solo en corrida completa (migrate/seeder/ventas por conteo) que pasan aislados → pollution preexistente entre tests, no regresión. Vistas revisadas una por una: Ventas, Producción, Inventario, Productos, Prendas, Clientes, Cotizador, Devoluciones, Finanzas, Maestros, Omisiones, Auditoría, Usuarios, Dashboard sanas (API real, toasts, normalización Numeric). LSP `Paginated[Read]` en rutas es preexistente y cosmético, no se toca.
+- **Verificación:** `npm run build` PASS; `test_usuarios`+`test_auth`+`test_rate_limit_password` 32/32; `test_audit` 22/22.
+- **Archivos:** `backend/app/api/routes/usuarios.py`, `backend/tests/test_usuarios.py`, `backend/tests/test_audit.py`, `src/views/UsuariosView.vue`, `src/views/PrendasListasView.vue`, `src/views/ClientesView.vue`, `src/views/ProduccionView.vue`, `src/components/atelier/FichaTallasClienteModal.vue`, `src/utils/contacto.ts` (nuevo). Sin commit.
+
 ### [2026-09-26] - Paridad desperdicio + hilos persistidos + Líneas ocultas + matriz honesta
 
 - **Paridad desperdicio (divergencia cerrada):** el front sumaba % desperdicio pero `_calcular` no. Mig 0045 agrega `desperdicio_pct` a Cotizaciones (default 0, existentes intactas) y el servidor lo aplica a telas igual que el front. Nota: revisión `0045_cotizaciones_hilos` (24 chars) porque `alembic_version.version_num` es varchar(32).

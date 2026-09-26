@@ -7,6 +7,7 @@ import NuevoClienteModal from '@/components/atelier/NuevoClienteModal.vue'
 import FichaTallasClienteModal from '@/components/atelier/FichaTallasClienteModal.vue'
 import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 import { showToast } from '@/utils/toast'
+import { waUrl } from '@/utils/contacto'
 import { useClientes } from '@/composables/useClientes'
 import type { ClienteRead } from '@/services/api/clientes'
 
@@ -196,7 +197,6 @@ function solicitarEliminar(c: ClienteDisplay) {
 }
 
 function abrirWhatsApp(c: ClienteDisplay) {
-  const cleanPhone = (c.telefono || '').replace(/\D/g, '')
   let msgText = ''
   if (c.talla_habitual?.includes('Sin Talla') || c.categoria_preferida?.includes('Tote Bags')) {
     msgText = `¡Hola ${c.nombre}! Te escribimos de Arpía 👜. Tenemos nuevas Tote Bags ilustradas y accesorios sin talla disponibles. ¿Te gustaría ver el catálogo? ✨`
@@ -204,7 +204,7 @@ function abrirWhatsApp(c: ClienteDisplay) {
     msgText = `¡Hola ${c.nombre}! Te escribimos de Arpía. Tenemos novedades en tus prendas favoritas en talla ${c.talla_habitual || 'estándar'}. ¿Deseas coordinar un nuevo pedido? 🪡✨`
   }
   const msg = encodeURIComponent(msgText)
-  const url = `https://wa.me/${cleanPhone || '573217265049'}?text=${msg}`
+  const url = waUrl(c.telefono, msg)
   window.open(url, '_blank')
 }
 </script>

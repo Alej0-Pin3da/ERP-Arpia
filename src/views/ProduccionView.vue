@@ -12,6 +12,7 @@ import {
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import DetallePedidoTallerModal from '@/components/atelier/DetallePedidoTallerModal.vue'
 import { showToast } from '@/utils/toast'
+import { waUrl } from '@/utils/contacto'
 
 const router = useRouter()
 const produccionService = useProduccion()
@@ -218,7 +219,7 @@ async function devolverEstado(pedido: PedidoDisplay) {
 
 function abrirWhatsApp(p: PedidoDisplay) {
   const msg = encodeURIComponent(`¡Hola ${p.cliente_nombre}! Te escribimos de Arpía sobre tu pedido *${p.codigo}* (${p.prenda_nombre}). Estado actual: *${p.estado}*. ✨`)
-  window.open(`https://wa.me/573217265049?text=${msg}`, '_blank')
+  window.open(waUrl(null, msg), '_blank')
 }
 </script>
 
