@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-26] - Pago por socia real (PAG-1 + auto-cierre)
+
+- **Causa:** "Registrar pago → Confirmar pago" era un no-op deliberado (toast informativo, nada persistía) porque no había dónde guardar. El estado nunca cambiaba.
+- **Cambio:** mig 0047 (`fecha_pago` + `comprobante` en distribución) + endpoint `PATCH /liquidaciones/{id}/distribucion/{socia_id}` (404/422) + auto-cierre a PAGADA cuando estaba APROBADA y no quedan pendientes (hop legal; en BORRADOR no auto-cierra). El modal persiste, muestra fecha/comprobante y avisa si se cerró sola.
+- **Verificación:** `test_finanzas_api_v4` 22/22 (3 tests nuevos); suite completa 855/855; `npm run build` PASS.
+- **Archivos:** mig 0047 (nueva), modelos/schemas/route finanzas, `DetalleLiquidacionModal.vue`, service liquidaciones. Sin commit.
+
 ### [2026-09-26] - Reparto: manda Maestros + liquidación desde ventas elegidas
 
 - **Socias redefinidas (dato):** Valqui figuraba 40% pero el estatuto dice Fondo 40/Margara 30/Valqui 30. Ahora Socios = Fondo Taller 40 (fondo) / Margarita 30 / Valqui 30, ARPIA desactivada (historia intacta). El 40% era del fondo, no de Valqui.

@@ -625,3 +625,92 @@ def test_estatuto_sincroniza_socias(client, admin_token):
         assert Decimal(str(por_nombre["Valqui"]["porcentaje_participacion"])) == Decimal("30")
     finally:
         _cleanup_all()
+
+
+# ---------------------------------------------------------------------------
+# PAG-1: pago por socia
+# ---------------------------------------------------------------------------
+
+
+def _montar_liquidacion_api(client, token):
+    _montar_socias_40_30_30_api(client, token)
+    resp = client.post(
+        "/api/v1/finanzas/liquidaciones/crear",
+        json=_liquidacion_payload(),
+        headers=_auth(token),
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+def test_pago_socia_persiste_estado_y_comprobante(client, admin_token):
+    """PATCH distribucion -> PAGADO con comprobante y fecha (PAG-1)."""
+    _cleanup_all()
+    try:
+        liq = _montar_liquidacion_api(client, admin_token)
+        d0 = liq["distribucion"][0]
+        resp = client.patch(
+            f"/api/v1/finanzas/liquidaciones/{liq['id']}/distribucion/{d0['socia_id']}",
+            json={"estado_pago": "PAGADO", "comprobante": "NEQ-123"},
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["estado_pago"] == "PAGADO"
+        assert body["comprobante"] == "NEQ-123"
+        assert body["fecha_pago"] is not None
+        assert body["liquidacion_auto_cerrada"] is False  # BORRADOR no auto-cierra
+        get = client.get(f"/api/v1/finanzas/liquidaciones/{liq['id']}", headers=_auth(admin_token))
+        d = [x for x in get.json()["distribucion"] if x["socia_id"] == d0["socia_id"]][0]
+        assert d["estado_pago"] == "PAGADO"
+        assert d["comprobante"] == "NEQ-123"
+    finally:
+        _cleanup_liq_anticipos()
+
+
+def test_pago_socia_cierra_liquidacion_aprobada(client, admin_token):
+    """Todas PAGADO + APROBADA -> auto PAGADA; en BORRADOR no."""
+    _cleanup_all()
+    try:
+        liq = _montar_liquidacion_api(client, admin_token)
+        client.patch(
+            f"/api/v1/finanzas/liquidaciones/{liq['id']}/estado",
+            json={"estado": "APROBADA"},
+            headers=_auth(admin_token),
+        )
+        ultimo = None
+        for d in liq["distribucion"]:
+            r = client.patch(
+                f"/api/v1/finanzas/liquidaciones/{liq['id']}/distribucion/{d['socia_id']}",
+                json={"estado_pago": "PAGADO"},
+                headers=_auth(admin_token),
+            )
+            assert r.status_code == 200, r.text
+            ultimo = r.json()
+        assert ultimo["liquidacion_auto_cerrada"] is True
+        get = client.get(f"/api/v1/finanzas/liquidaciones/{liq['id']}", headers=_auth(admin_token))
+        assert get.json()["estado"] == "PAGADA"
+    finally:
+        _cleanup_liq_anticipos()
+
+
+def test_pago_socia_404_y_422(client, admin_token):
+    """Socia inexistente -> 404; estado inválido -> 422."""
+    _cleanup_all()
+    try:
+        liq = _montar_liquidacion_api(client, admin_token)
+        r404 = client.patch(
+            f"/api/v1/finanzas/liquidaciones/{liq['id']}/distribucion/999999",
+            json={"estado_pago": "PAGADO"},
+            headers=_auth(admin_token),
+        )
+        assert r404.status_code == 404
+        d0 = liq["distribucion"][0]
+        r422 = client.patch(
+            f"/api/v1/finanzas/liquidaciones/{liq['id']}/distribucion/{d0['socia_id']}",
+            json={"estado_pago": "TRUCHO"},
+            headers=_auth(admin_token),
+        )
+        assert r422.status_code == 422
+    finally:
+        _cleanup_liq_anticipos()

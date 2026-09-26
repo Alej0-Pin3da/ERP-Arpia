@@ -45,6 +45,8 @@ from app.schemas.finanzas import (
     AnticipoDescuentoUpdate,
     AnticipoEstadoUpdate,
     AnticipoRead,
+    DistribucionPagoRead,
+    DistribucionPagoUpdate,
     LiquidacionCreate,
     LiquidacionEstadoUpdate,
     LiquidacionRead,
@@ -73,6 +75,7 @@ from app.services.finanzas import (
     eliminar_movimiento,
     eliminar_socio_configuracion,
     listar_socias,
+    registrar_pago_distribucion,
     settle_liquidacion,
     transicionar_anticipo,
     transicionar_liquidacion,
@@ -383,6 +386,8 @@ def _liquidacion_response(db: Session, liq: Liquidacion) -> dict:
                 "deduccion_anticipos": d.deduccion_anticipos,
                 "monto_neto": d.monto_neto,
                 "estado_pago": d.estado_pago,
+                "fecha_pago": d.fecha_pago,
+                "comprobante": d.comprobante,
             }
             for d in liq.distribucion
         ],
@@ -467,6 +472,41 @@ def patch_liquidacion_estado(
     resp = _liquidacion_response(db, liq)
     resp["warnings"] = []
     return resp
+
+
+@router.patch(
+    "/liquidaciones/{liquidacion_id}/distribucion/{socia_id}",
+    response_model=DistribucionPagoRead,
+)
+@_critical_limiter.limit("30/minute")
+def pagar_distribucion_socia(
+    request: Request,
+    liquidacion_id: int,
+    socia_id: int,
+    payload: DistribucionPagoUpdate,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(mutation_user),
+):
+    """Pago por socia (PAG-1): persiste estado/comprobante/fecha; auto-cierra la
+    liquidación a PAGADA cuando estaba APROBADA y no quedan pendientes."""
+    fila, auto_cerrada = registrar_pago_distribucion(
+        db,
+        liquidacion_id,
+        socia_id,
+        payload.estado_pago,
+        comprobante=payload.comprobante,
+        fecha_pago=payload.fecha_pago,
+    )
+    return {
+        "id": fila.id,
+        "liquidacion_id": fila.liquidacion_id,
+        "socia_id": fila.socia_id,
+        "socia_nombre": fila.socia.nombre if fila.socia else None,
+        "estado_pago": fila.estado_pago,
+        "fecha_pago": fila.fecha_pago,
+        "comprobante": fila.comprobante,
+        "liquidacion_auto_cerrada": auto_cerrada,
+    }
 
 
 @router.delete("/liquidaciones/{liquidacion_id}", status_code=status.HTTP_204_NO_CONTENT)

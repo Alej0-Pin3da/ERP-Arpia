@@ -15,6 +15,8 @@ export interface LiquidacionDistribucionRead {
   deduccion_anticipos: number | string
   monto_neto: number | string
   estado_pago: string
+  fecha_pago?: string | null
+  comprobante?: string | null
 }
 
 export interface LiquidacionRead {
@@ -87,4 +89,33 @@ export async function transitionLiquidacion(
 
 export async function deleteLiquidacion(id: number): Promise<void> {
   await client.delete(`/finanzas/liquidaciones/${id}`)
+}
+
+export interface DistribucionPagoPayload {
+  estado_pago: 'PENDIENTE' | 'PAGADO' | 'RETENIDO'
+  comprobante?: string | null
+  fecha_pago?: string | null
+}
+
+export interface DistribucionPagoRead {
+  id: number
+  liquidacion_id: number
+  socia_id: number
+  socia_nombre?: string | null
+  estado_pago: string
+  fecha_pago?: string | null
+  comprobante?: string | null
+  liquidacion_auto_cerrada: boolean
+}
+
+export async function registrarPagoSocia(
+  liquidacionId: number,
+  sociaId: number,
+  payload: DistribucionPagoPayload,
+): Promise<DistribucionPagoRead> {
+  const { data } = await client.patch<DistribucionPagoRead>(
+    `/finanzas/liquidaciones/${liquidacionId}/distribucion/${sociaId}`,
+    payload,
+  )
+  return data
 }

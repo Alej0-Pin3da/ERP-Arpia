@@ -602,6 +602,64 @@ def eliminar_liquidacion(db: Session, liquidacion_id: int) -> None:
     db.commit()
 
 
+def registrar_pago_distribucion(
+    db: Session,
+    liquidacion_id: int,
+    socia_id: int,
+    estado_pago: str,
+    comprobante: str | None = None,
+    fecha_pago=None,
+) -> tuple[LiquidacionDistribucion, bool]:
+    """Pago por socia (PAG-1): persiste estado/comprobante/fecha de una fila.
+
+    404 si la fila no existe; 422 si el estado es inválido. Si todas las filas
+    quedan PAGADO y la liquidación está APROBADA, la cierra a PAGADA en la
+    misma transacción (hop legal LIQ-2); retorna (fila, auto_cerrada).
+    """
+    if estado_pago not in (
+        DistribucionEstado.PENDIENTE.value,
+        DistribucionEstado.PAGADO.value,
+        DistribucionEstado.RETENIDO.value,
+    ):
+        raise HTTPException(status_code=422, detail=f"estado_pago inválido: {estado_pago}")
+    fila = db.scalar(
+        select(LiquidacionDistribucion).where(
+            LiquidacionDistribucion.liquidacion_id == liquidacion_id,
+            LiquidacionDistribucion.socia_id == socia_id,
+        )
+    )
+    if fila is None:
+        raise HTTPException(status_code=404, detail="Distribución no encontrada para esa socia")
+    fila.estado_pago = estado_pago
+    if estado_pago == DistribucionEstado.PAGADO.value:
+        fila.fecha_pago = fecha_pago or date.today()
+        if comprobante:
+            fila.comprobante = comprobante
+    elif estado_pago == DistribucionEstado.PENDIENTE.value:
+        fila.fecha_pago = None
+        fila.comprobante = None
+    elif comprobante:
+        fila.comprobante = comprobante
+    db.flush()
+    auto_cerrada = False
+    liq = db.get(Liquidacion, liquidacion_id)
+    if liq is not None and liq.estado == LiquidacionEstado.APROBADA.value:
+        pendientes = db.scalar(
+            select(func.count())
+            .select_from(LiquidacionDistribucion)
+            .where(
+                LiquidacionDistribucion.liquidacion_id == liquidacion_id,
+                LiquidacionDistribucion.estado_pago != DistribucionEstado.PAGADO.value,
+            )
+        )
+        if not pendientes:
+            liq.transition_to(LiquidacionEstado.PAGADA)
+            auto_cerrada = True
+    db.commit()
+    db.refresh(fila)
+    return fila, auto_cerrada
+
+
 # ---------------------------------------------------------------------------
 # v4 — ANT-1/2/3: anticipos
 # ---------------------------------------------------------------------------

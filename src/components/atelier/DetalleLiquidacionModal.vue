@@ -4,6 +4,7 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import { showToast } from '@/utils/toast'
+import { registrarPagoSocia } from '@/services/api/liquidaciones'
 
 /** Minimal liquidación shape this modal reads (REAL display object from the caller). */
 export interface LiquidacionDetalleItem {
@@ -48,6 +49,7 @@ const emit = defineEmits<{
 const modalPagoVisible = ref(false)
 const sociaPagoSeleccionada = ref<LiquidacionDetalleItem | null>(null)
 const comprobanteInput = ref('')
+const registrandoPago = ref(false)
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
@@ -59,13 +61,31 @@ function abrirRegistroPago(item: LiquidacionDetalleItem) {
   modalPagoVisible.value = true
 }
 
-function confirmarPagoSocia() {
-  if (!props.liquidacion || !sociaPagoSeleccionada.value) return
-
-  // La API no tiene endpoint de pago por socia (solo transición de la
-  // liquidación completa): no se finge un éxito que no se persistió.
-  showToast('info', 'Modo REAL', 'El pago por socia se gestiona con la transición de la liquidación en Finanzas.')
-  modalPagoVisible.value = false
+async function confirmarPagoSocia() {
+  if (!props.liquidacion || !sociaPagoSeleccionada.value || registrandoPago.value) return
+  registrandoPago.value = true
+  try {
+    const res = await registrarPagoSocia(props.liquidacion.id, sociaPagoSeleccionada.value.socia_id, {
+      estado_pago: 'PAGADO',
+      comprobante: comprobanteInput.value.trim() || null,
+    })
+    sociaPagoSeleccionada.value.estado_pago = 'PAGADO'
+    sociaPagoSeleccionada.value.fecha_pago = res.fecha_pago ?? new Date().toISOString().split('T')[0]
+    sociaPagoSeleccionada.value.comprobante_transferencia = res.comprobante ?? comprobanteInput.value.trim()
+    modalPagoVisible.value = false
+    showToast(
+      'success',
+      'Pago registrado',
+      res.liquidacion_auto_cerrada
+        ? `${sociaPagoSeleccionada.value.nombre_socia} pagada y liquidación cerrada a PAGADA.`
+        : `${sociaPagoSeleccionada.value.nombre_socia} marcada como PAGADA.`,
+    )
+  } catch (e: unknown) {
+    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+    showToast('error', 'No se pudo registrar', typeof detail === 'string' ? detail : 'Revisá la conexión e intentá de nuevo.')
+  } finally {
+    registrandoPago.value = false
+  }
 }
 
 function compartirWhatsApp() {
@@ -345,6 +365,7 @@ function compartirWhatsApp() {
           icon="pi pi-check"
           size="small"
           class="p-button-success text-xs font-semibold"
+          :loading="registrandoPago"
           @click="confirmarPagoSocia"
         />
       </div>

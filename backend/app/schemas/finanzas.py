@@ -167,6 +167,27 @@ class LiquidacionEstadoUpdate(BaseModel):
     estado: Literal["BORRADOR", "APROBADA", "PAGADA"]
 
 
+class DistribucionPagoUpdate(BaseModel):
+    """Pago por socia: PENDIENTE/PAGADO/RETENIDO + comprobante (PAG-1)."""
+
+    estado_pago: Literal["PENDIENTE", "PAGADO", "RETENIDO"]
+    comprobante: str | None = Field(default=None, max_length=255)
+    fecha_pago: date | None = None
+
+
+class DistribucionPagoRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    liquidacion_id: int
+    socia_id: int
+    socia_nombre: str | None = None
+    estado_pago: str
+    fecha_pago: date | None = None
+    comprobante: str | None = None
+    liquidacion_auto_cerrada: bool = False
+
+
 class LiquidacionDistribucionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -179,6 +200,8 @@ class LiquidacionDistribucionRead(BaseModel):
     deduccion_anticipos: Decimal
     monto_neto: Decimal
     estado_pago: str
+    fecha_pago: date | None = None
+    comprobante: str | None = None
 
 
 class LiquidacionRead(BaseModel):

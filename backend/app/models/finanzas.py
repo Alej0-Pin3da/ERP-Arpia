@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
@@ -248,6 +248,9 @@ class LiquidacionDistribucion(Base):
     deduccion_anticipos: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, server_default=text("0"), default=Decimal("0"))
     monto_neto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     estado_pago: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'PENDIENTE'"), default=DistribucionEstado.PENDIENTE.value)
+    # Pago por socia (0047): fecha real + comprobante de transferencia.
+    fecha_pago: Mapped[date | None] = mapped_column(Date, nullable=True)
+    comprobante: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     liquidacion: Mapped[Liquidacion] = relationship(back_populates="distribucion")
     socia: Mapped[SociosConfiguracion] = relationship()
