@@ -474,3 +474,154 @@ def test_anticipo_socia_inexistente_404(client, admin_token):
         assert resp.status_code in (404, 422)
     finally:
         _cleanup_all()
+
+
+# ---------------------------------------------------------------------------
+# LIQ-ventas: liquidación desde ventas elegidas + estatuto manda
+# ---------------------------------------------------------------------------
+
+
+def _montar_venta_db(total="50000", costo="20000", estado="confirmed"):
+    """Venta + detalle directos (sin stock): snapshot para liquidar."""
+    from app.models.productos import Producto, TipoProducto
+    from app.models.ventas import DetalleVenta, Venta
+
+    db = SessionLocal()
+    try:
+        tipo = TipoProducto(nombre=f"Tipo {_unique()}")
+        db.add(tipo)
+        db.flush()
+        prod = Producto(nombre=f"Prod {_unique()}", tipo_producto_id=tipo.id)
+        db.add(prod)
+        db.flush()
+        venta = Venta(total_venta=Decimal(total), estado=estado)
+        db.add(venta)
+        db.flush()
+        db.add(
+            DetalleVenta(
+                venta_id=venta.id,
+                producto_id=prod.id,
+                cantidad=Decimal("1"),
+                precio_unitario_aplicado=Decimal(total),
+                costo_unitario_aplicado=Decimal(costo),
+            )
+        )
+        db.commit()
+        return venta.id
+    finally:
+        db.close()
+
+
+def _cleanup_ventas_test():
+    from app.models.ventas import DetalleVenta, Venta
+
+    db = SessionLocal()
+    try:
+        db.query(DetalleVenta).delete()
+        db.query(Venta).delete()
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_liquidacion_desde_ventas_snapshot_y_link(client, admin_token):
+    """venta_ids -> totales del snapshot, link seteado, reparto 40/30/30."""
+    _cleanup_all()
+    _montar_socias_40_30_30_api(client, admin_token)
+    v1 = _montar_venta_db("50000", "20000")
+    v2 = _montar_venta_db("30000", "10000")
+    try:
+        resp = client.post(
+            "/api/v1/finanzas/liquidaciones/crear",
+            json=_liquidacion_payload(
+                total_ventas_brutas="0",
+                costo_taller_insumos="0",
+                utilidad_neta_total="0",
+                fondo_reinversion_monto="0",
+                utilidad_repartible="0",
+                gastos_operativos="5000",
+                venta_ids=[v1, v2],
+            ),
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        # servidor manda: 80000 - 30000 - 5000 = 45000 neta, fondo 18000, rep 27000
+        assert Decimal(body["total_ventas_brutas"]) == Decimal("80000")
+        assert Decimal(body["costo_taller_insumos"]) == Decimal("30000")
+        assert Decimal(body["utilidad_neta_total"]) == Decimal("45000")
+        assert Decimal(body["fondo_reinversion_monto"]) == Decimal("18000")
+        assert Decimal(body["utilidad_repartible"]) == Decimal("27000")
+        assert sorted(body["venta_ids"]) == sorted([v1, v2])
+        montos = sorted(Decimal(d["monto_bruto"]) for d in body["distribucion"])
+        assert montos == [Decimal("8100"), Decimal("8100"), Decimal("10800")]
+        # link persistido en las ventas
+        from app.models.ventas import Venta
+
+        db = SessionLocal()
+        try:
+            for vid in (v1, v2):
+                assert db.get(Venta, vid).liquidacion_id == body["id"]
+        finally:
+            db.close()
+    finally:
+        _cleanup_liq_anticipos()
+        _cleanup_ventas_test()
+
+
+def test_liquidacion_venta_repetida_409(client, admin_token):
+    """La misma venta en dos liquidaciones -> 409."""
+    _cleanup_all()
+    _montar_socias_40_30_30_api(client, admin_token)
+    v1 = _montar_venta_db("50000", "20000")
+    try:
+        payload = _liquidacion_payload(gastos_operativos="0", venta_ids=[v1])
+        r1 = client.post("/api/v1/finanzas/liquidaciones/crear", json=payload, headers=_auth(admin_token))
+        assert r1.status_code == 201, r1.text
+        r2 = client.post("/api/v1/finanzas/liquidaciones/crear", json=payload, headers=_auth(admin_token))
+        assert r2.status_code == 409
+    finally:
+        _cleanup_liq_anticipos()
+        _cleanup_ventas_test()
+
+
+def test_liquidacion_venta_cancelada_422(client, admin_token):
+    """Venta cancelled no se puede liquidar -> 422."""
+    _cleanup_all()
+    _montar_socias_40_30_30_api(client, admin_token)
+    v1 = _montar_venta_db("50000", "20000", estado="cancelled")
+    try:
+        resp = client.post(
+            "/api/v1/finanzas/liquidaciones/crear",
+            json=_liquidacion_payload(gastos_operativos="0", venta_ids=[v1]),
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 422
+    finally:
+        _cleanup_liq_anticipos()
+        _cleanup_ventas_test()
+
+
+def test_estatuto_sincroniza_socias(client, admin_token):
+    """PATCH estatuto -> Fondo/Margarita/Valqui replicados en Socios."""
+    _cleanup_all()
+    try:
+        resp = client.patch(
+            "/api/v1/maestros/parametros-costeo",
+            json={
+                "distribucion_reinversion_pct": "40",
+                "reparto_margara_pct": "30",
+                "reparto_valqui_pct": "30",
+            },
+            headers=_auth(admin_token),
+        )
+        assert resp.status_code == 200, resp.text
+        rows = client.get("/api/v1/finanzas/socios", headers=_auth(admin_token)).json()
+        items = rows["items"] if isinstance(rows, dict) else rows
+        por_nombre = {s["nombre"]: s for s in items}
+        assert Decimal(str(por_nombre["Fondo Taller"]["porcentaje_participacion"])) == Decimal("40")
+        assert por_nombre["Fondo Taller"]["es_fondo_taller"] is True
+        assert Decimal(str(por_nombre["Margarita"]["porcentaje_participacion"])) == Decimal("30")
+        assert Decimal(str(por_nombre["Valqui"]["porcentaje_participacion"])) == Decimal("30")
+    finally:
+        _cleanup_all()

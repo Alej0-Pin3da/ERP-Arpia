@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-26] - Reparto: manda Maestros + liquidación desde ventas elegidas
+
+- **Socias redefinidas (dato):** Valqui figuraba 40% pero el estatuto dice Fondo 40/Margara 30/Valqui 30. Ahora Socios = Fondo Taller 40 (fondo) / Margarita 30 / Valqui 30, ARPIA desactivada (historia intacta). El 40% era del fondo, no de Valqui.
+- **Manda Maestros (código):** el estatuto era decorado (fondo hardcodeado 40, % ignorados). Ahora `patch_parametros` replica fondo/margara/valqui en Socios en la misma transacción, y `crear_liquidacion` lee el % fondo del estatuto en vez del 40 fijo. El preview también usa el % del estatuto (fallback 40).
+- **Liquidación desde ventas:** mig 0046 (`Ventas.liquidacion_id` FK SET NULL) + `venta_ids` en crear: solo confirmed y sin liquidar (404/422/409), totales/costo/neta/repartible del snapshot (el servidor manda), link en la misma transacción. GET lista `sin_liquidar`. En el modal: picker de ventas confirmadas sin liquidar, totales bloqueados con selección (limpiar = manual), respuesta trae `venta_ids`.
+- **Bugs matados al pasar:** `cargarTotalesVentas` filtraba por 'COMPLETADA' pero la API manda 'confirmed' → siempre caía a 23.5M/6.8M hardcodeados. Reemplazado por el picker real.
+- **Verificación:** `test_finanzas_api_v4` 19/19 (4 tests nuevos: snapshot+link, 409 repetida, 422 cancelada, sync estatuto); afectadas 167/167; `npm run build` PASS.
+- **Archivos:** mig 0046 (nueva), modelos/ventas+schemas, `services/finanzas.py`, `services/maestros.py`, routes finanzas/ventas, `NuevaLiquidacionModal.vue`, services liquidaciones/ventas, `MaestrosView.vue` (nota). Sin commit.
+
 ### [2026-09-26] - Backfill filas sin fecha con 2025-03 autorizado (4 gastos)
 
 - **Qué:** `plan_compras` y `plan_finanzas` aceptan `fecha_fallback` (default None = comportamiento intacto). Nuevo `migrate/backfill_sin_fecha.py` (--dry-run/--apply): dif por (hoja,fila) + doble guarda idempotente por clave natural. Aplicado: 4 GASTOS ARPIA como Gasto socio ARPIA al 2025-03-01 ($61.300 total); re-run confirma 0 duplicados (4 ya-existentes).

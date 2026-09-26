@@ -284,6 +284,7 @@ def patch_parametros(db: Session, data: dict) -> ParametrosCosteo:
     for k, v in data.items():
         if v is not None or k in data:
             setattr(obj, k, v)
+    _sincronizar_socias_desde_estatuto(db, obj)
     try:
         db.commit()
         db.refresh(obj)
@@ -291,3 +292,37 @@ def patch_parametros(db: Session, data: dict) -> ParametrosCosteo:
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(status_code=422, detail=str(e)) from None
+
+
+def _sincronizar_socias_desde_estatuto(db: Session, obj: ParametrosCosteo) -> None:
+    """El estatuto manda: replica fondo/margara/valqui en SociosConfiguracion.
+
+    Fondo por flag es_fondo_taller (get-or-create "Fondo Taller"); Margarita y
+    Valqui por nombre (solo si existen, nunca se crean socias desde acá).
+    Misma transacción que el patch (el caller commitea).
+    """
+    from app.models.finanzas import SociosConfiguracion
+
+    fondo = db.scalar(
+        select(SociosConfiguracion).where(SociosConfiguracion.es_fondo_taller.is_(True))
+    )
+    if fondo is None:
+        fondo = SociosConfiguracion(
+            nombre="Fondo Taller",
+            porcentaje_participacion=obj.distribucion_reinversion_pct,
+            es_fondo_taller=True,
+            activo=True,
+        )
+        db.add(fondo)
+    else:
+        fondo.porcentaje_participacion = obj.distribucion_reinversion_pct
+        fondo.activo = True
+    for nombre, pct in (
+        ("Margarita", obj.reparto_margara_pct),
+        ("Valqui", obj.reparto_valqui_pct),
+    ):
+        socia = db.scalar(select(SociosConfiguracion).where(SociosConfiguracion.nombre == nombre))
+        if socia is None:
+            db.add(SociosConfiguracion(nombre=nombre, porcentaje_participacion=pct, activo=True))
+        else:
+            socia.porcentaje_participacion = pct

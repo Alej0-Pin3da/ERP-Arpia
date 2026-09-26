@@ -94,6 +94,11 @@ class Venta(Base):
     )
     reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Liquidación que la incluye (0046): una venta va a lo sumo a una liquidación.
+    liquidacion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("liquidaciones.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     cliente: Mapped[Cliente | None] = relationship(lazy="selectin")  # noqa: F821
     detalles: Mapped[list[DetalleVenta]] = relationship(back_populates="venta", lazy="selectin")
     reversed_by_user: Mapped[Usuario | None] = relationship(lazy="selectin")  # noqa: F821

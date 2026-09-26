@@ -95,6 +95,8 @@ class VentaRead(BaseModel):
     reversed_motivo: str | None = None
     reversed_by: int | None = None
     reversed_at: datetime | None = None
+    # Liquidación que la incluye (0046, NULL = sin liquidar)
+    liquidacion_id: int | None = None
     # Enriched fields (derived via model @property, no extra query if selectin)
     cliente_nombre: str | None = None
     codigo: str | None = None

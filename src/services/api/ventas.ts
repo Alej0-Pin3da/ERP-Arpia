@@ -67,6 +67,7 @@ export interface VentaRead {
   margarita_30?: string | number | null
   valqui_30?: string | number | null
   es_regalo: boolean
+  liquidacion_id?: number | null
   detalles: DetalleVentaRead[]
 }
 
@@ -79,6 +80,7 @@ export interface ListVentasParams {
   canal_venta?: CanalVentaInput
   estado?: string
   producto_id?: number
+  sin_liquidar?: boolean
   limit?: number
   offset?: number
   sort_by?: string

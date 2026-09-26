@@ -32,6 +32,7 @@ export interface LiquidacionRead {
   observaciones?: string | null
   distribucion: LiquidacionDistribucionRead[]
   warnings: string[]
+  venta_ids?: number[]
 }
 
 export interface LiquidacionCreatePayload {
@@ -44,6 +45,7 @@ export interface LiquidacionCreatePayload {
   fondo_reinversion_monto: number | string
   utilidad_repartible: number | string
   observaciones?: string | null
+  venta_ids?: number[]
 }
 
 export interface Paginated<T> {

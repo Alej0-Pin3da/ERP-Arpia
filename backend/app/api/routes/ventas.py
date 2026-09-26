@@ -80,6 +80,7 @@ def list_ventas(
     canal_venta: str | None = None,
     estado: str | None = None,
     producto_id: int | None = None,
+    sin_liquidar: bool | None = None,
     sort_by: str | None = None,
     order: Literal["asc", "desc"] = "asc",
     db: Session = Depends(get_db),
@@ -92,6 +93,8 @@ def list_ventas(
         stmt = stmt.where(Venta.estado == estado)
     if producto_id is not None:
         stmt = stmt.where(Venta.detalles.any(DetalleVenta.producto_id == producto_id))
+    if sin_liquidar:
+        stmt = stmt.where(Venta.liquidacion_id.is_(None))
     stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_VENTAS)
     rows, total = paginar(db, stmt, limit, offset)
     return Paginated[VentaRead](items=list(rows), total=total)

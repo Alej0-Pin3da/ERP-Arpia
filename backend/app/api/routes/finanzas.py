@@ -38,6 +38,7 @@ from app.models.finanzas import (
     SociosConfiguracion,
 )
 from app.models.usuarios import Usuario
+from app.models.ventas import Venta
 from app.schemas.common import Paginated
 from app.schemas.finanzas import (
     AnticipoCreate,
@@ -368,6 +369,9 @@ def _liquidacion_response(db: Session, liq: Liquidacion) -> dict:
         "utilidad_repartible": liq.utilidad_repartible,
         "estado": liq.estado,
         "observaciones": liq.observaciones,
+        "venta_ids": sorted(
+            v.id for v in db.scalars(select(Venta).where(Venta.liquidacion_id == liq.id)).all()
+        ),
         "distribucion": [
             {
                 "id": d.id,

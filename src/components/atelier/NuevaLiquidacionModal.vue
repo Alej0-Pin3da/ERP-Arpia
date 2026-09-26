@@ -11,6 +11,7 @@ import { showToast } from '@/utils/toast'
 import { useFinanzas } from '@/composables/useFinanzas'
 import { useSocios } from '@/composables/useSocios'
 import { useVentas } from '@/composables/useVentas'
+import { getParametros } from '@/services/api/maestros'
 import type { LiquidacionRead } from '@/services/api/liquidaciones'
 
 /** Minimal liquidación shape this modal edits (REAL display object from the caller). */
@@ -78,6 +79,9 @@ interface LocalItemDistribucion {
 
 const distribucionLocal = ref<LocalItemDistribucion[]>([])
 
+// Ventas elegibles para liquidar (confirmed + sin liquidar).
+const ventasElegibles = ref<{ id: number; codigo: string; fecha: string; cliente: string; total: number; costo: number }[]>([])
+
 const estadosOptions = [
   { label: 'Borrador / En Revisión', value: 'BORRADOR' },
   { label: 'Aprobada por Socias', value: 'APROBADA' },
@@ -93,7 +97,7 @@ const utilidadNetaCalculada = computed(() => {
 })
 
 const fondoReinversionCalculado = computed(() => {
-  return Math.round(utilidadNetaCalculada.value * 0.4)
+  return Math.round(utilidadNetaCalculada.value * (fondoPct.value / 100))
 })
 
 const utilidadRepartibleSocias = computed(() => {
@@ -133,8 +137,8 @@ async function cargarPreview() {
 
 function recalcularDistribucion() {
   // Preview must mirror the server (crear_liquidacion): bruto over the
-  // REPARTIBLE (neta - 40% fondo), ded = full pending sum (no cap), neto
-  // = bruto - ded (may go negative, same as the server).
+  // REPARTIBLE (neta - fondo del estatuto), ded = full pending sum (no cap),
+  // neto = bruto - ded (may go negative, same as the server).
   const util = utilidadRepartibleSocias.value
   const activas = sociasPreview.value.filter((s) => s.activo)
 
@@ -165,24 +169,56 @@ function recalcularDistribucion() {
 }
 
 async function cargarTotalesVentas() {
-  // Pull totals from completed ventas (server data)
+  // Ventas elegibles: confirmed y sin liquidar (el servidor valida igual).
   try {
-    const r = await ventasApi.list({ limit: 100 })
-    const completadas = ((r as any).items ?? []).filter((v: any) => String(v.estado ?? '').toUpperCase() === 'COMPLETADA')
-    const vTotal = completadas.reduce((acc: number, v: any) => acc + Number(v.total_venta ?? 0), 0)
-    const cTotal = completadas.reduce((acc: number, v: any) => acc + Number(v.costo_total ?? 0), 0)
-
-    totalVentas.value = vTotal > 0 ? vTotal : 23500000
-    costoInsumos.value = cTotal > 0 ? cTotal : 6800000
-    gastosOperativos.value = 1800000
+    const r = await ventasApi.list({ estado: 'confirmed', sin_liquidar: true, limit: 100 } as any)
+    ventasElegibles.value = ((r as any).items ?? []).map((v: any) => ({
+      id: v.id,
+      codigo: v.codigo ?? `VEN-${v.id}`,
+      fecha: String(v.fecha ?? '').slice(0, 10),
+      cliente: v.cliente_nombre ?? '—',
+      total: Number(v.total_venta ?? 0),
+      costo: Number(v.costo_total ?? 0),
+    }))
+    if (!ventasElegibles.value.length) {
+      showToast('info', 'Sin ventas', 'No hay ventas confirmadas sin liquidar.')
+    }
   } catch {
-    totalVentas.value = 23500000
-    costoInsumos.value = 6800000
-    gastosOperativos.value = 1800000
+    ventasElegibles.value = []
+    showToast('error', 'No se pudo cargar', 'Revisá la conexión con el backend.')
   }
-  recalcularDistribucion()
+}
 
-  showToast('info', 'Valores Importados', `Se importaron ${formatCOP(totalVentas.value)} en ventas completadas del taller.`)
+// % fondo del estatuto de Maestros (manda Maestros; 40 si no carga).
+const fondoPct = ref(40)
+async function cargarFondoEstatuto() {
+  try {
+    const p = await getParametros()
+    fondoPct.value = Number((p as any).distribucion_reinversion_pct ?? 40)
+  } catch {
+    fondoPct.value = 40
+  }
+}
+
+// Selección: con ventas elegidas los totales se calculan y se bloquean.
+const ventasSel = ref<number[]>([])
+const haySeleccion = computed(() => ventasSel.value.length > 0)
+function toggleVenta(id: number) {
+  ventasSel.value = ventasSel.value.includes(id)
+    ? ventasSel.value.filter((x) => x !== id)
+    : [...ventasSel.value, id]
+  aplicarSeleccion()
+}
+function aplicarSeleccion() {
+  const sel = new Set(ventasSel.value)
+  const elegidas = ventasElegibles.value.filter((v) => sel.has(v.id))
+  totalVentas.value = elegidas.reduce((acc, v) => acc + v.total, 0)
+  costoInsumos.value = elegidas.reduce((acc, v) => acc + v.costo, 0)
+  recalcularDistribucion()
+}
+function limpiarSeleccion() {
+  ventasSel.value = []
+  recalcularDistribucion()
 }
 
 function initForm() {
@@ -206,8 +242,11 @@ function initForm() {
     totalVentas.value = totalVentas.value || 0
     costoInsumos.value = 7200000
     gastosOperativos.value = 1800000
+    ventasSel.value = []
     estado.value = 'BORRADOR'
     observaciones.value = 'Liquidación de utilidades sujeta a revisión y visto bueno de las socias.'
+    void cargarTotalesVentas()
+    void cargarFondoEstatuto()
     recalcularDistribucion()
   }
 }
@@ -241,6 +280,7 @@ async function guardar() {
   }
 
   // Real API: server computes codigo + distribucion, only header totals sent
+  // (con ventas elegidas el servidor recalcula todo del snapshot).
   const apiPayload = {
     periodo: periodo.value.trim(),
     fecha_cierre: fechaCierre.value,
@@ -251,6 +291,7 @@ async function guardar() {
     fondo_reinversion_monto: fondoReinversionCalculado.value,
     utilidad_repartible: utilidadRepartibleSocias.value,
     observaciones: observaciones.value || null,
+    ...(haySeleccion.value ? { venta_ids: [...ventasSel.value] } : {}),
   }
   guardando.value = true
   try {
@@ -312,13 +353,45 @@ async function guardar() {
           <div class="text-[11px] font-bold text-amber-400 uppercase tracking-wider font-mono">
             Balance Financiero del Periodo
           </div>
-          <Button
-            label="Importar Ventas del Taller"
-            icon="pi pi-sync"
-            size="small"
-            class="p-button-outlined p-button-warning text-[11px] py-1 px-2.5"
-            @click="cargarTotalesVentas"
-          />
+          <span v-if="haySeleccion" class="text-[11px] text-emerald-300 font-mono">
+            {{ ventasSel.length }} venta(s) elegida(s) — totales del snapshot
+          </span>
+          <button
+            v-if="haySeleccion"
+            type="button"
+            class="text-[11px] text-stone-400 hover:text-stone-200 underline"
+            @click="limpiarSeleccion"
+          >
+            Limpiar y cargar a mano
+          </button>
+        </div>
+
+        <!-- Ventas a liquidar (confirmed + sin liquidar) -->
+        <div v-if="!isEditing" class="rounded-xl border border-stone-800 bg-stone-950/60 p-3 space-y-2">
+          <div class="text-[11px] font-bold text-stone-300 uppercase tracking-wider">
+            Ventas a liquidar (opcional — sin tildar se carga a mano)
+          </div>
+          <div v-if="!ventasElegibles.length" class="text-xs text-stone-500">
+            No hay ventas confirmadas sin liquidar.
+          </div>
+          <div v-else class="max-h-40 overflow-y-auto space-y-1.5">
+            <label
+              v-for="v in ventasElegibles"
+              :key="v.id"
+              class="flex items-center gap-2 rounded-lg border border-stone-800 bg-stone-900/60 px-2.5 py-1.5 text-xs cursor-pointer hover:border-amber-500/40"
+            >
+              <input
+                type="checkbox"
+                :checked="ventasSel.includes(v.id)"
+                class="accent-amber-500"
+                @change="toggleVenta(v.id)"
+              />
+              <span class="font-mono font-bold text-amber-300">{{ v.codigo }}</span>
+              <span class="text-stone-400">{{ v.fecha }}</span>
+              <span class="text-stone-200 truncate">{{ v.cliente }}</span>
+              <span class="font-mono text-stone-300 ml-auto">{{ formatCOP(v.total) }}</span>
+            </label>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -334,6 +407,7 @@ async function guardar() {
               :min="0"
               :min-fraction-digits="0"
               :max-fraction-digits="0"
+              :disabled="haySeleccion"
               class="w-full text-xs font-mono"
             />
           </div>
@@ -350,6 +424,7 @@ async function guardar() {
               :min="0"
               :min-fraction-digits="0"
               :max-fraction-digits="0"
+              :disabled="haySeleccion"
               class="w-full text-xs font-mono"
             />
           </div>
@@ -379,7 +454,7 @@ async function guardar() {
           </div>
 
           <div class="p-2.5 rounded-lg bg-amber-950/40 border border-amber-500/30 flex items-center justify-between">
-            <span class="text-amber-300 text-[11px]">🏛️ Fondo Taller (40%):</span>
+            <span class="text-amber-300 text-[11px]">🏛️ Fondo Taller ({{ fondoPct }}%):</span>
             <span class="text-amber-300 font-bold text-sm">{{ formatCOP(fondoReinversionCalculado) }}</span>
           </div>
 

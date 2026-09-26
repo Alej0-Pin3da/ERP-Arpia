@@ -143,7 +143,11 @@ class SocioConfiguracionRead(BaseModel):
 
 
 class LiquidacionCreate(BaseModel):
-    """Header payload — the six totals plus period/close date (LIQ-1)."""
+    """Header payload - the six totals plus period/close date (LIQ-1).
+
+    Con venta_ids, tvb/costo se calculan del snapshot de esas ventas (el
+    servidor manda) y las ventas quedan linkeadas en la misma transacción.
+    """
 
     periodo: str = Field(min_length=1, max_length=20)
     fecha_cierre: date
@@ -154,6 +158,7 @@ class LiquidacionCreate(BaseModel):
     fondo_reinversion_monto: Decimal
     utilidad_repartible: Decimal
     observaciones: str | None = None
+    venta_ids: list[int] | None = None
 
 
 class LiquidacionEstadoUpdate(BaseModel):
@@ -193,6 +198,7 @@ class LiquidacionRead(BaseModel):
     observaciones: str | None = None
     distribucion: list[LiquidacionDistribucionRead] = []
     warnings: list[str] = []
+    venta_ids: list[int] = []
 
 
 # ---------------------------------------------------------------------------

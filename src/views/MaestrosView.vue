@@ -1627,7 +1627,7 @@ function formatoCOP(val: number) {
                 />
               </div>
             </div>
-            <p class="text-[11px] text-stone-400">Estatuto de reparto mensual de utilidades netas del taller.</p>
+            <p class="text-[11px] text-stone-400">Estatuto de reparto mensual de utilidades netas del taller. Al guardar, actualiza las socias (manda Maestros).</p>
           </div>
         </div>
 

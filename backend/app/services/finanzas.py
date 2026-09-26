@@ -27,7 +27,16 @@ from app.models.finanzas import (
     MovimientoFinanciero,
     SociosConfiguracion,
 )
-from app.models.ventas import DocumentState
+from app.models.maestros import ParametrosCosteo
+from app.models.ventas import DocumentState, Venta
+
+
+def _fondo_pct_estatuto(db: Session) -> Decimal:
+    """% fondo del estatuto de Maestros (manda Maestros; default 40)."""
+    params = db.get(ParametrosCosteo, 1)
+    if params is None:
+        return Decimal("40")
+    return Decimal(params.distribucion_reinversion_pct or 40)
 
 
 def _suma_participacion(db: Session) -> Decimal:
@@ -432,6 +441,9 @@ def crear_liquidacion(db: Session, payload: dict) -> tuple[Liquidacion, list[str
     - computes distribution over ALL activo=true socias incl the fondo; each row
       ``monto_bruto = utilidad_repartible * porcentaje/100``, ``deduccion`` = sum of
       PENDIENTE_DESCUENTO anticipos, ``neto = bruto - deduccion`` (LIQ-3);
+    - with ``venta_ids``: tvb/costo/neta/repartible come from the sales snapshot
+      (solo confirmed y sin liquidar; 404/422/409) y las ventas quedan linkeadas;
+    - fondo % from the Maestros statute (manda Maestros);
     - marks those anticipos DESCONTADO and links them to the new liquidacion in
       the same transaction (ANT-2);
     - ``codigo`` is LIQ-YYYY-NN sequential; IntegrityError on a concurrent
@@ -440,7 +452,31 @@ def crear_liquidacion(db: Session, payload: dict) -> tuple[Liquidacion, list[str
     tvb = Decimal(payload["total_ventas_brutas"])
     costo = Decimal(payload["costo_taller_insumos"])
     gastos = Decimal(payload["gastos_operativos"])
+    venta_ids = payload.get("venta_ids") or []
+    ventas_liq: list = []
+    if venta_ids:
+        # El servidor manda: totales del snapshot de las ventas elegidas.
+        for vid in dict.fromkeys(venta_ids):
+            venta = db.get(Venta, vid)
+            if venta is None:
+                raise HTTPException(status_code=404, detail=f"Venta {vid} no encontrada")
+            if venta.estado != DocumentState.CONFIRMED.value:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Venta {vid} no está confirmada (estado {venta.estado})",
+                )
+            if venta.liquidacion_id is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Venta {vid} ya está liquidada en LIQ-{venta.liquidacion_id:04d}",
+                )
+            ventas_liq.append(venta)
+        tvb = sum((v.total_venta or Decimal("0") for v in ventas_liq), Decimal("0"))
+        costo = sum((v.costo_total or Decimal("0") for v in ventas_liq), Decimal("0"))
     neta = Decimal(payload["utilidad_neta_total"])
+    if venta_ids:
+        # Con ventas elegidas el servidor es totalmente autoritativo.
+        neta = tvb - costo - gastos
     if neta != tvb - costo - gastos:
         raise HTTPException(
             status_code=422,
@@ -463,7 +499,10 @@ def crear_liquidacion(db: Session, payload: dict) -> tuple[Liquidacion, list[str
     repartible = Decimal(payload["utilidad_repartible"])
     fondo_reinversion = Decimal(payload.get("fondo_reinversion_monto", "0"))
     if any(s.es_fondo_taller for s in socias):
-        fondo_reinversion = (neta * Decimal("40") / Decimal("100")).quantize(Decimal("0.01"))
+        fondo_reinversion = (neta * _fondo_pct_estatuto(db) / Decimal("100")).quantize(Decimal("0.01"))
+    if venta_ids:
+        # El repartible también lo fija el servidor (neta - fondo).
+        repartible = (neta - fondo_reinversion).quantize(Decimal("0.01"))
 
     anio = payload["fecha_cierre"].year if hasattr(payload["fecha_cierre"], "year") else date.today().year
     codigo = _siguiente_codigo_liquidacion(db, anio)
@@ -483,6 +522,8 @@ def crear_liquidacion(db: Session, payload: dict) -> tuple[Liquidacion, list[str
     )
     db.add(liq)
     db.flush()
+    for venta in ventas_liq:
+        venta.liquidacion_id = liq.id
 
     rows: list[LiquidacionDistribucion] = []
     anticipos_a_descontar: list[Anticipo] = []
