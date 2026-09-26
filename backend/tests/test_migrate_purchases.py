@@ -263,6 +263,23 @@ def test_plan_compras_sin_fecha_ni_heredable_omitida(mini_libro):
     assert plan.conteos.sin_fecha == 1
 
 
+def test_plan_compras_fecha_fallback_rescata_omitida(mini_libro):
+    from datetime import datetime, UTC
+
+    from migrate.loaders import LibroMigracion
+    from migrate.purchases import plan_compras
+
+    fallback = datetime(2025, 3, 1, tzinfo=UTC)
+    with LibroMigracion(mini_libro) as libro:
+        plan = plan_compras(libro, fecha_fallback=fallback)
+    # R6 entra con la fecha autorizada; el resto idéntico al plan base
+    assert plan.conteo_compras == 4
+    encaje = [c for c in plan.compras if c.insumo_nombre == f"{PREFIX_TEST} Encaje"]
+    assert len(encaje) == 1
+    assert encaje[0].fecha == fallback
+    assert plan.conteos.sin_fecha == 0
+
+
 # --------------------------------------------------------------------------- #
 # 2b. P1 fix: sub-tabla derecha como fuente UNICA (no duplicada)
 # --------------------------------------------------------------------------- #

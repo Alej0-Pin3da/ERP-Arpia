@@ -238,6 +238,7 @@ def _procesar_subtabla_derecha(
     nombres_izquierda: set[str],
     ultima_fecha: dict[ClaveFecha, object],
     report,
+    fecha_fallback=None,
 ) -> bool:
     """Procesa la celda derecha de la fila (P1 fix).
 
@@ -307,16 +308,19 @@ def _procesar_subtabla_derecha(
     clave_f = ClaveFecha(clave_ins)
     fecha = fecha_para_fila(fecha_raw, clave_f, ultima_fecha)
     if fecha is None:
-        conteos.sin_fecha += 1
-        if report:
-            report.warn(
-                hoja,
-                indx,
-                config["fecha"],
-                f"{nombre_display} (sub-tabla derecha): fecha vacia y sin fila "
-                f"contigua del mismo insumo; omitida (D5, nunca now())",
-            )
-        return True
+        if fecha_fallback is not None:
+            fecha = coerce_aware(fecha_fallback)
+        else:
+            conteos.sin_fecha += 1
+            if report:
+                report.warn(
+                    hoja,
+                    indx,
+                    config["fecha"],
+                    f"{nombre_display} (sub-tabla derecha): fecha vacia y sin fila "
+                    f"contigua del mismo insumo; omitida (D5, nunca now())",
+                )
+            return True
     fecha = coerce_aware(fecha)
     plan.compras.append(
         CompraPlan(
@@ -396,13 +400,14 @@ def _nombres_izquierda_hoja(
     return nombres
 
 
-def plan_compras(libro, report=None) -> ComprasPlan:
+def plan_compras(libro, report=None, fecha_fallback=None) -> ComprasPlan:
     """Build the purchase plan from the bounded workbook (read-only).
 
     Bloque izquierdo + sub-tabla derecha (P1 fix): la derecha se procesa solo
     cuando el item NO aparece en el bloque izquierdo de la misma hoja (fuente
     unica); cada fila se filtra por el universo BOM; fechas bajo politica D5;
-    never now().
+    never now(). Con fecha_fallback, las filas sin fecha propia ni contigua
+    heredable toman esa fecha en vez de omitirse (backfill autorizado).
     """
     plan = ComprasPlan()
     universo = _universo_bom(libro, report)
@@ -439,6 +444,7 @@ def plan_compras(libro, report=None) -> ComprasPlan:
                     universo,
                     ultima_fecha,
                     report,
+                    fecha_fallback,
                 )
             _procesar_subtabla_derecha(
                 plan,
@@ -449,6 +455,7 @@ def plan_compras(libro, report=None) -> ComprasPlan:
                 nombres_izquierda,
                 ultima_fecha,
                 report,
+                fecha_fallback,
             )
     return plan
 
@@ -466,6 +473,7 @@ def _procesar_fila_izquierda(
     universo: dict[str, str],
     ultima_fecha: dict[ClaveFecha, object],
     report,
+    fecha_fallback=None,
 ) -> None:
     """Procesa una fila del bloque izquierdo (compra WAC BOM-only)."""
     conteos = plan.conteos
@@ -504,16 +512,19 @@ def _procesar_fila_izquierda(
     clave_f = ClaveFecha(clave_ins)
     fecha = fecha_para_fila(fecha_raw, clave_f, ultima_fecha)
     if fecha is None:
-        conteos.sin_fecha += 1
-        if report:
-            report.warn(
-                hoja,
-                indx,
-                col_fecha,
-                f"{nombre_display}: fecha vacia y sin fila contigua del mismo "
-                f"insumo; omitida (D5, nunca now())",
-            )
-        return
+        if fecha_fallback is not None:
+            fecha = coerce_aware(fecha_fallback)
+        else:
+            conteos.sin_fecha += 1
+            if report:
+                report.warn(
+                    hoja,
+                    indx,
+                    col_fecha,
+                    f"{nombre_display}: fecha vacia y sin fila contigua del mismo "
+                    f"insumo; omitida (D5, nunca now())",
+                )
+            return
     # Fecha del Excel (posible naive) -> aware (TIMESTAMPTZ, sin ambiguedad).
     fecha = coerce_aware(fecha)
     plan.compras.append(

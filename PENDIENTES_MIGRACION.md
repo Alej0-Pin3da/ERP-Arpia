@@ -39,7 +39,9 @@ Fecha: 2026-08-09
 
 ### 3.2 Decisiones de negocio que quedan abiertas (NO bloquean, documentadas)
 1. **GASTOS ARPIA sin fecha** (4 filas: MATERIALES SURTIDOS, DOMICILIO CAJA, ENVIO TELA, AYUDANTE CORTE): la hoja no tiene columna de fecha → NO migraron (política D5 "nunca now()"). Si querés que entren, hay que darles fecha manual.
+   - **RESUELTO 2026-09-26:** usuario autorizó 2025-03. `migrate/backfill_sin_fecha.py` (--dry-run/--apply, idempotente por clave natural): 4 movimientos Gasto socio ARPIA por $61.300 al 2025-03-01, reporte `backfill_sin_fecha_20260926_134703.json`. Hallazgo: el Excel actual ya trae fechas en las filas de INVERSION MARGARA omitidas en agosto (0 compras nuevas); 2 filas "total" excluidas por filtro junk explícito.
 2. **~30% de compras sin fecha** en INVERSION MARGARA (sesgos, hilos, bonos, etc.): omitidas por D5 (heredan contigua o se omiten). Revisar el JSON `backend/migrate/reports/migracion_20260809_100153.json` para ver la lista completa de WARN.
+   - **RESUELTO 2026-09-26:** ver punto 1 — el workbook vigente ya las trae con fecha o heredable; el backfill con fallback no encontró compras pendientes (diff 0).
 3. **2 combos "Caja Despertar"** omitidos en BOM: el producto "Noche y Dia" no está en el catálogo (no aparece como producto propio en el Excel; se descartó como ghost duplicado). Si el negocio vende esas cajas, hay que crearlas.
 4. **Stock manual de 10 insumos** (cadenas totebag, cremallera, tapavarilla, satines/sesgos): se fijó stock = consumo BOM + 10% margen (no viene del Excel; el Excel no registraba esas compras en formato interpretable).
 

@@ -257,11 +257,13 @@ def _es_fila_izquierda(fila: dict[str, object], cols_izq: tuple[str, ...]) -> bo
     return any(col in fila for col in cols_izq)
 
 
-def plan_finanzas(libro, report=None) -> FinanzasPlan:
+def plan_finanzas(libro, report=None, fecha_fallback=None) -> FinanzasPlan:
     """Build the plan from the bounded workbook (read-only).
 
     Filas del universo BOM (ya F2 WAC) -> bom_skip; sub-tabla derecha de
     VALQUI (J..N price list) -> subtabla; GASTOS ARPA sin fecha -> report INFO.
+    Con fecha_fallback, las filas sin fecha toman esa fecha en vez de omitirse
+    (backfill autorizado) y GASTOS ARPIA migra como socio ARPIA.
     """
     plan = FinanzasPlan()
     conteos = plan.conteos
@@ -281,7 +283,7 @@ def plan_finanzas(libro, report=None) -> FinanzasPlan:
             if hoja == "INVERSION VALQUI" and _es_subtabla_j_n(fila):
                 conteos.subtabla += 1
                 continue
-            _agregar_fila(plan, fila, hoja, indx, col_desc, col_costo, col_fecha, universo, report)
+            _agregar_fila(plan, fila, hoja, indx, col_desc, col_costo, col_fecha, universo, report, fecha_fallback)
 
     # INVERSION MARGARA: right block H..L (real INVERSION MARZO/OCT).
     if "INVERSION MARGARA" in SHEET_BOUNDS:
@@ -303,16 +305,19 @@ def plan_finanzas(libro, report=None) -> FinanzasPlan:
                     continue
                 fecha = _coerce_fecha(fila.get("K"))
                 if fecha is None:
-                    conteos.sin_fecha += 1
-                    if report:
-                        report.warn(
-                            "INVERSION MARGARA",
-                            indx,
-                            "K",
-                            f"{normalizar_nombre(nombre)}: fila sin fecha "
-                            f"(D5, nunca now()) -> omitida",
-                        )
-                    continue
+                    if fecha_fallback is not None:
+                        fecha = coerce_aware(fecha_fallback)
+                    else:
+                        conteos.sin_fecha += 1
+                        if report:
+                            report.warn(
+                                "INVERSION MARGARA",
+                                indx,
+                                "K",
+                                f"{normalizar_nombre(nombre)}: fila sin fecha "
+                                f"(D5, nunca now()) -> omitida",
+                            )
+                        continue
                 _movimiento_a_plan(
                     plan,
                     normalizar_nombre(nombre),
@@ -323,7 +328,8 @@ def plan_finanzas(libro, report=None) -> FinanzasPlan:
                     report=report,
                 )
 
-    # GASTOS ARP4: sin columna de fecha en el Excel -> se reporta, no migra.
+    # GASTOS ARPIA: sin columna de fecha en el Excel -> se reporta, no migra.
+    # Con fecha_fallback (backfill autorizado) migra como socio ARPIA.
     if _HOJA_GASTOS[0] in SHEET_BOUNDS:
         try:
             lectura = libro.leer_hoja(_HOJA_GASTOS[0], report=report)
@@ -336,6 +342,17 @@ def plan_finanzas(libro, report=None) -> FinanzasPlan:
                     continue
                 costo = normalizar_decimal(fila.get(_HOJA_GASTOS[2]))
                 if costo is None:
+                    continue
+                if fecha_fallback is not None:
+                    _movimiento_a_plan(
+                        plan,
+                        normalizar_nombre(nombre),
+                        costo,
+                        coerce_aware(fecha_fallback),
+                        hoja=_HOJA_GASTOS[0],
+                        fila=indx,
+                        report=report,
+                    )
                     continue
                 conteos.gastos_referencia += 1
                 if report:
@@ -356,7 +373,7 @@ def _es_subtabla_j_n(fila: dict[str, object]) -> bool:
     return derecha and not izquierda
 
 
-def _agregar_fila(plan, fila, hoja, indx, col_desc, col_costo, col_fecha, universo, report) -> None:
+def _agregar_fila(plan, fila, hoja, indx, col_desc, col_costo, col_fecha, universo, report, fecha_fallback=None) -> None:
     nombre_raw = fila.get(col_desc)
     if not isinstance(nombre_raw, str) or not nombre_raw.strip():
         return
@@ -369,15 +386,18 @@ def _agregar_fila(plan, fila, hoja, indx, col_desc, col_costo, col_fecha, univer
         return
     fecha = _coerce_fecha(fila.get(col_fecha))
     if fecha is None:
-        plan.conteos.sin_fecha += 1
-        if report:
-            report.warn(
-                hoja,
-                indx,
-                col_fecha,
-                f"{normalizar_nombre(nombre_raw)}: fecha vacia; no migrado (D5, nunca now())",
-            )
-        return
+        if fecha_fallback is not None:
+            fecha = coerce_aware(fecha_fallback)
+        else:
+            plan.conteos.sin_fecha += 1
+            if report:
+                report.warn(
+                    hoja,
+                    indx,
+                    col_fecha,
+                    f"{normalizar_nombre(nombre_raw)}: fecha vacia; no migrado (D5, nunca now())",
+                )
+            return
     _movimiento_a_plan(plan, normalizar_nombre(nombre_raw), monto, fecha, hoja, indx, report)
 
 

@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-26] - Backfill filas sin fecha con 2025-03 autorizado (4 gastos)
+
+- **Qué:** `plan_compras` y `plan_finanzas` aceptan `fecha_fallback` (default None = comportamiento intacto). Nuevo `migrate/backfill_sin_fecha.py` (--dry-run/--apply): dif por (hoja,fila) + doble guarda idempotente por clave natural. Aplicado: 4 GASTOS ARPIA como Gasto socio ARPIA al 2025-03-01 ($61.300 total); re-run confirma 0 duplicados (4 ya-existentes).
+- **Hallazgos:** el Excel vigente ya trae fechas en las INVERSION MARGARA omitidas en agosto (0 compras pendientes); 2 filas "total" ($13.5M + $4M) excluidas por filtro junk — casi se migran como gasto real.
+- **Verificación:** test nuevo `fecha_fallback_rescata_omitida` + `test_migrate_purchases`/`test_migrate_finanzas` 32/32 PASS.
+- **Archivos:** `backend/migrate/purchases.py`, `backend/migrate/finanzas.py`, `backend/migrate/backfill_sin_fecha.py` (nuevo), `backend/tests/test_migrate_purchases.py`, `PENDIENTES_MIGRACION.md`. Sin commit.
+
 ### [2026-09-26] - Suite en verde 847/847: higiene de tests + muertos + spec contacto
 
 - **Higiene de tests (14 → 0 en corrida completa):** la causa era una sola enfermedad — asserts absolutos sobre DB compartida sin limpieza. `test_audit` hardcodeaba `insumo_id: 1` (analiticos borra sus filas y el autoincremental avanza → 404); ahora usa el id real. `test_devoluciones` y `test_migrate_sales` (6) contaban todas las filas; ahora aíslan por identidad propia (`_ventas_id_de_test`, `>=`). `test_audit` usaba `@test.local` que el validador de email rechaza al leer Clientes → `@arpia-test.com`. `test_ventas_api` asumía vacíos globales; ahora scopea por producto. Seeder y claves canónicas: `==` → `>=` + subset. `test_migrate_validate` (N7a/f/g escanean toda la DB): `_preparar_entorno` vacía el ledger ajeno en orden FK antes de sembrar.
