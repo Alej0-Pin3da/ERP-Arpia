@@ -10,7 +10,7 @@ Este documento registra cronológica y detalladamente todas las modificaciones, 
 - **Líneas fuera de Maestros:** el tab `catprod` mostraba Categorías y Líneas; ahora solo Categorías (backend intacto, datos LINEA conservados). Placeholders de la Ficha actualizados.
 - **Matriz honesta:** el BOM no guarda dimensiones por insumo (`BomInsumoRead` no tiene ancho/alto), así que el `0.24 × 0.85` era ficción en tabla, cards y CSV. Columnas eliminadas: la matriz muestra consumo y valores reales. Si algún día se modelan medidas, vuelven con datos de verdad.
 - **Verificación:** `npm run build` PASS; `test_cotizaciones_api` + `test_finanzas_api_v4` 30/30 PASS; `alembic upgrade head` → 0045 en dev.
-- **Archivos:** `backend/alembic/versions/0045_cotizaciones_hilos.py` (nueva), `backend/app/models/cotizacion.py`, `backend/app/schemas/cotizacion.py`, `backend/app/api/routes/cotizaciones.py`, `src/services/api/cotizaciones.ts`, `src/views/CotizadorView.vue`, `src/views/MaestrosView.vue`, `src/components/atelier/FichaTecnicaModal.vue`. Sin commit.
+- **Archivos:** `backend/alembic/versions/0045_cotizaciones_hilos.py` (nueva), `backend/app/models/cotizacion.py`, `backend/app/schemas/cotizacion.py`, `backend/app/api/routes/cotizaciones.py`, `src/services/api/cotizaciones.ts`, `src/views/CotizadorView.vue`, `src/views/MaestrosView.vue`, `src/components/atelier/FichaTecnicaModal.vue`, `.gitignore` (.pi/ ignorado). Sin commit.
 
 ### [2026-09-26] - Cotizador: 7 flojos auditados y corregidos
 

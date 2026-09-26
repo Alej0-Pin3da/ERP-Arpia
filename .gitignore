@@ -1,5 +1,6 @@
 # Herramientas de orquestación local (registro de skills por máquina)
 .atl/
+.pi/
 
 # Python / FastAPI
 __pycache__/
