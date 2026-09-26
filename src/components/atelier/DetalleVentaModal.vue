@@ -126,7 +126,7 @@ function compartirWhatsApp() {
           </span>
         </div>
         <p class="text-[11px] text-stone-400 font-serif italic tracking-wide m-0">
-          Corsetería & Lencería de Autor • Pereira, Colombia
+          HECHO POR GARRAS COLOMBIANAS • Pereira, Colombia
         </p>
 
         <div class="mt-4 pt-3 border-t border-stone-800/80 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">

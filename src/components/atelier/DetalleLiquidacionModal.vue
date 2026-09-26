@@ -93,31 +93,32 @@ function compartirWhatsApp() {
   const l = props.liquidacion
   const fecha = l.fecha_cierre
 
+  // Sin emojis: en algunos WhatsApp se ven como �. Solo texto + *negrita*.
   let mensaje = `*ACTA DE LIQUIDACIÓN Y REPARTO DE UTILIDADES - ARPÍA*\n`
-  mensaje += `📜 *Código:* ${l.codigo}\n`
-  mensaje += `📅 *Periodo:* ${l.periodo} (Cierre: ${fecha})\n`
-  mensaje += `💰 *Ventas Totales:* ${formatCOP(l.total_ventas_brutas)}\n`
-  mensaje += `✂️ *Costos Insumos:* ${formatCOP(l.costo_taller_insumos)}\n`
-  mensaje += `🏢 *Gastos Operativos:* ${formatCOP(l.gastos_operativos)}\n`
-  mensaje += `✨ *Utilidad Neta Total:* ${formatCOP(l.utilidad_neta_total)}\n`
+  mensaje += `- Código: ${l.codigo}\n`
+  mensaje += `- Periodo: ${l.periodo} (Cierre: ${fecha})\n`
+  mensaje += `- Ventas Totales: ${formatCOP(l.total_ventas_brutas)}\n`
+  mensaje += `- Costos Insumos: ${formatCOP(l.costo_taller_insumos)}\n`
+  mensaje += `- Gastos Operativos: ${formatCOP(l.gastos_operativos)}\n`
+  mensaje += `- Utilidad Neta Total: ${formatCOP(l.utilidad_neta_total)}\n`
   mensaje += `------------------------------------\n`
   mensaje += `*DISTRIBUCIÓN OFICIAL DE SOCIAS:*\n`
 
   l.distribucion.forEach((d) => {
-    mensaje += `\n• *${d.nombre_socia}* (${d.porcentaje}%):\n`
+    mensaje += `\n* ${d.nombre_socia}* (${d.porcentaje}%):\n`
     mensaje += `  - Cuota Bruta: ${formatCOP(d.monto_bruto)}\n`
     if (d.deduccion_anticipos > 0) {
       mensaje += `  - Anticipos Descontados: -${formatCOP(d.deduccion_anticipos)}\n`
     }
     mensaje += `  - *Neto a Transferir:* ${formatCOP(d.monto_neto_pagar)}\n`
-    mensaje += `  - Estado: ${d.estado_pago === 'PAGADO' ? '✅ PAGADO' : '⏳ PENDIENTE'}\n`
+    mensaje += `  - Estado: ${d.estado_pago === 'PAGADO' ? '[PAGADO]' : '[PENDIENTE]'}\n`
     if (d.banco_destino) {
       mensaje += `  - Cuenta: ${d.banco_destino}\n`
     }
   })
 
   mensaje += `\n------------------------------------\n`
-  mensaje += `Arpía • Corsetería & Lencería de Autor`
+  mensaje += `Arpía • HECHO POR GARRAS COLOMBIANAS`
 
   const url = `https://wa.me/?text=${encodeURIComponent(mensaje)}`
   window.open(url, '_blank')
@@ -137,7 +138,7 @@ function compartirWhatsApp() {
       <div class="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-stone-900 via-stone-950 to-stone-900 p-6 text-center relative overflow-hidden">
         <div class="absolute -right-8 -bottom-8 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
         <div class="text-[10px] font-mono tracking-widest uppercase text-amber-400 font-bold">
-          Arpía • Corsetería & Lencería de Autor
+          Arpía • HECHO POR GARRAS COLOMBIANAS
         </div>
         <h2 class="text-xl sm:text-2xl font-serif font-bold text-stone-100 mt-1">
           Acta de Liquidación y Reparto de Utilidades

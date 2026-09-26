@@ -162,7 +162,7 @@ async function guardarEnProducto() {
             A R P Í A
           </div>
           <div class="text-[10px] font-serif italic text-stone-400">
-            Corsetería & Lencería de Autor
+            HECHO POR GARRAS COLOMBIANAS
           </div>
         </div>
 

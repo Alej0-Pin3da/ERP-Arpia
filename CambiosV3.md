@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-26] - Acta WhatsApp sin emojis + marca HECHO POR GARRAS COLOMBIANAS
+
+- **WhatsApp:** el acta usaba emojis (📜💰✅⏳) que en su WhatsApp se ven como � (el archivo está sano en UTF-8, es render del cliente). Mensaje reescrito solo con texto + *negrita*: estados como [PAGADO]/[PENDIENTE].
+- **Marca:** "Corsetería & Lencería de Autor" → "HECHO POR GARRAS COLOMBIANAS" en acta (header + mensaje), recibo, etiqueta y título. Quedan "Alta Costura" solo como nombres de categoría/margen, no como marca. El historial de CambiosV3.md no se reescribe.
+- **Verificación:** `npm run build` PASS; cero restos en `src/` + `index.html`.
+- **Archivos:** `DetalleLiquidacionModal.vue`, `DetalleVentaModal.vue`, `EtiquetaPrendaModal.vue`, `index.html`. Sin commit.
+
 ### [2026-09-26] - Pago por socia real (PAG-1 + auto-cierre)
 
 - **Causa:** "Registrar pago → Confirmar pago" era un no-op deliberado (toast informativo, nada persistía) porque no había dónde guardar. El estado nunca cambiaba.
