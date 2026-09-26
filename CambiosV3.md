@@ -3,6 +3,18 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-26] - Cotizador: 7 flojos auditados y corregidos
+
+- **No pisar valores:** `onRecetaChange` cargaba nombre/tiempos/CIF/margen pero además pisaba metros (1.0/0.5), precios (split 70/30 de costo_insumos) y avíos fijos (4000/3500). Ahora solo trae nombre, tiempos, CIF y margen; telas/precios/avíos son decisión de la cotización.
+- **Costo real proporcional:** `usarCostoReal` metía todo el diff en CIF y lo distorsionaba. Ahora escala los 6 insumos monetarios por el mismo ratio para igualar al BOM sin romper proporciones.
+- **Regla margen clara:** los ×2.2 (margen ≥100%) y ×2 (factor ≤5%) existían en frontend y servidor sin explicar. Misma matemática, ahora documentada en ambos y con nota visible bajo el slider.
+- **Historial en vista:** el backend listaba/filtraba cotizaciones pero la vista no mostraba nada. Ahora lista las últimas 10 con estado y botones borrador→enviada→aprobada/descartada, sin salir.
+- **WhatsApp con desglose:** el texto era genérico ("telas de alta costura..."). Ahora lleva cliente, telas+desperdicio, hilos estimados, avíos, mano, CIF, precio+margen y observaciones.
+- **Cliente y notas:** el modelo los soportaba pero el form no los pedía. Ahora dropdown de clientes + observaciones, se guardan y recargan historial.
+- **% desperdicio telas:** las telas iban al 100% mientras el BOM usa `porcentaje_desperdicio`. Ahora `subtotalTelas` aplica el % (default 5, editable). Nota: el servidor no lo contempla aún; la próxima cotización que lo incluya en `_calcular` debe versionar la paridad.
+- **Verificación:** `npm run build` PASS; `test_cotizaciones_api` 15/15 PASS. Sin migración.
+- **Archivos:** `src/views/CotizadorView.vue`, `backend/app/api/routes/cotizaciones.py` (comentario). Sin commit.
+
 ### [2026-09-26] - Análisis con data real + hilos estimados + Línea fuera de UI
 
 - **Análisis (estaba pobre):** `AnalisisView.vue` solo mostraba 4 contadores locales + rentabilidad teórica por receta, ignorando los 6 endpoints reales del backend (`/analiticos/resumen`, `ventas-mensuales`, `top-productos`, `top-insumos`, `finanzas-mensuales`, `margen-por-producto`, `insumos-bajo-stock`). Ahora cablea los 7 con fallback silencioso: resumen del período (ventas/ticket/margen/gastos/resultado neto), ventas por mes (últimos 6), ingresos vs gastos por mes, top 5 productos e insumos, margen real snapshot por producto y detalle de stock crítico. Nada se fabrica: si un endpoint falla, la sección queda vacía.

@@ -34,7 +34,12 @@ editor_user = require_roles("admin", "operador")
 
 
 def _calcular(payload: CotizacionCreate) -> tuple[Decimal, Decimal, Decimal]:
-    """Mirror of the Cotizador frontend math (server is authoritative)."""
+    """Mirror of the Cotizador frontend math (server is authoritative).
+
+    Regla visible (igual en el frontend): margen normal -> costo/(1-margen);
+    margen >=100% -> x2.2 fijo; margen que deje menos de 5% de factor -> x2
+    (tope anti-margen-cero para no dividir por ~0).
+    """
     subtotal_telas = (
         payload.metros_tela * payload.precio_metro_tela
         + payload.metros_forro * payload.precio_metro_forro
