@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.deps import get_db, require_admin, require_roles
-from app.core.exceptions import DomainError
+from app.core.exceptions import DomainError, EntityNotFoundError
 from app.models.produccion import (
     PedidoProduccion,
     PedidoProduccionEstado,
