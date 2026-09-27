@@ -45,6 +45,7 @@ from app.models.produccion import (
 from app.models.productos import Producto, VarianteProducto
 from app.services.costos import calcular_costo_produccion, tasas_costeo
 from app.services.inventory import descontar_stock, explosion_materiales
+from app.services.reservas import liberar_pedido
 
 
 def pedido_esta_completado(pedido: PedidoProduccion) -> bool:
@@ -186,16 +187,21 @@ def completar_lote(db: Session, pedido: PedidoProduccion) -> dict[str, Decimal]:
         db, pedido.producto_id, pedido.variante_id, cantidad
     )
 
-    # Full-detail availability pass (locks rows; no mutation). descontar_stock
-    # below aborts on the FIRST shortage only, so this pass builds the 409
-    # with EVERY short insumo instead.
+    # V6 M4: judge availability on what's REALLY free — actual stock minus
+    # OTHER lots' reservations (this lot's own share doesn't block itself).
+    # The release happens only after the pass succeeds, so a 409 keeps this
+    # lot's reservation intact for a later retry.
     faltantes: list[str] = []
     for insumo_id in sorted(explosion):
         insumo = db.get(Insumo, insumo_id, with_for_update=True, populate_existing=True)
         if insumo is None:
             raise EntityNotFoundError("Insumo", insumo_id)
         requerido = explosion[insumo_id]
-        disponible = insumo.stock_actual or Decimal("0")
+        ajena = max(
+            Decimal("0"),
+            (insumo.stock_reservado or Decimal("0")) - requerido,
+        )
+        disponible = (insumo.stock_actual or Decimal("0")) - ajena
         if disponible < requerido:
             faltantes.append(
                 f"'{insumo.nombre}' (requiere {requerido}, disponible {disponible})"
@@ -205,6 +211,9 @@ def completar_lote(db: Session, pedido: PedidoProduccion) -> dict[str, Decimal]:
             "Stock insuficiente para completar el lote: " + "; ".join(faltantes),
             status_code=409,
         )
+
+    # Pass succeeded: release this lot's share (clamped, legacy rows free 0).
+    liberar_pedido(db, pedido)
 
     descontar_stock(db, explosion)
 

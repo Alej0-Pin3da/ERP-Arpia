@@ -16,7 +16,7 @@ interface TopInsumoRow { insumo_id?: number; nombre?: string | null; unidad_medi
 interface VentaMensualRow { mes?: string | null; total?: number | string | null; cantidad?: number | string | null }
 interface FinanzaMensualRow { mes?: string | null; ingresos?: number | string | null; gastos?: number | string | null }
 interface MargenProductoRow { producto_id: number; margen_total?: number | string | null; margen_promedio?: number | string | null }
-interface InsumoCriticoRow { nombre?: string | null; stock_actual?: number | string | null; stock_minimo?: number | string | null }
+interface InsumoCriticoRow { nombre?: string | null; stock_actual?: number | string | null; stock_minimo?: number | string | null; disponible?: number | string | null }
 
 const insumosApi = useInsumos()
 const produccionApi = useProduccion()
@@ -53,7 +53,7 @@ async function cargarAnalisis() {
 onMounted(() => { void cargarAnalisis(); void cargarProductosAnalisis() })
 
 const pedidosSrc = computed(() => pedidos.value)
-const insumosAlertasCount = computed(() => insumos.value.filter((i: InsumoRead & { stock?: number | string }) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)).length)
+const insumosAlertasCount = computed(() => insumos.value.filter((i: InsumoRead & { stock?: number | string }) => Number(i.disponible ?? i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)).length)
 const productosAnalisis = ref<ProductoRead[]>([])
 async function cargarProductosAnalisis() {
   try {
@@ -229,7 +229,7 @@ function formatCOP(v: number): string {
           <div class="text-[11px] uppercase font-bold text-red-300 mb-1">Detalle stock crítico ({{ insumosCriticos.length }})</div>
           <div v-for="(c, i) in insumosCriticos.slice(0, 5)" :key="i" class="flex items-center justify-between text-xs font-mono">
             <span class="text-stone-300 truncate">{{ c.nombre }}</span>
-            <span class="text-red-300">{{ Number(c.stock_actual ?? 0) }} / mín {{ Number(c.stock_minimo ?? 0) }}</span>
+            <span class="text-red-300">{{ Number(c.disponible ?? c.stock_actual ?? 0) }} / mín {{ Number(c.stock_minimo ?? 0) }}</span>
           </div>
         </div>
       </div>

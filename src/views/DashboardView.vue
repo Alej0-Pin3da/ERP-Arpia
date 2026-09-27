@@ -59,7 +59,7 @@ async function cargarDashboard() {
 onMounted(() => { void cargarDashboard() })
 
 type InsumoCriticoRow = InsumoRead & { stock?: number | string }
-const insumosCriticos = computed(() => insumos.value.filter((i: InsumoCriticoRow) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)))
+const insumosCriticos = computed(() => insumos.value.filter((i: InsumoCriticoRow) => Number(i.disponible ?? i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)))
 // En REAL la API (PedidoProduccionRead) no trae codigo/cliente_nombre/
 // prenda_nombre ni montos; se normaliza como en ProduccionView para no
 // renderizar celdas vacías ni $NaN (Numeric serializa como string).
@@ -474,11 +474,11 @@ function getEstadoBadgeClass(estado: string) {
                 <div class="font-bold text-stone-200 text-xs">{{ it.nombre }}</div>
                 <div class="text-[11px] text-stone-400">{{ it.proveedor ?? it.nombre_categoria ?? '—' }}</div>
               </div>
-              <span class="text-xs font-mono font-bold text-red-400">{{ it.stock_actual }} {{ it.unidad_medida }}</span>
+              <span class="text-xs font-mono font-bold text-red-400">{{ it.disponible ?? it.stock_actual }} {{ it.unidad_medida }}</span>
             </div>
             <div class="text-[11px] text-stone-400 flex justify-between">
               <span>Mínimo requerido: {{ it.stock_minimo }} {{ it.unidad_medida }}</span>
-              <span class="text-amber-400 font-semibold">Faltante: {{ (it.stock_minimo - it.stock_actual).toFixed(1) }} {{ it.unidad_medida }}</span>
+              <span class="text-amber-400 font-semibold">Faltante: {{ (it.stock_minimo - (it.disponible ?? it.stock_actual)).toFixed(1) }} {{ it.unidad_medida }}</span>
             </div>
             <Button
               label="Generar Orden de Compra"

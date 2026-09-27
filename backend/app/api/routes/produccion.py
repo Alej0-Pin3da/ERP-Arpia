@@ -35,6 +35,7 @@ from app.schemas.produccion import (
 )
 from app.services.paginacion import aplicar_orden, paginar
 from app.services.costos import tasas_costeo
+from app.services.reservas import liberar_pedido, reservar_pedido
 from app.services.produccion import (
     completar_lote,
     obtener_promedio_tiempos_producto,
@@ -352,6 +353,9 @@ def create_pedido(
         # Creating straight into listo/completado completes the lot at once.
         if pedido_esta_completado(pedido):
             completar_lote(db, pedido)
+        else:
+            # V6 M4: open orders set aside their BOM at birth.
+            reservar_pedido(db, pedido)
         db.commit()
         db.refresh(pedido)
     except IntegrityError as e:
@@ -433,6 +437,9 @@ def delete_pedido(
     pedido = db.get(PedidoProduccion, pedido_id)
     if pedido is None:
         raise HTTPException(status_code=404, detail="Pedido de producción no encontrado")
+    # V6 M4: deleting an open order frees its reservation (clamped: completed
+    # or legacy rows release 0).
+    liberar_pedido(db, pedido)
     db.delete(pedido)
     db.commit()
 

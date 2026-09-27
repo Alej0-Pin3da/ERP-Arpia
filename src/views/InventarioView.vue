@@ -30,6 +30,8 @@ interface InsumoDisplay {
   ubicacion: string
   proveedor: string
   stock_actual: number
+  stock_reservado: number
+  disponible: number
   stock_minimo: number
   unidad_medida: string
   costo_unitario: number
@@ -91,6 +93,8 @@ async function cargarInsumos() {
       // Sin join de proveedor en el backend: se muestra — hasta que exista.
       proveedor: i.proveedor || i.nombre_proveedor || '—',
       stock_actual: Number(i.stock_actual) || 0,
+      stock_reservado: Number(i.stock_reservado ?? 0) || 0,
+      disponible: Math.max(0, (Number(i.disponible ?? i.stock_actual) || 0)),
       stock_minimo: Number(i.stock_minimo) || 0,
       unidad_medida: i.unidad_medida,
       costo_unitario: Number(i.costo_promedio_actual) || 0,
@@ -127,8 +131,8 @@ const insumosFiltrados = computed(() => {
     // Categoria
     const matchesCat = categoriaFiltro.value === 'Todas' || item.categoria === categoriaFiltro.value
 
-    // Solo Bajo Stock
-    const matchesBajo = !soloBajoStock.value || item.stock_actual <= item.stock_minimo
+    // Solo Bajo Stock (sobre disponible: lo reservado no se puede usar)
+    const matchesBajo = !soloBajoStock.value || item.disponible <= item.stock_minimo
 
     return matchesSearch && matchesTipo && matchesCat && matchesBajo
   })
@@ -163,7 +167,7 @@ const insumosFiltrados = computed(() => {
             compareText(text(a.item.proveedor), text(b.item.proveedor))
           break
         case 'stock':
-          cmp = (Number(a.item.stock_actual) || 0) - (Number(b.item.stock_actual) || 0)
+          cmp = (Number(a.item.disponible) || 0) - (Number(b.item.disponible) || 0)
           break
         case 'costo':
           cmp = (Number(a.item.costo_unitario) || 0) - (Number(b.item.costo_unitario) || 0)
@@ -182,7 +186,7 @@ const insumosFiltrados = computed(() => {
 
 const directosCount = computed(() => insumos.value.filter((i) => i.tipo === 'Directo').length)
 const indirectosCount = computed(() => insumos.value.filter((i) => i.tipo === 'Indirecto').length)
-const insumosCriticosCount = computed(() => insumos.value.filter((i: InsumoDisplay & { stock?: number }) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)).length)
+const insumosCriticosCount = computed(() => insumos.value.filter((i: InsumoDisplay & { stock?: number }) => (i.disponible ?? i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)).length)
 const valorTotalInventario = computed(() => insumos.value.reduce((acc: number, i: InsumoDisplay & { stock?: number; costo?: number }) => acc + (Number(i.stock_actual ?? i.stock ?? 0) * Number(i.costo_unitario ?? i.costo ?? 0)), 0))
 
 function formatCOP(val: number) {
@@ -495,23 +499,26 @@ function solicitarEliminar(item: InsumoDisplay) {
                 <div class="text-[11px] text-stone-400">{{ it.proveedor }}</div>
               </td>
 
-              <!-- Stock Level & Bar -->
+              <!-- Stock Level & Bar (disponible = actual − reservado) -->
               <td class="py-3 px-3.5 min-w-[140px]">
                 <div class="flex items-center justify-between font-mono font-bold text-xs">
-                  <span :class="it.stock_actual <= it.stock_minimo ? 'text-red-400' : 'text-stone-100'">
-                    {{ it.stock_actual }} {{ it.unidad_medida }}
+                  <span :class="it.disponible <= it.stock_minimo ? 'text-red-400' : 'text-stone-100'">
+                    {{ it.disponible }} {{ it.unidad_medida }}
                   </span>
                   <span class="text-[11px] text-stone-400 font-normal">mín {{ it.stock_minimo }} {{ it.unidad_medida }}</span>
+                </div>
+                <div v-if="it.stock_reservado > 0" class="text-[10px] text-amber-400/90 font-mono mt-0.5">
+                  actual {{ it.stock_actual }} · reservado {{ it.stock_reservado }}
                 </div>
                 <!-- Mini Bar -->
                 <div class="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden mt-1.5">
                   <div
                     class="h-full rounded-full"
-                    :class="it.stock_actual <= it.stock_minimo ? 'bg-red-500' : 'bg-emerald-400'"
-                    :style="{ width: `${Math.min(100, (it.stock_actual / (it.stock_minimo * 2)) * 100)}%` }"
+                    :class="it.disponible <= it.stock_minimo ? 'bg-red-500' : 'bg-emerald-400'"
+                    :style="{ width: `${Math.min(100, (it.disponible / (it.stock_minimo * 2)) * 100)}%` }"
                   />
                 </div>
-                <div v-if="it.stock_actual <= it.stock_minimo" class="text-[10px] text-red-400 font-bold mt-0.5">
+                <div v-if="it.disponible <= it.stock_minimo" class="text-[10px] text-red-400 font-bold mt-0.5">
                   ⚠️ REPONER
                 </div>
               </td>
@@ -607,13 +614,14 @@ function solicitarEliminar(item: InsumoDisplay) {
           </div>
           <div class="text-sm text-stone-300">{{ it.ubicacion }} <span class="text-stone-500">· {{ it.proveedor }}</span></div>
           <div class="flex items-center justify-between">
-            <span class="text-xs uppercase tracking-wider text-stone-400">Stock</span>
-            <span class="font-mono font-bold text-sm" :class="it.stock_actual <= it.stock_minimo ? 'text-red-400' : 'text-stone-100'">{{ it.stock_actual }} {{ it.unidad_medida }}</span>
+            <span class="text-xs uppercase tracking-wider text-stone-400">Disponible</span>
+            <span class="font-mono font-bold text-sm" :class="it.disponible <= it.stock_minimo ? 'text-red-400' : 'text-stone-100'">{{ it.disponible }} {{ it.unidad_medida }}</span>
           </div>
+          <div v-if="it.stock_reservado > 0" class="text-[10px] text-amber-400/90 font-mono">actual {{ it.stock_actual }} · reservado {{ it.stock_reservado }}</div>
           <div class="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
-            <div class="h-full rounded-full" :class="it.stock_actual <= it.stock_minimo ? 'bg-red-500' : 'bg-emerald-400'" :style="{ width: `${Math.min(100, (it.stock_actual / (it.stock_minimo * 2)) * 100)}%` }" />
+            <div class="h-full rounded-full" :class="it.disponible <= it.stock_minimo ? 'bg-red-500' : 'bg-emerald-400'" :style="{ width: `${Math.min(100, (it.disponible / (it.stock_minimo * 2)) * 100)}%` }" />
           </div>
-          <div v-if="it.stock_actual <= it.stock_minimo" class="text-xs text-red-400 font-bold">⚠️ REPONER (mín {{ it.stock_minimo }} {{ it.unidad_medida }})</div>
+          <div v-if="it.disponible <= it.stock_minimo" class="text-xs text-red-400 font-bold">⚠️ REPONER (mín {{ it.stock_minimo }} {{ it.unidad_medida }})</div>
           <div class="flex items-center justify-between text-sm">
             <span class="text-stone-400">{{ formatCOP(it.costo_unitario) }} / {{ it.unidad_medida }}</span>
             <span class="font-mono font-bold text-amber-300">{{ formatCOP(it.stock_actual * it.costo_unitario) }}</span>

@@ -37,6 +37,8 @@ class InsumoRead(InsumoBase):
 
     id: int
     stock_actual: Decimal
+    stock_reservado: Decimal = Decimal("0")
+    disponible: Decimal = Decimal("0")
     stock_minimo: Decimal
     costo_promedio_actual: Decimal
     nombre_categoria: str | None = None

@@ -24,12 +24,12 @@ async function cargarInsumos() {
   } catch { insumos.value = [] }
 }
 onMounted(() => { void cargarInsumos() })
-type InsumoCritico = InsumoRead & { stock?: number | string }
-const criticos = computed(() => insumos.value.filter((i: InsumoCritico)=>Number(i.stock_actual??i.stock??0)<=Number(i.stock_minimo??0)))
+type InsumoCritico = InsumoRead & { stock?: number | string; disponible?: number | string }
+const criticos = computed(() => insumos.value.filter((i: InsumoCritico)=>Number(i.disponible ?? i.stock_actual??i.stock??0)<=Number(i.stock_minimo??0)))
 
 const totalSugerido = computed(() => {
   return criticos.value.reduce((sum, item) => {
-    const deficit = Math.max(0, item.stock_minimo * 2 - item.stock_actual)
+    const deficit = Math.max(0, item.stock_minimo * 2 - Number(item.disponible ?? item.stock_actual))
     // P0-4: en REAL la API manda costo_promedio_actual (Numeric → string), no costo_unitario
     return sum + (deficit * Number(item.costo_unitario ?? item.costo_promedio_actual ?? 0))
   }, 0)
@@ -37,7 +37,7 @@ const totalSugerido = computed(() => {
 
 async function generarOrden() {
   for (const item of criticos.value) {
-    const deficit = Math.max(0, item.stock_minimo * 2 - item.stock_actual)
+    const deficit = Math.max(0, item.stock_minimo * 2 - Number(item.disponible ?? item.stock_actual))
     if (deficit <= 0) continue
     try {
       await comprasApi.createCompraInsumo({

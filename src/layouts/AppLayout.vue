@@ -31,7 +31,7 @@ async function cargarAlertasInsumos() {
   } catch { insumosList.value = [] }
 }
 onMounted(() => { void cargarAlertasInsumos() })
-const hasAlertas = computed(() => insumosList.value.some((i: InsumoRead & { stock?: number | string }) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
+const hasAlertas = computed(() => insumosList.value.some((i: InsumoRead & { stock?: number | string }) => Number(i.disponible ?? i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)))
 const router = useRouter()
 const route = useRoute()
 const sidebarOpen = ref(false)

@@ -33,6 +33,12 @@ class Insumo(Base):
     stock_actual: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
+    # V6 M4: tela comprometida por pedidos en curso (reservada al crear el
+    # pedido, liberada al completarlo/anularlo). Lo disponible nunca es
+    # stock_actual a secas: ver ``disponible``.
+    stock_reservado: Mapped[Decimal] = mapped_column(
+        Numeric(15, 4), nullable=False, default=Decimal("0")
+    )
     stock_minimo: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
@@ -47,6 +53,18 @@ class Insumo(Base):
 
     categoria: Mapped[CategoriaInsumo] = relationship(back_populates="insumos")
     compras: Mapped[list[CompraInsumo]] = relationship(back_populates="insumo", lazy="selectin")
+
+    @property
+    def disponible(self) -> Decimal:
+        """Stock libre = actual menos reservado (nunca negativo a la vista)."""
+        try:
+            return max(
+                Decimal("0"),
+                (self.stock_actual or Decimal("0"))
+                - (self.stock_reservado or Decimal("0")),
+            )
+        except Exception:
+            return Decimal("0")
 
     def __repr__(self) -> str:
         return f"<Insumo id={self.id} nombre={self.nombre!r}>"

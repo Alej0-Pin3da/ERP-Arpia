@@ -16,6 +16,9 @@ export interface InsumoRead {
   ubicacion?: string | null
   stock_actual: number | string
   stock_minimo: number | string
+  // V6 M4: committed to open production orders + free stock.
+  stock_reservado: number | string
+  disponible: number | string
   costo_promedio_actual: number | string
   nombre_categoria?: string | null
 }

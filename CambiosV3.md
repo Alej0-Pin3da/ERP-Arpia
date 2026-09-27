@@ -3,6 +3,16 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - V6 Módulo 4: Reservas predictivas de inventario
+
+- **Modelo + migración `dcc928a70607`:** `Insumos.stock_reservado` (Numeric, default 0) + propiedad `disponible` (actual − reservado, nunca negativa a la vista) y `InsumoRead` con ambos campos.
+- **Servicio (`services/reservas.py`, sin commits propios):** `reservar_pedido` aparta la explosión al crear; `liberar_pedido` la suelta con clamp a cero (filas legacy y drift jamás dan negativo).
+- **Hooks:** crear pedido reserva (salvo creado directo a listo, que consume), `completar_lote` juzga sobre `actual − reservas ajenas` (lo propio no se bloquea a sí mismo) y libera solo si pasa el 409 (un cierre fallido conserva la reserva para reintentar), borrar pedido libera.
+- **Supuesto honesto:** la liberación recalcula la explosión actual; un BOM editado a mitad de producción deriva por el delta (el clamp lo contiene). Sin ledger por pedido a propósito.
+- **Frontend:** `InsumoRead` con ambos campos; Inventario muestra Disponible + pista de reservado, filas rojas y alertas sobre disponible; AppLayout, Dashboard, SugerirOrden y Análisis usan disponible (déficits inclusive).
+- **Tests:** `test_reservas_api.py` (5: reserva sin tocar actual, cierre libera+descuenta e idempotente, contención con 409 honesto y cesión, borrado libera, respuesta expone ambos).
+- **Verificación:** reservas 5/5 + producción/inventario 42/42, lint 0, vitest 52/52, build limpio.
+
 ### [2026-09-27] - V6 Módulo 3: Webhook WooCommerce bidireccional
 
 - **Modelo + migración `557107cefd09`:** `Webhook_Eventos` (source+external_id únicos, venta_id, estado). Además backfill de `ix_Reparto_Ventas_venta_id` (drift de la migración M2 escrita a mano, detectado por autogenerate y convergido acá con nota).
