@@ -1,0 +1,11 @@
+{
+  "name": "Arpia ERP — Modo Feria",
+  "short_name": "Arpia",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f0f",
+  "theme_color": "#0f0f0f",
+  "icons": [
+    { "src": "/arpia-emblem.png", "sizes": "any", "type": "image/png" }
+  ]
+}

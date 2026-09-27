@@ -3,6 +3,71 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - V4 Backend: Service Layer categorias_insumos + tipos_productos
+
+- **Service Layer para Categorías de Insumos (`backend/app/services/categorias_insumos.py`, `backend/app/api/routes/categorias_insumos.py`):**
+  - Desacople de queries SQLAlchemy de los handlers HTTP (`listar_categorias_insumo`, `obtener_categoria_insumo`, `crear_categoria_insumo`, `actualizar_categoria_insumo`, `eliminar_categoria_insumo` con paginación y filtro `q`).
+- **Service Layer para Tipos de Producto (`backend/app/services/tipos_productos.py`, `backend/app/api/routes/tipos_productos.py`):**
+  - Desacople de CRUD con manejo de `IntegrityError` → 409 en nombre duplicado y en borrado con uso referencial.
+- **Verificación:** import + rutas delegando a servicios; suite existente sin regresión.
+- **Archivos:** `backend/app/services/categorias_insumos.py` (nuevo), `backend/app/services/tipos_productos.py` (nuevo), `backend/app/api/routes/categorias_insumos.py`, `backend/app/api/routes/tipos_productos.py`, `CambiosV3.md`.
+
+### [2026-09-27] - V4 Frontend: Modularización Container-Presentational de FinanzasView.vue
+
+- **Deconstrucción del Monolito:** `src/views/FinanzasView.vue` se refactorizó de 1.433 líneas a ~673 líneas (-53% de código en el orquestador), extrayendo 5 subcomponentes de pestaña + 1 módulo de tipos bajo `src/components/finanzas/`:
+  - `types.ts`: Interfaces TypeScript compartidas (`SociaDisplay`, `LiquidacionDisplay`, `AnticipoDisplay`, `DistribucionDisplay`) y helper `formatCOP`.
+  - `FinanzasLiquidacionesTab.vue`: Tabla/cards responsiva de liquidaciones con filtros de búsqueda y estado, acciones CRUD y ciclo de transición de estados (BORRADOR→APROBADA→PAGADA). Emite eventos tipados al orquestador.
+  - `FinanzasSociasTab.vue`: Grid de cards de socias con historial de liquidaciones, anticipos pendientes por socia, toggle activo/inactivo.
+  - `FinanzasAnticiposTab.vue`: Tabla/cards de anticipos, filtro de búsqueda, acción de marcar descontado con estado de carga individual por anticipo.
+  - `FinanzasMovimientosTab.vue`: Tabla/cards de movimientos, dropdowns de filtro tipo/estado con recarga delegada al padre.
+  - `FinanzasSimuladorTab.vue`: Simulador interactivo de punto de equilibrio textil con sliders, InputNumbers y KPIs computados en tiempo real.
+- **Patrón de Comunicación:** Todos los subcomponentes usan `defineProps` + `defineEmits` tipados; el orquestador es el único titular del estado y de las llamadas a la API.
+- **Verificación:** `npm test` 44/44 PASS + `npm run build` PASS (438 módulos, sin errores TS).
+- **Archivos:** `src/views/FinanzasView.vue` (refactor), `src/components/finanzas/types.ts` (nuevo), `src/components/finanzas/FinanzasLiquidacionesTab.vue` (nuevo), `src/components/finanzas/FinanzasSociasTab.vue` (nuevo), `src/components/finanzas/FinanzasAnticiposTab.vue` (nuevo), `src/components/finanzas/FinanzasMovimientosTab.vue` (nuevo), `src/components/finanzas/FinanzasSimuladorTab.vue` (nuevo), `V4.md`, `CambiosV3.md`.
+
+### [2026-09-27] - V4 Frontend: Modularización Container-Presentational de MaestrosView.vue
+
+- **Deconstrucción del Monolito:** `src/views/MaestrosView.vue` se refactorizó de 2.363 líneas a ~270 líneas (-88% de código en el archivo), desacoplando 9 dominios maestros en componentes autónomos con responsabilidad única bajo `src/components/maestros/`:
+  - `MaestroProveedoresTab.vue`: Directorio de proveedores, filtrado por categorías, cards y modal de alta/edición.
+  - `MaestroCanalesTab.vue`: Canales comerciales, tarifas, comisiones y modal.
+  - `MaestroMetodosPagoTab.vue`: Métodos de pago, pasarelas, acreditación y modal.
+  - `MaestroTallasTab.vue`: Matriz anatómica de tallas estándar y catálogo de productos sin talla (merch) con modales.
+  - `MaestroCategoriasTab.vue`: Familias de colección y segmentación de tallas con modal.
+  - `MaestroCatProdTab.vue`: Categorías y líneas de producto con CRUD inline.
+  - `MaestroUbicacionesTab.vue`: Ubicaciones físicas de taller y modal.
+  - `MaestroCosteoTab.vue`: Tarifas de confección, energía, patronaje y distribución estatutaria 40/30/30.
+- **Orquestador Limpio:** `MaestrosView.vue` ahora solo gestiona la pestaña activa, métricas rápidas, la carga centralizada con caché SWR y el diálogo global de confirmación de borrado.
+- **Verificación:** `npm test` 44/44 PASS + `npm run build` PASS (427 módulos).
+- **Archivos:** `src/views/MaestrosView.vue`, `src/components/maestros/MaestroProveedoresTab.vue` (nuevo), `src/components/maestros/MaestroCanalesTab.vue` (nuevo), `src/components/maestros/MaestroMetodosPagoTab.vue` (nuevo), `src/components/maestros/MaestroTallasTab.vue` (nuevo), `src/components/maestros/MaestroCategoriasTab.vue` (nuevo), `src/components/maestros/MaestroCatProdTab.vue` (nuevo), `src/components/maestros/MaestroUbicacionesTab.vue` (nuevo), `src/components/maestros/MaestroCosteoTab.vue` (nuevo), `V4.md`, `CambiosV3.md`.
+
+### [2026-09-27] - Implementaciones V4: Caché Maestros, Service Layer Clientes, Concurrencia Finanzas y Feedback Loop de Tiempos
+
+- **Caché SWR/TTL en Frontend (`src/composables/useMaestros.ts`):**
+  - Implementación de almacenamiento en memoria con TTL de 60 segundos para catálogos maestros de baja volatilidad (`canales`, `metodos`, `categorias`, `catprod`, `ubicaciones`, `tallas`, `sintalla`, `parametros`).
+  - Mecanismo de invalidación selectiva ante mutaciones (`create`, `update`, `delete`) y función `clearCache` exportada.
+  - Verificación: 10/10 tests aprobados en `useMaestros.test.ts`.
+- **Service Layer para Clientes (`backend/app/services/clientes.py`, `backend/app/api/routes/clientes.py`):**
+  - Desacople limpio de la lógica de negocio y queries SQLAlchemy de los controladores HTTP.
+  - Mantenimiento estricto del principio de responsabilidad única (Clean Architecture).
+- **Concurrencia Pesimista en Finanzas (`backend/app/services/finanzas.py`):**
+  - Aplicado `db.get(Venta, vid, with_for_update=True)` en `crear_liquidacion` para garantizar atomicidad y prevenir dobles liquidaciones concurrentes de ventas.
+- **Feedback Loop de Tiempos Reales de Taller (`backend/app/api/routes/produccion.py`, `backend/app/services/produccion.py`, `src/services/api/pedidos-produccion.ts`):**
+  - Endpoint `GET /api/v1/pedidos-produccion/promedio-tiempos-producto?producto_id={id}` que calcula los promedios reales de minutos por fase (`corte`, `costura`, `acabados`, `calidad`) y totales para lotes cerrados.
+  - Esquema Pydantic `PromedioTiemposProductoRead` y tipado frontend `PromedioTiemposProductoRead` con función cliente `getPromedioTiemposProducto`.
+  - Prueba unitaria añadida `test_promedio_tiempos_producto` en `backend/tests/test_produccion_tiempos.py`.
+- **Verificación:** `npm test` 44/44 PASS + `npm run build` PASS (411 módulos).
+- **Archivos:** `src/composables/useMaestros.ts`, `backend/app/services/clientes.py` (nuevo), `backend/app/api/routes/clientes.py`, `backend/app/services/finanzas.py`, `backend/app/services/produccion.py`, `backend/app/schemas/produccion.py`, `backend/app/api/routes/produccion.py`, `src/services/api/pedidos-produccion.ts`, `backend/tests/test_produccion_tiempos.py`, `V4.md`, `CambiosV3.md`.
+
+### [2026-09-27] - V4.md: Propuesta de Evolución y Mejoras de Arquitectura
+
+- **Documentación de Estrategia:** Creación de `V4.md` con el diagnóstico del estado actual del ERP tras la purga completa de mocks y la operación 100% real.
+- **Ejes de Mejora Abordados:**
+  1. *Frontend:* Descomposición de componentes monolíticos (`MaestrosView.vue` de 2.363 líneas, `FinanzasView.vue` de 1.433 líneas, `FichaTecnicaModal.vue`), capa de caché SWR/Pinia para catálogos maestros y generación automatizada de contratos de tipos TypeScript desde FastAPI.
+  2. *Backend:* Homogeneización del Service Layer en rutas residuales (`maestros.py`, `clientes.py`), bloqueos pesimistas (`with_for_update()`) en liquidaciones/anticipos financieros y jerarquía unificada de excepciones de dominio.
+  3. *Atelier Slow-Fashion:* Feedback loop de costeo real a fichas técnicas estándar, trazabilidad de desperdicio textil y retazos reingresables en corte, y resiliencia offline/PWA para ventas en ferias y showrooms.
+  4. *Calidad & DevOps:* Pruebas E2E con Playwright sobre flujos dorados, cobertura mínima en CI, auditoría con diff JSONB (antes/después) y estrategia automatizada de backups.
+- **Archivos:** `V4.md` (nuevo), `CambiosV3.md`.
+
 ### [2026-09-27] - Cotizador: tabla Base BOM con precio unitario exacto
 
 - **Causa:** la tabla mostraba `Precio unit. $1` en todo (tela $0,793/cm, entretela $1,267/cm, botón $222,014/un) porque usaba `formatCOP` que redondea a pesos. Nuevo `fmtPrecioU`: precio exacto con hasta 3 decimales + unidad original (`$0,793/cm`, `$1.300/m`, `$222,014/un`).

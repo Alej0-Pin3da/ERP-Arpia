@@ -493,3 +493,38 @@ def test_tiempos_cascada_al_borrar_pedido(client, admin_token, db_session):
         )
     finally:
         _cleanup(producto_id, insumo_id, tipo_id, cat_id)
+
+
+def test_promedio_tiempos_producto(client, admin_token):
+    """GET /pedidos-produccion/promedio-tiempos-producto returns average time per phase."""
+    cat_id, insumo_id, tipo_id, producto_id = _setup()
+    headers = _auth(admin_token)
+    try:
+        pedido_id = _crear_pedido(client, headers, producto_id)
+        # Advance to costura so corte and costura can be registered
+        client.patch(f"/api/v1/pedidos-produccion/{pedido_id}", json={"fase": "costura"}, headers=headers)
+        url_tiempos = f"/api/v1/pedidos-produccion/{pedido_id}/tiempos"
+        client.post(url_tiempos, json={"fase": "corte", "operaria": "Ana", "minutos_reales": "20"}, headers=headers)
+        client.post(url_tiempos, json={"fase": "costura", "operaria": "Bea", "minutos_reales": "40"}, headers=headers)
+
+        res = client.get(
+            f"/api/v1/pedidos-produccion/promedio-tiempos-producto?producto_id={producto_id}",
+            headers=headers,
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["producto_id"] == producto_id
+        assert Decimal(str(data["fases"]["corte"])) == Decimal("20.00")
+        assert Decimal(str(data["fases"]["costura"])) == Decimal("40.00")
+        assert Decimal(str(data["fases"]["acabados"])) == Decimal("0.00")
+        assert Decimal(str(data["promedio_minutos_totales"])) == Decimal("60.00")
+
+        # 404 on nonexistent product
+        res_404 = client.get(
+            "/api/v1/pedidos-produccion/promedio-tiempos-producto?producto_id=999999",
+            headers=headers,
+        )
+        assert res_404.status_code == 404
+    finally:
+        _cleanup(producto_id, insumo_id, tipo_id, cat_id)
+

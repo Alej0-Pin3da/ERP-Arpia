@@ -1,24 +1,17 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import or_, select
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_admin, require_roles
 from app.models.clientes import Cliente
 from app.schemas.cliente import ClienteCreate, ClienteRead, ClienteUpdate
 from app.schemas.common import Paginated
-from app.services.paginacion import aplicar_orden, paginar
+from app.services import clientes as clientes_service
 
 router = APIRouter(prefix="/clientes", tags=["clientes"])
 
 audited_user = require_roles("admin", "operador", "consulta")
-
-# Whitelisted server-side sort keys (plain columns on Cliente).
-_SORTABLE_CLIENTES = {
-    "id": Cliente.id,
-    "nombre": Cliente.nombre,
-}
 
 
 @router.get("", response_model=Paginated[ClienteRead])
@@ -33,23 +26,17 @@ def list_clientes(
     db: Session = Depends(get_db),
     _: Cliente = Depends(audited_user),
 ):
-    stmt = select(Cliente).order_by(Cliente.id)
-    if tipo is not None:
-        stmt = stmt.where(Cliente.tipo == tipo)
-    if ciudad is not None:
-        stmt = stmt.where(Cliente.ciudad == ciudad)
-    if q is not None:
-        like = f"%{q}%"
-        stmt = stmt.where(
-            or_(
-                Cliente.nombre.ilike(like),
-                Cliente.ciudad.ilike(like),
-                Cliente.direccion.ilike(like),
-            )
-        )
-    stmt = aplicar_orden(stmt, sort_by, order, _SORTABLE_CLIENTES)
-    rows, total = paginar(db, stmt, limit, offset)
-    return Paginated[ClienteRead](items=list(rows), total=total)
+    rows, total = clientes_service.listar_clientes(
+        db,
+        limit=limit,
+        offset=offset,
+        q=q,
+        tipo=tipo,
+        ciudad=ciudad,
+        sort_by=sort_by,
+        order=order,
+    )
+    return Paginated[ClienteRead](items=rows, total=total)
 
 
 @router.get("/{cliente_id}", response_model=ClienteRead)
@@ -58,10 +45,7 @@ def get_cliente(
     db: Session = Depends(get_db),
     _: Cliente = Depends(audited_user),
 ):
-    cliente = db.get(Cliente, cliente_id)
-    if cliente is None:
-        raise HTTPException(status_code=404, detail="Cliente not found")
-    return cliente
+    return clientes_service.obtener_cliente(db, cliente_id)
 
 
 @router.post("", response_model=ClienteRead, status_code=status.HTTP_201_CREATED)
@@ -70,11 +54,7 @@ def create_cliente(
     db: Session = Depends(get_db),
     _: Cliente = Depends(require_admin),
 ):
-    cliente = Cliente(**payload.model_dump())
-    db.add(cliente)
-    db.commit()
-    db.refresh(cliente)
-    return cliente
+    return clientes_service.crear_cliente(db, payload)
 
 
 @router.put("/{cliente_id}", response_model=ClienteRead)
@@ -84,14 +64,7 @@ def update_cliente(
     db: Session = Depends(get_db),
     _: Cliente = Depends(require_admin),
 ):
-    cliente = db.get(Cliente, cliente_id)
-    if cliente is None:
-        raise HTTPException(status_code=404, detail="Cliente not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(cliente, field, value)
-    db.commit()
-    db.refresh(cliente)
-    return cliente
+    return clientes_service.actualizar_cliente(db, cliente_id, payload)
 
 
 @router.delete("/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -100,8 +73,4 @@ def delete_cliente(
     db: Session = Depends(get_db),
     _: Cliente = Depends(require_admin),
 ):
-    cliente = db.get(Cliente, cliente_id)
-    if cliente is None:
-        raise HTTPException(status_code=404, detail="Cliente not found")
-    db.delete(cliente)
-    db.commit()
+    clientes_service.eliminar_cliente(db, cliente_id)

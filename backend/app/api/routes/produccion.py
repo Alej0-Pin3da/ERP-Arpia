@@ -31,11 +31,13 @@ from app.schemas.produccion import (
     TiempoFaseRead,
     TiempoFaseUpdate,
     TiemposListRead,
+    PromedioTiemposProductoRead,
 )
 from app.services.paginacion import aplicar_orden, paginar
 from app.services.costos import tasas_costeo
 from app.services.produccion import (
     completar_lote,
+    obtener_promedio_tiempos_producto,
     pedido_esta_completado,
     totales_tiempos,
     validar_avance_fase,
@@ -300,6 +302,22 @@ def list_pedidos(
     return Paginated[PedidoProduccionRead](
         items=[_pedido_to_read(p, db) for p in rows], total=total
     )
+
+
+@router_pedidos.get(
+    "/promedio-tiempos-producto",
+    response_model=PromedioTiemposProductoRead,
+)
+def get_promedio_tiempos_producto(
+    producto_id: int,
+    db: Session = Depends(get_db),
+    _: PedidoProduccion = Depends(audited_user),
+):
+    """Retorna el promedio de minutos reales por fase para los lotes completados del producto."""
+    try:
+        return obtener_promedio_tiempos_producto(db, producto_id)
+    except EntityNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router_pedidos.get("/{pedido_id}", response_model=PedidoProduccionRead)

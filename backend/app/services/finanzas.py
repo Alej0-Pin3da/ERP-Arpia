@@ -457,7 +457,7 @@ def crear_liquidacion(db: Session, payload: dict) -> tuple[Liquidacion, list[str
     if venta_ids:
         # El servidor manda: totales del snapshot de las ventas elegidas.
         for vid in dict.fromkeys(venta_ids):
-            venta = db.get(Venta, vid)
+            venta = db.get(Venta, vid, with_for_update=True)
             if venta is None:
                 raise HTTPException(status_code=404, detail=f"Venta {vid} no encontrada")
             if venta.estado != DocumentState.CONFIRMED.value:

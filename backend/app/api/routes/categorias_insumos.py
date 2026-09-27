@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, require_admin, require_roles
@@ -10,7 +9,13 @@ from app.schemas.categoria_insumo import (
     CategoriaInsumoUpdate,
 )
 from app.schemas.common import Paginated
-from app.services.paginacion import paginar
+from app.services.categorias_insumos import (
+    actualizar_categoria_insumo,
+    crear_categoria_insumo,
+    eliminar_categoria_insumo,
+    listar_categorias_insumo,
+    obtener_categoria_insumo,
+)
 
 router = APIRouter(prefix="/categorias-insumos", tags=["categorias-insumos"])
 
@@ -25,11 +30,8 @@ def list_categorias(
     db: Session = Depends(get_db),
     _: CategoriaInsumo = Depends(audited_user),
 ):
-    stmt = select(CategoriaInsumo).order_by(CategoriaInsumo.id)
-    if q is not None:
-        stmt = stmt.where(CategoriaInsumo.nombre.ilike(f"%{q}%"))
-    rows, total = paginar(db, stmt, limit, offset)
-    return Paginated[CategoriaInsumoRead](items=list(rows), total=total)
+    rows, total = listar_categorias_insumo(db, limit=limit, offset=offset, q=q)
+    return Paginated[CategoriaInsumoRead](items=rows, total=total)
 
 
 @router.get("/{categoria_id}", response_model=CategoriaInsumoRead)
@@ -38,10 +40,7 @@ def get_categoria(
     db: Session = Depends(get_db),
     _: CategoriaInsumo = Depends(audited_user),
 ):
-    categoria = db.get(CategoriaInsumo, categoria_id)
-    if categoria is None:
-        raise HTTPException(status_code=404, detail="CategoriaInsumo not found")
-    return categoria
+    return obtener_categoria_insumo(db, categoria_id)
 
 
 @router.post("", response_model=CategoriaInsumoRead, status_code=status.HTTP_201_CREATED)
@@ -50,11 +49,7 @@ def create_categoria(
     db: Session = Depends(get_db),
     _: CategoriaInsumo = Depends(require_admin),
 ):
-    categoria = CategoriaInsumo(**payload.model_dump())
-    db.add(categoria)
-    db.commit()
-    db.refresh(categoria)
-    return categoria
+    return crear_categoria_insumo(db, payload)
 
 
 @router.put("/{categoria_id}", response_model=CategoriaInsumoRead)
@@ -64,14 +59,7 @@ def update_categoria(
     db: Session = Depends(get_db),
     _: CategoriaInsumo = Depends(require_admin),
 ):
-    categoria = db.get(CategoriaInsumo, categoria_id)
-    if categoria is None:
-        raise HTTPException(status_code=404, detail="CategoriaInsumo not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(categoria, field, value)
-    db.commit()
-    db.refresh(categoria)
-    return categoria
+    return actualizar_categoria_insumo(db, categoria_id, payload)
 
 
 @router.delete("/{categoria_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -80,8 +68,4 @@ def delete_categoria(
     db: Session = Depends(get_db),
     _: CategoriaInsumo = Depends(require_admin),
 ):
-    categoria = db.get(CategoriaInsumo, categoria_id)
-    if categoria is None:
-        raise HTTPException(status_code=404, detail="CategoriaInsumo not found")
-    db.delete(categoria)
-    db.commit()
+    eliminar_categoria_insumo(db, categoria_id)

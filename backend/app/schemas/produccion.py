@@ -139,3 +139,11 @@ class TiemposListRead(BaseModel):
     total_minutos: Decimal
     total_mano_obra: Decimal
     total_energia: Decimal
+
+
+class PromedioTiemposProductoRead(BaseModel):
+    producto_id: int
+    total_lotes_completados: int
+    fases: dict[str, Decimal]
+    promedio_minutos_totales: Decimal
+

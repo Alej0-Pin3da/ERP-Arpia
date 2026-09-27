@@ -208,3 +208,18 @@ export async function updateTiempoPedido(
   )
   return data
 }
+
+export interface PromedioTiemposProductoRead {
+  producto_id: number
+  total_lotes_completados: number
+  fases: Record<string, number>
+  promedio_minutos_totales: number
+}
+
+export async function getPromedioTiemposProducto(productoId: number): Promise<PromedioTiemposProductoRead> {
+  const { data } = await client.get<PromedioTiemposProductoRead>('/pedidos-produccion/promedio-tiempos-producto', {
+    params: { producto_id: productoId },
+  })
+  return data
+}
+

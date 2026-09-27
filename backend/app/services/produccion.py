@@ -27,7 +27,7 @@ already-completed lot is a no-op (guarded by ``cantidad_producida``).
 from decimal import Decimal
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import DomainValidationError, EntityNotFoundError
@@ -243,3 +243,80 @@ def completar_lote(db: Session, pedido: PedidoProduccion) -> dict[str, Decimal]:
         "mano_obra_real": totales["mano_obra_real"],
         "energia_real": totales["energia_real"],
     }
+
+
+def obtener_promedio_tiempos_producto(db: Session, producto_id: int) -> dict:
+    """Calcula el promedio de minutos reales por fase y totales para los lotes completados de un producto."""
+    producto = db.get(Producto, producto_id)
+    if producto is None:
+        raise EntityNotFoundError("Producto", producto_id)
+
+    total_lotes = db.scalar(
+        select(func.count(PedidoProduccion.id)).where(
+            PedidoProduccion.producto_id == producto_id,
+            PedidoProduccion.cantidad_producida.is_not(None),
+            PedidoProduccion.cantidad_producida > 0,
+        )
+    ) or 0
+
+    fases_stats = db.execute(
+        select(
+            TiempoFase.fase,
+            func.avg(TiempoFase.minutos_reales).label("promedio"),
+        )
+        .join(PedidoProduccion, TiempoFase.pedido_id == PedidoProduccion.id)
+        .where(PedidoProduccion.producto_id == producto_id)
+        .group_by(TiempoFase.fase)
+    ).all()
+
+    fases_dict = {fase: Decimal("0.00") for fase in FASES_TIEMPO_ORDEN}
+    total_promedio = Decimal("0.00")
+    for row in fases_stats:
+        fase = row[0]
+        avg_min = row[1]
+        if fase in fases_dict and avg_min is not None:
+            val = Decimal(str(round(float(avg_min), 2)))
+            fases_dict[fase] = val
+            total_promedio += val
+
+    return {
+        "producto_id": producto_id,
+        "total_lotes_completados": total_lotes,
+        "fases": fases_dict,
+        "promedio_minutos_totales": total_promedio,
+    }
+
+
+# --- V4 Eje 3.2: trazabilidad de retazos (foundation, sin migracion) ---
+# Umbral minimo util para reingreso a inventario (V4.md: ej. > 0.5 m2).
+UMBRAL_RETAZO_M2 = Decimal("0.5")
+
+
+def es_retazo_reutilizable(area_m2: Decimal | float | str) -> bool:
+    """Return True when a cut offcut is worth re-entering into inventory."""
+    return Decimal(str(area_m2)) > UMBRAL_RETAZO_M2
+
+
+def clasificar_retazo(area_m2: Decimal | float | str) -> str:
+    """Classify an offcut as reusable stock or plain waste."""
+    return "retazo" if es_retazo_reutilizable(area_m2) else "desperdicio"
+
+
+def estimar_retazos_lote(metros_sobrantes: Decimal | float | str, ancho_m: Decimal | float | str = "1.5") -> dict:
+    """Estimate reusable offcut area from leftover meters and fabric width.
+
+    Re-entry itself stays manual through the existing Insumos flow
+    (Retazo insumos already exist as seed data); this pure helper gives
+    the corte closure a deterministic, testable decision point.
+    """
+    sobrantes = Decimal(str(metros_sobrantes))
+    ancho = Decimal(str(ancho_m))
+    area = sobrantes * ancho if sobrantes > 0 and ancho > 0 else Decimal("0")
+    return {
+        "metros_sobrantes": sobrantes,
+        "ancho_m": ancho,
+        "area_m2": area,
+        "clasificacion": clasificar_retazo(area),
+        "reingresable": es_retazo_reutilizable(area),
+    }
+
