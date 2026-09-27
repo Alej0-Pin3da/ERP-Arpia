@@ -516,13 +516,6 @@ const precioSugeridoAuto = computed(() => {
   return Math.round(costo / (1 - margen / 100))
 })
 
-const precioOverrideInfo = computed(() => {
-  if (!props.receta) return false
-  const stored = Number(props.receta.precio_venta ?? 0)
-  const auto = Number(precioSugeridoAuto.value ?? 0)
-  return stored > 0 && auto > 0 && Math.abs(stored - auto) > 1
-})
-
 const precioMostrado = computed(() => {
   if (isEditing.value) return Number(editPrecio.value ?? 0)
   if (!props.receta) return Number(props.receta?.precio_venta ?? 0)

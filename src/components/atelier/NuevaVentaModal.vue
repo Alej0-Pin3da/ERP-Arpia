@@ -327,10 +327,8 @@ async function cargarVariantesYStock(it: LocalItem, prendaId: number, opts: { pr
     )
     const rows = (stockRes.data.items ?? []).filter((r) => r.producto_id === prendaId)
     const porVariante = new Map<number, number>()
-    let genericas = 0
     for (const r of rows) {
       if (r.variante_id != null) porVariante.set(r.variante_id, (porVariante.get(r.variante_id) ?? 0) + 1)
-      else genericas += 1
     }
     const total = rows.length
     it.stockDisponible = total
@@ -522,20 +520,16 @@ async function guardar() {
     }
   }
 
-  let nombreClienteFinal = 'Cliente General'
   let cidFinal: number | null = null
 
   if (modoCliente.value === 'existente' && clienteId.value) {
     const c = (clientes.value as { id: number; nombre: string }[]).find((x) => x.id === clienteId.value)
     if (c) {
-      nombreClienteFinal = c.nombre
       cidFinal = c.id
     } else {
       // clienteId viene de un cliente que ya no existe en la fuente activa — evita mandar id fantasma
       cidFinal = null
     }
-  } else if (clienteNombreManual.value.trim()) {
-    nombreClienteFinal = clienteNombreManual.value.trim()
   }
 
   // Real API — valores resueltos a codigo maestro (ver canalToCodigo)

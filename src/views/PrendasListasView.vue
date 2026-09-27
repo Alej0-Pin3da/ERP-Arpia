@@ -348,7 +348,6 @@ const loteFiltrados = computed(() => {
 
 const loteStockTotal = computed(() => lotes.value.reduce((acc, l) => acc + l.stock, 0))
 const loteValorizacion = computed(() => lotes.value.reduce((acc, l) => acc + l.stock * l.precio, 0))
-const lotePrecioMedio = computed(() => (loteStockTotal.value > 0 ? loteValorizacion.value / loteStockTotal.value : 0))
 // Totales unificados lote + talla (lo que la dueña opera).
 const stockTotalUds = computed(() => loteStockTotal.value + udsDisponibles.value)
 const valorizacionTotal = computed(() => loteValorizacion.value + valorizacionUnitaria.value)

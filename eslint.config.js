@@ -10,7 +10,7 @@ export default tseslint.config(
   },
   {
     name: 'app/files-to-ignore',
-    ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', '**/src/types/api.d.ts'],
+    ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', '**/src/types/api.d.ts', 'e2e/**', 'playwright.config.ts'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

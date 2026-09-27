@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
 import { showToast } from '@/utils/toast'
 import * as auditoriaApi from '@/services/api/auditoria'
 import type { PrecioVersionRead, CostoVersionRead, CierreMensualRead } from '@/services/api/auditoria'

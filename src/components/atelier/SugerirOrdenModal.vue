@@ -44,7 +44,7 @@ async function generarOrden() {
         cantidad_comprada: deficit,
         precio_unitario_compra: Number(item.costo_unitario ?? item.costo_promedio_actual ?? 0),
       })
-    } catch (e) { /* continue */ }
+    } catch { /* continue */ }
   }
   void cargarInsumos()
   showToast('success', 'Orden de Compra Procesada', 'Se ha reabastecido el stock de los insumos críticos sugeridos.')

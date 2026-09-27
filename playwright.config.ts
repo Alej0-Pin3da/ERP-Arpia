@@ -1,4 +1,3 @@
-// @ts-nocheck — optional dep: installed only when running `npm run test:e2e`.
 import { defineConfig, devices } from '@playwright/test'
 
 // V4 Eje 4.1 foundation: golden-path E2E scaffold (production, commercial,

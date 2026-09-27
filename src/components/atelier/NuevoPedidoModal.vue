@@ -13,7 +13,6 @@ import { useProduccion } from '@/composables/useProduccion'
 import { useMaestros } from '@/composables/useMaestros'
 import { listVariantes, createVariante } from '@/services/api/productos'
 import type { PedidoProduccionRead } from '@/services/api/pedidos-produccion'
-import { client } from '@/api/client'
 import { showToast } from '@/utils/toast'
 
 defineProps<{

@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Limpieza lint: 79→64 problemas, fix `??` muerto en VentasView
+
+- **Fix real (`src/views/VentasView.vue:101`):** `Number(raw.subtotal ?? (A+B) ?? 0)` tenía el `?? 0` muerto (`Number()+Number()` nunca es nullish) y dejaba pasar `NaN` a la UI cuando faltaba el subtotal. Ahora `Number(...) || 0`: mismo valor en todos los casos sanos, `0` en vez de `NaN` en el caso roto.
+- **Código muerto eliminado (8):** `pruebasCalce` (DetallePedidoTallerModal), `datosCompletos` (EtiquetaPrendaModal), `precioOverrideInfo` (FichaTecnicaModal), `genericas` + `nombreClienteFinal` (NuevaVentaModal), import `client` (NuevoPedidoModal), param `e` (SugerirOrdenModal), import `InputText` (AuditoriaView), `lotePrecioMedio` (PrendasListasView).
+- **Directivas eslint podridas (3):** `disable` sin efecto en AnalisisView:2, ProduccionView:134 y 155.
+- **E2E fuera del lint:** `e2e/**` y `playwright.config.ts` ignorados en `eslint.config.js` (usan la dep opcional `@playwright/test`, solo existe con `test:e2e`).
+- **Deuda documentada (no tocada):** quedan 64 errores `no-explicit-any` preexistentes — es una migración de tipos, no un bugfix, va como cambio aparte.
+- **Verificación:** `npm run lint` 79→64 (0 warnings), `npm test` 47/47, `npm run build` limpio.
+
 ### [2026-09-27] - V4 Backend: Service Layer categorias_insumos + tipos_productos
 
 - **Service Layer para Categorías de Insumos (`backend/app/services/categorias_insumos.py`, `backend/app/api/routes/categorias_insumos.py`):**

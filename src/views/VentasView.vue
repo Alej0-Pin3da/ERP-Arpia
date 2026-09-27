@@ -98,7 +98,7 @@ function normalizeVenta(raw: Record<string, unknown>): VentaDisplay {
         costo_subtotal: Number(d.costo_subtotal ?? 0),
       }
     }),
-    subtotal: Number(raw.subtotal ?? (Number(raw.total_venta ?? 0) + Number(raw.descuento_valor ?? 0)) ?? 0),
+    subtotal: Number(raw.subtotal ?? (Number(raw.total_venta ?? 0) + Number(raw.descuento_valor ?? 0))) || 0,
     descuento_porcentaje: Number(raw.descuento_porcentaje ?? 0),
     descuento_valor: Number(raw.descuento_valor ?? 0),
     codigo_descuento: (raw.codigo_descuento as string) ?? null,

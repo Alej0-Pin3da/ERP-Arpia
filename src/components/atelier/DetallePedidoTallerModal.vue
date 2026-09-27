@@ -75,8 +75,6 @@ const editOperaria = ref('')
 const editMinutos = ref<number | null>(null)
 const actualizandoTiempo = ref(false)
 
-const pruebasCalce = ref<Array<{ id: number; fecha: string; tipo: string; estado: string; notas: string }>>([])
-
 const anticipoPagado = ref<boolean | null>(null)
 
 const totalHorasTaller = computed(() =>

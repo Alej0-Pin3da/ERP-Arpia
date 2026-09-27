@@ -1,4 +1,3 @@
-// @ts-nocheck — optional dep: installed only when running `npm run test:e2e`.
 import { expect, test } from '@playwright/test'
 
 // V4 golden paths (foundation): production -> commercial -> closing.

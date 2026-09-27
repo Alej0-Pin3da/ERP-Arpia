@@ -68,7 +68,6 @@ const serialNumber = computed(() => {
 
 // REAL-only: sin prenda real no se puede imprimir (la variante es opcional:
 // el flujo lote no tiene talla/color unitarios — se muestran como '—').
-const datosCompletos = computed(() => Boolean(props.prenda?.codigo && props.prenda?.nombre))
 
 function formatCOP(val: number | string) {
   return `$${Math.round(Number(val ?? 0)).toLocaleString('es-CO')}`

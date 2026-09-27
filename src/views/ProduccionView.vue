@@ -131,7 +131,6 @@ function abrirFichaTaller(p: PedidoDisplay) {
 // Kanban columns = the 5 real workshop phases (backend CHECK
 // ck_pedidos_produccion_fase). Display labels in uppercase.
 const estados: string[] = [...FASES_PRODUCCION.map((f) => f.toUpperCase())]
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
@@ -152,7 +151,6 @@ const pedidosFiltrados = computed(() => {
 function getPedidosPorEstado(est: string) {
   return pedidosFiltrados.value.filter((p) => p.estado === est)
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 // Avance secuencial de fase (PATCH /pedidos-produccion/{id} {fase}):
 // corte → costura → acabados → calidad → listo. El backend valida el paso
