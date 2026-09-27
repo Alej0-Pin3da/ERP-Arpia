@@ -3,6 +3,16 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - V6 Módulo 1: Kits y Cajas promocionales
+
+- **Modelo + migración `c84889c70b73`:** tablas `Kits` (nombre, precio_promocional, activo) y `Kit_Productos` (kit_id CASCADE, producto_id RESTRICT, cantidad, única kit/producto). Autogenerate limpiado a mano como siempre.
+- **Costeo vivo (`services/kits.py`):** `costear_kit` suma `calcular_costo_produccion × cantidad` por línea (misma matemática recursiva de producción, nunca se desactualiza); margen sobre precio promo con alerta visual bajo 5% (`MARGEN_SEGURIDAD_KIT`), sin bloquear.
+- **API (`routes/kits.py`):** CRUD + líneas (POST con líneas atómico con rollback, GET con snapshot, PATCH, DELETE CASCADE, POST/DELETE líneas con 409 en duplicada y 422 en producto fantasma).
+- **Frontend:** `services/api/kits.ts`, `NuevoKitModal.vue` (picker de productos + precio final), `MaestroKitsTab.vue` (costo/margen/alerta por caja, líneas, sumar/quitar, editar precio) enchufado como tab 📦 en MaestrosView.
+- **Tests:** `test_kits_api.py` (8: snapshot, alerta <5%, 422/409/404, CRUD, auth).
+- **Verificación:** backend 8/8, lint 0, vitest 52/52, build limpio.
+- **Alcance honesto:** vender kits con explosión de stock por componente queda como siguiente paso (el costeo para cotizar ya está).
+
 ### [2026-09-27] - V6 Fase 0: purga verificada (sin cortes)
 
 - **0.1 Mocks:** sin referencias a `useAtelierStore`/`atelier.ts` en todo `src`; `stores/` solo tiene `auth.ts`. `VITE_USE_MOCK` aparece únicamente en tests afirmando modo REAL. Nada que purgar.

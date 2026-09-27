@@ -23,6 +23,8 @@ import MaestroCategoriasTab from '@/components/maestros/MaestroCategoriasTab.vue
 import MaestroCatProdTab from '@/components/maestros/MaestroCatProdTab.vue'
 import MaestroUbicacionesTab from '@/components/maestros/MaestroUbicacionesTab.vue'
 import MaestroCosteoTab from '@/components/maestros/MaestroCosteoTab.vue'
+import MaestroKitsTab from '@/components/maestros/MaestroKitsTab.vue'
+import { listKits, deleteKit, type KitRead } from '@/services/api/kits'
 
 const maestros = useMaestros()
 
@@ -36,6 +38,7 @@ const ubicacionesList = ref<UbicacionRead[]>([])
 const tallasList = ref<TallaRead[]>([])
 const sinTallaList = ref<ProductoSinTallaRead[]>([])
 const parametrosApi = ref<ParametrosRead | null>(null)
+const kitsList = ref<KitRead[]>([])
 
 async function cargarDatos(force = false) {
   try {
@@ -66,10 +69,20 @@ async function cargarDatos(force = false) {
 
 onMounted(() => {
   void cargarDatos()
+  void cargarKits()
 })
 
+async function cargarKits() {
+  try {
+    const r = await listKits({ limit: 100 })
+    kitsList.value = r.items ?? []
+  } catch {
+    // keep previous state on error
+  }
+}
+
 // Tab active
-type TabType = 'proveedores' | 'canales' | 'pagos' | 'categorias' | 'catprod' | 'ubicaciones' | 'costeo' | 'tallas'
+type TabType = 'proveedores' | 'canales' | 'pagos' | 'categorias' | 'catprod' | 'ubicaciones' | 'costeo' | 'tallas' | 'kits'
 const tabActiva = ref<TabType>('proveedores')
 
 // Eliminar genérico
@@ -95,8 +108,10 @@ async function confirmarEliminar() {
     else if (t.tipo === 'categoria') await maestros.removeCategoria(t.id)
     else if (t.tipo === 'catprod') await maestros.removeCategoriaProducto(t.id)
     else if (t.tipo === 'ubicacion') await maestros.removeUbicacion(t.id)
+    else if (t.tipo === 'kit') await deleteKit(t.id)
 
-    await cargarDatos(true)
+    if (t.tipo === 'kit') await cargarKits()
+    else await cargarDatos(true)
     showToast('info', 'Eliminado', `${t.nombre} eliminado del catálogo.`)
   } catch (e: unknown) {
     const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
@@ -245,6 +260,17 @@ const totalUbicaciones = computed(() => ubicacionesList.value.length)
         >
           <span>⚖️</span> Tarifas de Costeo & Mano de Obra
         </button>
+
+        <button
+          id="btn-tab-kits"
+          @click="tabActiva = 'kits'"
+          class="px-4 py-2 text-xs font-mono font-medium rounded-t-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+          :class="tabActiva === 'kits'
+            ? 'bg-stone-800 text-amber-300 border-t-2 border-amber-400 shadow-inner'
+            : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900/60'"
+        >
+          <span>📦</span> Kits & Cajas ({{ kitsList.length }})
+        </button>
       </div>
     </div>
 
@@ -303,6 +329,13 @@ const totalUbicaciones = computed(() => ubicacionesList.value.length)
       v-else-if="tabActiva === 'costeo'"
       :parametros="parametrosApi"
       @actualizado="parametrosApi = $event"
+    />
+
+    <MaestroKitsTab
+      v-else-if="tabActiva === 'kits'"
+      :kits="kitsList"
+      @actualizado="cargarKits()"
+      @solicitar-eliminar="solicitarEliminar"
     />
 
     <!-- Global Delete Confirmation Dialog -->
