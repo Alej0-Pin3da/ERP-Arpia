@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useInsumos } from '@/composables/useInsumos'
+import type { InsumoRead } from '@/services/api/insumos'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
@@ -13,11 +14,11 @@ interface PrendaTendido {
 }
 
 const insumosApi = useInsumos()
-const insumos = ref<any[]>([])
+const insumos = ref<InsumoRead[]>([])
 async function cargarInsumos() {
   try {
     const r = await insumosApi.list({ limit: 100 })
-    insumos.value = (r as any).items ?? []
+    insumos.value = r.items ?? []
   } catch { insumos.value = [] }
 }
 onMounted(() => { void cargarInsumos() })
@@ -51,9 +52,9 @@ const telasOptions = computed(() => {
 
 function onTelaChange() {
   if (telaSeleccionadaId.value) {
-    const item = insumos.value.find((i: any) => i.id === telaSeleccionadaId.value)
+    const item = insumos.value.find((i) => i.id === telaSeleccionadaId.value)
     if (item) {
-      largoTotalDisponible.value = item.stock_actual
+      largoTotalDisponible.value = Number(item.stock_actual)
     }
   }
 }

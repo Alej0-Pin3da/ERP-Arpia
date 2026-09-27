@@ -6,23 +6,30 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import { showToast } from '@/utils/toast'
+import { getApiErrorDetail } from '@/utils/api-error'
 import { useDevoluciones } from '@/composables/useDevoluciones'
 import { useVentas } from '@/composables/useVentas'
 import { useProductos } from '@/composables/useProductos'
-import type { DevolucionCreatePayload } from '@/services/api/devoluciones'
+import type { DevolucionCreatePayload, DevolucionRead } from '@/services/api/devoluciones'
 
 const devolucionesApi = useDevoluciones()
 const ventasApi = useVentas()
 const productosApi = useProductos()
-const devoluciones = ref<any[]>([])
+type DevolucionRow = DevolucionRead & {
+  tipo?: string | null
+  fecha?: string | null
+  creado_en?: string | null
+  created_at?: string | null
+}
+const devoluciones = ref<DevolucionRow[]>([])
 async function cargarDevoluciones() {
   try {
     const r = await devolucionesApi.list({ limit: 100 })
-    devoluciones.value = (r as any).items ?? []
+    devoluciones.value = r.items ?? []
   } catch { devoluciones.value = [] }
 }
 onMounted(() => { void cargarDevoluciones() })
-const devolucionesDisplay = computed(() => devoluciones.value.map((d: any) => ({
+const devolucionesDisplay = computed(() => devoluciones.value.map((d) => ({
   id: d.id,
   codigo: `GAR-${d.id}`,
   // Nombres reales resueltos por el backend (sin inventar "Cliente N").
@@ -65,11 +72,11 @@ async function cargarListasForm() {
       ventasApi.list({ limit: 100 }),
       productosApi.list({ limit: 100 }),
     ])
-    ventasOptions.value = ((v as any).items ?? []).map((s: any) => ({
+    ventasOptions.value = (v.items ?? []).map((s) => ({
       label: `${s.codigo ?? `VEN-${s.id}`} · ${s.cliente_nombre ?? '—'} · $${Math.round(Number(s.total_venta ?? 0)).toLocaleString('es-CO')}`,
       value: s.id,
     }))
-    productosOptions.value = ((p.items ?? []) as any[]).map((r: any) => ({
+    productosOptions.value = (p.items ?? []).map((r) => ({
       label: `${r.nombre} (${r.codigo ?? `PRD-${r.id}`})`,
       value: r.id,
     }))
@@ -89,13 +96,7 @@ function removeItem(idx: number) {
 }
 
 function extractDetail(e: unknown): string {
-  const axiosDetail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
-  if (Array.isArray(axiosDetail)) {
-    return axiosDetail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ')
-  }
-  if (typeof axiosDetail === 'string' && axiosDetail) return axiosDetail
-  if (e instanceof Error && e.message) return e.message
-  return 'No se pudo registrar la devolución'
+  return getApiErrorDetail(e, 'No se pudo registrar la devolución')
 }
 
 // --- Delete devolucion (P1-8: solo draft) ---

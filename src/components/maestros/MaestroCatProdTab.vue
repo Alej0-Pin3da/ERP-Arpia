@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import type { CategoriaProductoRead } from '@/services/api/maestros'
 import { useMaestros } from '@/composables/useMaestros'
 import { showToast } from '@/utils/toast'
+import { getApiErrorDetail } from '@/utils/api-error'
 
 const props = defineProps<{
   catProdList: CategoriaProductoRead[]
@@ -30,8 +31,7 @@ async function agregarCatProd(tipo: string) {
     emit('actualizado')
     showToast('success', 'Guardado', `${nombre} agregado a ${tipo === 'CATEGORIA' ? 'Categorías' : 'Líneas'}.`)
   } catch (e: unknown) {
-    const detail = (e as any)?.response?.data?.detail ?? (e as Error)?.message ?? 'Error al guardar'
-    showToast('error', 'No se pudo guardar', typeof detail === 'string' ? detail : '¿Nombre duplicado?')
+    showToast('error', 'No se pudo guardar', getApiErrorDetail(e, '¿Nombre duplicado?'))
   }
 }
 

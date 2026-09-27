@@ -4,6 +4,7 @@ import InputNumber from 'primevue/inputnumber'
 import type { CanalRead } from '@/services/api/maestros'
 import { useMaestros } from '@/composables/useMaestros'
 import { showToast } from '@/utils/toast'
+import { getApiErrorDetail } from '@/utils/api-error'
 
 defineProps<{
   canales: CanalRead[]
@@ -31,7 +32,7 @@ function sanitizeCanalPayload(form: Record<string, unknown>): Record<string, unk
   const out: Record<string, unknown> = {}
   const nombre = String(form.nombre ?? '').trim()
   if (nombre) out.nombre = nombre
-  let codigo = String((form as any).codigo ?? '').trim()
+  let codigo = String(form.codigo ?? '').trim()
   if (!codigo && nombre) {
     codigo = nombre.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '').slice(0, 50) || 'CANAL'
   }
@@ -44,13 +45,13 @@ function sanitizeCanalPayload(form: Record<string, unknown>): Record<string, unk
     const n = Number(com)
     if (!Number.isNaN(n)) out.comision_pct = Math.max(0, Math.min(100, n))
   }
-  const costo = (form as any).costo_fijo_mensual
+  const costo = form.costo_fijo_mensual
   if (costo !== '' && costo !== null && costo !== undefined) {
     const n = Number(costo)
     if (!Number.isNaN(n)) out.costo_fijo_mensual = Math.max(0, n)
   }
-  out.activo = (form as any).activo !== false
-  const desc = String((form as any).descripcion ?? '').trim()
+  out.activo = form.activo !== false
+  const desc = String(form.descripcion ?? '').trim()
   out.descripcion = desc || null
   return out
 }
@@ -90,9 +91,7 @@ async function guardarCanal() {
     showToast('success', 'Canal guardado', `${canalForm.value.nombre} guardado correctamente.`)
     modalCanal.value = false
   } catch (e: unknown) {
-    const msg = (e as any)?.response?.data?.detail ?? (e as Error)?.message ?? 'Error al guardar canal'
-    const detail = Array.isArray(msg) ? msg.map((d: any) => d.msg || JSON.stringify(d)).join(', ') : String(msg)
-    showToast('error', 'Error 422', detail)
+    showToast('error', 'Error 422', getApiErrorDetail(e, 'Error al guardar canal', ', '))
   }
 }
 

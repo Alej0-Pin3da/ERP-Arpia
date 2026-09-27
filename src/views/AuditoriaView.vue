@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
 import { showToast } from '@/utils/toast'
+import { getApiErrorDetail } from '@/utils/api-error'
 import * as auditoriaApi from '@/services/api/auditoria'
 import type { PrecioVersionRead, CostoVersionRead, CierreMensualRead } from '@/services/api/auditoria'
 import { useProductos } from '@/composables/useProductos'
@@ -37,13 +38,7 @@ const costos = ref<CostoVersionRead[]>([])
 const cierres = ref<CierreMensualRead[]>([])
 
 function extractDetail(e: unknown): string {
-  const axiosDetail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
-  if (Array.isArray(axiosDetail)) {
-    return axiosDetail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ')
-  }
-  if (typeof axiosDetail === 'string' && axiosDetail) return axiosDetail
-  if (e instanceof Error && e.message) return e.message
-  return 'No se pudo cargar la auditoría fiscal'
+  return getApiErrorDetail(e, 'No se pudo cargar la auditoría fiscal')
 }
 
 function productoIdParam(): { producto_id?: number } {

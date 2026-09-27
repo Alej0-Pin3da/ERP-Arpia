@@ -6,6 +6,8 @@ import Dropdown from 'primevue/dropdown'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import { showToast } from '@/utils/toast'
+import { getApiErrorDetail } from '@/utils/api-error'
+import type { PrecioVersionRead, CostoVersionRead } from '@/services/api/auditoria'
 import * as bomApi from '@/services/api/bom'
 import * as insumosApi from '@/services/api/insumos'
 import * as productosApi from '@/services/api/productos'
@@ -564,8 +566,8 @@ const isDirty = computed(() => {
 })
 
     // Historial fiscal (precio + costo) — slice(0, 20) para no romper el render
-    const historial = ref<any[]>([])
-    const historialCostos = ref<any[]>([])
+    const historial = ref<PrecioVersionRead[]>([])
+    const historialCostos = ref<CostoVersionRead[]>([])
     const loadingHistorial = ref(false)
     async function cargarHistorial() {
       if (!recetaId.value) { historial.value = []; historialCostos.value = []; return }
@@ -662,9 +664,7 @@ async function guardarEditBom(bom: bomApi.BomInsumoRead) {
     editBomDetalle.value = ''
     await cargarBom()
   } catch (e: unknown) {
-    const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
-    const msg = Array.isArray(detail) ? (detail as { msg?: string }[]).map((d) => d.msg ?? JSON.stringify(d)).join('; ') : (detail as string ?? (e as Error)?.message ?? 'Error al guardar')
-    showToast('error', 'Error al guardar', String(msg))
+    showToast('error', 'Error al agregar', getApiErrorDetail(e, 'Error al agregar'))
   }
 }
 

@@ -4,6 +4,7 @@ import InputNumber from 'primevue/inputnumber'
 import type { ProveedorRead } from '@/services/api/maestros'
 import { useMaestros } from '@/composables/useMaestros'
 import { showToast } from '@/utils/toast'
+import { getApiErrorDetail } from '@/utils/api-error'
 
 const props = defineProps<{
   proveedores: ProveedorRead[]
@@ -106,9 +107,7 @@ async function guardarProveedor() {
     showToast('success', 'Proveedor guardado', `${provForm.value.nombre} guardado correctamente.`)
     modalProveedor.value = false
   } catch (e: unknown) {
-    const msg = (e as any)?.response?.data?.detail ?? (e as Error)?.message ?? 'Error al guardar proveedor'
-    const detail = Array.isArray(msg) ? msg.map((d: any) => d.msg || JSON.stringify(d)).join(', ') : String(msg)
-    showToast('error', 'Error 422', detail)
+    showToast('error', 'Error 422', getApiErrorDetail(e, 'Error al guardar proveedor', ', '))
   }
 }
 </script>

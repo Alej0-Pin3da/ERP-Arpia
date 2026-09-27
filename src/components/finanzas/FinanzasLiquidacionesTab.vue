@@ -22,7 +22,7 @@ const searchLiquidaciones = ref('')
 const filterEstadoLiquidacion = ref('TODOS')
 
 function porcentajeSociaReparto(i: number, fallback: number): number {
-  const s = props.sociasReparto[i] as any
+  const s = props.sociasReparto[i] as (SociaDisplay & { porcentaje_participacion?: number }) | undefined
   return Number(s?.porcentaje ?? s?.porcentaje_participacion ?? fallback) || fallback
 }
 

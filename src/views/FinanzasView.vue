@@ -155,7 +155,7 @@ const descontandoAnticipoId = ref<number | null>(null)
 const totalHistoricoFacturado = computed(() => liquidacionesList.value.reduce((a, l) => a + l.total_ventas_brutas, 0))
 const totalHistoricoFondo = computed(() => liquidacionesList.value.reduce((a, l) => a + l.fondo_reinversion_monto, 0))
 const sociasReparto = computed(() =>
-  (sociasList.value as any[]).filter((s) => !s.es_fondo_taller && s.activo !== false).slice(0, 2),
+  sociasList.value.filter((s) => !s.es_fondo_taller && s.activo !== false).slice(0, 2),
 )
 
 function totalRepartidoSocia(sociaId: number | undefined): number {
@@ -166,15 +166,15 @@ function totalRepartidoSocia(sociaId: number | undefined): number {
   }, 0)
 }
 
-const totalRepartidoMargara = computed(() => totalRepartidoSocia((sociasReparto.value[0] as any)?.id))
-const totalRepartidoValqui = computed(() => totalRepartidoSocia((sociasReparto.value[1] as any)?.id))
+const totalRepartidoMargara = computed(() => totalRepartidoSocia(sociasReparto.value[0]?.id))
+const totalRepartidoValqui = computed(() => totalRepartidoSocia(sociasReparto.value[1]?.id))
 
 function nombreSociaReparto(i: number, fallback: string): string {
-  return ((sociasReparto.value[i] as any)?.nombre as string) ?? fallback
+  return sociasReparto.value[i]?.nombre ?? fallback
 }
 
 function porcentajeSociaReparto(i: number, fallback: number): number {
-  const s = sociasReparto.value[i] as any
+  const s = sociasReparto.value[i] as (SociaDisplay & { porcentaje_participacion?: number }) | undefined
   return Number(s?.porcentaje ?? s?.porcentaje_participacion ?? fallback) || fallback
 }
 

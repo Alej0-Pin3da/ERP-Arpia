@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useProductos } from '@/composables/useProductos'
+import type { ClienteRead } from '@/services/api/clientes'
 import { useBom } from '@/composables/useBom'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
@@ -11,7 +12,7 @@ import Slider from 'primevue/slider'
 import { showToast } from '@/utils/toast'
 import { createCotizacion, listCotizaciones, updateCotizacionEstado, type CotizacionRead } from '@/services/api/cotizaciones'
 import { useClientes } from '@/composables/useClientes'
-import { updateProducto } from '@/services/api/productos'
+import { updateProducto, type ProductoRead } from '@/services/api/productos'
 import { getParametros } from '@/services/api/maestros'
 import { listInsumos, getInsumo, type InsumoRead } from '@/services/api/insumos'
 import type { CostoLineaRead } from '@/services/api/bom'
@@ -19,7 +20,7 @@ import type { CostoLineaRead } from '@/services/api/bom'
 const router = useRouter()
 const productosApi = useProductos()
 const bomApi = useBom()
-const productos = ref<any[]>([])
+const productos = ref<ProductoRead[]>([])
 const costoReal = ref<number | null>(null)
 const loadingCostoReal = ref(false)
 // Líneas base del BOM real (GET /productos/{id}/costo): referencia informativa.
@@ -41,7 +42,7 @@ const baseParcial = ref<string | null>(null)
 async function cargarProductos() {
   try {
     const r = await productosApi.list({ limit: 100 })
-    productos.value = (r.items as any) ?? []
+    productos.value = r.items ?? []
   } catch { productos.value = [] }
 }
 onMounted(() => { void cargarProductos(); void cargarClientes(); void cargarHistorial(); void cargarMeta() })
@@ -54,7 +55,7 @@ const margenHeredado = ref<number | null>(null)
 async function cargarMeta() {
   try {
     const p = await getParametros()
-    margenMetaGlobal.value = Number((p as any).margen_meta_global_pct ?? 35)
+    margenMetaGlobal.value = Number(p.margen_meta_global_pct ?? 35)
     if (margenHeredado.value == null && !recetaSeleccionada.value) {
       margenPct.value = Math.round(Number(margenMetaGlobal.value))
     }
@@ -81,7 +82,7 @@ async function cargarClientes() {
     const r = await clientesApi.list({ limit: 100 })
     clientesOptions.value = [
       { label: '-- Sin cliente --', value: null },
-      ...((r.items as any[]) ?? []).map((c: any) => ({ label: `${c.nombre} ${c.apellido ?? ''}`.trim(), value: c.id })),
+      ...(r.items ?? []).map((c: ClienteRead & { apellido?: string | null }) => ({ label: `${c.nombre} ${c.apellido ?? ''}`.trim(), value: c.id })),
     ]
   } catch { /* sin clientes: se cotiza igual */ }
 }

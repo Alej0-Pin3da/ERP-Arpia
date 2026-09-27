@@ -10,6 +10,8 @@ import DataSourceBadge from '@/components/DataSourceBadge.vue'
 import NuevaRecetaModal from '@/components/atelier/NuevaRecetaModal.vue'
 import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 import { showToast } from '@/utils/toast'
+import { getApiErrorDetail } from '@/utils/api-error'
+import type { ProductoRead } from '@/services/api/productos'
 
 const productosApi = useProductos()
 const bomApi = useBom()
@@ -71,7 +73,7 @@ const categorias = [
   'Alta Costura',
 ]
 
-const productos = ref<any[]>([])
+const productos = ref<ProductoRead[]>([])
 const bomCounts = ref<Record<number, number>>({})
 const udsPorProducto = ref<Record<string, number>>({})
 async function cargarUdsPorTalla() {
@@ -99,11 +101,11 @@ async function cargarMargenMeta() {
 async function cargarProductos() {
   try {
     const r = await productosApi.list({ limit: 100 })
-    productos.value = (r.items as any) ?? []
+    productos.value = r.items ?? []
     // Cargar conteo BOM real por producto (no bloquea grilla)
     try {
       const counts = await Promise.all(
-        productos.value.map(async (p: any) => {
+        productos.value.map(async (p) => {
           try {
             const bom = await bomApi.listInsumos(p.id)
             return [p.id, bom.length] as const
@@ -117,7 +119,7 @@ async function cargarProductos() {
   } catch { productos.value = [] }
 }
 onMounted(() => { void cargarProductos(); void cargarMargenMeta(); void cargarUdsPorTalla() })
-function mapProductoRow(p: any): RecetaDisplay {
+function mapProductoRow(p: ProductoRead): RecetaDisplay {
   return {
   id: p.id,
   codigo: p.codigo ?? `PRD-${p.id}`,
@@ -161,7 +163,7 @@ function mapProductoRow(p: any): RecetaDisplay {
   coleccion: p.coleccion ?? null,
   }
 }
-const recetasDisplay = computed(() => productos.value.map((p: any) => mapProductoRow(p)))
+const recetasDisplay = computed(() => productos.value.map((p) => mapProductoRow(p)))
 const recetasFiltradas = computed(() => {
   let list = recetasDisplay.value.filter((r) => {
     const q = search.value.trim().toLowerCase()
@@ -257,10 +259,8 @@ async function eliminarReceta(r: RecetaDisplay) {
     await productosApi.remove(r.id)
     showToast('success','Producto eliminado', `${r.nombre} eliminado correctamente.`)
     await cargarProductos()
-  } catch (e: any) {
-    const detail = e?.response?.data?.detail
-    const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ') : (detail ?? e?.message ?? 'Error al eliminar')
-    showToast('error','Error al eliminar', String(msg))
+  } catch (e: unknown) {
+    showToast('error','Error al eliminar', getApiErrorDetail(e, 'Error al eliminar'))
   } finally {
     eliminarEnCurso.value = false
     recetaAEliminar.value = null

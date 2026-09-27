@@ -3,6 +3,16 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Cero `any`: helper `getApiErrorDetail` + tipado de 13 archivos (lint 64→0)
+
+- **Helper compartido (`src/utils/api-error.ts`, nuevo + 5 tests):** `getApiErrorDetail(e, fallback, separator)` tipado sin `any` — detalle string verbatim, arrays de validación joineados, mensaje de Error, fallback. Reemplaza 9 bloques catch copiados a mano (3 tabs de maestros, NuevaRecetaModal, FichaTecnicaModal, ProductosView, DevolucionesView, AuditoriaView) con idénticos títulos/fallbacks; `extractApiDetail` en `pedidos-produccion.ts` ahora lo envuelve (API pública intacta).
+- **Casts redundantes eliminados:** los composables ya retornan `Paginated<XRead>`, así que `(r as any).items` sobraba en Omisiones, Devoluciones, Optimizador, Cotizador, Productos; callbacks de `.map/.find/.filter` ahora infieren el `XRead`.
+- **Formularios de maestros:** `(form as any).campo` sobraba (`form` ya es `Record<string, unknown>`) en Canales y Métodos de Pago.
+- **Receptores honestos:** `SociaDisplay & { porcentaje_participacion?: number }` (el backend manda ambas formas), `DevolucionRow` (alias `tipo/fecha` que el backend resuelve), `ClienteRead & { apellido?: string }`, `RecetaEmit & { tipo_producto_id?, precio_venta_sugerido? }`.
+- **Fix de paso:** `item.stock_actual` (number|string) ahora va con `Number(...)` en OptimizadorView.
+- **Alcance honesto:** archivos con `eslint-disable` de `any` a nivel archivo (AnalisisView, DashboardView, InventarioView, etc.) quedan como deuda opt-in — el disable fue decisión de su autor, no se toca sin revisión.
+- **Verificación:** `npm run lint` 64→0 (0 warnings), `npm test` 52/52 (13 archivos), `npm run build` limpio.
+
 ### [2026-09-27] - Limpieza lint: 79→64 problemas, fix `??` muerto en VentasView
 
 - **Fix real (`src/views/VentasView.vue:101`):** `Number(raw.subtotal ?? (A+B) ?? 0)` tenía el `?? 0` muerto (`Number()+Number()` nunca es nullish) y dejaba pasar `NaN` a la UI cuando faltaba el subtotal. Ahora `Number(...) || 0`: mismo valor en todos los casos sanos, `0` en vez de `NaN` en el caso roto.

@@ -4,6 +4,7 @@ import InputNumber from 'primevue/inputnumber'
 import type { MetodoRead } from '@/services/api/maestros'
 import { useMaestros } from '@/composables/useMaestros'
 import { showToast } from '@/utils/toast'
+import { getApiErrorDetail } from '@/utils/api-error'
 
 defineProps<{
   metodos: MetodoRead[]
@@ -31,7 +32,7 @@ function sanitizeMetodoPayload(form: Record<string, unknown>): Record<string, un
   const out: Record<string, unknown> = {}
   const nombre = String(form.nombre ?? '').trim()
   if (nombre) out.nombre = nombre
-  let codigo = String((form as any).codigo ?? '').trim()
+  let codigo = String(form.codigo ?? '').trim()
   if (!codigo && nombre) {
     codigo = nombre.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '').slice(0, 50) || 'METODO'
   }
@@ -46,10 +47,10 @@ function sanitizeMetodoPayload(form: Record<string, unknown>): Record<string, un
   }
   const tiempo = String(form.tiempo_acreditacion ?? '').trim()
   out.tiempo_acreditacion = tiempo || null
-  out.activo = (form as any).activo !== false
-  const datos = String((form as any).datos_cuenta ?? '').trim()
+  out.activo = form.activo !== false
+  const datos = String(form.datos_cuenta ?? '').trim()
   out.datos_cuenta = datos || null
-  const desc = String((form as any).descripcion ?? '').trim()
+  const desc = String(form.descripcion ?? '').trim()
   out.descripcion = desc || null
   return out
 }
@@ -89,9 +90,7 @@ async function guardarPago() {
     showToast('success', 'Método guardado', `${pagoForm.value.nombre} guardado correctamente.`)
     modalPago.value = false
   } catch (e: unknown) {
-    const msg = (e as any)?.response?.data?.detail ?? (e as Error)?.message ?? 'Error al guardar método de pago'
-    const detail = Array.isArray(msg) ? msg.map((d: any) => d.msg || JSON.stringify(d)).join(', ') : String(msg)
-    showToast('error', 'Error 422', detail)
+    showToast('error', 'Error 422', getApiErrorDetail(e, 'Error al guardar método de pago', ', '))
   }
 }
 </script>

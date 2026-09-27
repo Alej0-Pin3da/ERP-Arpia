@@ -4,6 +4,7 @@
  * Mirrors backend schemas/produccion.py (PedidoProduccionCreate/Update/Read).
  */
 import { client } from '@/api/client'
+import { getApiErrorDetail } from '@/utils/api-error'
 
 export interface PedidoProduccionRead {
   id: number
@@ -91,19 +92,7 @@ export function siguienteFase(fase: string | null | undefined): string | undefin
  * a string or a validation-error array — both are surfaced verbatim.
  */
 export function extractApiDetail(e: unknown): string {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const response = (e as any)?.response
-  const detail = response?.data?.detail
-  if (typeof detail === 'string' && detail.trim()) return detail
-  if (Array.isArray(detail)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const parts = detail.map((d: any) =>
-      typeof d === 'string' ? d : (d?.msg ?? JSON.stringify(d)),
-    )
-    if (parts.length) return parts.join('; ')
-  }
-  if (e instanceof Error && e.message) return e.message
-  return 'Error desconocido'
+  return getApiErrorDetail(e, 'Error desconocido', '; ')
 }
 
 export async function listPedidosProduccion(

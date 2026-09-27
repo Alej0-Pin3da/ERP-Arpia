@@ -7,6 +7,7 @@ import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import { showToast } from '@/utils/toast'
+import { getApiErrorDetail } from '@/utils/api-error'
 import * as productosApi from '@/services/api/productos'
 
 /** Emit payload: mapped display shape consumed by ProductosView (REAL data flow). */
@@ -92,9 +93,9 @@ watch(() => props.visible, (v) => {
       manoObra.value = props.receta.mano_obra ?? 0
       cifEnergia.value = props.receta.cif_energia ?? 1500
       precioVenta.value = props.receta.precio_venta ?? 95000
-      recomendaciones.value = (props.receta as any).recomendaciones_taller ?? ''
+      recomendaciones.value = props.receta.recomendaciones_taller ?? ''
       // try to extract tipo_producto_id from mapped product if available
-      const raw = props.receta as any
+      const raw = props.receta as RecetaEmit & { tipo_producto_id?: number | null }
       if (raw.tipo_producto_id) tipoProductoId.value = raw.tipo_producto_id
     } else {
       // Reset for create
@@ -113,12 +114,12 @@ watch(() => props.receta, (r) => {
     categoria.value = r.categoria ?? 'Corsetería'
     linea.value = r.linea ?? 'Corsetería'
     descripcion.value = r.descripcion ?? ''
-    tiempoConfeccion.value = (r as any).tiempo_confeccion_min ?? null
-    costoInsumos.value = (r as any).costo_insumos ?? null
-    manoObra.value = (r as any).mano_obra ?? 0
-    cifEnergia.value = (r as any).cif_energia ?? 1500
-    precioVenta.value = (r as any).precio_venta ?? (r as any).precio_venta_sugerido ?? 95000
-    recomendaciones.value = (r as any).recomendaciones_taller ?? ''
+    tiempoConfeccion.value = r.tiempo_confeccion_min ?? null
+    costoInsumos.value = r.costo_insumos ?? null
+    manoObra.value = r.mano_obra ?? 0
+    cifEnergia.value = r.cif_energia ?? 1500
+    precioVenta.value = r.precio_venta ?? (r as RecetaEmit & { precio_venta_sugerido?: number | null }).precio_venta_sugerido ?? 95000
+    recomendaciones.value = r.recomendaciones_taller ?? ''
   }
 })
 
@@ -212,10 +213,8 @@ async function guardar() {
       codigo.value = ''
       descripcion.value = ''
     }
-  } catch (e: any) {
-    const detail = e?.response?.data?.detail
-    const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ') : (detail ?? e?.message ?? 'Error al guardar')
-    showToast('error', 'Error al guardar', String(msg))
+  } catch (e: unknown) {
+    showToast('error', 'Error al guardar', getApiErrorDetail(e, 'Error al guardar'))
   } finally {
     saving.value = false
   }

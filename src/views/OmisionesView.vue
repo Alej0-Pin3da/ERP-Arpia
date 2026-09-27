@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import Paginator from 'primevue/paginator'
 import { useOmisiones } from '@/composables/useOmisiones'
+import type { OmisionRead } from '@/services/api/omisiones'
 import { showToast } from '@/utils/toast'
 
 const omisionesApi = useOmisiones()
@@ -10,17 +11,17 @@ const omisionesApi = useOmisiones()
 const PAGE_SIZE = 25
 const total = ref(0)
 const first = ref(0)
-const omisiones = ref<any[]>([])
+const omisiones = ref<OmisionRead[]>([])
 async function cargarOmisiones() {
   try {
     const r = await omisionesApi.list({ limit: PAGE_SIZE, offset: first.value })
-    omisiones.value = (r as any).items ?? []
-    total.value = Number((r as any).total ?? 0)
+    omisiones.value = r.items ?? []
+    total.value = Number(r.total ?? 0)
     if (!omisiones.value.length && first.value > 0) {
       first.value = Math.max(0, first.value - PAGE_SIZE)
       const r2 = await omisionesApi.list({ limit: PAGE_SIZE, offset: first.value })
-      omisiones.value = (r2 as any).items ?? []
-      total.value = Number((r2 as any).total ?? 0)
+      omisiones.value = r2.items ?? []
+      total.value = Number(r2.total ?? 0)
     }
   } catch { omisiones.value = [] }
 }
@@ -29,7 +30,7 @@ function onPage(e: { first: number }) {
   void cargarOmisiones()
 }
 onMounted(() => { void cargarOmisiones() })
-const omisionesDisplay = computed(() => omisiones.value.map((o: any) => ({
+const omisionesDisplay = computed(() => omisiones.value.map((o) => ({
   id: o.id,
   fecha: o.creado_en || '',
   usuario: o.hoja || 'Sistema',
