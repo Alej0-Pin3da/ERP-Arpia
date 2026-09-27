@@ -85,24 +85,27 @@ function formatCOP(val: number) {
 function compartirWhatsApp() {
   if (!props.venta) return
   const v = props.venta
-  const lineasPrendas = v.items
-    .map((it) => `• ${it.cantidad}x ${it.nombre_prenda} (${it.talla}, ${it.color}) - ${formatCOP(it.subtotal)}`)
-    .join('%0A')
-
-  const msg = `*ARPÍA - COMPROBANTE DE COMPRA*%0A%0A` +
-    `*Código:* ${v.codigo}%0A` +
-    `*Fecha:* ${v.fecha}%0A` +
-    `*Cliente:* ${v.cliente_nombre}%0A` +
-    `*Canal:* ${v.canal}%0A%0A` +
-    `*Prendas:*%0A${lineasPrendas}%0A%0A` +
-    (v.descuento_valor > 0 ? `*Descuento:* -${formatCOP(v.descuento_valor)} (${v.descuento_porcentaje}%)%0A` : '') +
-    `*TOTAL FACTURADO:* ${formatCOP(v.total_venta)}%0A` +
-    `*Método de Pago:* ${v.metodo_pago}%0A%0A` +
-    `¡Gracias por apoyar la corsetería y confección de autor de Arpía! ✨🖤`
+  let mensaje = `*ARPÍA - COMPROBANTE DE COMPRA*\n\n`
+  mensaje += `*Código:* ${v.codigo}\n`
+  mensaje += `*Fecha:* ${v.fecha}\n`
+  mensaje += `*Cliente:* ${v.cliente_nombre}\n`
+  mensaje += `*Canal:* ${v.canal}\n\n`
+  mensaje += `*Prendas:*\n`
+  v.items.forEach((it) => {
+    mensaje += `- ${it.cantidad}x ${it.nombre_prenda} (${it.talla}, ${it.color}) - ${formatCOP(it.subtotal)}\n`
+  })
+  mensaje += `\n`
+  if (v.descuento_valor > 0) {
+    mensaje += `*Descuento:* -${formatCOP(v.descuento_valor)} (${v.descuento_porcentaje}%)\n`
+  }
+  mensaje += `*TOTAL FACTURADO:* ${formatCOP(v.total_venta)}\n`
+  mensaje += `*Método de Pago:* ${v.metodo_pago}\n\n`
+  mensaje += `Gracias por apoyar a Arpia!\n`
+  mensaje += `Arpía - HECHO POR GARRAS COLOMBIANAS`
 
   const phone = telefonoLimpio.value
   if (!phone) return
-  const url = `https://wa.me/${phone}?text=${msg}`
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(mensaje)}`
   window.open(url, '_blank')
 }
 </script>

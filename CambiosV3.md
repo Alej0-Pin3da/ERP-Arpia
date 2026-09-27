@@ -3,6 +3,12 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - WhatsApp ventas/liquidaciones: negrita y encoding corregidos
+
+- **Liquidación (`DetalleLiquidacionModal.vue`):** la línea de socia era `\n* Nombre* (...)` — el `* ` inicial rompía la negrita de WhatsApp (mostraba asteriscos literales). Ahora es `\n- *Nombre* (...)`: bullet `- ` fuera de la negrita.
+- **Venta (`DetalleVentaModal.vue`):** el comprobante se armaba con `%0A` manual + bullets `•` + emojis finales `✨🖤`, y los valores se interpolaban sin codificar (tildes/espacios rompían la URL). Reescrito con el patrón de liquidación: mensaje con `\n` reales, bullets `- `, sin emojis, cierre `Arpía - HECHO POR GARRAS COLOMBIANAS`, y `encodeURIComponent` una sola vez sobre el mensaje completo. Descuento solo si > 0.
+- **Verificación:** `npm run build` PASS (vite 411 módulos + server bundle).
+
 ### [2026-09-26] - Acta WhatsApp sin emojis + marca HECHO POR GARRAS COLOMBIANAS
 
 - **WhatsApp:** el acta usaba emojis (📜💰✅⏳) que en su WhatsApp se ven como � (el archivo está sano en UTF-8, es render del cliente). Mensaje reescrito solo con texto + *negrita*: estados como [PAGADO]/[PENDIENTE].

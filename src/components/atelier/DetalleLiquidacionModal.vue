@@ -105,7 +105,7 @@ function compartirWhatsApp() {
   mensaje += `*DISTRIBUCIÓN OFICIAL DE SOCIAS:*\n`
 
   l.distribucion.forEach((d) => {
-    mensaje += `\n* ${d.nombre_socia}* (${d.porcentaje}%):\n`
+    mensaje += `\n- *${d.nombre_socia}* (${d.porcentaje}%):\n`
     mensaje += `  - Cuota Bruta: ${formatCOP(d.monto_bruto)}\n`
     if (d.deduccion_anticipos > 0) {
       mensaje += `  - Anticipos Descontados: -${formatCOP(d.deduccion_anticipos)}\n`
