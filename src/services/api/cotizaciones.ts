@@ -16,6 +16,10 @@ export interface InsumoCotizacionLinea {
   precio_unitario: number
   unidad_medida: string
   desperdicio_pct: number
+  // Solo frontend (no se envía): si la línea es tela/forro y cuenta para
+  // la heurística de hilos. El BOM lo fija por clasificación; lo manual
+  // arranca en true. El backend lo ignora (Pydantic extra=ignore).
+  esTela?: boolean
 }
 
 export interface CotizacionCreatePayload {

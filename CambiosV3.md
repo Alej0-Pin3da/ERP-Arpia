@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Fix crítico: hilos sobrestimados por mercería en cm + yardas sin soporte
+
+- **Causa real (verificada con datos, no la reportada):** la conversión cm→m (`aMetros`) SÍ funcionaba — 23.400 cm daban 234 m y de ahí los ~28.000 m de hilo. El inflador era otro: `metrosTotalesTela` sumaba TODAS las líneas con unidad de longitud, incluyendo mercería del BOM en cm (elásticos, sesgos, cintas, encajes: el Bralete solo aporta ~32 m falsos). La variable se llama "tela" pero contaba de todo.
+- **Fix:** `src/utils/unidades.ts` nuevo con `normalizarAMetros` (m/cm/mm/yardas×0.9144, resto null) + 6 tests; `aMetros` local eliminado. Las líneas llevan `esTela` (el BOM lo fija por clasificación Telas/Forro, lo manual arranca true) y la heurística filtra `esTela !== false`.
+- **Yardas:** antes devolvían null (0 m); ahora ×0.9144.
+- **Default `costoHiloMetro`:** $8 → $2 (cono real). Solo default de UI, cotizaciones guardadas intactas.
+- **Backend:** verificado sin contraparte — solo persiste `costo_hilo_m`/`metros_hilo` informativos, no calcula. Sin cambios.
+- **Verificación:** lint 0, vitest 58/58 (14 archivos), build limpio, backend cotizaciones 18/18.
+
 ### [2026-09-27] - V6 Módulo 5: Copy comercial con IA local
 
 - **Servicio (`services/ai_copy.py`):** lee el BOM real (nombres vía `desglosar_costo_produccion`), inyecta en prompt fijo (2 párrafos, tono oscuro/elegante/alternativo) y llama a Ollama/llama.cpp non-streaming. HTTP inyectable (tests sin red). Nada se persiste: el copy vuelve y la Ficha lo pone en `descripcion` para guardar por el flujo normal.

@@ -16,6 +16,7 @@ import { updateProducto, type ProductoRead } from '@/services/api/productos'
 import { getParametros } from '@/services/api/maestros'
 import { listInsumos, getInsumo, type InsumoRead } from '@/services/api/insumos'
 import type { CostoLineaRead } from '@/services/api/bom'
+import { normalizarAMetros } from '@/utils/unidades'
 
 const router = useRouter()
 const productosApi = useProductos()
@@ -71,7 +72,7 @@ const nombrePrenda = ref('Bustier Estructurado en Tul y Satén')
 const UNIDADES_INSUMO = ['m', 'cm', 'mm', 'un', 'doc', 'par', 'pza', 'kg', 'yarda']
 const insumos = ref<InsumoCotizacionLinea[]>([])
 function agregarInsumo() {
-  insumos.value.push({ nombre: '', cantidad: 0, precio_unitario: 0, unidad_medida: 'm', desperdicio_pct: 0 })
+  insumos.value.push({ nombre: '', cantidad: 0, precio_unitario: 0, unidad_medida: 'm', desperdicio_pct: 0, esTela: true })
 }
 function eliminarInsumo(index: number) {
   insumos.value.splice(index, 1)
@@ -125,10 +126,13 @@ const costoEmpaque = ref<number>(4500)
 // (overlock + recta + remates). El costo por metro es editable porque
 // depende del cono que compre el taller. No se suma sola al total:
 // se muestra y se aplica a Avíos con un botón para no duplicar.
-const costoHiloMetro = ref<number>(8)
-// Metros lineales para la heurística de hilos: suma de líneas con unidad
-// de longitud (m/cm/mm); el resto no aporta metros de tela.
-const metrosTotalesTela = computed(() => insumos.value.reduce((acc, l) => acc + (aMetros(Number(l.cantidad ?? 0), l.unidad_medida ?? '') ?? 0), 0))
+const costoHiloMetro = ref<number>(2)
+// Metros lineales de TELA para la heurística de hilos: suma estrictamente
+// sobre metros reales normalizados (cm→/100, mm→/1000, yardas→×0.9144) y
+// solo de líneas de tela/forro — la mercería del BOM no cuenta.
+const metrosTotalesTela = computed(() => insumos.value
+  .filter((l) => l.esTela !== false)
+  .reduce((acc, l) => acc + (normalizarAMetros(Number(l.cantidad ?? 0), l.unidad_medida ?? '') ?? 0), 0))
 const metrosHiloEstimado = computed(() => Math.round(metrosTotalesTela.value * 120))
 const costoHilosEstimado = computed(() => Math.round(metrosHiloEstimado.value * Number(costoHiloMetro.value ?? 0)))
 function aplicarEstimacionHilos() {
@@ -154,17 +158,6 @@ const recetasOptions = computed(() => {
     })),
   ]
 })
-
-// Conversión a metros: el BOM trae longitudes en cm/mm/m según el insumo
-// (ej. tela 23400 cm → 234 m). Unidades no-longitud (un, pza, par, doc…)
-// devuelven null: jamás van a metros de tela/forro.
-function aMetros(cant: number, unidad: string): number | null {
-  const u = (unidad ?? '').trim().toLowerCase()
-  if (u === 'cm' || u === 'centimetro' || u === 'centimetros' || u === 'centímetro' || u === 'centímetros') return cant / 100
-  if (u === 'mm' || u === 'milimetro' || u === 'milimetros' || u === 'milímetro' || u === 'milímetros') return cant / 1000
-  if (u === 'm' || u === 'mt' || u === 'mts' || u === 'metro' || u === 'metros') return cant
-  return null
-}
 
 // Clasificación de una línea BOM contra el maestro de insumos.
 // Categorías reales del maestro: Telas | Herrajes | Empaques | Químicos (+ las
@@ -255,7 +248,7 @@ async function aplicarBaseBom() {
     let clase = clasificarLineaBom(m, '')
     const efectiva = cant * (1 + d / 100)
     const subtotal = efectiva * precio
-    const conv = aMetros(cant, m.unidad_medida ?? '')
+    const conv = normalizarAMetros(cant, m.unidad_medida ?? '')
     if ((clase === 'tela' || clase === 'forro') && conv == null) {
       // Unidad no-longitud jamás va a metros: se valoriza como avío para no
       // perder la plata (la tabla lo muestra con Va a = Avíos).
@@ -275,6 +268,9 @@ async function aplicarBaseBom() {
       precio_unitario: precio,
       unidad_medida: unidad,
       desperdicio_pct: d,
+      // Solo tela/forro alimentan la heurística de hilos: la mercería
+      // (elásticos, cintas, sesgos en cm) se cose pero no a tasa de tela.
+      esTela: destino === 'Telas' || destino === 'Forro',
     })
   }
   // Tela/forro sin precio en el maestro (>0) no dan un ponderado honesto:
