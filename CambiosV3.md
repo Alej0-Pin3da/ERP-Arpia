@@ -3,6 +3,16 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Cotizador: campos arrancan con el BOM real, extras quedan manuales
+
+- **Qué se auto-llena desde el BOM (`CotizadorView.vue`, `onRecetaChange` → `cargarBaseBom`/`aplicarBaseBom`, solo frontend, sin backend nuevo):** telas = Σ `cantidad_requerida` de líneas clase tela + precio/m promedio ponderado con `costo_promedio_actual` del maestro; forro igual con líneas de forro; desperdicio = promedio simple de `%` de las líneas tela/forro (el mayor castigaría prototipos con piezas chicas); avíos = Σ cantidad efectiva × precio de líneas no-tela/no-forro/no-empaque; empaque = Σ de líneas clase empaque (solo se pisa si el BOM trae); tiempo = `tiempo_confeccion_min` del producto o, si viene 0/null, suma de fases estándar (`tiempo_corte/costura/acabados/calidad_min`); CIF y margen heredado como antes; tarifa $/hora queda manual (la receta no tiene tasa, `mano_obra` es un total).
+- **Clasificación (`clasificarLineaBom`):** el maestro real solo tiene categorías Telas|Herrajes|Empaques|Químicos (+ las del taller): empaque manda por categoría == Empaques (misma regla que `migrate/sales.py`), tela por categoría/tipo/unidad (m), forro por nombre (forro/entretela, vive bajo Telas), resto = avío. Keywords por nombre son fallback documentado.
+- **Qué queda como extra manual:** todo lo que se edite sobre la base (empaque especial, urgencia, ajustes de la cotización). El total y el guardado siguen saliendo de los campos, así que el backend `_calcular` da lo mismo. Fórmulas de precio y schema del payload intactos (hilos siguen informativos, solo entran vía avíos).
+- **Si el maestro no alcanza (partial honesto, prohibido fakear):** si alguna línea del BOM no resuelve en el maestro, o la tela/forro no tiene precio > 0, NO se pisan metros/precios/avíos: solo tiempo/CIF/margen + bloque de referencia, toast `Base BOM parcial` con el motivo. Receta sin BOM: aviso + se conserva lo manual.
+- **Quitado:** botón `Usar costo real` y línea de diferencia (el escalado proporcional distorsionaba; la base YA es real). Quedan: línea `Costo real BOM (DB)`, badge margen heredado, línea `A meta N% daría`. Nuevo bloque colapsable `Base BOM (N líneas)` con nombre × cantidad ≈ costo por línea. No-pisar-con-ceros extendido a cada grupo (0/null del BOM conserva el valor con toast).
+- **Verificación:** `npm run build` PASS (vite 411 módulos + server bundle).
+- **Archivos:** `src/views/CotizadorView.vue` (único).
+
 ### [2026-09-27] - Piso-vs-lista, margen heredado y no-pisar-ceros en cotizador
 
 - **Piso vs lista (`FichaTecnicaModal.vue`):** `Sugerido (35%): $X` → `Piso a meta 35% (referencia): $X` (también en modo edición). El principal sigue siendo `PRECIO VENTA $80.000 · Margen real 82%`: el precio lista manda, el piso a meta 35% es solo referencia. Solo strings, sin cambio de fórmulas.

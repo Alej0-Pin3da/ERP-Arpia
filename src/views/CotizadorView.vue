@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useProductos } from '@/composables/useProductos'
 import { useBom } from '@/composables/useBom'
 import { useRouter } from 'vue-router'
@@ -13,6 +13,8 @@ import { createCotizacion, listCotizaciones, updateCotizacionEstado, type Cotiza
 import { useClientes } from '@/composables/useClientes'
 import { updateProducto } from '@/services/api/productos'
 import { getParametros } from '@/services/api/maestros'
+import { listInsumos, getInsumo, type InsumoRead } from '@/services/api/insumos'
+import type { CostoLineaRead } from '@/services/api/bom'
 
 const router = useRouter()
 const productosApi = useProductos()
@@ -20,6 +22,13 @@ const bomApi = useBom()
 const productos = ref<any[]>([])
 const costoReal = ref<number | null>(null)
 const loadingCostoReal = ref(false)
+// Líneas base del BOM real (GET /productos/{id}/costo): referencia informativa.
+// Los campos editables arrancan con estos valores; lo que se agregue a mano
+// son extras de ESTA cotización (empaque especial, urgencia, ajustes).
+const lineasBase = ref<CostoLineaRead[]>([])
+// Motivo cuando la base quedó parcial (maestro sin precio/categoría mapeable):
+// telas y avíos NO se pisan; solo tiempo/CIF/margen + bloque de referencia.
+const baseParcial = ref<string | null>(null)
 async function cargarProductos() {
   try {
     const r = await productosApi.list({ limit: 100 })
@@ -126,34 +135,167 @@ const recetasOptions = computed(() => {
   ]
 })
 
-async function cargarCostoReal() {
-  if (!recetaSeleccionada.value) { costoReal.value = null; return }
-  loadingCostoReal.value = true
-  try {
-    const c = await bomApi.getCosto(recetaSeleccionada.value) as { total?: number | string }
-    costoReal.value = Number(c.total ?? 0)
-  } catch { costoReal.value = null }
-  finally { loadingCostoReal.value = false }
+// Clasificación de una línea BOM contra el maestro de insumos.
+// Categorías reales del maestro: Telas | Herrajes | Empaques | Químicos (+ las
+// que cree el taller). No hay categoría "forro": el forro/entretela vive bajo
+// Telas y se distingue por nombre. Empaque manda por categoría == Empaques
+// (misma regla que el backend en migrate/sales.py); los keywords por nombre
+// son fallback documentado, no verdad del maestro.
+type ClaseLinea = 'tela' | 'forro' | 'empaque' | 'avio'
+function clasificarLineaBom(m: InsumoRead, nombreFallback: string): ClaseLinea {
+  const cat = (m.nombre_categoria ?? '').toLowerCase()
+  const nom = ((m.nombre ?? '') || nombreFallback).toLowerCase()
+  const uni = (m.unidad_medida ?? '').toLowerCase()
+  const tip = (m.tipo ?? '').toLowerCase()
+  if (cat.includes('empaque') || /\b(empaque|bolsa|etiqueta|caja|papel|envio|envío)\b/.test(nom)) return 'empaque'
+  const esTela = cat.includes('tela') || tip.includes('tela') || ['m', 'mt', 'mts', 'metro', 'metros'].includes(uni)
+  if (esTela) {
+    if (nom.includes('forro') || nom.includes('entretela') || nom.includes('lining')) return 'forro'
+    return 'tela'
+  }
+  // Forro cargado con otra categoría pero nombre claro (taller que no usa Telas).
+  if (nom.includes('forro') || nom.includes('entretela')) return 'forro'
+  return 'avio'
 }
 
-function onRecetaChange() {
+async function cargarBaseBom() {
+  if (!recetaSeleccionada.value) { costoReal.value = null; lineasBase.value = []; baseParcial.value = null; return }
+  loadingCostoReal.value = true
+  try {
+    const c = await bomApi.getCosto(recetaSeleccionada.value)
+    costoReal.value = Number(c.total ?? 0)
+    lineasBase.value = Array.isArray(c.lineas) ? c.lineas : []
+  } catch { costoReal.value = null; lineasBase.value = [] }
+  finally { loadingCostoReal.value = false }
+  await aplicarBaseBom()
+}
+
+async function aplicarBaseBom() {
+  const productoId = recetaSeleccionada.value
+  if (!productoId) return
+  baseParcial.value = null
+  let bom: { insumo_id: number; cantidad_requerida: number | string; porcentaje_desperdicio: number | string }[]
+  try {
+    bom = await bomApi.listInsumos(productoId)
+  } catch {
+    baseParcial.value = 'No se pudo leer el BOM de la receta; se conserva lo manual.'
+    return
+  }
+  if (!bom.length) {
+    showToast('info', 'Receta sin BOM', 'La receta no tiene insumos cargados; conservo tus valores manuales.')
+    return
+  }
+  // Maestro para precio (costo_promedio_actual) y categoría: un solo listado
+  // + getInsumo puntual para los ids que falten (límite alto, taller chico).
+  const ids = [...new Set(bom.map((l) => Number(l.insumo_id)))]
+  const maestro = new Map<number, InsumoRead>()
+  try {
+    const r = await listInsumos({ limit: 500 })
+    for (const it of r.items ?? []) maestro.set(Number(it.id), it)
+  } catch { /* cae al puntual */ }
+  const faltantes = ids.filter((id) => !maestro.has(id))
+  if (faltantes.length) {
+    const res = await Promise.allSettled(faltantes.map((id) => getInsumo(id)))
+    res.forEach((x, i) => { if (x.status === 'fulfilled') maestro.set(faltantes[i], x.value) })
+  }
+  const sinMaestro = ids.filter((id) => !maestro.has(id))
+  if (sinMaestro.length) {
+    // Prohibido fakear: sin precio/categoría del maestro no se inventan
+    // metros ni precios. Solo tiempo/CIF/margen (ya aplicados) + referencia.
+    baseParcial.value = `Base parcial: ${sinMaestro.length} insumo(s) del BOM sin datos en el maestro; telas y avíos quedan manuales.`
+    showToast('warn', 'Base BOM parcial', baseParcial.value)
+    return
+  }
+  const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
+  let mTela = 0, vTela = 0, nTela = 0, mForro = 0, vForro = 0, nForro = 0
+  let avios = 0, nAvio = 0, empaque = 0, nEmpaque = 0
+  const desp: number[] = []
+  for (const l of bom) {
+    const m = maestro.get(Number(l.insumo_id))!
+    const cant = num(l.cantidad_requerida)
+    const d = num(l.porcentaje_desperdicio)
+    const precio = num(m.costo_promedio_actual)
+    const clase = clasificarLineaBom(m, '')
+    // Cantidades del BOM ya vienen en unidad canónica (Telas → m); la avío se
+    // valora con cantidad efectiva (con su % desperdicio propio, como el backend).
+    const efectiva = cant * (1 + d / 100)
+    if (clase === 'tela') { mTela += cant; vTela += cant * precio; nTela++; desp.push(d) }
+    else if (clase === 'forro') { mForro += cant; vForro += cant * precio; nForro++; desp.push(d) }
+    else if (clase === 'empaque') { empaque += efectiva * precio; nEmpaque++ }
+    else { avios += efectiva * precio; nAvio++ }
+  }
+  // Tela/forro sin precio en el maestro (>0) no dan promedio ponderado honesto:
+  // parcial antes de pisar. Un avío en 0 solo aporta 0, no distorsiona al resto.
+  const telaSinPrecio = nTela > 0 && mTela > 0 && vTela <= 0
+  const forroSinPrecio = nForro > 0 && mForro > 0 && vForro <= 0
+  if (telaSinPrecio || forroSinPrecio) {
+    baseParcial.value = `Base parcial: la ${telaSinPrecio ? 'tela' : 'el forro'} del BOM no tiene precio en el maestro; telas y avíos quedan manuales.`
+    showToast('warn', 'Base BOM parcial', baseParcial.value)
+    return
+  }
+  // No-pisar-con-ceros: un 0/null del BOM conserva el valor actual con aviso.
+  const red2 = (v: number) => Math.round(v * 100) / 100
+  const aplicados: string[] = []
+  if (mTela > 0) {
+    metrosTela.value = red2(mTela)
+    precioMetroTela.value = Math.round(vTela / mTela)
+    aplicados.push(`tela ${red2(mTela)} m`)
+  }
+  if (mForro > 0) {
+    metrosForro.value = red2(mForro)
+    precioMetroForro.value = Math.round(vForro / mForro)
+    aplicados.push(`forro ${red2(mForro)} m`)
+  }
+  if (desp.length) {
+    // Desperdicio: promedio simple de las líneas de tela/forro. El mayor
+    // castigaría prototipos con piezas chicas; el promedio refleja la merma
+    // típica del modelo.
+    desperdicioPct.value = red2(desp.reduce((a, b) => a + b, 0) / desp.length)
+    aplicados.push(`desperdicio ${desperdicioPct.value}%`)
+  }
+  if (nAvio > 0) {
+    if (avios > 0) { costoAvios.value = Math.round(avios); aplicados.push(`avíos ${formatCOP(avios)}`) }
+    else showToast('warn', 'Avíos en 0 en el BOM', 'El BOM trae avíos sin precio, conservo tu valor.')
+  }
+  if (nEmpaque > 0) {
+    if (empaque > 0) { costoEmpaque.value = Math.round(empaque); aplicados.push(`empaque ${formatCOP(empaque)}`) }
+    else showToast('warn', 'Empaque en 0 en el BOM', 'El BOM trae empaque sin precio, conservo tu valor.')
+  }
+  if (aplicados.length) {
+    showToast('success', 'Base real cargada', `Desde el BOM: ${aplicados.join(' · ')}. Lo manual son extras de esta cotización.`)
+  }
+}
+
+async function onRecetaChange() {
   if (!recetaSeleccionada.value) {
     // Prenda nueva/manual: se limpia lo heredado y el margen vuelve a la meta.
     margenHeredado.value = null
     margenPct.value = Math.round(Number(margenMetaGlobal.value ?? 35))
+    costoReal.value = null
+    lineasBase.value = []
+    baseParcial.value = null
     return
   }
   const r = (productos.value).find((x) => x.id === recetaSeleccionada.value)
   if (r) {
     nombrePrenda.value = r.nombre
-    // Solo receta: nombre, tiempos, CIF y margen. Las telas/precios/avíos
-    // NO se pisan: son decisión de esta cotización, no de la receta.
+    // Solo receta: nombre, tiempos, CIF y margen. Tarifa $/hora no existe en la
+    // receta (mano_obra es un total, no una tasa): queda manual como siempre.
     // P0-5: la API manda Numeric como string ("83000.0000") y nulls; normalizar
     // con Number() para que InputNumber/slider no queden vacíos.
     // Ceros de receta NO pisan: se conserva el valor actual con aviso.
     const t = r.tiempo_confeccion_min
     if (t == null || Number(t) <= 0) {
-      showToast('warn', 'Tiempo en 0 en la receta', 'La receta trae 0 en tiempo de confección, conservo tu valor.')
+      // Fallback: suma de fases estándar (0036) si existe alguna.
+      const fases = ['tiempo_corte_min', 'tiempo_costura_min', 'tiempo_acabados_min', 'tiempo_calidad_min']
+        .map((k) => Number((r as Record<string, unknown>)[k] ?? 0))
+        .filter((n) => Number.isFinite(n) && n > 0)
+      if (fases.length) {
+        tiempoConfeccionMin.value = fases.reduce((a, b) => a + b, 0)
+        showToast('info', 'Tiempo por fases estándar', `La receta no trae tiempo total; sumé fases (${tiempoConfeccionMin.value} min).`)
+      } else {
+        showToast('warn', 'Tiempo en 0 en la receta', 'La receta trae 0 en tiempo de confección, conservo tu valor.')
+      }
     } else {
       tiempoConfeccionMin.value = Number(t)
     }
@@ -172,28 +314,7 @@ function onRecetaChange() {
       margenPct.value = Math.round(Number(m))
     }
   }
-}
-
-watch(recetaSeleccionada, () => { void cargarCostoReal() })
-
-function usarCostoReal() {
-  if (costoReal.value == null) return
-  // Proporcional: escala todos los insumos monetarios por el mismo ratio para
-  // que el total iguale al real sin distorsionar solo el CIF.
-  const totalManual = costoTotalConfeccion.value
-  if (totalManual > 0) {
-    const ratio = costoReal.value / totalManual
-    const round = (v: number) => Math.max(0, Math.round(v))
-    precioMetroTela.value = round(precioMetroTela.value * ratio)
-    precioMetroForro.value = round(precioMetroForro.value * ratio)
-    costoAvios.value = round(costoAvios.value * ratio)
-    costoEmpaque.value = round(costoEmpaque.value * ratio)
-    tarifaHora.value = round(tarifaHora.value * ratio)
-    costoCif.value = round(costoCif.value * ratio)
-    showToast('success', 'Costo real aplicado', `Insumos escalados ×${ratio.toFixed(2)} para igualar $${Math.round(costoReal.value).toLocaleString('es-CO')}`)
-  } else {
-    costoCif.value = costoReal.value
-  }
+  await cargarBaseBom()
 }
 
 // Calculations (telas con % desperdicio, como el BOM con porcentaje_desperdicio)
@@ -525,12 +646,17 @@ async function llevarPrecioAProducto() {
                 <span class="text-amber-300 flex items-center gap-1"><i class="pi pi-database text-[10px]" /> Costo real BOM (DB):</span>
                 <span class="font-mono font-bold" :class="loadingCostoReal ? 'text-stone-400' : 'text-amber-300'">{{ loadingCostoReal ? 'Cargando...' : (costoReal !== null ? formatCOP(costoReal!) : 'Sin BOM') }}</span>
               </div>
-              <div v-if="costoReal !== null" class="flex justify-end">
-                <button type="button" class="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/30" @click="usarCostoReal">Usar costo real</button>
-              </div>
-              <div v-if="costoReal !== null && Math.abs(costoReal - costoTotalConfeccion) > 100" class="text-[11px] text-center" :class="costoReal > costoTotalConfeccion ? 'text-amber-400' : 'text-emerald-400'">
-                {{ costoReal > costoTotalConfeccion ? '▲' : '▼' }} Diferencia {{ formatCOP(Math.abs(costoReal - costoTotalConfeccion)) }} vs cálculo manual
-              </div>
+              <details v-if="lineasBase.length" class="rounded-lg border border-stone-800 bg-stone-950/60 px-2 py-1.5 text-[11px]">
+                <summary class="cursor-pointer text-stone-400 font-bold">Base BOM ({{ lineasBase.length }} líneas) — los campos arrancan con estos valores</summary>
+                <div class="mt-1 space-y-1">
+                  <div v-for="(l, i) in lineasBase" :key="`${l.tipo}-${l.id}-${i}`" class="flex justify-between gap-2 text-stone-300">
+                    <span class="truncate">{{ l.nombre }} <span class="text-stone-500">× {{ Number(l.cantidad) }}</span></span>
+                    <span class="font-mono shrink-0">{{ formatCOP(Number(l.costo_total)) }}</span>
+                  </div>
+                </div>
+                <p v-if="baseParcial" class="text-amber-400 m-0 mt-1">{{ baseParcial }}</p>
+                <p v-else class="text-stone-500 m-0 mt-1">Lo que agregues a mano son extras de esta cotización (empaque especial, urgencia, ajustes).</p>
+              </details>
           </div>
 
           <!-- Suggested Sale Price Box -->
