@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useProductos } from '@/composables/useProductos'
 import type { ClienteRead } from '@/services/api/clientes'
 import { useBom } from '@/composables/useBom'
@@ -298,6 +298,8 @@ async function aplicarBaseBom() {
 }
 
 async function onRecetaChange() {
+  // Nueva prenda/receta: el auditor vuelve a autocompletarse con el sugerido.
+  mercadoTocado.value = false
   if (!recetaSeleccionada.value) {
     // Prenda nueva/manual: se limpia lo heredado y el margen vuelve a la meta.
     margenHeredado.value = null
@@ -383,9 +385,13 @@ const gananciaNeta = computed(() => {
   return precioVentaSugerido.value - costoTotalConfeccion.value
 })
 
-// Auditor de precio de mercado: compara un precio de venta fijo actual
-// contra el costo real para ver si cumple la meta del taller.
+// Auditor de precio fijo: compara el precio de tienda contra el costo real.
+// Se autocompleta con el sugerido hasta que el usuario escribe el suyo.
 const precioMercado = ref<number | null>(null)
+const mercadoTocado = ref(false)
+watch(precioVentaSugerido, (v) => {
+  if (!mercadoTocado.value) precioMercado.value = Math.round(v)
+}, { immediate: true })
 const margenRealMercado = computed(() => {
   const p = Number(precioMercado.value ?? 0)
   const c = costoTotalConfeccion.value
@@ -396,9 +402,8 @@ const veredictoMercado = computed(() => {
   if (margenRealMercado.value == null) return null
   const meta = Number(margenMetaGlobal.value ?? 35)
   const m = margenRealMercado.value
-  if (m < 0) return { tono: 'perdida', texto: `PERDIENDO PLATA (margen ${m.toFixed(1)}%)` }
-  if (m < meta) return { tono: 'bajo', texto: `BAJO META (${m.toFixed(1)}% vs meta ${meta}%)` }
-  return { tono: 'ok', texto: `RENTABLE (${m.toFixed(1)}% vs meta ${meta}%)` }
+  if (m >= meta) return { tono: 'ok', texto: `¡RENTABLE! (margen real ${m.toFixed(1)}% vs meta ${meta}%)` }
+  return { tono: 'alerta', texto: `ALERTA: margen ${m.toFixed(1)}% por debajo de la meta ${meta}%` }
 })
 
 // Piso a meta global (referencia): mismo costo, margen de Maestros (default 35%).
@@ -647,7 +652,7 @@ async function llevarPrecioAProducto() {
               <InputNumber v-model="costoHiloMetro" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" class="w-32 font-mono text-xs" />
               <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-bold" :class="hilosYaSumados ? 'bg-stone-800 text-stone-500 border border-stone-700' : 'bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30'" :disabled="hilosYaSumados" @click="aplicarEstimacionHilos">{{ hilosYaSumados ? '✓ Ya sumado' : 'Sumar a Avíos' }}</button>
             </div>
-            <p class="text-[10px] text-stone-500 m-0">Heurística: 120 m hilo por metro de tela+forro (overlock+recta+remates), con tope de 1000 m / $2.000. Ajustá el $/m según tu cono.</p>
+            <p class="text-[10px] text-stone-500 m-0">Heurística: 120 m hilo por metro de tela+forro (overlock+recta+remates), con tope de 500 m / $2.000. Ajustá el $/m según tu cono.</p>
           </div>
         </div>
 
@@ -677,27 +682,32 @@ async function llevarPrecioAProducto() {
           </div>
         </div>
 
-        <!-- Margin Slider -->
+        <!-- Margen base del taller (la meta manda; el slider es ajuste fino) -->
         <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 shadow-lg space-y-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
-              <i class="pi pi-percentage" /> Margen de Ganancia Deseado
+              <i class="pi pi-percentage" /> Margen base del taller
             </div>
             <span class="flex items-center gap-2">
-              <span v-if="margenHeredado !== null" class="px-2 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[10px] font-bold">margen heredado {{ margenHeredado }}% de la receta</span>
+              <span v-if="margenHeredado !== null" class="px-2 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[10px] font-bold">meta heredada {{ margenHeredado }}% de la receta</span>
+              <span v-else class="px-2 py-0.5 rounded-full border border-stone-700 bg-stone-900 text-stone-300 text-[10px] font-bold">meta global {{ margenMetaGlobal }}% de Maestros</span>
               <span class="font-mono text-sm font-extrabold text-amber-300">{{ margenPct }}%</span>
             </span>
           </div>
 
-          <Slider v-model="margenPct" :min="20" :max="90" class="w-full" />
-
-          <div class="flex justify-between text-[11px] text-stone-500 font-medium">
-            <span>20% (Mayorista)</span>
-            <span class="text-amber-400 font-bold">55% - 65% (Taller Estándar)</span>
-            <span>80%+ (Alta Costura)</span>
-          </div>
-          <p class="text-[10px] text-stone-500 m-0">Regla visible: margen ≥100% usa ×2.2 fijo; margen que deje menos de 5% de factor usa ×2 (tope anti-margen-cero). Igual en servidor.</p>
           <p class="text-[11px] text-stone-400 m-0">A meta {{ margenMetaGlobal }}% daría {{ formatCOP(precioAMeta) }} (piso de referencia; el precio lista manda).</p>
+          <details class="rounded-xl border border-stone-800 bg-stone-950/60 px-3 py-2">
+            <summary class="cursor-pointer text-[11px] text-stone-400 font-bold">Ajuste fino de margen (avanzado)</summary>
+            <div class="pt-3 space-y-3">
+              <Slider v-model="margenPct" :min="20" :max="90" class="w-full" />
+              <div class="flex justify-between text-[11px] text-stone-500 font-medium">
+                <span>20% (Mayorista)</span>
+                <span class="text-amber-400 font-bold">55% - 65% (Taller Estándar)</span>
+                <span>80%+ (Alta Costura)</span>
+              </div>
+              <p class="text-[10px] text-stone-500 m-0">Regla visible: margen ≥100% usa ×2.2 fijo; margen que deje menos de 5% de factor usa ×2 (tope anti-margen-cero). Igual en servidor.</p>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -791,13 +801,12 @@ async function llevarPrecioAProducto() {
             <div class="text-[11px] font-bold text-sky-400 uppercase tracking-wider">
               Auditor — ¿Mi precio actual es rentable?
             </div>
-            <InputNumber v-model="precioMercado" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" placeholder="Precio de venta actual ($)" class="w-full font-mono text-xs" />
+            <label class="block text-[11px] text-stone-400">Precio de Venta Real / Tienda ($)</label>
+            <InputNumber v-model="precioMercado" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" placeholder="Precio de venta actual ($)" class="w-full font-mono text-xs" @input="mercadoTocado = true" />
             <div v-if="veredictoMercado" class="text-sm font-extrabold font-mono px-2 py-1.5 rounded-lg border"
               :class="veredictoMercado.tono === 'ok'
                 ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
-                : veredictoMercado.tono === 'bajo'
-                  ? 'text-amber-300 border-amber-500/40 bg-amber-500/10'
-                  : 'text-red-300 border-red-500/40 bg-red-500/10'">
+                : 'text-red-300 border-red-500/40 bg-red-500/10'">
               {{ veredictoMercado.texto }}
             </div>
             <div v-else class="text-[10px] text-stone-500">Ingresá el precio fijo de mercado para auditarlo contra este costo.</div>

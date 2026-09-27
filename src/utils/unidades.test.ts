@@ -91,9 +91,9 @@ describe('tope y doble escala de hilos (Falda Emily)', () => {
   })
 
   it('el costo de hilo jamás supera $2.000 (tope automático)', () => {
-    expect(estimarHilos(234, 2)).toEqual({ metros: 1000, costo: TOPE_COSTO_HILOS, conTope: false })
-    expect(estimarHilos(234, 8)).toEqual({ metros: 1000, costo: TOPE_COSTO_HILOS, conTope: true })
+    expect(estimarHilos(234, 2)).toEqual({ metros: 500, costo: 1000, conTope: false })
+    expect(estimarHilos(234, 8)).toEqual({ metros: 500, costo: TOPE_COSTO_HILOS, conTope: true })
     expect(estimarHilos(2.34, 2)).toEqual({ metros: 281, costo: 562, conTope: false })
-    expect(TOPE_HILO_METROS).toBe(1000)
+    expect(TOPE_HILO_METROS).toBe(500)
   })
 })

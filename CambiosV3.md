@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Cotizador auditor gerencial (espec: margen base + precio tienda)
+
+- **Tope hilos 500 m:** `TOPE_HILO_METROS` 1000→500 (el costo ya estaba en $2.000). A $2/m el techo efectivo son $1.000; el cap de $2.000 muerde si subís el $/m.
+- **Slider a segundo plano:** la sección de margen ahora titula "Margen base del taller" con la meta (heredada o global) como baseline visible; el slider vive en un `<details>` colapsado de ajuste fino. Lógica intacta.
+- **Precio Real / Tienda:** se autocompleta con el sugerido hasta que escribís el tuyo (flag `mercadoTocado`, se resetea al cambiar de receta). Etiqueta y veredictos según espec: `¡RENTABLE! (margen real X% vs meta Y%)` en verde, `ALERTA: ...` en rojo.
+- **Verificación:** lint 0, vitest 65/65, build limpio. Backend sin cambios (verificado por tercera vez: no calcula hilos).
+
 ### [2026-09-27] - Hilos con tope, botón idempotente y auto-división cm>500
 
 - **Tope de seguridad (`estimarHilos` en `unidades.ts`):** jamás más de 1000 m ni $2.000 de hilo, aunque el BOM venga mal cargado. La UI avisa "tope aplicado" cuando recorta.

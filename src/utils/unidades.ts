@@ -25,8 +25,8 @@ export const UMBRAL_LINEA_SOSPECHOSA_M = 50
  */
 export const UMBRAL_AUTO_CM = 500
 
-/** Techo de la heurística: ni el vestido más complejo pasa de acá. */
-export const TOPE_HILO_METROS = 1000
+/** Techo de la heurística: ninguna prenda pasa de acá. */
+export const TOPE_HILO_METROS = 500
 export const TOPE_COSTO_HILOS = 2000
 /** Tasa de la heurística: metros de hilo por metro de tela. */
 export const HILO_POR_METRO_TELA = 120
