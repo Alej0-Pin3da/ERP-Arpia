@@ -12,7 +12,7 @@ frontend), and can later feed the product's ``precio_venta_sugerido``:
   borrador → enviada → aprobada/descartada.
 """
 
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -36,21 +36,27 @@ editor_user = require_roles("admin", "operador")
 def _calcular(payload: CotizacionCreate) -> tuple[Decimal, Decimal, Decimal]:
     """Mirror of the Cotizador frontend math (server is authoritative).
 
+    Dynamic BOM: every line brings its own waste factor
+    (cantidad * (1 + desperdicio_pct/100)); the financial subtotal is
+    rounded HALF_UP to cents. Then avíos/empaque (aggregates), labor and
+    CIF are added.
+
     Regla visible (igual en el frontend): margen normal -> costo/(1-margen);
     margen >=100% -> x2.2 fijo; margen que deje menos de 5% de factor -> x2
-    (tope anti-margen-cero para no dividir por ~0).
-    Las telas llevan % desperdicio (merma de corte, como el BOM); los hilos
-    son informativos y entran al costo vía costo_avios cuando se aplican.
+    (tope anti-margen-cero para no dividir por ~0). Los hilos son
+    informativos y entran al costo vía costo_avios cuando se aplican.
     """
-    subtotal_telas = (
-        payload.metros_tela * payload.precio_metro_tela
-        + payload.metros_forro * payload.precio_metro_forro
-    ) * (Decimal(1) + payload.desperdicio_pct / Decimal(100))
+    subtotal_materiales = Decimal("0.00")
+    for insumo in payload.insumos:
+        factor_desperdicio = Decimal("1.00") + (insumo.desperdicio_pct / Decimal("100.00"))
+        cantidad_efectiva = insumo.cantidad * factor_desperdicio
+        subtotal_materiales += cantidad_efectiva * insumo.precio_unitario
+    subtotal_materiales = subtotal_materiales.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     subtotal_avios = payload.costo_avios + payload.costo_empaque
     subtotal_mano_obra = (
         Decimal(payload.tiempo_confeccion_min) / Decimal(60)
     ) * payload.tarifa_hora
-    costo = subtotal_telas + subtotal_avios + subtotal_mano_obra + payload.costo_cif
+    costo = subtotal_materiales + subtotal_avios + subtotal_mano_obra + payload.costo_cif
     if payload.margen_pct >= Decimal(100):
         precio = costo * Decimal("2.2")
     else:
@@ -81,17 +87,13 @@ def create_cotizacion(
         cliente_id=payload.cliente_id,
         producto_id=payload.producto_id,
         nombre_prenda=payload.nombre_prenda,
-        metros_tela=payload.metros_tela,
-        precio_metro_tela=payload.precio_metro_tela,
-        metros_forro=payload.metros_forro,
-        precio_metro_forro=payload.precio_metro_forro,
+        insumos_detalle=[i.model_dump(mode="json") for i in payload.insumos],
         costo_avios=payload.costo_avios,
         costo_empaque=payload.costo_empaque,
         tiempo_confeccion_min=payload.tiempo_confeccion_min,
         tarifa_hora=payload.tarifa_hora,
         costo_cif=payload.costo_cif,
         margen_pct=payload.margen_pct,
-        desperdicio_pct=payload.desperdicio_pct,
         costo_hilo_m=payload.costo_hilo_m,
         metros_hilo=payload.metros_hilo,
         costo_total=costo,

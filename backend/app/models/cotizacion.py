@@ -1,11 +1,11 @@
 """Cotizacion model — persisted quick quotes from the Cotizador.
 
-A quote snapshots the inputs the user priced with (fabric/forro meters and
-prices, avíos, empaque, labor time/rate, CIF) plus the server-computed
-results (costo_total, margen_pct, precio_sugerido, ganancia_neta), so the
-number no longer dies in WhatsApp: it has history and can later feed the
-product's ``precio_venta_sugerido``. ``codigo`` is derived (COT-0001),
-never stored, mirroring ``Venta.codigo``.
+A quote snapshots the inputs the user priced with (dynamic BOM line items
+in ``insumos_detalle``, avíos, empaque, labor time/rate, CIF) plus the
+server-computed results (costo_total, margen_pct, precio_sugerido,
+ganancia_neta), so the number no longer dies in WhatsApp: it has history
+and can later feed the product's ``precio_venta_sugerido``. ``codigo`` is
+derived (COT-0001), never stored, mirroring ``Venta.codigo``.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -39,19 +40,13 @@ class Cotizacion(Base):
         ForeignKey("Productos.id", ondelete="SET NULL"), nullable=True, index=True
     )
     nombre_prenda: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Dynamic BOM snapshot (immutable per quote): list of
+    # {nombre, cantidad, precio_unitario, unidad_medida, desperdicio_pct}.
+    # Replaces the old static tela/forro columns (dropped in migration).
+    insumos_detalle: Mapped[list | None] = mapped_column(
+        JSONB, nullable=True, server_default="[]"
+    )
     # Pricing inputs (snapshot of what the user priced with).
-    metros_tela: Mapped[Decimal] = mapped_column(
-        Numeric(15, 4), nullable=False, default=Decimal("0")
-    )
-    precio_metro_tela: Mapped[Decimal] = mapped_column(
-        Numeric(15, 4), nullable=False, default=Decimal("0")
-    )
-    metros_forro: Mapped[Decimal] = mapped_column(
-        Numeric(15, 4), nullable=False, default=Decimal("0")
-    )
-    precio_metro_forro: Mapped[Decimal] = mapped_column(
-        Numeric(15, 4), nullable=False, default=Decimal("0")
-    )
     costo_avios: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
@@ -66,11 +61,8 @@ class Cotizacion(Base):
     margen_pct: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )
-    # Merma de corte sobre telas (%, como el BOM) + estimación de hilos
-    # (informativa: el costo de hilos entra vía costo_avios si se aplica).
-    desperdicio_pct: Mapped[Decimal] = mapped_column(
-        Numeric(15, 4), nullable=False, default=Decimal("0")
-    )
+    # Estimación de hilos (informativa: el costo de hilos entra vía
+    # costo_avios si se aplica).
     costo_hilo_m: Mapped[Decimal] = mapped_column(
         Numeric(15, 4), nullable=False, default=Decimal("0")
     )

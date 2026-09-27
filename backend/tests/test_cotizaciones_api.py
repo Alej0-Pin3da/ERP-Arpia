@@ -1,10 +1,11 @@
-"""Cotizaciones API endpoint tests.
+"""Cotizaciones API endpoint tests (dynamic BOM).
 
 Drives the /api/v1/cotizaciones HTTP surface through the FastAPI TestClient
 against the real test PostgreSQL:
-- POST /cotizaciones: snapshots inputs, server-computes costo_total /
-  precio_sugerido / ganancia_neta with the Cotizador math; 201; 401 without
-  auth; 422 on unknown cliente_id/producto_id or negative inputs.
+- POST /cotizaciones: snapshots the dynamic insumos list (JSONB, immutable
+  per quote), server-computes costo_total / precio_sugerido / ganancia_neta
+  with per-line waste; 201; 401 without auth; 422 on unknown
+  cliente_id/producto_id, negative inputs or invalid insumo lines.
 - GET /cotizaciones: paginated {items, total} with AND-combined filters
   (cliente_id, producto_id, estado, q on nombre_prenda); audited roles.
 - GET /cotizaciones/{id}: one quote; 404 when missing.
@@ -42,10 +43,22 @@ def _auth(token: str) -> dict:
 def _payload(**overrides):
     base = {
         "nombre_prenda": "Bustier prueba",
-        "metros_tela": 2,
-        "precio_metro_tela": 10000,
-        "metros_forro": 1,
-        "precio_metro_forro": 5000,
+        "insumos": [
+            {
+                "nombre": "Tela principal",
+                "cantidad": 2,
+                "precio_unitario": 10000,
+                "unidad_medida": "m",
+                "desperdicio_pct": 0,
+            },
+            {
+                "nombre": "Forro",
+                "cantidad": 1,
+                "precio_unitario": 5000,
+                "unidad_medida": "m",
+                "desperdicio_pct": 0,
+            },
+        ],
         "costo_avios": 3000,
         "costo_empaque": 2000,
         "tiempo_confeccion_min": 60,
@@ -77,7 +90,8 @@ def test_post_cotizacion_requires_auth(client):
 
 def test_post_cotizacion_computa_resultados(client, admin_token):
     body = _crear_cotizacion(client, admin_token)
-    # costo = 2*10000 + 1*5000 + 3000+2000 + (60/60)*12000 + 1000 = 43000
+    # materiales = 2*10000 + 1*5000 = 25000 (desperdicio 0)
+    # costo = 25000 + 3000+2000 + (60/60)*12000 + 1000 = 43000
     # margen 60 -> factor 0.4 -> precio 107500, ganancia 64500
     assert Decimal(str(body["costo_total"])) == Decimal("43000")
     assert Decimal(str(body["precio_sugerido"])) == Decimal("107500")
@@ -86,6 +100,65 @@ def test_post_cotizacion_computa_resultados(client, admin_token):
     assert body["estado"] == "borrador"
     assert body["codigo"] == f"COT-{body['id']:04d}"
     assert body["nombre_prenda"] == "Bustier prueba"
+
+
+def test_post_cotizacion_snapshot_insumos_inmutable(client, admin_token):
+    body = _crear_cotizacion(client, admin_token)
+    detalle = body["insumos_detalle"]
+    assert len(detalle) == 2
+    assert detalle[0]["nombre"] == "Tela principal"
+    assert Decimal(str(detalle[0]["cantidad"])) == Decimal("2")
+    assert Decimal(str(detalle[1]["precio_unitario"])) == Decimal("5000")
+    # Snapshot survives a re-read (history does not depend on the catalog).
+    again = client.get(
+        f"/api/v1/cotizaciones/{body['id']}", headers=_auth(admin_token)
+    ).json()
+    assert again["insumos_detalle"] == detalle
+
+
+def test_post_cotizacion_desperdicio_por_linea(client, admin_token):
+    body = _crear_cotizacion(
+        client,
+        admin_token,
+        insumos=[
+            {
+                "nombre": "Tela principal",
+                "cantidad": 2,
+                "precio_unitario": 10000,
+                "unidad_medida": "m",
+                "desperdicio_pct": 10,
+            },
+            {
+                "nombre": "Forro",
+                "cantidad": 1,
+                "precio_unitario": 5000,
+                "unidad_medida": "m",
+                "desperdicio_pct": 0,
+            },
+        ],
+    )
+    # materiales = 2*1.1*10000 + 1*5000 = 27000
+    # costo = 27000 + 3000+2000 + 12000 + 1000 = 45000
+    assert Decimal(str(body["costo_total"])) == Decimal("45000")
+
+
+def test_post_cotizacion_422_insumo_invalido(client, admin_token):
+    # cantidad <= 0 is rejected per line.
+    resp = client.post(
+        "/api/v1/cotizaciones",
+        json=_payload(
+            insumos=[
+                {
+                    "nombre": "Tela rota",
+                    "cantidad": 0,
+                    "precio_unitario": 100,
+                    "unidad_medida": "m",
+                }
+            ]
+        ),
+        headers=_auth(admin_token),
+    )
+    assert resp.status_code == 422
 
 
 def test_post_cotizacion_margen_100_duplica_22(client, admin_token):

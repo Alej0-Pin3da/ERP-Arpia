@@ -3,6 +3,16 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Cotizador BOM dinámico (refactor_cotizador_bom.md Pasos 1-4)
+
+- **Paso 1 — Modelo + migración `ddd8ad1b3d72`:** `insumos_detalle` JSONB (snapshot inmutable por cotización) en `Cotizacion`; dropeadas `metros_tela`, `precio_metro_tela`, `metros_forro`, `precio_metro_forro` y `desperdicio_pct` global (el desperdicio ahora es por línea). La migración vuelca tela/forro históricos al JSONB antes del drop (producción protegida) y deja `'[]'` donde no había nada. Autogenerate limpiado a mano (traía ruido de índices/tablas ajenas). Tabla `"Cotizaciones"` con mayúscula, no minúscula como decía la espec.
+- **Paso 2 — Schemas:** `InsumoCotizacion` {nombre, cantidad>0, precio_unitario≥0, unidad_medida, desperdicio_pct≥0} con parseo Decimal; `CotizacionCreate.insumos` (lista, default []) y `CotizacionRead.insumos_detalle`.
+- **Paso 3 — `_calcular`:** itera líneas con factor por línea + redondeo HALF_UP a centavos; resto idéntico (avíos/empaque agregados, mano, CIF, ramas de margen). Persiste `insumos_detalle` con `model_dump(mode="json")`.
+- **Paso 4 — `CotizadorView.vue`:** Sección 1 ahora es lista dinámica (nombre, cantidad, unidad, precio, % desp, subtotal por línea, añadir/eliminar). El BOM real se vuelca línea por línea sin condensar; agregados manuales intactos (no hay doble conteo). Hilos estiman desde metros con unidad de longitud. Preservado: margen heredado, piso-vs-lista, WhatsApp con desglose, historial con estados, Base BOM trazable, llevar-precio.
+- **Tests:** `test_cotizaciones_api.py` reescrito (18: 15 migrados + desperdicio por línea + 422 por línea inválida + snapshot inmutable).
+- **Verificación:** backend 18/18, `npm run lint` 0, `npm test` 52/52, `npm run build` limpio.
+- **Archivos:** modelo, migración, schemas, routes/cotizaciones.py, tests, services/api/cotizaciones.ts, views/CotizadorView.vue, refactor_cotizador_bom.md, CambiosV3.md.
+
 ### [2026-09-27] - Cero `any` total: 15 disables levantados, 118 sitios tipados (lint 0/0)
 
 - **Disables eliminados:** 12 directivas de archivo + 2 recortadas (Analisis, Dashboard) + 1 next-line en router. Quedan solo 2 `no-empty` intencionales (catches vacíos con fallback silencioso por diseño).

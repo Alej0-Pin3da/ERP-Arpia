@@ -10,7 +10,7 @@ import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Slider from 'primevue/slider'
 import { showToast } from '@/utils/toast'
-import { createCotizacion, listCotizaciones, updateCotizacionEstado, type CotizacionRead } from '@/services/api/cotizaciones'
+import { createCotizacion, listCotizaciones, updateCotizacionEstado, type CotizacionRead, type InsumoCotizacionLinea } from '@/services/api/cotizaciones'
 import { useClientes } from '@/composables/useClientes'
 import { updateProducto, type ProductoRead } from '@/services/api/productos'
 import { getParametros } from '@/services/api/maestros'
@@ -65,12 +65,20 @@ async function cargarMeta() {
 const recetaSeleccionada = ref<number | null>(null)
 const nombrePrenda = ref('Bustier Estructurado en Tul y Satén')
 
-// Section 1: Telas & Forros (+ % desperdicio como el BOM)
-const metrosTela = ref<number>(1.2)
-const precioMetroTela = ref<number>(22000)
-const metrosForro = ref<number>(0.6)
-const precioMetroForro = ref<number>(12000)
-const desperdicioPct = ref<number>(5)
+// Section 1: Materiales dinámicos (BOM por líneas).
+// Cada línea trae su % desperdicio propio; el servidor calcula igual.
+// Las líneas del BOM real se vuelcan acá sin condensar (trazabilidad total).
+const UNIDADES_INSUMO = ['m', 'cm', 'mm', 'un', 'doc', 'par', 'pza', 'kg', 'yarda']
+const insumos = ref<InsumoCotizacionLinea[]>([])
+function agregarInsumo() {
+  insumos.value.push({ nombre: '', cantidad: 0, precio_unitario: 0, unidad_medida: 'm', desperdicio_pct: 0 })
+}
+function eliminarInsumo(index: number) {
+  insumos.value.splice(index, 1)
+}
+function subtotalLinea(l: InsumoCotizacionLinea): number {
+  return Number(l.cantidad ?? 0) * (1 + Number(l.desperdicio_pct ?? 0) / 100) * Number(l.precio_unitario ?? 0)
+}
 
 // Cliente + notas (el modelo los soporta; antes quedaban huérfanos)
 const clientesApi = useClientes()
@@ -118,7 +126,9 @@ const costoEmpaque = ref<number>(4500)
 // depende del cono que compre el taller. No se suma sola al total:
 // se muestra y se aplica a Avíos con un botón para no duplicar.
 const costoHiloMetro = ref<number>(8)
-const metrosTotalesTela = computed(() => Number(metrosTela.value ?? 0) + Number(metrosForro.value ?? 0))
+// Metros lineales para la heurística de hilos: suma de líneas con unidad
+// de longitud (m/cm/mm); el resto no aporta metros de tela.
+const metrosTotalesTela = computed(() => insumos.value.reduce((acc, l) => acc + (aMetros(Number(l.cantidad ?? 0), l.unidad_medida ?? '') ?? 0), 0))
 const metrosHiloEstimado = computed(() => Math.round(metrosTotalesTela.value * 120))
 const costoHilosEstimado = computed(() => Math.round(metrosHiloEstimado.value * Number(costoHiloMetro.value ?? 0)))
 function aplicarEstimacionHilos() {
@@ -231,20 +241,18 @@ async function aplicarBaseBom() {
     return
   }
   const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
-  let mTela = 0, vTela = 0, nTela = 0, mForro = 0, vForro = 0, nForro = 0
-  let avios = 0, nAvio = 0, empaque = 0, nEmpaque = 0
-  const desp: number[] = []
+  // El BOM se vuelca línea por línea al arreglo dinámico (sin condensar:
+  // cada línea conserva cantidad original, precio y % propio). La tabla
+  // trazable (detalleBase) sigue mostrando a dónde fue cada línea.
+  const lineas: InsumoCotizacionLinea[] = []
   detalleBase.value = []
   for (const l of bom) {
     const m = maestro.get(Number(l.insumo_id))!
     const cant = num(l.cantidad_requerida)
     const d = num(l.porcentaje_desperdicio)
     const precio = num(m.costo_promedio_actual)
+    const unidad = (m.unidad_medida ?? '').trim() || 'un'
     let clase = clasificarLineaBom(m, '')
-    // La plata siempre es cantidad efectiva × precio en su unidad original
-    // (con su % desperdicio propio, como el backend); los metros de
-    // tela/forro salen de aMetros (cm→/100, mm→/1000) y el precio/m es el
-    // ponderado post-conversión (Σ plata / Σ metros).
     const efectiva = cant * (1 + d / 100)
     const subtotal = efectiva * precio
     const conv = aMetros(cant, m.unidad_medida ?? '')
@@ -254,63 +262,37 @@ async function aplicarBaseBom() {
       clase = 'avio'
     }
     let destino: DetalleBase['destino'] = 'Avíos'
-    if (clase === 'tela') { mTela += conv ?? 0; vTela += cant * precio; nTela++; desp.push(d); destino = 'Telas' }
-    else if (clase === 'forro') { mForro += conv ?? 0; vForro += cant * precio; nForro++; desp.push(d); destino = 'Forro' }
-    else if (clase === 'empaque') { empaque += subtotal; nEmpaque++; destino = 'Empaque' }
-    else { avios += subtotal; nAvio++ }
+    if (clase === 'tela') destino = 'Telas'
+    else if (clase === 'forro') destino = 'Forro'
+    else if (clase === 'empaque') destino = 'Empaque'
     detalleBase.value.push({
       nombre: m.nombre ?? `Insumo ${l.insumo_id}`,
-      cant, unidad: (m.unidad_medida ?? '').trim() || '—',
-      aMetros: conv, precio, subtotal, destino,
+      cant, unidad, aMetros: conv, precio, subtotal, destino,
+    })
+    lineas.push({
+      nombre: m.nombre ?? `Insumo ${l.insumo_id}`,
+      cantidad: cant,
+      precio_unitario: precio,
+      unidad_medida: unidad,
+      desperdicio_pct: d,
     })
   }
-  // Tela/forro sin precio en el maestro (>0) no dan promedio ponderado honesto:
-  // parcial antes de pisar. Un avío en 0 solo aporta 0, no distorsiona al resto.
-  const telaSinPrecio = nTela > 0 && mTela > 0 && vTela <= 0
-  const forroSinPrecio = nForro > 0 && mForro > 0 && vForro <= 0
-  if (telaSinPrecio || forroSinPrecio) {
-    baseParcial.value = `Base parcial: la ${telaSinPrecio ? 'tela' : 'el forro'} del BOM no tiene precio en el maestro; telas y avíos quedan manuales.`
+  // Tela/forro sin precio en el maestro (>0) no dan un ponderado honesto:
+  // parcial antes de pisar. Un avío en 0 solo aporta 0, no distorsiona.
+  const lineasTelaForroSinPrecio = lineas.filter((x, i) => {
+    const dest = detalleBase.value[i]?.destino
+    return (dest === 'Telas' || dest === 'Forro') && x.cantidad > 0 && !(x.precio_unitario > 0)
+  })
+  if (lineasTelaForroSinPrecio.length) {
+    baseParcial.value = `Base parcial: ${lineasTelaForroSinPrecio.length} línea(s) de tela/forro sin precio en el maestro; conservo tus materiales.`
     showToast('warn', 'Base BOM parcial', baseParcial.value)
     return
   }
-  // No-pisar-con-ceros: un 0/null del BOM conserva el valor actual con aviso.
-  const red2 = (v: number) => Math.round(v * 100) / 100
-  const aplicados: string[] = []
-  if (mTela > 0) {
-    metrosTela.value = red2(mTela)
-    precioMetroTela.value = Math.round(vTela / mTela)
-    aplicados.push(`tela ${red2(mTela)} m`)
-  }
-  if (mForro > 0) {
-    metrosForro.value = red2(mForro)
-    precioMetroForro.value = Math.round(vForro / mForro)
-    aplicados.push(`forro ${red2(mForro)} m`)
-  }
-  if (desp.length) {
-    // Desperdicio: promedio simple de las líneas de tela/forro. El mayor
-    // castigaría prototipos con piezas chicas; el promedio refleja la merma
-    // típica del modelo.
-    desperdicioPct.value = red2(desp.reduce((a, b) => a + b, 0) / desp.length)
-    aplicados.push(`desperdicio ${desperdicioPct.value}%`)
-  }
-  if (nAvio > 0) {
-    if (avios > 0) { costoAvios.value = Math.round(avios); aplicados.push(`avíos ${formatCOP(avios)}`) }
-    else showToast('warn', 'Avíos en 0 en el BOM', 'El BOM trae avíos sin precio, conservo tu valor.')
-  }
-  if (nEmpaque > 0) {
-    if (empaque > 0) { costoEmpaque.value = Math.round(empaque); aplicados.push(`empaque ${formatCOP(empaque)}`) }
-    else showToast('warn', 'Empaque en 0 en el BOM', 'El BOM trae empaque sin precio, conservo tu valor.')
-  } else {
-    // Receta cargada y BOM sin líneas de empaque: arranca en $0, no en el
-    // default quemado ($4500).
-    costoEmpaque.value = 0
-    aplicados.push('empaque $0, el BOM no trae')
-  }
-  if (aplicados.length) {
-    // La tabla trazable se muestra expandida al cargar receta.
-    baseExpandida.value = true
-    showToast('success', 'Base real cargada', `Desde el BOM: ${aplicados.join(' · ')}. Lo manual son extras de esta cotización.`)
-  }
+  // Los agregados manuales (avíos/empaque) no se tocan: el BOM ya vive en
+  // las líneas; lo manual son extras de esta cotización.
+  insumos.value = lineas
+  baseExpandida.value = true
+  showToast('success', 'Base real cargada', `Desde el BOM: ${lineas.length} líneas de materiales. Lo manual son extras de esta cotización.`)
 }
 
 async function onRecetaChange() {
@@ -369,10 +351,9 @@ async function onRecetaChange() {
   await cargarBaseBom()
 }
 
-// Calculations (telas con % desperdicio, como el BOM con porcentaje_desperdicio)
-const subtotalTelas = computed(() => {
-  const base = (metrosTela.value * precioMetroTela.value) + (metrosForro.value * precioMetroForro.value)
-  return base * (1 + Number(desperdicioPct.value ?? 0) / 100)
+// Materials: dynamic BOM lines, each with its own waste % (same as backend).
+const subtotalMateriales = computed(() => {
+  return insumos.value.reduce((acc, l) => acc + subtotalLinea(l), 0)
 })
 
 const subtotalAvios = computed(() => {
@@ -384,7 +365,7 @@ const subtotalManoObra = computed(() => {
 })
 
 const costoTotalConfeccion = computed(() => {
-  return subtotalTelas.value + subtotalAvios.value + subtotalManoObra.value + costoCif.value
+  return subtotalMateriales.value + subtotalAvios.value + subtotalManoObra.value + costoCif.value
 })
 
 const precioVentaSugerido = computed(() => {
@@ -439,7 +420,7 @@ function copiarPresupuestoWhatsApp() {
     `👗 *Prenda:* ${nombrePrenda.value}`,
     ...(nombreCliente && clienteSeleccionado.value ? [`👤 *Cliente:* ${nombreCliente}`] : []),
     `🧵 *Tiempo estimado:* ${tiempoConfeccionMin.value} min`,
-    `🧷 *Telas y forros (+${Number(desperdicioPct.value ?? 0)}% desperdicio):* ${formatCOP(subtotalTelas.value)}`,
+    `🧷 *Materiales (${insumos.value.length} líneas):* ${formatCOP(subtotalMateriales.value)}`,
     `🧵 *Hilos estimados:* ${metrosHiloEstimado.value} m ≈ ${formatCOP(costoHilosEstimado.value)}`,
     `📦 *Avíos y empaque:* ${formatCOP(subtotalAvios.value)}`,
     `💪 *Mano de obra:* ${formatCOP(subtotalManoObra.value)} · *CIF:* ${formatCOP(costoCif.value)}`,
@@ -461,21 +442,29 @@ async function guardarCotizacion() {
   }
   guardando.value = true
   try {
+    const lineasValidas = insumos.value
+      .filter((l) => l.nombre.trim() && Number(l.cantidad) > 0)
+      .map((l) => ({
+        nombre: l.nombre.trim(),
+        cantidad: Number(l.cantidad),
+        precio_unitario: Number(l.precio_unitario ?? 0),
+        unidad_medida: l.unidad_medida || 'un',
+        desperdicio_pct: Number(l.desperdicio_pct ?? 0),
+      }))
+    if (lineasValidas.length < insumos.value.length) {
+      showToast('info', 'Líneas incompletas', 'Las líneas sin nombre o con cantidad 0 no se guardan.')
+    }
     const saved = await createCotizacion({
       producto_id: recetaSeleccionada.value,
       cliente_id: clienteSeleccionado.value,
       nombre_prenda: nombrePrenda.value.trim(),
-      metros_tela: metrosTela.value,
-      precio_metro_tela: precioMetroTela.value,
-      metros_forro: metrosForro.value,
-      precio_metro_forro: precioMetroForro.value,
+      insumos: lineasValidas,
       costo_avios: costoAvios.value,
       costo_empaque: costoEmpaque.value,
       tiempo_confeccion_min: Math.round(tiempoConfeccionMin.value),
       tarifa_hora: tarifaHora.value,
       costo_cif: costoCif.value,
       margen_pct: margenPct.value,
-      desperdicio_pct: Number(desperdicioPct.value ?? 0),
       costo_hilo_m: Number(costoHiloMetro.value ?? 0),
       metros_hilo: metrosHiloEstimado.value,
       observaciones: observaciones.value.trim() || null,
@@ -562,37 +551,45 @@ async function llevarPrecioAProducto() {
           </div>
         </div>
 
-        <!-- Section 1: Telas y Forros -->
+        <!-- Section 1: Materiales dinámicos (BOM) -->
         <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 shadow-lg space-y-4">
           <div class="flex items-center justify-between border-b border-stone-800 pb-2">
             <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
-              <i class="pi pi-clone" /> 1. Telas y Forros Directos
+              <i class="pi pi-clone" /> 1. Materiales (BOM dinámico)
             </div>
-            <span class="font-mono text-xs font-bold text-stone-300">{{ formatCOP(subtotalTelas) }}</span>
+            <span class="font-mono text-xs font-bold text-stone-300">{{ formatCOP(subtotalMateriales) }}</span>
           </div>
 
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div>
-              <label class="block text-[11px] text-stone-400 mb-1">Metros Tela Principal</label>
-              <InputNumber v-model="metrosTela" mode="decimal" locale="es-CO" :min="0.1" :max-fraction-digits="2" class="w-full font-mono text-xs" />
+          <div v-if="!insumos.length" class="text-xs text-stone-500">Sin líneas todavía: cargá una receta BOM o añadí insumos a mano.</div>
+          <div v-for="(l, idx) in insumos" :key="idx" class="grid grid-cols-2 sm:grid-cols-12 gap-2 items-end rounded-xl border border-stone-800/70 bg-stone-950/40 p-2">
+            <div class="col-span-2 sm:col-span-4">
+              <label class="block text-[11px] text-stone-400 mb-1">Insumo</label>
+              <InputText v-model="l.nombre" placeholder="Tela, forro, botón..." class="w-full text-xs" />
             </div>
-            <div>
-              <label class="block text-[11px] text-stone-400 mb-1">Precio Metro ($)</label>
-              <InputNumber v-model="precioMetroTela" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="2" class="w-full font-mono text-xs" />
+            <div class="col-span-1 sm:col-span-2">
+              <label class="block text-[11px] text-stone-400 mb-1">Cantidad</label>
+              <InputNumber v-model="l.cantidad" mode="decimal" locale="es-CO" :min="0" :max-fraction-digits="2" class="w-full font-mono text-xs" />
             </div>
-            <div>
-              <label class="block text-[11px] text-stone-400 mb-1">Metros Forro / Entretela</label>
-              <InputNumber v-model="metrosForro" mode="decimal" locale="es-CO" :min="0" :max-fraction-digits="2" class="w-full font-mono text-xs" />
+            <div class="col-span-1 sm:col-span-2">
+              <label class="block text-[11px] text-stone-400 mb-1">Unidad</label>
+              <Dropdown v-model="l.unidad_medida" :options="UNIDADES_INSUMO" class="w-full text-xs" />
             </div>
-            <div>
-              <label class="block text-[11px] text-stone-400 mb-1">Precio Forro/m ($)</label>
-              <InputNumber v-model="precioMetroForro" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="2" class="w-full font-mono text-xs" />
+            <div class="col-span-1 sm:col-span-2">
+              <label class="block text-[11px] text-stone-400 mb-1">Precio unit. ($)</label>
+              <InputNumber v-model="l.precio_unitario" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="2" class="w-full font-mono text-xs" />
+            </div>
+            <div class="col-span-1 sm:col-span-1">
+              <label class="block text-[11px] text-stone-400 mb-1">% Desp.</label>
+              <InputNumber v-model="l.desperdicio_pct" :min="0" class="w-full font-mono text-xs" />
+            </div>
+            <div class="col-span-2 sm:col-span-1 flex items-end justify-between gap-1">
+              <span class="font-mono text-[11px] text-emerald-300">{{ formatCOP(subtotalLinea(l)) }}</span>
+              <button type="button" class="px-2 py-1 rounded-lg bg-stone-800 text-stone-400 text-xs hover:bg-red-900/50 hover:text-red-300" title="Eliminar línea" @click="eliminarInsumo(idx)">✕</button>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <label class="text-[11px] text-stone-400">Desperdicio telas (%)</label>
-            <InputNumber v-model="desperdicioPct" :min="0" :max="50" class="w-24 font-mono text-xs" />
-            <span class="text-[10px] text-stone-500">Como el BOM: cubre merma de corte.</span>
+            <button type="button" class="px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/30" @click="agregarInsumo">+ Añadir insumo</button>
+            <span class="text-[10px] text-stone-500">Cada línea lleva su % de merma, como el BOM.</span>
           </div>
         </div>
 
@@ -690,8 +687,8 @@ async function llevarPrecioAProducto() {
 
           <div class="space-y-2.5 text-xs">
             <div class="flex justify-between text-stone-300">
-              <span>Telas & Forros:</span>
-              <span class="font-mono font-semibold">{{ formatCOP(subtotalTelas) }}</span>
+              <span>Materiales ({{ insumos.length }} líneas):</span>
+              <span class="font-mono font-semibold">{{ formatCOP(subtotalMateriales) }}</span>
             </div>
             <div class="flex justify-between text-stone-300">
               <span>Avíos, Hilos & Empaque:</span>
