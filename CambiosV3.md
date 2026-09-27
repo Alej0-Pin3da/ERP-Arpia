@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Piso-vs-lista, margen heredado y no-pisar-ceros en cotizador
+
+- **Piso vs lista (`FichaTecnicaModal.vue`):** `Sugerido (35%): $X` → `Piso a meta 35% (referencia): $X` (también en modo edición). El principal sigue siendo `PRECIO VENTA $80.000 · Margen real 82%`: el precio lista manda, el piso a meta 35% es solo referencia. Solo strings, sin cambio de fórmulas.
+- **Margen heredado (`CotizadorView.vue`):** al cargar receta BOM, badge `margen heredado N% de la receta` junto al slider + línea secundaria `A meta 35% daría $Y (piso de referencia; el precio lista manda)`. Prenda nueva sin receta: margen default = meta global de Maestros (`parametros-costeo.margen_meta_global_pct`, fallback 35), ya no 60 fijo.
+- **No-pisar-ceros (`onRecetaChange`):** si la receta trae 0/null en tiempo de confección, CIF o margen, se conserva el valor actual y se avisa con toast (`La receta trae 0 en X, conservo tu valor`). Limpiar la receta vuelve el margen a la meta y limpia lo heredado.
+- **Método de costeo real (referencia, sin código):** costo = Materiales (tela/forro con % desperdicio + avíos + hilos + empaque) + Mano de obra (minutos cronometrados × tarifa hora real = jornal zona/8 o costo-minuto taller = costos totales mensuales / minutos productivos reales, ocupación ~60%, no horas abiertas) + CIF prorrateado + admin/ventas. Cronometrar 3-5 repeticiones por talla y promediar. Fuentes: Cartilla Artesanías de Colombia, CBI SAM/CM sheet, costo-minuto taller.
+- **Próximo paso (no existe endpoint):** verificado que NO hay endpoint de promedio de tiempos por producto — `TiempoFase` vive por pedido (`GET /pedidos-produccion/{id}/tiempos`, una fila por fase) y analíticos no agrega tiempos. Campos de tiempo siguen manuales. Próximo paso: endpoint agregado tipo `GET /pedidos-produccion/promedio-por-producto?producto_id=` (promedio de minutos reales por fase + N lotes) para mostrar `Últimos lotes: N min prom (M lotes)` solo informativo en el cotizador. Sin backend nuevo en este cambio.
+- **Verificación:** `npm run build` PASS (vite 411 módulos + server bundle).
+
 ### [2026-09-27] - WhatsApp ventas/liquidaciones: negrita y encoding corregidos
 
 - **Liquidación (`DetalleLiquidacionModal.vue`):** la línea de socia era `\n* Nombre* (...)` — el `* ` inicial rompía la negrita de WhatsApp (mostraba asteriscos literales). Ahora es `\n- *Nombre* (...)`: bullet `- ` fuera de la negrita.
