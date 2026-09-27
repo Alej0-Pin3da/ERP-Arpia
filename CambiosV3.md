@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - V6 Fase 0: purga verificada (sin cortes)
+
+- **0.1 Mocks:** sin referencias a `useAtelierStore`/`atelier.ts` en todo `src`; `stores/` solo tiene `auth.ts`. `VITE_USE_MOCK` aparece únicamente en tests afirmando modo REAL. Nada que purgar.
+- **0.2 Cotizador estático:** ya eliminado en `fc7631a` (JSONB + drops + tests). Verificado sin restos.
+- **0.3 Desacople:** auditado, no purgado — el preview de reparto del modal es espejo de solo-lectura (el servidor recalcula todo en `crear_liquidacion`: fondo por estatuto, anticipos pendientes completos, neto) y las alertas de stock locales son la única señal hasta que el Módulo 4 haga al backend autoritativo con `stock_reservado`. Cortarlas hoy sería dejar el taller ciego.
+- **Espec V6** (`openspec/modulos_avanzados_v6.md) incorporada como plan de registro.
+
 ### [2026-09-27] - Cotizador BOM dinámico (refactor_cotizador_bom.md Pasos 1-4)
 
 - **Paso 1 — Modelo + migración `ddd8ad1b3d72`:** `insumos_detalle` JSONB (snapshot inmutable por cotización) en `Cotizacion`; dropeadas `metros_tela`, `precio_metro_tela`, `metros_forro`, `precio_metro_forro` y `desperdicio_pct` global (el desperdicio ahora es por línea). La migración vuelca tela/forro históricos al JSONB antes del drop (producción protegida) y deja `'[]'` donde no había nada. Autogenerate limpiado a mano (traía ruido de índices/tablas ajenas). Tabla `"Cotizaciones"` con mayúscula, no minúscula como decía la espec.
