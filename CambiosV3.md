@@ -3,6 +3,14 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Hilos con tope, botón idempotente y auto-división cm>500
+
+- **Tope de seguridad (`estimarHilos` en `unidades.ts`):** jamás más de 1000 m ni $2.000 de hilo, aunque el BOM venga mal cargado. La UI avisa "tope aplicado" cuando recorta.
+- **Botón Sumar a Avíos idempotente:** lleva `hilosAplicados` (delta propio); si la estimación no cambió muestra "✓ Ya sumado" y deshabilita; si cambió, reemplaza el monto anterior en vez de acumular. Doble clic ya no duplica.
+- **Auto-división inteligente:** tela en cm con cantidad >500 (`UMBRAL_AUTO_CM`) se computa ÷100 extra para hilos (23.400 cm → 2,34 m), con badge visible "posible doble escala". SOLO hilos: la plata sigue cantidad×precio sin tocarse. Límite honesto: un BOM por lote legítimamente grande también dispara la regla — por eso se muestra, no se esconde.
+- **Backend:** sin cambios (no calcula hilos, solo persiste).
+- **Verificación:** lint 0, vitest 65/65, build limpio.
+
 ### [2026-09-27] - Cotizador auditor: líneas sospechosas, precio de mercado y paridad al centavo
 
 - **Normalización estricta verificada:** el helper ya dividía cm/mm y ahora la matemática vive en `unidades.ts` testeado (`subtotalLineaMaterial`, `subtotalMateriales` con HALF_UP, `metrosTelaDeLineas`, `esLineaSospechosa`); la vista los consume (fuente única, sin duplicar fórmulas).

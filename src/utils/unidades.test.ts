@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   METROS_POR_YARDA,
+  TOPE_COSTO_HILOS,
+  TOPE_HILO_METROS,
   esLineaSospechosa,
+  estimarHilos,
+  fueAutoajustada,
+  metrosHiloDeLinea,
   metrosTelaDeLineas,
   normalizarAMetros,
   redondearCentavos,
@@ -60,16 +65,35 @@ describe('matemática del cotizador (paridad con backend)', () => {
 
   it('metros de tela excluyen mercería aunque venga en cm', () => {
     const lineas = [
-      { cantidad: 23400, unidad_medida: 'cm', esTela: true }, // Falda Emily: 234 m
+      { cantidad: 234, unidad_medida: 'cm', esTela: true }, // 2.34 m
       { cantidad: 504, unidad_medida: 'cm', esTela: false }, // encaje: no cuenta
       { cantidad: 2, unidad_medida: 'un', esTela: false },
     ]
-    expect(metrosTelaDeLineas(lineas)).toBe(234)
+    expect(metrosTelaDeLineas(lineas)).toBeCloseTo(2.34, 10)
   })
 
   it('marca líneas sospechosas de más de 50 m', () => {
     expect(esLineaSospechosa({ cantidad: 23400, unidad_medida: 'cm' })).toBe(true)
     expect(esLineaSospechosa({ cantidad: 234, unidad_medida: 'cm' })).toBe(false)
     expect(esLineaSospechosa({ cantidad: 2, unidad_medida: 'm' })).toBe(false)
+  })
+})
+
+describe('tope y doble escala de hilos (Falda Emily)', () => {
+  it('23.400 cm con doble escala se computan como 2,34 m para hilos', () => {
+    expect(metrosHiloDeLinea({ cantidad: 23400, unidad_medida: 'cm', esTela: true })).toBeCloseTo(2.34, 10)
+    expect(fueAutoajustada({ cantidad: 23400, unidad_medida: 'cm', esTela: true })).toBe(true)
+  })
+
+  it('cm normales (234 cm = 2,34 m) no se autoajustan', () => {
+    expect(metrosHiloDeLinea({ cantidad: 234, unidad_medida: 'cm', esTela: true })).toBeCloseTo(2.34, 10)
+    expect(fueAutoajustada({ cantidad: 234, unidad_medida: 'cm', esTela: true })).toBe(false)
+  })
+
+  it('el costo de hilo jamás supera $2.000 (tope automático)', () => {
+    expect(estimarHilos(234, 2)).toEqual({ metros: 1000, costo: TOPE_COSTO_HILOS, conTope: false })
+    expect(estimarHilos(234, 8)).toEqual({ metros: 1000, costo: TOPE_COSTO_HILOS, conTope: true })
+    expect(estimarHilos(2.34, 2)).toEqual({ metros: 281, costo: 562, conTope: false })
+    expect(TOPE_HILO_METROS).toBe(1000)
   })
 })

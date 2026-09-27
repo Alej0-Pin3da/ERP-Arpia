@@ -16,7 +16,7 @@ import { updateProducto, type ProductoRead } from '@/services/api/productos'
 import { getParametros } from '@/services/api/maestros'
 import { listInsumos, getInsumo, type InsumoRead } from '@/services/api/insumos'
 import type { CostoLineaRead } from '@/services/api/bom'
-import { esLineaSospechosa, metrosTelaDeLineas, normalizarAMetros, subtotalLineaMaterial, subtotalMateriales as sumaMaterialesCentavos } from '@/utils/unidades'
+import { esLineaSospechosa, estimarHilos, fueAutoajustada, metrosHiloDeLinea, metrosTelaDeLineas, normalizarAMetros, subtotalLineaMaterial, subtotalMateriales as sumaMaterialesCentavos } from '@/utils/unidades'
 
 const router = useRouter()
 const productosApi = useProductos()
@@ -128,11 +128,22 @@ const costoHiloMetro = ref<number>(2)
 // sobre metros reales normalizados (cm→/100, mm→/1000, yardas→×0.9144) y
 // solo de líneas de tela/forro — la mercería del BOM no cuenta.
 const metrosTotalesTela = computed(() => metrosTelaDeLineas(insumos.value))
-const metrosHiloEstimado = computed(() => Math.round(metrosTotalesTela.value * 120))
-const costoHilosEstimado = computed(() => Math.round(metrosHiloEstimado.value * Number(costoHiloMetro.value ?? 0)))
+// Estimación con topes de seguridad: jamás más de 1000 m ni $2.000,
+// aunque una unidad venga mal cargada en el BOM.
+const estimacionHilos = computed(() => estimarHilos(metrosTotalesTela.value, Number(costoHiloMetro.value ?? 0)))
+const metrosHiloEstimado = computed(() => estimacionHilos.value.metros)
+const costoHilosEstimado = computed(() => estimacionHilos.value.costo)
+// Monto de hilo ya incluido en Avíos: el botón reemplaza, nunca acumula.
+const hilosAplicados = ref<number | null>(null)
+const hilosYaSumados = computed(() => hilosAplicados.value !== null && hilosAplicados.value === costoHilosEstimado.value)
 function aplicarEstimacionHilos() {
-  costoAvios.value = Number(costoAvios.value ?? 0) + costoHilosEstimado.value
-  showToast('success', 'Estimación aplicada', `${metrosHiloEstimado.value} m de hilo ≈ ${formatCOP(costoHilosEstimado.value)} sumados a Avíos.`)
+  if (hilosYaSumados.value) {
+    showToast('info', 'Ya sumado', 'Esa estimación ya está incluida en Avíos.')
+    return
+  }
+  costoAvios.value = Number(costoAvios.value ?? 0) - (hilosAplicados.value ?? 0) + costoHilosEstimado.value
+  hilosAplicados.value = costoHilosEstimado.value
+  showToast('success', 'Estimación aplicada', `${metrosHiloEstimado.value} m de hilo ≈ ${formatCOP(costoHilosEstimado.value)} en Avíos (reemplaza lo anterior, no acumula).`)
 }
 
 // Section 3: Mano de Obra & Costos Fijos
@@ -595,7 +606,8 @@ async function llevarPrecioAProducto() {
               <button type="button" class="px-2 py-1 rounded-lg bg-stone-800 text-stone-400 text-xs hover:bg-red-900/50 hover:text-red-300" title="Eliminar línea" @click="eliminarInsumo(idx)">✕</button>
             </div>
             <div v-if="esLineaSospechosa(l)" class="col-span-2 sm:col-span-12 text-[10px] text-amber-300 font-bold">
-              ⚠ Línea sospechosa: equivale a más de 50 m en una sola prenda — ¿la unidad está bien cargada?
+              <span v-if="fueAutoajustada(l)">⚠ Posible doble escala: {{ fmtCant(Number(l.cantidad ?? 0)) }} cm se computan como {{ fmtCant(metrosHiloDeLinea(l)) }} m para hilos. La plata no se toca.</span>
+              <span v-else>⚠ Línea sospechosa: equivale a más de 50 m en una sola prenda — ¿la unidad está bien cargada?</span>
             </div>
           </div>
           <div class="flex items-center gap-2">
@@ -629,12 +641,13 @@ async function llevarPrecioAProducto() {
               <span class="font-bold uppercase tracking-wider text-stone-400 text-[11px]">Estimación hilos por tela (aprox.)</span>
               <span class="font-mono text-stone-300">{{ metrosTotalesTela.toFixed(2) }} m tela → {{ metrosHiloEstimado }} m hilo ≈ {{ formatCOP(costoHilosEstimado) }}</span>
             </div>
+            <div v-if="estimacionHilos.conTope" class="text-[10px] text-amber-300 font-bold">Tope $2.000 aplicado: revisá las unidades del BOM.</div>
             <div class="flex items-center gap-2">
               <label class="text-[11px] text-stone-400">Costo hilo $/m</label>
               <InputNumber v-model="costoHiloMetro" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" class="w-32 font-mono text-xs" />
-              <button type="button" class="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/30" @click="aplicarEstimacionHilos">Sumar a Avíos</button>
+              <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-bold" :class="hilosYaSumados ? 'bg-stone-800 text-stone-500 border border-stone-700' : 'bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30'" :disabled="hilosYaSumados" @click="aplicarEstimacionHilos">{{ hilosYaSumados ? '✓ Ya sumado' : 'Sumar a Avíos' }}</button>
             </div>
-            <p class="text-[10px] text-stone-500 m-0">Heurística: 120 m hilo por metro de tela+forro (overlock+recta+remates). Ajustá el $/m según tu cono.</p>
+            <p class="text-[10px] text-stone-500 m-0">Heurística: 120 m hilo por metro de tela+forro (overlock+recta+remates), con tope de 1000 m / $2.000. Ajustá el $/m según tu cono.</p>
           </div>
         </div>
 
