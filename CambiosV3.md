@@ -3,6 +3,24 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Cotizador: tabla Base BOM con precio unitario exacto
+
+- **Causa:** la tabla mostraba `Precio unit. $1` en todo (tela $0,793/cm, entretela $1,267/cm, botón $222,014/un) porque usaba `formatCOP` que redondea a pesos. Nuevo `fmtPrecioU`: precio exacto con hasta 3 decimales + unidad original (`$0,793/cm`, `$1.300/m`, `$222,014/un`).
+- **Verificación:** `npm run build` PASS.
+- **Archivos:** `src/views/CotizadorView.vue`.
+
+### [2026-09-27] - Cotizador: conversión de unidades, mercería→avíos, empaque $0 y tabla BOM trazable
+
+- **Causa (caso real):** BOM con Resorte 0.3 m / Tela 23400 cm / Botón 6 un / Entretela 500 cm mostraba tela `23.400,3 m a $1`, empaque $4.500 fantasma e hilos $22M. Tres bugs: (1) sin conversión de unidades (todo asumido en metros), (2) resorte clasificado como tela por unidad m, (3) empaque con default quemado intacto aunque el BOM no trae.
+- **Conversión (`aMetros` nuevo en `CotizadorView.vue`):** cm→/100, mm→/1000, m/mt/mts/metro(s)→×1; resto (un, pza, par, doc…) → null y jamás va a metros de tela/forro (si una línea tela/forro trae unidad no-longitud, se valoriza como avío para no perder la plata). La plata siempre es cantidad efectiva × precio en su unidad original; precio/m = ponderado post-conversión (Σ plata / Σ metros). Caso real ahora: tela 234 m a $79, forro 5 m a $127, avíos $1.722 (resorte $390 + botón $1.332), total materiales ≈ $20.919.
+- **Clasificación (`clasificarLineaBom`):** keywords de mercería ANTES de la regla de tela → avío: resorte, elástico, caucho, cinta, sesgo, ribete, vivo, cordón, cremallera, cierre, botón, broche, ojal, hebilla, hilo (con plurales y acentos). Tela solo por categoría Telas o nombre (se quitó la regla "unidad m → tela" y el match por tipo). Empaque y forro como antes.
+- **Empaque $0:** con receta cargada y BOM sin líneas de empaque, `costoEmpaque = 0` + aviso en el toast de aplicados (`empaque $0, el BOM no trae`). Hilos $22M se normaliza solo con metros reales.
+- **Tabla trazable expandida:** el colapsable pasó a bloque expandido al cargar receta (`baseExpandida`, sincronizado con `@toggle`), con tabla Material | Cant. BOM (unidad original) | A m (o —) | Precio unit. | Subtotal | Va a (Telas/Forro/Avíos/Empaque). Campos del formulario intactos (efectivos editables = base + extras).
+- **Tiempo supuesto (`tiempoSupuesto`):** hint `supuesto — cronometrar en taller` bajo Tiempo Confección solo si NO vino de la receta (default inicial, receta en 0 sin fases, o prenda nueva); tiempo total o suma de fases de receta → sin hint. Flag mínimo, sin rediseño.
+- **Mantiene:** badge margen heredado, línea piso-a-meta, no-pisar-con-ceros, toast de aplicados, guardado desde campos, sin backend, sin cambio de fórmulas.
+- **Verificación:** `npm run build` PASS (vite 411 módulos + server bundle).
+- **Archivos:** `src/views/CotizadorView.vue` (único).
+
 ### [2026-09-27] - Cotizador: campos arrancan con el BOM real, extras quedan manuales
 
 - **Qué se auto-llena desde el BOM (`CotizadorView.vue`, `onRecetaChange` → `cargarBaseBom`/`aplicarBaseBom`, solo frontend, sin backend nuevo):** telas = Σ `cantidad_requerida` de líneas clase tela + precio/m promedio ponderado con `costo_promedio_actual` del maestro; forro igual con líneas de forro; desperdicio = promedio simple de `%` de las líneas tela/forro (el mayor castigaría prototipos con piezas chicas); avíos = Σ cantidad efectiva × precio de líneas no-tela/no-forro/no-empaque; empaque = Σ de líneas clase empaque (solo se pisa si el BOM trae); tiempo = `tiempo_confeccion_min` del producto o, si viene 0/null, suma de fases estándar (`tiempo_corte/costura/acabados/calidad_min`); CIF y margen heredado como antes; tarifa $/hora queda manual (la receta no tiene tasa, `mano_obra` es un total).

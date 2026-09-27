@@ -26,6 +26,15 @@ const loadingCostoReal = ref(false)
 // Los campos editables arrancan con estos valores; lo que se agregue a mano
 // son extras de ESTA cotización (empaque especial, urgencia, ajustes).
 const lineasBase = ref<CostoLineaRead[]>([])
+// Detalle trazable por línea del BOM para la tabla visible (Material | Cant
+// BOM | Conversión a m | Precio unit. | Subtotal | Va a).
+type DetalleBase = { nombre: string; cant: number; unidad: string; aMetros: number | null; precio: number; subtotal: number; destino: 'Telas' | 'Forro' | 'Avíos' | 'Empaque' }
+const detalleBase = ref<DetalleBase[]>([])
+// El bloque Base BOM se muestra EXPANDIDO al cargar receta (el usuario no
+// registraba el colapsable cerrado).
+const baseExpandida = ref(true)
+// true = el tiempo NO vino de la receta (default o receta en 0): supuesto.
+const tiempoSupuesto = ref(true)
 // Motivo cuando la base quedó parcial (maestro sin precio/categoría mapeable):
 // telas y avíos NO se pisan; solo tiempo/CIF/margen + bloque de referencia.
 const baseParcial = ref<string | null>(null)
@@ -135,20 +144,34 @@ const recetasOptions = computed(() => {
   ]
 })
 
+// Conversión a metros: el BOM trae longitudes en cm/mm/m según el insumo
+// (ej. tela 23400 cm → 234 m). Unidades no-longitud (un, pza, par, doc…)
+// devuelven null: jamás van a metros de tela/forro.
+function aMetros(cant: number, unidad: string): number | null {
+  const u = (unidad ?? '').trim().toLowerCase()
+  if (u === 'cm' || u === 'centimetro' || u === 'centimetros' || u === 'centímetro' || u === 'centímetros') return cant / 100
+  if (u === 'mm' || u === 'milimetro' || u === 'milimetros' || u === 'milímetro' || u === 'milímetros') return cant / 1000
+  if (u === 'm' || u === 'mt' || u === 'mts' || u === 'metro' || u === 'metros') return cant
+  return null
+}
+
 // Clasificación de una línea BOM contra el maestro de insumos.
 // Categorías reales del maestro: Telas | Herrajes | Empaques | Químicos (+ las
 // que cree el taller). No hay categoría "forro": el forro/entretela vive bajo
 // Telas y se distingue por nombre. Empaque manda por categoría == Empaques
 // (misma regla que el backend en migrate/sales.py); los keywords por nombre
 // son fallback documentado, no verdad del maestro.
+// Mercería ANTES que tela: elásticos/resortes/cintas se venden por metro pero
+// son avíos; la vieja regla "unidad m → tela" los sumaba a los metros de tela.
+const MERCERIA_RE = /\b(resortes?|el[aá]sticos?|cauchos?|cintas?|sesgos?|ribetes?|vivos?|cord[oó]n(es)?|cremalleras?|cierres?|bot[oó]n(es)?|broches?|ojales?|hebillas?|hilos?)\b/
 type ClaseLinea = 'tela' | 'forro' | 'empaque' | 'avio'
 function clasificarLineaBom(m: InsumoRead, nombreFallback: string): ClaseLinea {
   const cat = (m.nombre_categoria ?? '').toLowerCase()
   const nom = ((m.nombre ?? '') || nombreFallback).toLowerCase()
-  const uni = (m.unidad_medida ?? '').toLowerCase()
-  const tip = (m.tipo ?? '').toLowerCase()
   if (cat.includes('empaque') || /\b(empaque|bolsa|etiqueta|caja|papel|envio|envío)\b/.test(nom)) return 'empaque'
-  const esTela = cat.includes('tela') || tip.includes('tela') || ['m', 'mt', 'mts', 'metro', 'metros'].includes(uni)
+  if (MERCERIA_RE.test(nom)) return 'avio'
+  // Tela solo por categoría Telas o nombre (ya no por unidad: ver MERCERIA_RE).
+  const esTela = cat.includes('tela') || nom.includes('tela')
   if (esTela) {
     if (nom.includes('forro') || nom.includes('entretela') || nom.includes('lining')) return 'forro'
     return 'tela'
@@ -159,7 +182,7 @@ function clasificarLineaBom(m: InsumoRead, nombreFallback: string): ClaseLinea {
 }
 
 async function cargarBaseBom() {
-  if (!recetaSeleccionada.value) { costoReal.value = null; lineasBase.value = []; baseParcial.value = null; return }
+  if (!recetaSeleccionada.value) { costoReal.value = null; lineasBase.value = []; detalleBase.value = []; baseParcial.value = null; return }
   loadingCostoReal.value = true
   try {
     const c = await bomApi.getCosto(recetaSeleccionada.value)
@@ -210,19 +233,35 @@ async function aplicarBaseBom() {
   let mTela = 0, vTela = 0, nTela = 0, mForro = 0, vForro = 0, nForro = 0
   let avios = 0, nAvio = 0, empaque = 0, nEmpaque = 0
   const desp: number[] = []
+  detalleBase.value = []
   for (const l of bom) {
     const m = maestro.get(Number(l.insumo_id))!
     const cant = num(l.cantidad_requerida)
     const d = num(l.porcentaje_desperdicio)
     const precio = num(m.costo_promedio_actual)
-    const clase = clasificarLineaBom(m, '')
-    // Cantidades del BOM ya vienen en unidad canónica (Telas → m); la avío se
-    // valora con cantidad efectiva (con su % desperdicio propio, como el backend).
+    let clase = clasificarLineaBom(m, '')
+    // La plata siempre es cantidad efectiva × precio en su unidad original
+    // (con su % desperdicio propio, como el backend); los metros de
+    // tela/forro salen de aMetros (cm→/100, mm→/1000) y el precio/m es el
+    // ponderado post-conversión (Σ plata / Σ metros).
     const efectiva = cant * (1 + d / 100)
-    if (clase === 'tela') { mTela += cant; vTela += cant * precio; nTela++; desp.push(d) }
-    else if (clase === 'forro') { mForro += cant; vForro += cant * precio; nForro++; desp.push(d) }
-    else if (clase === 'empaque') { empaque += efectiva * precio; nEmpaque++ }
-    else { avios += efectiva * precio; nAvio++ }
+    const subtotal = efectiva * precio
+    const conv = aMetros(cant, m.unidad_medida ?? '')
+    if ((clase === 'tela' || clase === 'forro') && conv == null) {
+      // Unidad no-longitud jamás va a metros: se valoriza como avío para no
+      // perder la plata (la tabla lo muestra con Va a = Avíos).
+      clase = 'avio'
+    }
+    let destino: DetalleBase['destino'] = 'Avíos'
+    if (clase === 'tela') { mTela += conv ?? 0; vTela += cant * precio; nTela++; desp.push(d); destino = 'Telas' }
+    else if (clase === 'forro') { mForro += conv ?? 0; vForro += cant * precio; nForro++; desp.push(d); destino = 'Forro' }
+    else if (clase === 'empaque') { empaque += subtotal; nEmpaque++; destino = 'Empaque' }
+    else { avios += subtotal; nAvio++ }
+    detalleBase.value.push({
+      nombre: m.nombre ?? `Insumo ${l.insumo_id}`,
+      cant, unidad: (m.unidad_medida ?? '').trim() || '—',
+      aMetros: conv, precio, subtotal, destino,
+    })
   }
   // Tela/forro sin precio en el maestro (>0) no dan promedio ponderado honesto:
   // parcial antes de pisar. Un avío en 0 solo aporta 0, no distorsiona al resto.
@@ -260,8 +299,15 @@ async function aplicarBaseBom() {
   if (nEmpaque > 0) {
     if (empaque > 0) { costoEmpaque.value = Math.round(empaque); aplicados.push(`empaque ${formatCOP(empaque)}`) }
     else showToast('warn', 'Empaque en 0 en el BOM', 'El BOM trae empaque sin precio, conservo tu valor.')
+  } else {
+    // Receta cargada y BOM sin líneas de empaque: arranca en $0, no en el
+    // default quemado ($4500).
+    costoEmpaque.value = 0
+    aplicados.push('empaque $0, el BOM no trae')
   }
   if (aplicados.length) {
+    // La tabla trazable se muestra expandida al cargar receta.
+    baseExpandida.value = true
     showToast('success', 'Base real cargada', `Desde el BOM: ${aplicados.join(' · ')}. Lo manual son extras de esta cotización.`)
   }
 }
@@ -273,7 +319,9 @@ async function onRecetaChange() {
     margenPct.value = Math.round(Number(margenMetaGlobal.value ?? 35))
     costoReal.value = null
     lineasBase.value = []
+    detalleBase.value = []
     baseParcial.value = null
+    tiempoSupuesto.value = true
     return
   }
   const r = (productos.value).find((x) => x.id === recetaSeleccionada.value)
@@ -292,12 +340,15 @@ async function onRecetaChange() {
         .filter((n) => Number.isFinite(n) && n > 0)
       if (fases.length) {
         tiempoConfeccionMin.value = fases.reduce((a, b) => a + b, 0)
+        tiempoSupuesto.value = false
         showToast('info', 'Tiempo por fases estándar', `La receta no trae tiempo total; sumé fases (${tiempoConfeccionMin.value} min).`)
       } else {
+        tiempoSupuesto.value = true
         showToast('warn', 'Tiempo en 0 en la receta', 'La receta trae 0 en tiempo de confección, conservo tu valor.')
       }
     } else {
       tiempoConfeccionMin.value = Number(t)
+      tiempoSupuesto.value = false
     }
     const cif = r.cif_energia
     if (cif == null || Number(cif) <= 0) {
@@ -361,6 +412,22 @@ const precioAMeta = computed(() => {
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
+}
+
+// Cantidades del BOM con unidad original (ej. 23.400 cm): máx 2 decimales.
+function fmtCant(val: number) {
+  return Number(val ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 2 })
+}
+
+// Precio unitario exacto con su unidad (ej. $0,793/cm): sin redondear,
+// porque formatCOP redondea a pesos y la tabla mostraba $1 en todo.
+function fmtPrecioU(val: number, unidad: string) {
+  const p = Number(val ?? 0).toLocaleString('es-CO', { maximumFractionDigits: 3 })
+  return `$${p}/${unidad || 'un'}`
+}
+
+function onBaseToggle(e: Event) {
+  baseExpandida.value = (e.target as HTMLDetailsElement).open
 }
 
 function copiarPresupuestoWhatsApp() {
@@ -575,6 +642,7 @@ async function llevarPrecioAProducto() {
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Tiempo Confección (min)</label>
               <InputNumber v-model="tiempoConfeccionMin" :min="1" class="w-full font-mono text-xs" />
+              <p v-if="tiempoSupuesto" class="text-[10px] text-amber-400/90 m-0 mt-1">supuesto — cronometrar en taller</p>
             </div>
             <div>
               <label class="block text-[11px] text-stone-400 mb-1">Tarifa $/hora</label>
@@ -646,9 +714,33 @@ async function llevarPrecioAProducto() {
                 <span class="text-amber-300 flex items-center gap-1"><i class="pi pi-database text-[10px]" /> Costo real BOM (DB):</span>
                 <span class="font-mono font-bold" :class="loadingCostoReal ? 'text-stone-400' : 'text-amber-300'">{{ loadingCostoReal ? 'Cargando...' : (costoReal !== null ? formatCOP(costoReal!) : 'Sin BOM') }}</span>
               </div>
-              <details v-if="lineasBase.length" class="rounded-lg border border-stone-800 bg-stone-950/60 px-2 py-1.5 text-[11px]">
-                <summary class="cursor-pointer text-stone-400 font-bold">Base BOM ({{ lineasBase.length }} líneas) — los campos arrancan con estos valores</summary>
-                <div class="mt-1 space-y-1">
+              <details v-if="detalleBase.length || lineasBase.length" :open="baseExpandida" class="rounded-lg border border-stone-800 bg-stone-950/60 px-2 py-1.5 text-[11px]" @toggle="onBaseToggle">
+                <summary class="cursor-pointer text-stone-400 font-bold">Base BOM ({{ detalleBase.length || lineasBase.length }} líneas) — cada línea dice a dónde fue</summary>
+                <div v-if="detalleBase.length" class="overflow-x-auto">
+                  <table class="w-full mt-1.5 text-[10px] text-stone-300 border-collapse">
+                    <thead>
+                      <tr class="text-stone-500 uppercase tracking-wider text-[9px] text-left">
+                        <th class="py-1 pr-1 font-bold">Material</th>
+                        <th class="py-1 pr-1 font-bold text-right">Cant. BOM</th>
+                        <th class="py-1 pr-1 font-bold text-right">A m</th>
+                        <th class="py-1 pr-1 font-bold text-right">Precio unit.</th>
+                        <th class="py-1 pr-1 font-bold text-right">Subtotal</th>
+                        <th class="py-1 font-bold text-right">Va a</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(d, i) in detalleBase" :key="`${d.nombre}-${i}`" class="border-t border-stone-800/60">
+                        <td class="py-1 pr-1 max-w-[110px] truncate" :title="d.nombre">{{ d.nombre }}</td>
+                        <td class="py-1 pr-1 font-mono text-right whitespace-nowrap">{{ fmtCant(d.cant) }} {{ d.unidad }}</td>
+                        <td class="py-1 pr-1 font-mono text-right whitespace-nowrap">{{ d.aMetros == null ? '—' : `${fmtCant(d.aMetros)} m` }}</td>
+                        <td class="py-1 pr-1 font-mono text-right whitespace-nowrap">{{ fmtPrecioU(d.precio, d.unidad) }}</td>
+                        <td class="py-1 pr-1 font-mono text-right whitespace-nowrap">{{ formatCOP(d.subtotal) }}</td>
+                        <td class="py-1 font-bold text-right whitespace-nowrap text-amber-300/90">{{ d.destino }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div v-else class="mt-1 space-y-1">
                   <div v-for="(l, i) in lineasBase" :key="`${l.tipo}-${l.id}-${i}`" class="flex justify-between gap-2 text-stone-300">
                     <span class="truncate">{{ l.nombre }} <span class="text-stone-500">× {{ Number(l.cantidad) }}</span></span>
                     <span class="font-mono shrink-0">{{ formatCOP(Number(l.costo_total)) }}</span>
