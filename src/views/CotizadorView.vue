@@ -16,7 +16,7 @@ import { updateProducto, type ProductoRead } from '@/services/api/productos'
 import { getParametros } from '@/services/api/maestros'
 import { listInsumos, getInsumo, type InsumoRead } from '@/services/api/insumos'
 import type { CostoLineaRead } from '@/services/api/bom'
-import { normalizarAMetros } from '@/utils/unidades'
+import { esLineaSospechosa, metrosTelaDeLineas, normalizarAMetros, subtotalLineaMaterial, subtotalMateriales as sumaMaterialesCentavos } from '@/utils/unidades'
 
 const router = useRouter()
 const productosApi = useProductos()
@@ -77,9 +77,6 @@ function agregarInsumo() {
 function eliminarInsumo(index: number) {
   insumos.value.splice(index, 1)
 }
-function subtotalLinea(l: InsumoCotizacionLinea): number {
-  return Number(l.cantidad ?? 0) * (1 + Number(l.desperdicio_pct ?? 0) / 100) * Number(l.precio_unitario ?? 0)
-}
 
 // Cliente + notas (el modelo los soporta; antes quedaban huérfanos)
 const clientesApi = useClientes()
@@ -130,9 +127,7 @@ const costoHiloMetro = ref<number>(2)
 // Metros lineales de TELA para la heurística de hilos: suma estrictamente
 // sobre metros reales normalizados (cm→/100, mm→/1000, yardas→×0.9144) y
 // solo de líneas de tela/forro — la mercería del BOM no cuenta.
-const metrosTotalesTela = computed(() => insumos.value
-  .filter((l) => l.esTela !== false)
-  .reduce((acc, l) => acc + (normalizarAMetros(Number(l.cantidad ?? 0), l.unidad_medida ?? '') ?? 0), 0))
+const metrosTotalesTela = computed(() => metrosTelaDeLineas(insumos.value))
 const metrosHiloEstimado = computed(() => Math.round(metrosTotalesTela.value * 120))
 const costoHilosEstimado = computed(() => Math.round(metrosHiloEstimado.value * Number(costoHiloMetro.value ?? 0)))
 function aplicarEstimacionHilos() {
@@ -347,10 +342,9 @@ async function onRecetaChange() {
   await cargarBaseBom()
 }
 
-// Materials: dynamic BOM lines, each with its own waste % (same as backend).
-const subtotalMateriales = computed(() => {
-  return insumos.value.reduce((acc, l) => acc + subtotalLinea(l), 0)
-})
+// Materials: dynamic BOM lines, each with its own waste % (same as backend,
+// cent-rounded HALF_UP on both sides so the stored total matches the screen).
+const subtotalMateriales = computed(() => sumaMaterialesCentavos(insumos.value))
 
 const subtotalAvios = computed(() => {
   return costoAvios.value + costoEmpaque.value
@@ -376,6 +370,24 @@ const precioVentaSugerido = computed(() => {
 
 const gananciaNeta = computed(() => {
   return precioVentaSugerido.value - costoTotalConfeccion.value
+})
+
+// Auditor de precio de mercado: compara un precio de venta fijo actual
+// contra el costo real para ver si cumple la meta del taller.
+const precioMercado = ref<number | null>(null)
+const margenRealMercado = computed(() => {
+  const p = Number(precioMercado.value ?? 0)
+  const c = costoTotalConfeccion.value
+  if (!(p > 0) || !(c > 0)) return null
+  return ((p - c) / p) * 100
+})
+const veredictoMercado = computed(() => {
+  if (margenRealMercado.value == null) return null
+  const meta = Number(margenMetaGlobal.value ?? 35)
+  const m = margenRealMercado.value
+  if (m < 0) return { tono: 'perdida', texto: `PERDIENDO PLATA (margen ${m.toFixed(1)}%)` }
+  if (m < meta) return { tono: 'bajo', texto: `BAJO META (${m.toFixed(1)}% vs meta ${meta}%)` }
+  return { tono: 'ok', texto: `RENTABLE (${m.toFixed(1)}% vs meta ${meta}%)` }
 })
 
 // Piso a meta global (referencia): mismo costo, margen de Maestros (default 35%).
@@ -579,8 +591,11 @@ async function llevarPrecioAProducto() {
               <InputNumber v-model="l.desperdicio_pct" :min="0" class="w-full font-mono text-xs" />
             </div>
             <div class="col-span-2 sm:col-span-1 flex items-end justify-between gap-1">
-              <span class="font-mono text-[11px] text-emerald-300">{{ formatCOP(subtotalLinea(l)) }}</span>
+              <span class="font-mono text-[11px] text-emerald-300">{{ formatCOP(subtotalLineaMaterial(l)) }}</span>
               <button type="button" class="px-2 py-1 rounded-lg bg-stone-800 text-stone-400 text-xs hover:bg-red-900/50 hover:text-red-300" title="Eliminar línea" @click="eliminarInsumo(idx)">✕</button>
+            </div>
+            <div v-if="esLineaSospechosa(l)" class="col-span-2 sm:col-span-12 text-[10px] text-amber-300 font-bold">
+              ⚠ Línea sospechosa: equivale a más de 50 m en una sola prenda — ¿la unidad está bien cargada?
             </div>
           </div>
           <div class="flex items-center gap-2">
@@ -756,6 +771,23 @@ async function llevarPrecioAProducto() {
             <div class="text-xs text-emerald-400 font-semibold pt-1">
               Ganancia Neta: {{ formatCOP(gananciaNeta) }} ({{ margenPct }}%)
             </div>
+          </div>
+
+          <!-- Auditor: precio de venta actual vs costo real -->
+          <div class="bg-stone-950/90 border border-sky-500/40 rounded-xl p-4 text-center space-y-2 shadow-inner">
+            <div class="text-[11px] font-bold text-sky-400 uppercase tracking-wider">
+              Auditor — ¿Mi precio actual es rentable?
+            </div>
+            <InputNumber v-model="precioMercado" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" placeholder="Precio de venta actual ($)" class="w-full font-mono text-xs" />
+            <div v-if="veredictoMercado" class="text-sm font-extrabold font-mono px-2 py-1.5 rounded-lg border"
+              :class="veredictoMercado.tono === 'ok'
+                ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
+                : veredictoMercado.tono === 'bajo'
+                  ? 'text-amber-300 border-amber-500/40 bg-amber-500/10'
+                  : 'text-red-300 border-red-500/40 bg-red-500/10'">
+              {{ veredictoMercado.texto }}
+            </div>
+            <div v-else class="text-[10px] text-stone-500">Ingresá el precio fijo de mercado para auditarlo contra este costo.</div>
           </div>
 
           <!-- Action Buttons -->

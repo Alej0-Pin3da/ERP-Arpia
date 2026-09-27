@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { METROS_POR_YARDA, normalizarAMetros } from './unidades'
+import {
+  METROS_POR_YARDA,
+  esLineaSospechosa,
+  metrosTelaDeLineas,
+  normalizarAMetros,
+  redondearCentavos,
+  subtotalLineaMaterial,
+  subtotalMateriales,
+} from './unidades'
 
 describe('normalizarAMetros', () => {
   it('pasa metros tal cual', () => {
@@ -33,5 +41,35 @@ describe('normalizarAMetros', () => {
     expect(normalizarAMetros(100, ' CM ')).toBe(1)
     expect(normalizarAMetros(100, null)).toBeNull()
     expect(normalizarAMetros(Number.NaN, 'm')).toBeNull()
+  })
+})
+
+describe('matemática del cotizador (paridad con backend)', () => {
+  it('subtotal por línea con desperdicio propio', () => {
+    expect(
+      subtotalLineaMaterial({ cantidad: 2, precio_unitario: 10000, desperdicio_pct: 10 }),
+    ).toBeCloseTo(22000, 10)
+  })
+
+  it('subtotal total redondea HALF_UP igual que _calcular (3 × 0.7933 = 2.38)', () => {
+    expect(
+      subtotalMateriales([{ cantidad: 3, precio_unitario: 0.7933, desperdicio_pct: 0 }]),
+    ).toBe(2.38)
+    expect(redondearCentavos(2.3799)).toBe(2.38)
+  })
+
+  it('metros de tela excluyen mercería aunque venga en cm', () => {
+    const lineas = [
+      { cantidad: 23400, unidad_medida: 'cm', esTela: true }, // Falda Emily: 234 m
+      { cantidad: 504, unidad_medida: 'cm', esTela: false }, // encaje: no cuenta
+      { cantidad: 2, unidad_medida: 'un', esTela: false },
+    ]
+    expect(metrosTelaDeLineas(lineas)).toBe(234)
+  })
+
+  it('marca líneas sospechosas de más de 50 m', () => {
+    expect(esLineaSospechosa({ cantidad: 23400, unidad_medida: 'cm' })).toBe(true)
+    expect(esLineaSospechosa({ cantidad: 234, unidad_medida: 'cm' })).toBe(false)
+    expect(esLineaSospechosa({ cantidad: 2, unidad_medida: 'm' })).toBe(false)
   })
 })

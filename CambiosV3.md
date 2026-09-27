@@ -3,6 +3,14 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Cotizador auditor: líneas sospechosas, precio de mercado y paridad al centavo
+
+- **Normalización estricta verificada:** el helper ya dividía cm/mm y ahora la matemática vive en `unidades.ts` testeado (`subtotalLineaMaterial`, `subtotalMateriales` con HALF_UP, `metrosTelaDeLineas`, `esLineaSospechosa`); la vista los consume (fuente única, sin duplicar fórmulas).
+- **Línea sospechosa (>50 m):** badge ámbar por fila cuando equivale a más de 50 m — advierte sin auto-corregir (un lote real sí puede superarlos). Cubre el caso Falda Emily (23.400 cm = 234 m en una línea).
+- **Auditor de mercado:** campo "Precio de venta actual" en el resumen + veredicto instantáneo contra la meta del taller: RENTABLE (verde), BAJO META (ámbar), PERDIENDO PLATA (rojo).
+- **Paridad backend/frontend:** el front redondea el subtotal HALF_UP igual que `_calcular`; test backend que guarda 3×0.7933 y exige `costo_total == 2.38` (más su espejo en vitest). El backend no convierte unidades porque la plata siempre va en unidad original — verificado, sin cambios allá.
+- **Verificación:** backend 19/19, lint 0, vitest 62/62, build limpio.
+
 ### [2026-09-27] - Fix crítico: hilos sobrestimados por mercería en cm + yardas sin soporte
 
 - **Causa real (verificada con datos, no la reportada):** la conversión cm→m (`aMetros`) SÍ funcionaba — 23.400 cm daban 234 m y de ahí los ~28.000 m de hilo. El inflador era otro: `metrosTotalesTela` sumaba TODAS las líneas con unidad de longitud, incluyendo mercería del BOM en cm (elásticos, sesgos, cintas, encajes: el Bralete solo aporta ~32 m falsos). La variable se llama "tela" pero contaba de todo.

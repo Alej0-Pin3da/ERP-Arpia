@@ -281,3 +281,33 @@ def test_patch_estado_404_inexistente(client, admin_token):
         "/api/v1/cotizaciones/999999/estado", json={"estado": "enviada"}, headers=_auth(admin_token)
     )
     assert resp.status_code == 404
+
+
+def test_costo_total_coincide_al_centavo_con_frontend(client, admin_token):
+    """Paridad con el frontend: misma fórmula + HALF_UP a centavos.
+
+    El front calcula subtotalMateriales con redondeo HALF_UP idéntico, así
+    que el costo guardado en PostgreSQL debe coincidir al centavo con la
+    pantalla (3 × 0.7933 = 2.3799 -> 2.38).
+    """
+    body = _crear_cotizacion(
+        client,
+        admin_token,
+        insumos=[
+            {
+                "nombre": "Tela a cuadros",
+                "cantidad": 3,
+                "precio_unitario": 0.7933,
+                "unidad_medida": "cm",
+                "desperdicio_pct": 0,
+            }
+        ],
+        costo_avios=0,
+        costo_empaque=0,
+        tiempo_confeccion_min=0,
+        tarifa_hora=0,
+        costo_cif=0,
+        margen_pct=0,
+    )
+    assert Decimal(str(body["costo_total"])) == Decimal("2.38")
+    assert body["insumos_detalle"][0]["unidad_medida"] == "cm"
