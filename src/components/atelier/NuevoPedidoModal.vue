@@ -1,5 +1,4 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ref, computed, onMounted } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
@@ -14,6 +13,9 @@ import { useMaestros } from '@/composables/useMaestros'
 import { listVariantes, createVariante } from '@/services/api/productos'
 import type { PedidoProduccionRead } from '@/services/api/pedidos-produccion'
 import { showToast } from '@/utils/toast'
+import { getApiErrorDetail } from '@/utils/api-error'
+import type { ClienteRead } from '@/services/api/clientes'
+import type { ProductoRead } from '@/services/api/productos'
 
 defineProps<{
   visible: boolean
@@ -41,8 +43,8 @@ const estado = ref<string>('pendiente')
 const prioridad = ref<string>('normal')
 const fechaEntrega = ref<string>('')
 
-const clientes = ref<any[]>([])
-const productos = ref<any[]>([])
+const clientes = ref<ClienteRead[]>([])
+const productos = ref<ProductoRead[]>([])
 const variantes = ref<{ id: number; nombre_variante: string }[]>([])
 const matrizTallas = ref<string[]>([])
 
@@ -63,8 +65,8 @@ async function cargarDatos() {
       clientesApi.list({ limit: 100 }),
       productosApi.list({ limit: 100 }),
     ])
-    clientes.value = (c.items as any) ?? []
-    productos.value = (p.items as any) ?? []
+    clientes.value = c.items ?? []
+    productos.value = p.items ?? []
   } catch {
     clientes.value = []
     productos.value = []
@@ -95,14 +97,14 @@ const variantesOptions = computed(() => {
 const varianteKey = ref<string>('none')
 
 const clientesOptions = computed(() => {
-  return (clientes.value as any[]).map((c) => ({
+  return clientes.value.map((c) => ({
     label: `${c.nombre} (${c.telefono || 'Sin tel'})`,
     value: c.id,
   }))
 })
 
 const recetasOptions = computed(() => {
-  return (productos.value as any[]).map((r) => ({
+  return productos.value.map((r) => ({
     label: `${r.nombre} (${r.codigo ?? `PRD-${r.id}`})`,
     value: r.id,
   }))
@@ -118,11 +120,7 @@ async function onRecetaChange() {
 }
 
 function extractDetail(e: unknown): string {
-  const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
-  if (Array.isArray(detail)) return detail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ')
-  if (typeof detail === 'string' && detail) return detail
-  if (e instanceof Error && e.message) return e.message
-  return 'No se pudo crear el pedido'
+  return getApiErrorDetail(e, 'No se pudo crear el pedido')
 }
 
 async function guardarPedidoReal() {
@@ -142,7 +140,7 @@ async function guardarPedidoReal() {
       return
     }
   } else if (modoCliente.value === 'existente' && clienteSeleccionado.value) {
-    const existe = (clientes.value as any[]).some((c) => c.id === clienteSeleccionado.value)
+    const existe = clientes.value.some((c) => c.id === clienteSeleccionado.value)
     if (!existe) {
       showToast('warn', 'Clienta inválida', 'La clienta seleccionada ya no existe. Elegí otra o cargá el nombre manual.')
       return
@@ -179,7 +177,7 @@ async function guardarPedidoReal() {
       fecha_entrega_estimada: fechaEntrega.value || null,
       observaciones: observaciones.value.trim() || null,
     })
-    showToast('success', 'Pedido Registrado', `Pedido #${(creado as any).id ?? ''} creado en estado ${estado.value}.`)
+    showToast('success', 'Pedido Registrado', `Pedido #${creado.id ?? ''} creado en estado ${estado.value}.`)
     emit('pedido-creado', creado)
     emit('update:visible', false)
     recetaSeleccionada.value = null

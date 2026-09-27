@@ -1,5 +1,4 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
@@ -10,6 +9,7 @@ import Textarea from 'primevue/textarea'
 import { showToast } from '@/utils/toast'
 import { useFinanzas } from '@/composables/useFinanzas'
 import { useSocios } from '@/composables/useSocios'
+import type { SociaRead } from '@/services/api/socios'
 import type { AnticipoRead } from '@/services/api/anticipos'
 
 /** Minimal anticipo shape this modal edits (REAL display object from the caller). */
@@ -56,17 +56,17 @@ const observaciones = ref('')
 
 const guardando = ref(false)
 
-const socias = ref<any[]>([])
+const socias = ref<SociaRead[]>([])
 
 async function cargarSocias() {
   try {
     const r = await sociosApi.list({ limit: 100 })
-    socias.value = (r.items as any) ?? []
+    socias.value = r.items ?? []
   } catch { socias.value = [] }
 }
 
 const sociasOptions = computed(() => {
-  return (socias.value as any[]).map((s) => ({
+  return socias.value.map((s) => ({
     label: `${s.nombre} (${s.rol || 'Socia'})`,
     value: s.id,
   }))
@@ -98,7 +98,7 @@ function initForm() {
     observaciones.value = a.observaciones || ''
   } else {
     // Default to first non-fondo socia
-    const soc = (socias.value as any[]).find((s) => !s.es_fondo_taller)
+    const soc = socias.value.find((s) => !s.es_fondo_taller)
     sociaId.value = soc ? soc.id : null
     fecha.value = new Date().toISOString().split('T')[0]
     monto.value = 350000

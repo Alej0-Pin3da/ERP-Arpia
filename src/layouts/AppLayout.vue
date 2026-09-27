@@ -1,5 +1,4 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Persistent Enterprise Layout.
  *
@@ -16,6 +15,7 @@ import SidebarMenu from '@/components/layout/SidebarMenu.vue'
 import NotificacionesModal from '@/components/atelier/NotificacionesModal.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useInsumos } from '@/composables/useInsumos'
+import type { InsumoRead } from '@/services/api/insumos'
 import { roleLabel } from '@/utils/menu'
 import arpiaBrandLogo from '@/assets/arpia-emblem.png'
 import Button from 'primevue/button'
@@ -23,15 +23,15 @@ import Tag from 'primevue/tag'
 
 const auth = useAuthStore()
 const insumosApi = useInsumos()
-const insumosList = ref<any[]>([])
+const insumosList = ref<InsumoRead[]>([])
 async function cargarAlertasInsumos() {
   try {
     const r = await insumosApi.list({ limit: 100 })
-    insumosList.value = (r as any).items ?? []
+    insumosList.value = r.items ?? []
   } catch { insumosList.value = [] }
 }
 onMounted(() => { void cargarAlertasInsumos() })
-const hasAlertas = computed(() => (insumosList.value as any[]).some((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
+const hasAlertas = computed(() => insumosList.value.some((i: InsumoRead & { stock?: number | string }) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)))
 const router = useRouter()
 const route = useRoute()
 const sidebarOpen = ref(false)

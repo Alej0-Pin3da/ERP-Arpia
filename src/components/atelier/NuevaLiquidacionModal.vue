@@ -1,5 +1,4 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
@@ -10,6 +9,7 @@ import Textarea from 'primevue/textarea'
 import { showToast } from '@/utils/toast'
 import { useFinanzas } from '@/composables/useFinanzas'
 import { useSocios } from '@/composables/useSocios'
+import type { SociaRead } from '@/services/api/socios'
 import { useVentas } from '@/composables/useVentas'
 import { getParametros } from '@/services/api/maestros'
 import type { LiquidacionRead } from '@/services/api/liquidaciones'
@@ -115,7 +115,7 @@ async function cargarPreview() {
       sociosApi.list({ limit: 100 }),
       finanzasApi.listAnticipos({ limit: 100 }),
     ])
-    sociasPreview.value = ((s as any).items ?? []).map((x: any) => ({
+    sociasPreview.value = (s.items ?? []).map((x: SociaRead & { porcentaje?: number | string }) => ({
       id: x.id,
       nombre: x.nombre,
       rol: x.rol ?? 'Socia',
@@ -124,7 +124,7 @@ async function cargarPreview() {
       numero_cuenta: x.numero_cuenta,
       activo: x.activo !== false,
     }))
-    anticiposPreview.value = ((a as any).items ?? []).map((x: any) => ({
+    anticiposPreview.value = (a.items ?? []).map((x) => ({
       socia_id: x.socia_id,
       monto: Number(x.monto ?? 0),
       estado: x.estado,
@@ -171,8 +171,8 @@ function recalcularDistribucion() {
 async function cargarTotalesVentas() {
   // Ventas elegibles: confirmed y sin liquidar (el servidor valida igual).
   try {
-    const r = await ventasApi.list({ estado: 'confirmed', sin_liquidar: true, limit: 100 } as any)
-    ventasElegibles.value = ((r as any).items ?? []).map((v: any) => ({
+    const r = await ventasApi.list({ estado: 'confirmed', sin_liquidar: true, limit: 100 })
+    ventasElegibles.value = (r.items ?? []).map((v) => ({
       id: v.id,
       codigo: v.codigo ?? `VEN-${v.id}`,
       fecha: String(v.fecha ?? '').slice(0, 10),
@@ -194,7 +194,7 @@ const fondoPct = ref(40)
 async function cargarFondoEstatuto() {
   try {
     const p = await getParametros()
-    fondoPct.value = Number((p as any).distribucion_reinversion_pct ?? 40)
+    fondoPct.value = Number(p.distribucion_reinversion_pct ?? 40)
   } catch {
     fondoPct.value = 40
   }

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import { useInsumos } from '@/composables/useInsumos'
+import type { InsumoRead } from '@/services/api/insumos'
 import * as comprasApi from '@/services/api/compras-insumos'
 import { showToast } from '@/utils/toast'
 
@@ -43,14 +43,14 @@ const itemsPedido = ref<ItemCompra[]>([])
 async function inicializarItems() {
   try {
     const r = await insumosApi.list({ limit: 100 })
-    itemsPedido.value = ((r as any).items ?? [])
-      .filter((i: any) => Number(i.stock_actual ?? 0) <= Number(i.stock_minimo ?? 0) * 1.5)
-      .map((i: any) => ({
+    itemsPedido.value = (r.items ?? [])
+      .filter((i) => Number(i.stock_actual ?? 0) <= Number(i.stock_minimo ?? 0) * 1.5)
+      .map((i: InsumoRead & { proveedor?: string | null }) => ({
         id: i.id,
         codigo: i.codigo || `INS-${i.id}`,
         nombre: i.nombre,
         // InsumoRead no trae proveedor: se muestra la categoría.
-        proveedor: (i as any).proveedor ?? i.nombre_categoria ?? '—',
+        proveedor: i.proveedor ?? i.nombre_categoria ?? '—',
         stock_actual: Number(i.stock_actual ?? 0),
         stock_minimo: Number(i.stock_minimo ?? 0),
         unidad_medida: i.unidad_medida,

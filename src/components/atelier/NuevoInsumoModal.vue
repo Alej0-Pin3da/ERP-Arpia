@@ -1,5 +1,4 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ref, computed, onMounted } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
@@ -10,6 +9,7 @@ import Textarea from 'primevue/textarea'
 import { useInsumos } from '@/composables/useInsumos'
 import { client } from '@/api/client'
 import { showToast } from '@/utils/toast'
+import { getApiErrorDetail } from '@/utils/api-error'
 
 defineProps<{
   visible: boolean
@@ -59,11 +59,7 @@ const unidadesOptions = [
 ]
 
 function extractDetail(e: unknown): string {
-  const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
-  if (Array.isArray(detail)) return detail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ')
-  if (typeof detail === 'string' && detail) return detail
-  if (e instanceof Error && e.message) return e.message
-  return 'No se pudo crear el insumo'
+  return getApiErrorDetail(e, 'No se pudo crear el insumo')
 }
 
 async function guardarReal() {
@@ -85,7 +81,7 @@ async function guardarReal() {
       stock_minimo: Number(stockMinimo.value) || 0,
       costo_promedio_actual: Number(costoUnitario.value) || 0,
     })
-    showToast('success', 'Insumo creado', `${(creado as any).nombre ?? nombre.value} registrado en el inventario.`)
+    showToast('success', 'Insumo creado', `${creado.nombre ?? nombre.value} registrado en el inventario.`)
     emit('insumo-creado', creado)
     emit('update:visible', false)
     nombre.value = ''

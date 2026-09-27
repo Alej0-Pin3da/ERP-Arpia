@@ -1,10 +1,10 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { computed, ref, onMounted } from 'vue'
 import * as comprasApi from '@/services/api/compras-insumos'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import { useInsumos } from '@/composables/useInsumos'
+import type { InsumoRead } from '@/services/api/insumos'
 import { showToast } from '@/utils/toast'
 
 defineProps<{
@@ -16,15 +16,16 @@ const emit = defineEmits<{
 }>()
 
 const insumosApi = useInsumos()
-const insumos = ref<any[]>([])
+const insumos = ref<InsumoRead[]>([])
 async function cargarInsumos() {
   try {
     const r = await insumosApi.list({ limit: 100 })
-    insumos.value = (r as any).items ?? []
+    insumos.value = r.items ?? []
   } catch { insumos.value = [] }
 }
 onMounted(() => { void cargarInsumos() })
-const criticos = computed(() => (insumos.value as any[]).filter((i:any)=>Number(i.stock_actual??i.stock??0)<=Number(i.stock_minimo??0)))
+type InsumoCritico = InsumoRead & { stock?: number | string }
+const criticos = computed(() => insumos.value.filter((i: InsumoCritico)=>Number(i.stock_actual??i.stock??0)<=Number(i.stock_minimo??0)))
 
 const totalSugerido = computed(() => {
   return criticos.value.reduce((sum, item) => {

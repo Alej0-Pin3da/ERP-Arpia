@@ -1,5 +1,4 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // EditarInsumoModal — edits an existing insumo via PATCH /insumos/{id}.
 // Field set mirrors NuevoInsumoModal (nombre, codigo, categoria_id, unidad,
 // tipo, ubicacion, stock_actual, stock_minimo, costo_promedio_actual) so both
@@ -12,9 +11,10 @@ import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import { useInsumos } from '@/composables/useInsumos'
-import type { InsumoUpdatePayload } from '@/services/api/insumos'
+import type { InsumoUpdatePayload, InsumoRead } from '@/services/api/insumos'
 import { client } from '@/api/client'
 import { showToast } from '@/utils/toast'
+import { getApiErrorDetail } from '@/utils/api-error'
 
 /** Minimal insumo shape this modal reads (REAL display object from the caller). */
 export interface InsumoEditarRef {
@@ -82,7 +82,7 @@ const unidadesOptions = [
 function prefillFromRow(row: InsumoEditarRef) {
   codigo.value = row.codigo ?? ''
   nombre.value = row.nombre ?? ''
-  descripcion.value = (row as any).descripcion ?? ''
+  descripcion.value = row.descripcion ?? ''
   tipo.value = row.tipo ?? 'Directo'
   categoria.value = row.categoria ?? ''
   categoriaId.value = null
@@ -90,12 +90,12 @@ function prefillFromRow(row: InsumoEditarRef) {
   stockActual.value = Number(row.stock_actual) || 0
   stockMinimo.value = Number(row.stock_minimo) || 0
   unidadMedida.value = row.unidad_medida ?? 'm'
-  costoUnitario.value = Number((row as any).costo_unitario) || 0
+  costoUnitario.value = Number(row.costo_unitario) || 0
 }
 
 async function prefillAuthoritative(id: number) {
   try {
-    const full: any = await insumosApi.get(id)
+    const full: InsumoRead = await insumosApi.get(id)
     if (!full || full.id == null) return
     nombre.value = full.nombre ?? nombre.value
     codigo.value = full.codigo ?? ''
@@ -123,11 +123,7 @@ watch(
 )
 
 function extractDetail(e: unknown): string {
-  const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
-  if (Array.isArray(detail)) return detail.map((d: any) => d.msg ?? JSON.stringify(d)).join('; ')
-  if (typeof detail === 'string' && detail) return detail
-  if (e instanceof Error && e.message) return e.message
-  return 'No se pudo actualizar el insumo'
+  return getApiErrorDetail(e, 'No se pudo actualizar el insumo')
 }
 
 function isForbidden(e: unknown): boolean {

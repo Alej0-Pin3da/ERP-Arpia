@@ -3,6 +3,14 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Cero `any` total: 15 disables levantados, 118 sitios tipados (lint 0/0)
+
+- **Disables eliminados:** 12 directivas de archivo + 2 recortadas (Analisis, Dashboard) + 1 next-line en router. Quedan solo 2 `no-empty` intencionales (catches vacíos con fallback silencioso por diseño).
+- **Router (`src/router/index.ts`):** `getView` ahora retorna `Component` — el glob eager da `{ default: Component }`, el lazy es un loader async válido. Se fue el `as any`.
+- **Vistas grandes:** AnalisisView (37, con interfaces de filas de agregados que documentan qué manda el backend) y DashboardView (34, con `PedidoTablaSource`, alias `total/utilidad_neta`, muerto `ventasMensuales` eliminado).
+- **Modales y layout:** SociaRead/InsumoRead/ClienteRead/ProductoRead/VentaRead/LiquidacionRead donde correspondía; alias de compat (`stock`, `proveedor`, `apellido`, `precio_venta`) como intersecciones opcionales documentadas, no como `any`.
+- **Verificación:** `npm run lint` 118→0 (0 warnings), `npm test` 52/52, `npm run build` limpio. Sin cambios de comportamiento: solo tipos + 1 muerto eliminado.
+
 ### [2026-09-27] - Cero `any`: helper `getApiErrorDetail` + tipado de 13 archivos (lint 64→0)
 
 - **Helper compartido (`src/utils/api-error.ts`, nuevo + 5 tests):** `getApiErrorDetail(e, fallback, separator)` tipado sin `any` — detalle string verbatim, arrays de validación joineados, mensaje de Error, fallback. Reemplaza 9 bloques catch copiados a mano (3 tabs de maestros, NuevaRecetaModal, FichaTecnicaModal, ProductosView, DevolucionesView, AuditoriaView) con idénticos títulos/fallbacks; `extractApiDetail` en `pedidos-produccion.ts` ahora lo envuelve (API pública intacta).

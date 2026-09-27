@@ -1,5 +1,4 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
@@ -60,11 +59,11 @@ const notas = ref('')
 const guardando = ref(false)
 
 // Socias activas para la validación de la suma de cuotas (display aid).
-const socias = ref<any[]>([])
+const socias = ref<Array<SociaRead & { porcentaje?: number | string }>>([])
 async function cargarSocias() {
   try {
     const r = await sociosApi.list({ limit: 100 })
-    socias.value = (r.items as any) ?? []
+    socias.value = r.items ?? []
   } catch { socias.value = [] }
 }
 

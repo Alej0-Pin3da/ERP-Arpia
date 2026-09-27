@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, no-empty */
+/* eslint-disable no-empty */
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
@@ -9,6 +9,12 @@ import { useVentas } from '@/composables/useVentas'
 import { useAnaliticos } from '@/composables/useAnaliticos'
 import { useSocios } from '@/composables/useSocios'
 import { useFinanzas } from '@/composables/useFinanzas'
+import type { InsumoRead } from '@/services/api/insumos'
+import type { PedidoProduccionRead } from '@/services/api/pedidos-produccion'
+import type { VentaRead } from '@/services/api/ventas'
+import type { SociaRead } from '@/services/api/socios'
+import type { LiquidacionRead, LiquidacionDistribucionRead } from '@/services/api/liquidaciones'
+import type { AnaliticosResumen } from '@/services/api/analiticos'
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
 
@@ -19,13 +25,13 @@ const ventasApi = useVentas()
 const analiticosApi = useAnaliticos()
 const sociosApi = useSocios()
 const finanzasApi = useFinanzas()
-const insumos = ref<any[]>([])
-const pedidos = ref<any[]>([])
-const ventas = ref<any[]>([])
-const socias = ref<any[]>([])
-const liquidaciones = ref<any[]>([])
+const insumos = ref<InsumoRead[]>([])
+const pedidos = ref<PedidoProduccionRead[]>([])
+const ventas = ref<VentaRead[]>([])
+const socias = ref<SociaRead[]>([])
+const liquidaciones = ref<LiquidacionRead[]>([])
 // Resumen del backend con fallback al cómputo local si falla.
-const resumen = ref<any | null>(null)
+const resumen = ref<AnaliticosResumen | null>(null)
 async function cargarDashboard() {
   try {
     const [ir, pr, vr] = await Promise.all([
@@ -33,9 +39,9 @@ async function cargarDashboard() {
       produccionApi.list({ limit: 100 }),
       ventasApi.list({ limit: 100 }),
     ])
-    insumos.value = (ir as any).items ?? []
-    pedidos.value = (pr as any).items ?? []
-    ventas.value = (vr as any).items ?? []
+    insumos.value = ir.items ?? []
+    pedidos.value = pr.items ?? []
+    ventas.value = vr.items ?? []
   } catch {}
   try {
     resumen.value = await analiticosApi.getResumen()
@@ -46,18 +52,27 @@ async function cargarDashboard() {
       sociosApi.list({ limit: 100, offset: 0 }),
       finanzasApi.listLiquidaciones({ limit: 100, offset: 0 }),
     ])
-    socias.value = (sr as any).items ?? []
-    liquidaciones.value = (lr as any).items ?? []
+    socias.value = sr.items ?? []
+    liquidaciones.value = lr.items ?? []
   } catch { socias.value = []; liquidaciones.value = [] }
 }
 onMounted(() => { void cargarDashboard() })
 
-const insumosCriticos = computed(() => (insumos.value as any[]).filter((i: any) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)))
+type InsumoCriticoRow = InsumoRead & { stock?: number | string }
+const insumosCriticos = computed(() => insumos.value.filter((i: InsumoCriticoRow) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)))
 // En REAL la API (PedidoProduccionRead) no trae codigo/cliente_nombre/
 // prenda_nombre ni montos; se normaliza como en ProduccionView para no
 // renderizar celdas vacías ni $NaN (Numeric serializa como string).
+type PedidoTablaSource = PedidoProduccionRead & {
+  cliente_nombre?: string | null
+  nombre_variante?: string | null
+  nombre_producto?: string | null
+  precio_venta?: number | string | null
+  utilidad_neta?: number | string | null
+  margen_pct?: number | string | null
+}
 const pedidosTabla = computed(() => {
-  return (pedidos.value as any[]).map((p: any) => {
+  return pedidos.value.map((p: PedidoTablaSource) => {
     const rawEstado = String(p.estado ?? '')
     const fase = String(p.fase || 'corte')
     return {
@@ -74,42 +89,39 @@ const pedidosTabla = computed(() => {
   })
 })
 
-const ventasMensuales = ref<any[]>([])
-// En REAL se prefiere el agregado del backend (snapshot, excluye anuladas);
-// si el endpoint falla, se usa el cómputo local sobre ventas.
 const totalVentas = computed(() => {
   if (resumen.value != null) return Number(resumen.value.ventas_total ?? 0)
-  return (ventas.value as any[]).reduce((acc: number, v: any) => acc + Number(v.total_venta ?? v.total ?? 0), 0)
+  return ventas.value.reduce((acc: number, v: VentaRead & { total?: number | string | null }) => acc + Number(v.total_venta ?? v.total ?? 0), 0)
 })
 const totalUtilidad = computed(() => {
   if (resumen.value != null) return Number(resumen.value.margen_total ?? 0)
-  return (ventas.value as any[]).reduce((acc: number, v: any) => acc + Number(v.ganancia_neta ?? v.utilidad_neta ?? 0), 0)
+  return ventas.value.reduce((acc: number, v: VentaRead & { utilidad_neta?: number | string | null }) => acc + Number(v.ganancia_neta ?? v.utilidad_neta ?? 0), 0)
 })
-const rentabilidad = computed(()=> (() => { const v = ventas.value as any[]; if (!v.length) return 0; const total = v.reduce((a,c)=>a+Number(c.total_venta??0),0); const gan = v.reduce((a,c)=>a+Number(c.ganancia_neta??0),0); return total ? Math.round((gan/total)*100) : 0 })())
-const pedidosActivos = computed(() => pedidos.value.filter((p: any) => p.estado !== 'ENTREGADO' && p.estado !== 'entregado').length)
+const rentabilidad = computed(()=> (() => { const v: VentaRead[] = ventas.value; if (!v.length) return 0; const total = v.reduce((a,c)=>a+Number(c.total_venta??0),0); const gan = v.reduce((a,c)=>a+Number(c.ganancia_neta??0),0); return total ? Math.round((gan/total)*100) : 0 })())
+const pedidosActivos = computed(() => pedidos.value.filter((p) => p.estado !== 'ENTREGADO' && p.estado !== 'entregado').length)
 const pipelineCounts = computed(() => {
   const counts: Record<string, number> = { COTIZADO:0, RESERVADO:0, CORTE:0, COSTURA:0, ACABADOS:0, CALIDAD:0, LISTO:0, ENTREGADO:0 }
-  ;(pedidos.value as any[]).forEach((p: any) => { const k = String(p.estado||'').toUpperCase(); if (k in counts) counts[k]++ })
+  ;(pedidos.value).forEach((p) => { const k = String(p.estado||'').toUpperCase(); if (k in counts) counts[k]++ })
   return counts
 })
 // REAL-only: reparto desde GET /socios + /liquidaciones (como FinanzasView).
 // Se oculta la sección cuando no hay datos; nunca se fabrica un 40/30/30.
 const sociasRepartoDashboard = computed(() =>
-  (socias.value as any[]).filter((s: any) => !s.es_fondo_taller && s.activo !== false).slice(0, 2),
+  socias.value.filter((s) => !s.es_fondo_taller && s.activo !== false).slice(0, 2),
 )
 const tieneRepartoReal = computed(() => sociasRepartoDashboard.value.length > 0 && liquidaciones.value.length > 0)
 function totalRepartidoSociaDashboard(sociaId: number | undefined): number {
   if (sociaId == null) return 0
-  return (liquidaciones.value as any[]).reduce((a: number, l: any) => {
-    const item = (l.distribucion as any[] ?? []).find((d: any) => d.socia_id === sociaId)
+  return liquidaciones.value.reduce((a: number, l: LiquidacionRead) => {
+    const item = l.distribucion.find((d) => d.socia_id === sociaId) as (LiquidacionDistribucionRead & { monto_neto_pagar?: number | string }) | undefined
     return a + (item ? Number(item.monto_neto ?? item.monto_neto_pagar ?? 0) : 0)
   }, 0)
 }
 const distribucion = computed(() => {
   const total = totalUtilidad.value
-  const fondo = (liquidaciones.value as any[]).reduce((a: number, l: any) => a + Number(l.fondo_reinversion_monto ?? 0), 0)
-  const s0 = sociasRepartoDashboard.value[0] as any
-  const s1 = sociasRepartoDashboard.value[1] as any
+  const fondo = liquidaciones.value.reduce((a: number, l: LiquidacionRead) => a + Number(l.fondo_reinversion_monto ?? 0), 0)
+  const s0 = sociasRepartoDashboard.value[0] as (SociaRead & { porcentaje?: number | string }) | undefined
+  const s1 = sociasRepartoDashboard.value[1] as (SociaRead & { porcentaje?: number | string }) | undefined
   return {
     total,
     fondo,

@@ -1,58 +1,70 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any, no-empty */
+/* eslint-disable no-empty */
 import { computed, ref, onMounted } from 'vue'
 import { useInsumos } from '@/composables/useInsumos'
 import { useProduccion } from '@/composables/useProduccion'
 import { useProductos } from '@/composables/useProductos'
 import { useAnaliticos } from '@/composables/useAnaliticos'
+import type { InsumoRead } from '@/services/api/insumos'
+import type { PedidoProduccionRead } from '@/services/api/pedidos-produccion'
+import type { ProductoRead } from '@/services/api/productos'
+import type { AnaliticosResumen } from '@/services/api/analiticos'
+
+// Aggregate row shapes as consumed below (backend Numeric may serialize as string).
+interface TopProductoRow { producto_id: number; unidades?: number | string | null; ingresos?: number | string | null }
+interface TopInsumoRow { insumo_id?: number; nombre?: string | null; unidad_medida?: string | null; cantidad?: number | string | null }
+interface VentaMensualRow { mes?: string | null; total?: number | string | null; cantidad?: number | string | null }
+interface FinanzaMensualRow { mes?: string | null; ingresos?: number | string | null; gastos?: number | string | null }
+interface MargenProductoRow { producto_id: number; margen_total?: number | string | null; margen_promedio?: number | string | null }
+interface InsumoCriticoRow { nombre?: string | null; stock_actual?: number | string | null; stock_minimo?: number | string | null }
 
 const insumosApi = useInsumos()
 const produccionApi = useProduccion()
 const productosApi = useProductos()
 const analiticosApi = useAnaliticos()
-const insumos = ref<any[]>([])
-const pedidos = ref<any[]>([])
-const resumen = ref<any | null>(null)
-const ventasMensuales = ref<any[]>([])
-const topProductos = ref<any[]>([])
-const topInsumos = ref<any[]>([])
-const finanzasMensuales = ref<any[]>([])
-const margenReal = ref<any[]>([])
-const insumosCriticos = ref<any[]>([])
+const insumos = ref<InsumoRead[]>([])
+const pedidos = ref<PedidoProduccionRead[]>([])
+const resumen = ref<AnaliticosResumen | null>(null)
+const ventasMensuales = ref<VentaMensualRow[]>([])
+const topProductos = ref<TopProductoRow[]>([])
+const topInsumos = ref<TopInsumoRow[]>([])
+const finanzasMensuales = ref<FinanzaMensualRow[]>([])
+const margenReal = ref<MargenProductoRow[]>([])
+const insumosCriticos = ref<InsumoCriticoRow[]>([])
 async function cargarAnalisis() {
   try {
     const [ir, pr] = await Promise.all([
       insumosApi.list({ limit: 100 }),
       produccionApi.list({ limit: 100 }),
     ])
-    insumos.value = (ir as any).items ?? []
-    pedidos.value = (pr as any).items ?? []
+    insumos.value = ir.items ?? []
+    pedidos.value = pr.items ?? []
   } catch {}
   // Agregados reales del backend (ANA-1..6). Cada uno con fallback silencioso:
   // si falla, la sección muestra vacío en vez de romper la vista.
   try { resumen.value = await analiticosApi.getResumen() } catch { resumen.value = null }
-  try { ventasMensuales.value = (await analiticosApi.getVentasMensuales() as any) ?? [] } catch { ventasMensuales.value = [] }
-  try { topProductos.value = (await analiticosApi.getTopProductos() as any) ?? [] } catch { topProductos.value = [] }
-  try { topInsumos.value = (await analiticosApi.getTopInsumos() as any) ?? [] } catch { topInsumos.value = [] }
-  try { finanzasMensuales.value = (await analiticosApi.getFinanzasMensuales() as any) ?? [] } catch { finanzasMensuales.value = [] }
-  try { margenReal.value = (await analiticosApi.getMargenPorProducto() as any) ?? [] } catch { margenReal.value = [] }
-  try { insumosCriticos.value = (await analiticosApi.getInsumosBajoStock() as any) ?? [] } catch { insumosCriticos.value = [] }
+  try { ventasMensuales.value = (await analiticosApi.getVentasMensuales() ?? []) as VentaMensualRow[] } catch { ventasMensuales.value = [] }
+  try { topProductos.value = (await analiticosApi.getTopProductos() as TopProductoRow[]) ?? [] } catch { topProductos.value = [] }
+  try { topInsumos.value = (await analiticosApi.getTopInsumos() as TopInsumoRow[]) ?? [] } catch { topInsumos.value = [] }
+  try { finanzasMensuales.value = (await analiticosApi.getFinanzasMensuales() as FinanzaMensualRow[]) ?? [] } catch { finanzasMensuales.value = [] }
+  try { margenReal.value = (await analiticosApi.getMargenPorProducto() as MargenProductoRow[]) ?? [] } catch { margenReal.value = [] }
+  try { insumosCriticos.value = (await analiticosApi.getInsumosBajoStock() ?? []) as InsumoCriticoRow[] } catch { insumosCriticos.value = [] }
 }
 onMounted(() => { void cargarAnalisis(); void cargarProductosAnalisis() })
 
-const pedidosSrc = computed(() => (pedidos.value as any[]))
-const insumosAlertasCount = computed(() => (insumos.value as any[]).filter((i: any) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)).length)
-const productosAnalisis = ref<any[]>([])
+const pedidosSrc = computed(() => pedidos.value)
+const insumosAlertasCount = computed(() => insumos.value.filter((i: InsumoRead & { stock?: number | string }) => Number(i.stock_actual ?? i.stock ?? 0) <= Number(i.stock_minimo ?? 0)).length)
+const productosAnalisis = ref<ProductoRead[]>([])
 async function cargarProductosAnalisis() {
   try {
     const r = await productosApi.list({ limit: 100 })
-    productosAnalisis.value = (r.items as any) ?? []
+    productosAnalisis.value = r.items ?? []
   } catch { productosAnalisis.value = [] }
 }
 // append to existing cargarAnalisis
 // Numeric de Postgres serializa como string: normalizar a number para que
 // formatCOP y el margen no reciban strings ni nulls.
-const recetasDisplay = computed(() => productosAnalisis.value.map((p: any) => ({
+const recetasDisplay = computed(() => productosAnalisis.value.map((p) => ({
   id: p.id,
   nombre: p.nombre,
   costo_estimado_materiales: Number(p.costo_insumos ?? 0),
@@ -62,29 +74,29 @@ const recetasDisplay = computed(() => productosAnalisis.value.map((p: any) => ({
 
 // Nombre de producto para los agregados que solo traen IDs (top/margen real).
 const nombreProducto = (id: number): string =>
-  String(productosAnalisis.value.find((p: any) => Number(p.id) === Number(id))?.nombre ?? `Producto #${id}`)
-const topProductosDisplay = computed(() => (topProductos.value as any[]).slice(0, 5).map((t: any) => ({
+  String(productosAnalisis.value.find((p) => Number(p.id) === Number(id))?.nombre ?? `Producto #${id}`)
+const topProductosDisplay = computed(() => topProductos.value.slice(0, 5).map((t) => ({
   producto_id: t.producto_id,
   nombre: nombreProducto(t.producto_id),
   unidades: Number(t.unidades ?? 0),
   ingresos: Number(t.ingresos ?? 0),
 })))
-const topInsumosDisplay = computed(() => (topInsumos.value as any[]).slice(0, 5).map((t: any) => ({
+const topInsumosDisplay = computed(() => topInsumos.value.slice(0, 5).map((t) => ({
   nombre: String(t.nombre ?? `Insumo #${t.insumo_id}`),
   unidad: String(t.unidad_medida ?? ''),
   cantidad: Number(t.cantidad ?? 0),
 })))
-const ventasMensualesDisplay = computed(() => (ventasMensuales.value as any[]).slice(-6).map((v: any) => ({
+const ventasMensualesDisplay = computed(() => ventasMensuales.value.slice(-6).map((v) => ({
   mes: String(v.mes ?? '').slice(0, 7),
   total: Number(v.total ?? 0),
   cantidad: Number(v.cantidad ?? 0),
 })))
-const finanzasMensualesDisplay = computed(() => (finanzasMensuales.value as any[]).slice(-6).map((f: any) => ({
+const finanzasMensualesDisplay = computed(() => finanzasMensuales.value.slice(-6).map((f) => ({
   mes: String(f.mes ?? '').slice(0, 7),
   ingresos: Number(f.ingresos ?? 0),
   gastos: Number(f.gastos ?? 0),
 })))
-const margenRealDisplay = computed(() => (margenReal.value as any[]).slice(0, 5).map((m: any) => ({
+const margenRealDisplay = computed(() => margenReal.value.slice(0, 5).map((m) => ({
   nombre: nombreProducto(m.producto_id),
   margen_total: Number(m.margen_total ?? 0),
   margen_promedio: Number(m.margen_promedio ?? 0),
@@ -98,9 +110,9 @@ const esEnProceso = (e: unknown) =>
   ['pendiente', 'en_produccion', 'corte', 'costura', 'confeccion', 'prueba', 'acabados', 'calidad'].includes(normEstado(e))
 
 const metricas = computed(() => {
-  const pedidosCompletados = pedidosSrc.value.filter((p: any) => esCompletado(p.estado)).length
-  const pedidosEnProceso = pedidosSrc.value.filter((p: any) => esEnProceso(p.estado)).length
-  const stockPrendas = productosAnalisis.value.reduce((acc: number, p: any) => acc + (Number(p.stock_actual ?? 0) || 0), 0)
+  const pedidosCompletados = pedidosSrc.value.filter((p) => esCompletado(p.estado)).length
+  const pedidosEnProceso = pedidosSrc.value.filter((p) => esEnProceso(p.estado)).length
+  const stockPrendas = productosAnalisis.value.reduce((acc: number, p) => acc + (Number(p.stock_actual ?? 0) || 0), 0)
   const insumosAlertas = insumosAlertasCount.value
 
   return {
@@ -215,9 +227,9 @@ function formatCOP(v: number): string {
         </div>
         <div v-if="insumosCriticos.length" class="pt-2 border-t border-stone-800">
           <div class="text-[11px] uppercase font-bold text-red-300 mb-1">Detalle stock crítico ({{ insumosCriticos.length }})</div>
-          <div v-for="(c, i) in (insumosCriticos as any[]).slice(0, 5)" :key="i" class="flex items-center justify-between text-xs font-mono">
-            <span class="text-stone-300 truncate">{{ (c as any).nombre }}</span>
-            <span class="text-red-300">{{ Number((c as any).stock_actual ?? 0) }} / mín {{ Number((c as any).stock_minimo ?? 0) }}</span>
+          <div v-for="(c, i) in insumosCriticos.slice(0, 5)" :key="i" class="flex items-center justify-between text-xs font-mono">
+            <span class="text-stone-300 truncate">{{ c.nombre }}</span>
+            <span class="text-red-300">{{ Number(c.stock_actual ?? 0) }} / mín {{ Number(c.stock_minimo ?? 0) }}</span>
           </div>
         </div>
       </div>

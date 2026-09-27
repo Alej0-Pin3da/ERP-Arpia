@@ -1,5 +1,4 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
@@ -376,7 +375,7 @@ function onTallaChange(it: LocalItem, talla: string) {
 
 async function seleccionarPrendaCatalogo(it: LocalItem, prendaId: number | null) {
   if (!prendaId) return
-  const src = productos.value as unknown as Record<string, any>[]
+  const src = productos.value as unknown as Array<{ id: number; nombre: string; precio_venta?: number | string; precio_venta_sugerido?: number | string }>
   const p = src.find((x) => x.id === prendaId)
   if (p) {
     it.producto_id = p.id

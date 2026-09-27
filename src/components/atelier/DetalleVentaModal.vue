@@ -1,9 +1,9 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { computed, ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import { useClientes } from '@/composables/useClientes'
+import type { ClienteRead } from '@/services/api/clientes'
 import arpiaEmblem from '@/assets/arpia-emblem.png'
 
 /** Minimal venta shape this modal reads (REAL display object from the caller). */
@@ -50,7 +50,7 @@ const emit = defineEmits<{
 }>()
 
 const clientesApi = useClientes()
-const cliente = ref<any>(null)
+const cliente = ref<ClienteRead | null>(null)
 
 async function cargarCliente() {
   cliente.value = null

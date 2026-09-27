@@ -18,6 +18,7 @@
  * PR5+ (RoutePlaceholder stands in until then).
  */
 import { createRouter, createWebHistory, type RouteRecordRaw, type Router, type RouterHistory } from 'vue-router'
+import type { Component } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import AppLayout from '@/layouts/AppLayout.vue'
 
@@ -38,16 +39,17 @@ const views = import.meta.env.MODE === 'test'
   ? import.meta.glob('../views/*View.vue', { eager: true })
   : import.meta.glob('../views/*View.vue')
 
-function getView(name: string) {
+function getView(name: string): Component {
   const path = `../views/${name}View.vue`
-  const match = views[path]
+  const match: unknown = views[path]
   if (!match) {
     throw new Error(`View ${name} not found in glob paths`)
   }
+  // Eager (test): module record — Lazy (prod): async component loader.
+  // Both satisfy vue-router's component contract.
   return import.meta.env.MODE === 'test'
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ? (match as any).default
-    : match
+    ? (match as { default: Component }).default
+    : (match as Component)
 }
 
 const routes: RouteRecordRaw[] = [

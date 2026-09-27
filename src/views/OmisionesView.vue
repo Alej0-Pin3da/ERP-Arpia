@@ -93,7 +93,7 @@ async function marcarResuelta(o: { id: number }) {
             <td class="py-3 px-3 text-right text-stone-400 font-semibold whitespace-nowrap">{{ o.impacto }}</td>
             <td class="py-3 px-3 text-center whitespace-nowrap">
               <span
-                v-if="(o as any).resuelta"
+                v-if="o.resuelta"
                 class="px-2.5 py-1 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 text-[10px]"
               >
                 Resuelta
@@ -127,7 +127,7 @@ async function marcarResuelta(o: { id: number }) {
             <span class="font-mono font-semibold text-stone-200">{{ o.impacto }}</span>
           </div>
           <div>
-            <span v-if="(o as any).resuelta" class="inline-block px-2.5 py-1 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 text-xs">Resuelta</span>
+            <span v-if="o.resuelta" class="inline-block px-2.5 py-1 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 text-xs">Resuelta</span>
             <Button v-else label="Resolver" icon="pi pi-check" size="small" text class="text-emerald-400 text-sm min-h-[40px]" :loading="resolviendoId === o.id" @click="marcarResuelta(o)" />
           </div>
         </div>

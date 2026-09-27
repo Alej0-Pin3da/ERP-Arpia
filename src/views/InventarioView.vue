@@ -1,11 +1,11 @@
 <script setup lang="ts">
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ref, computed, onMounted } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
 import { useAuthStore } from '@/stores/auth'
 import { useInsumos } from '@/composables/useInsumos'
+import type { InsumoRead } from '@/services/api/insumos'
 import NuevoInsumoModal from '@/components/atelier/NuevoInsumoModal.vue'
 import EditarInsumoModal from '@/components/atelier/EditarInsumoModal.vue'
 import CompraInsumoModal from '@/components/atelier/CompraInsumoModal.vue'
@@ -80,16 +80,16 @@ const insumos = ref<InsumoDisplay[]>([])
 async function cargarInsumos() {
   try {
     const res = await insumosService.list({ limit: 100 })
-    insumos.value = res.items.map((i: any) => ({
+    insumos.value = res.items.map((i: InsumoRead & { proveedor?: string | null; nombre_proveedor?: string | null }) => ({
       id: i.id,
       codigo: i.codigo || `INS-${i.id}`,
       nombre: i.nombre,
       descripcion: i.descripcion || '',
-      tipo: (i.tipo as any) || 'Directo',
+      tipo: i.tipo || 'Directo',
       categoria: i.nombre_categoria || 'General',
       ubicacion: i.ubicacion || 'Bodega',
       // Sin join de proveedor en el backend: se muestra — hasta que exista.
-      proveedor: (i.proveedor as string) || (i.nombre_proveedor as string) || '—',
+      proveedor: i.proveedor || i.nombre_proveedor || '—',
       stock_actual: Number(i.stock_actual) || 0,
       stock_minimo: Number(i.stock_minimo) || 0,
       unidad_medida: i.unidad_medida,
@@ -182,8 +182,8 @@ const insumosFiltrados = computed(() => {
 
 const directosCount = computed(() => insumos.value.filter((i) => i.tipo === 'Directo').length)
 const indirectosCount = computed(() => insumos.value.filter((i) => i.tipo === 'Indirecto').length)
-const insumosCriticosCount = computed(() => insumos.value.filter((i: any) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)).length)
-const valorTotalInventario = computed(() => insumos.value.reduce((acc: number, i: any) => acc + (Number(i.stock_actual ?? i.stock ?? 0) * Number(i.costo_unitario ?? i.costo ?? 0)), 0))
+const insumosCriticosCount = computed(() => insumos.value.filter((i: InsumoDisplay & { stock?: number }) => (i.stock_actual ?? i.stock ?? 0) <= (i.stock_minimo ?? 0)).length)
+const valorTotalInventario = computed(() => insumos.value.reduce((acc: number, i: InsumoDisplay & { stock?: number; costo?: number }) => acc + (Number(i.stock_actual ?? i.stock ?? 0) * Number(i.costo_unitario ?? i.costo ?? 0)), 0))
 
 function formatCOP(val: number) {
   return `$${Math.round(val).toLocaleString('es-CO')}`
