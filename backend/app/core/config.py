@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     # WooCommerce webhooks (V6 M3): HMAC-SHA256 secret. Empty = endpoint disabled.
     WOO_WEBHOOK_SECRET: str = ""
+    # Local LLM for commercial copy (V6 M5): Ollama / llama.cpp endpoint.
+    OLLAMA_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3.1"
+    OLLAMA_TIMEOUT_S: int = 60
 
     @property
     def cors_origins_list(self) -> list[str]:

@@ -12,6 +12,7 @@ import * as bomApi from '@/services/api/bom'
 import * as insumosApi from '@/services/api/insumos'
 import * as productosApi from '@/services/api/productos'
 import * as maestrosApi from '@/services/api/maestros'
+import { generarCopy } from '@/services/api/ai'
 
 /** Minimal receta shape this modal reads (REAL display object from the caller). */
 export interface RecetaFicha {
@@ -590,8 +591,28 @@ watch(precioSugeridoAuto, (v) => {
   }
 })
 
-async function agregarInsumo() {
-  if (!props.receta || !recetaId.value || !newInsumoId.value) {
+const generandoCopy = ref(false)
+const errorCopy = ref('')
+
+async function generarDescripcionIA() {
+  if (!recetaId.value) {
+    showToast('warn', 'Sin producto', 'Guardá la ficha primero para generar su descripción.')
+    return
+  }
+  generandoCopy.value = true
+  errorCopy.value = ''
+  try {
+    const r = await generarCopy(recetaId.value)
+    editDescripcion.value = r.texto
+    showToast('success', 'Descripción generada', `Con ${r.modelo}. Revisala y guardá la ficha.`)
+  } catch (e: unknown) {
+    errorCopy.value = getApiErrorDetail(e, 'La IA local no responde. ¿Ollama en marcha?')
+  } finally {
+    generandoCopy.value = false
+  }
+}
+
+async function agregarInsumo() {  if (!props.receta || !recetaId.value || !newInsumoId.value) {
     showToast('warn', 'Seleccioná un insumo', 'Elegí un insumo del dropdown.')
     return
   }
@@ -775,6 +796,15 @@ function exportarMatriz() {
           <input v-model="editNombre" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-sm font-bold text-stone-100 mb-2" />
           <label class="block text-[11px] uppercase font-bold text-stone-400 mb-1.5">Descripción del Modelo</label>
           <textarea v-model="editDescripcion" rows="2" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1.5 text-xs text-stone-300" placeholder="Detalles de patronaje..." />
+          <button
+            type="button"
+            class="mt-1.5 px-2.5 py-1 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[11px] font-bold hover:bg-purple-500/30 disabled:opacity-50"
+            :disabled="generandoCopy"
+            @click="generarDescripcionIA"
+          >
+            {{ generandoCopy ? 'Generando...' : '✨ Generar Descripción con IA' }}
+          </button>
+          <p v-if="errorCopy" class="text-[10px] text-red-400 m-0 mt-1">{{ errorCopy }}</p>
         </div>
 
         <div class="border border-amber-500/30 bg-amber-950/10 rounded-xl p-3 space-y-3">

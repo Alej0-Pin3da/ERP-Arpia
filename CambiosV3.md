@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - V6 Módulo 5: Copy comercial con IA local
+
+- **Servicio (`services/ai_copy.py`):** lee el BOM real (nombres vía `desglosar_costo_produccion`), inyecta en prompt fijo (2 párrafos, tono oscuro/elegante/alternativo) y llama a Ollama/llama.cpp non-streaming. HTTP inyectable (tests sin red). Nada se persiste: el copy vuelve y la Ficha lo pone en `descripcion` para guardar por el flujo normal.
+- **Ruta (`routes/ai.py`):** `POST /ai/generar-copy` {producto_id} → {producto_nombre, texto, modelo}. 404 sin producto; 503 si Ollama caído, 502 si responde mal; solo admin/operador. Campo `texto` (no `copy`: choca con `BaseModel.copy()`).
+- **Config:** `OLLAMA_URL` (default localhost:11434), `OLLAMA_MODEL` (llama3.1), `OLLAMA_TIMEOUT_S` (60).
+- **Frontend:** `services/api/ai.ts` + botón "Generar Descripción con IA" en la Ficha (rellena el textarea, con error visible si Ollama no responde).
+- **Tests:** `test_ai_copy.py` (5: prompt con BOM+tono, endpoint con stub, 404, 503, auth).
+- **Verificación:** 5/5 backend, lint 0, vitest 52/52, build limpio. Sin migración (sin cambios de esquema).
+
 ### [2026-09-27] - V6 Módulo 4: Reservas predictivas de inventario
 
 - **Modelo + migración `dcc928a70607`:** `Insumos.stock_reservado` (Numeric, default 0) + propiedad `disponible` (actual − reservado, nunca negativa a la vista) y `InsumoRead` con ambos campos.
