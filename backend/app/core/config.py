@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
     REDIS_URL: str = "redis://localhost:6379/0"
+    # WooCommerce webhooks (V6 M3): HMAC-SHA256 secret. Empty = endpoint disabled.
+    WOO_WEBHOOK_SECRET: str = ""
 
     @property
     def cors_origins_list(self) -> list[str]:

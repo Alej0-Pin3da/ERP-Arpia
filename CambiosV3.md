@@ -3,6 +3,16 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - V6 Módulo 3: Webhook WooCommerce bidireccional
+
+- **Modelo + migración `557107cefd09`:** `Webhook_Eventos` (source+external_id únicos, venta_id, estado). Además backfill de `ix_Reparto_Ventas_venta_id` (drift de la migración M2 escrita a mano, detectado por autogenerate y convergido acá con nota).
+- **Servicio (`services/webhooks.py`):** valida HMAC-SHA256 en tiempo constante; la orden se convierte en venta REAL canal `web` vía `registrar_venta` (explosión, prendas, costos y reparto M2 corren igual). Bajo pedido no necesita nada especial: sin prendas consume insumos por explosión estándar (409 si no hay nada → Woo reintenta al reponer).
+- **Idempotencia:** duplicados responden con la venta original (UNIQUE + relectura en carrera). Sin secreto → 503 cerrado.
+- **Ruta (`routes/webhooks.py`):** `POST /webhooks/woo/order-created` sin auth de sesión (la firma ES la auth). Sin frontend (la espec no lo pide).
+- **Config:** `WOO_WEBHOOK_SECRET` en Settings (vacío = deshabilitado).
+- **Tests:** `test_webhooks_woo.py` (5: venta real canal web, duplicado único, 401, 422, 503).
+- **Verificación:** 5/5 backend.
+
 ### [2026-09-27] - V6 Módulo 2: Liquidación y reinversión automática
 
 - **Modelo + migración `2a60aa143124`:** `Reglas_Liquidacion` (cuenta_destino única, porcentaje, activo), `Saldos_Socias` (cuenta única, saldo, actualizado_en) y `Reparto_Ventas` (ledger por venta: venta_id+cuenta únicos, monto). Seed desde el estatuto vigente (Fondo 40 / Margarita 30 / Valqui 30); sin reglas no hay reparto (documentado, no error).

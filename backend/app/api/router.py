@@ -24,6 +24,7 @@ from app.api.routes import (
     tipos_productos,
     usuarios,
     ventas,
+    webhooks,
 )
 
 api_router = APIRouter()
@@ -51,6 +52,7 @@ api_router.include_router(audit.router)
 api_router.include_router(observability.router)
 api_router.include_router(audit_fiscal.router)
 api_router.include_router(reparto.router)
+api_router.include_router(webhooks.router)
 
 
 @api_router.get("/__mode", tags=["mode"])
