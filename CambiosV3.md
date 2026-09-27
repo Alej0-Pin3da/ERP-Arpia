@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - V6 Módulo 2: Liquidación y reinversión automática
+
+- **Modelo + migración `2a60aa143124`:** `Reglas_Liquidacion` (cuenta_destino única, porcentaje, activo), `Saldos_Socias` (cuenta única, saldo, actualizado_en) y `Reparto_Ventas` (ledger por venta: venta_id+cuenta únicos, monto). Seed desde el estatuto vigente (Fondo 40 / Margarita 30 / Valqui 30); sin reglas no hay reparto (documentado, no error).
+- **Servicio (`services/reparto.py`):** `aplicar_reparto_venta` corre DENTRO de la transacción de `registrar_venta` (post-flush, sin commits propios): reparte `ganancia_neta` con conservación al centavo (última línea absorbe redondeo), lock pesimista en saldos, ledger auditable. Regalos/ganancia ≤0 no reparten. `revertir_reparto_venta` niega exacto en `anular_venta`.
+- **API (`routes/reparto.py`):** saldos en vivo, CRUD de reglas (409 en duplicada), ledger por venta. Saldos informativos: el cierre oficial sigue siendo `crear_liquidacion`, nada se paga doble.
+- **Frontend:** `services/api/reparto.ts`, `FinanzasSaldosTab.vue` (cards de saldo + editor de reglas con pausa) como tab 6 en FinanzasView.
+- **Tests:** `test_reparto_api.py` (5: split 50/50 exacto, sin ganancia, reversión a cero, sin reglas, 409/auth).
+- **Verificación:** reparto 5/5 + ventas 37/37 + finanzas/devoluciones 111/111 (cero regresión en el circuito tocado), lint 0, vitest 52/52, build limpio.
+
 ### [2026-09-27] - V6 Módulo 1: Kits y Cajas promocionales
 
 - **Modelo + migración `c84889c70b73`:** tablas `Kits` (nombre, precio_promocional, activo) y `Kit_Productos` (kit_id CASCADE, producto_id RESTRICT, cantidad, única kit/producto). Autogenerate limpiado a mano como siempre.

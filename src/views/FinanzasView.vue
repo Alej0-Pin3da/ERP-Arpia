@@ -11,6 +11,7 @@ import FinanzasSociasTab from '@/components/finanzas/FinanzasSociasTab.vue'
 import FinanzasAnticiposTab from '@/components/finanzas/FinanzasAnticiposTab.vue'
 import FinanzasMovimientosTab from '@/components/finanzas/FinanzasMovimientosTab.vue'
 import FinanzasSimuladorTab from '@/components/finanzas/FinanzasSimuladorTab.vue'
+import FinanzasSaldosTab from '@/components/finanzas/FinanzasSaldosTab.vue'
 import type {
   SociaDisplay,
   LiquidacionDisplay,
@@ -126,7 +127,7 @@ onMounted(() => {
 })
 
 // Subtabs
-type TabType = 'liquidaciones' | 'socias' | 'anticipos' | 'movimientos' | 'simulador'
+type TabType = 'liquidaciones' | 'socias' | 'anticipos' | 'movimientos' | 'simulador' | 'saldos'
 const activeTab = ref<TabType>('liquidaciones')
 
 // Modals state
@@ -493,6 +494,15 @@ async function recargarMovimientos(filters?: { tipo?: string; estado?: string })
         <i class="pi pi-chart-line" />
         Simulador Punto Equilibrio Textil
       </button>
+
+      <button
+        class="px-4 py-2 rounded-t-lg transition-all flex items-center gap-2 font-bold cursor-pointer"
+        :class="activeTab === 'saldos' ? 'bg-amber-500/10 text-amber-300 border-b-2 border-amber-400' : 'text-stone-400 hover:text-stone-200'"
+        @click="activeTab = 'saldos'"
+      >
+        <i class="pi pi-wallet" />
+        Saldos en Vivo
+      </button>
     </div>
 
     <!-- TAB 1: LIQUIDACIONES -->
@@ -539,6 +549,11 @@ async function recargarMovimientos(filters?: { tipo?: string; estado?: string })
     <!-- TAB 5: SIMULADOR -->
     <FinanzasSimuladorTab
       v-if="activeTab === 'simulador'"
+    />
+
+    <!-- TAB 6: SALDOS EN VIVO (V6 M2) -->
+    <FinanzasSaldosTab
+      v-if="activeTab === 'saldos'"
     />
 
     <!-- Modals -->

@@ -43,6 +43,7 @@ from app.models.maestros import (
 )
 from app.models.audit_fiscal import CierreMensual, CostoVersion, PrecioVersion
 from app.models.kits import Kit, KitProducto
+from app.models.reparto import ReglaLiquidacion, RepartoVenta, SaldoSocia
 from app.models.ventas import DetalleVenta, Devolucion, DevolucionItem, Venta
 
 __all__ = [
@@ -92,4 +93,7 @@ __all__ = [
     "CierreMensual",
     "Kit",
     "KitProducto",
+    "ReglaLiquidacion",
+    "SaldoSocia",
+    "RepartoVenta",
 ]

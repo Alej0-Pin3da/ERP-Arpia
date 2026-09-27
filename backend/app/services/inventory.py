@@ -24,6 +24,7 @@ from app.models.produccion import PrendaConfeccionada
 from app.models.productos import BomInsumo, BomProducto, Producto, VarianteProducto
 from app.models.ventas import DetalleVenta, DocumentState, Venta
 from app.services.costos import _lineas_insumo_efectivas, calcular_costo_produccion
+from app.services.reparto import aplicar_reparto_venta, revertir_reparto_venta
 
 # P1-6: canonical canal/metodo values (0010 seeds). Used as fallback when the
 # maestros tables are unavailable; otherwise membership is read from maestros.
@@ -468,6 +469,10 @@ def registrar_venta(db: Session, payload: dict) -> Venta:
     for producto_id, qty in sorted(restos.items()):
         _descontar_producto_bloqueado(bloqueados[producto_id], qty)
 
+    # V6 M2: split the gain across the active reparto rules in this same
+    # transaction (no commit here — a failure rolls back the whole sale).
+    aplicar_reparto_venta(db, venta)
+
     try:
         db.commit()
         db.refresh(venta)
@@ -731,6 +736,8 @@ def anular_venta(db: Session, venta_id: int) -> Venta:
         reponer_stock(db, resto_explosion)
     for producto_id, qty in sorted(restos.items()):
         _reponer_producto_bloqueado(bloqueados[producto_id], qty)
+    # V6 M2: negate this sale's applied split before the cancel commits.
+    revertir_reparto_venta(db, venta.id)
     try:
         venta.transition_to(DocumentState.CANCELLED)
         db.commit()

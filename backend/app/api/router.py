@@ -20,6 +20,7 @@ from app.api.routes import (
     omisiones,
     produccion,
     productos,
+    reparto,
     tipos_productos,
     usuarios,
     ventas,
@@ -49,6 +50,7 @@ api_router.include_router(produccion.router_pedidos)
 api_router.include_router(audit.router)
 api_router.include_router(observability.router)
 api_router.include_router(audit_fiscal.router)
+api_router.include_router(reparto.router)
 
 
 @api_router.get("/__mode", tags=["mode"])
