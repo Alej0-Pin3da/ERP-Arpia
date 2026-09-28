@@ -37,7 +37,10 @@ def costo_mano_energia_estandar(
     - Any per-phase standard time set (0036) -> automatic:
       mano = total_min x tasa_mano, energia = costura_min x tasa_energia
       (energy only on costura: sewing machines; same rule as TiempoFase).
-    - No times -> stored manual Producto.mano_obra / cif_energia (legacy
+    - No phases but tiempo_confeccion_min set -> the total drives labor
+      (mano = total x tasa_mano); energy stays 0 because without the
+      costura split it cannot be attributed honestly.
+    - Neither -> stored manual Producto.mano_obra / cif_energia (legacy
       fallback; NULL reads as 0). BOM entry (0036 decision) never writes here.
     """
     tiempos = [
@@ -55,6 +58,18 @@ def costo_mano_energia_estandar(
             costura_min * tasa_energia,
             total_min,
             costura_min,
+            tasa_mano,
+            tasa_energia,
+        )
+    total_confeccion = producto.tiempo_confeccion_min or 0
+    if total_confeccion > 0:
+        tasa_mano, tasa_energia = tasas_costeo(db)
+        total_min = Decimal(int(total_confeccion))
+        return (
+            total_min * tasa_mano,
+            Decimal("0"),
+            total_min,
+            Decimal("0"),
             tasa_mano,
             tasa_energia,
         )

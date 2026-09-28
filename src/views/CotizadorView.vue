@@ -461,6 +461,14 @@ async function actualizarFichaTecnica() {
       markup_pct: Math.round(Number(margenMetaGlobal.value ?? 35)),
     })
     showToast('success', 'Ficha técnica actualizada', `Precio, Tiempos y CIF guardados en el producto ${nombrePrenda.value}.`)
+    // El costo real BOM que se muestra viene de la DB: recargarlo para que
+    // refleje los tiempos recién guardados sin tener que recargar la receta.
+    if (recetaSeleccionada.value) {
+      try {
+        const c = await bomApi.getCosto(recetaSeleccionada.value)
+        costoReal.value = Number(c.total ?? 0)
+      } catch { /* conserva el anterior si falla */ }
+    }
     // Fase 2: si editaste cantidades del BOM, se ofrece llevarlas a la receta.
     const diffs = diffCantidadesBOM(insumos.value)
     if (diffs.length && recetaSeleccionada.value) {

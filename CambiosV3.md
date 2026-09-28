@@ -3,6 +3,14 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Fix: `tiempo_confeccion_min` ignorado por el motor de costos
+
+- **Causa:** `costo_mano_energia_estandar` solo miraba tiempos por fase o el legacy `mano_obra`; el total (ej. 120 del auditor) no lo consultaba nadie — el "Costo real BOM (DB)" no se movía tras actualizar la ficha.
+- **Fix:** rama intermedia — sin fases pero con total >0, mano = total × tasa, energía 0 (sin desglose de costura no se puede atribuir honestamente). Fases siguen mandando; sin nada, legacy intacto.
+- **UX:** tras Actualizar Ficha se recarga el costo real sin recargar la receta.
+- **Tests:** `test_costos_tiempo_total.py` (3: total mueve costo + línea mano, precedencia de fases con energía, fallback legacy).
+- **Verificación:** 28/28 con costos existentes (cero regresión), lint 0, vitest 67/67, build limpio.
+
 ### [2026-09-27] - Fase 2: sincronizar cantidades editadas al BOM con confirmación
 
 - **Rastreo:** al volcar el BOM, cada línea guarda `bomLineaId` + `cantidadOriginal` (frontend-only, no se envían al guardar cotización).
