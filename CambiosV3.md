@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Fase 2: sincronizar cantidades editadas al BOM con confirmación
+
+- **Rastreo:** al volcar el BOM, cada línea guarda `bomLineaId` + `cantidadOriginal` (frontend-only, no se envían al guardar cotización).
+- **Diff puro testeado (`diffCantidadesBOM`):** solo líneas del BOM con cantidad distinta; manuales y eliminadas fuera de alcance.
+- **Flujo:** Actualizar Ficha → PATCH producto + toast → si hay diffs, diálogo "¿Actualizar cantidades en la receta?" con detalle línea por línea → PUT por línea vía `updateBomInsumo` → toast + originales actualizados (sin recarga ruidosa).
+- **Verificación:** lint 0, vitest 67/67, build limpio. Backend intacto (`PUT bom/insumos` ya existía).
+
 ### [2026-09-27] - Auditor escribe a la Ficha: botón Actualizar Ficha Técnica (BOM)
 
 - **Botón renombrado** con tooltip ("Guarda los tiempos, CIF y precio real en el maestro del producto"); función `llevarPrecioAProducto` → `actualizarFichaTecnica`.

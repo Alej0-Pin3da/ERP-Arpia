@@ -20,6 +20,9 @@ export interface InsumoCotizacionLinea {
   // la heurística de hilos. El BOM lo fija por clasificación; lo manual
   // arranca en true. El backend lo ignora (Pydantic extra=ignore).
   esTela?: boolean
+  // Solo frontend (no se envían): rastreo a la línea del BOM para Fase 2.
+  bomLineaId?: number | null
+  cantidadOriginal?: number | null
 }
 
 export interface CotizacionCreatePayload {

@@ -45,10 +45,14 @@ export function normalizarAMetros(cantidad: number, unidad: string | null | unde
 /** Mínimo estructural de una línea de material (compatible con InsumoCotizacionLinea). */
 export interface LineaMaterial {
   cantidad: number
+  nombre?: string | null
   unidad_medida?: string | null
   precio_unitario?: number | null
   desperdicio_pct?: number | null
   esTela?: boolean
+  /** Solo frontend (no se envía): rastreo a la línea del BOM para Fase 2. */
+  bomLineaId?: number | null
+  cantidadOriginal?: number | null
 }
 
 /** Redondeo financiero HALF_UP a centavos (positivos): igual que el backend. */
@@ -93,6 +97,31 @@ export function fueAutoajustada(l: LineaMaterial): boolean {
   const cant = Number(l.cantidad ?? 0)
   const u = (l.unidad_medida ?? '').trim().toLowerCase()
   return CM.has(u) && cant > UMBRAL_AUTO_CM
+}
+
+export interface CambioCantidadBOM {
+  bomLineaId: number
+  nombre: string
+  antes: number
+  ahora: number
+}
+
+/** Líneas del BOM cuya cantidad editada difiere de la receta (Fase 2). */
+export function diffCantidadesBOM(lineas: LineaMaterial[]): CambioCantidadBOM[] {
+  const cambios: CambioCantidadBOM[] = []
+  for (const l of lineas) {
+    if (l.bomLineaId == null || l.cantidadOriginal == null) continue
+    const ahora = Number(l.cantidad ?? 0)
+    const antes = Number(l.cantidadOriginal ?? 0)
+    if (!Number.isFinite(ahora) || ahora === antes) continue
+    cambios.push({
+      bomLineaId: l.bomLineaId,
+      nombre: String(l.nombre ?? `línea ${l.bomLineaId}`),
+      antes,
+      ahora,
+    })
+  }
+  return cambios
 }
 
 /** Estimación de hilos con topes de seguridad (nunca más de $2.000). */

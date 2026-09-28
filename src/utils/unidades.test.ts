@@ -3,6 +3,7 @@ import {
   METROS_POR_YARDA,
   TOPE_COSTO_HILOS,
   TOPE_HILO_METROS,
+  diffCantidadesBOM,
   esLineaSospechosa,
   estimarHilos,
   fueAutoajustada,
@@ -95,5 +96,21 @@ describe('tope y doble escala de hilos (Falda Emily)', () => {
     expect(estimarHilos(234, 8)).toEqual({ metros: 500, costo: TOPE_COSTO_HILOS, conTope: true })
     expect(estimarHilos(2.34, 2)).toEqual({ metros: 281, costo: 562, conTope: false })
     expect(TOPE_HILO_METROS).toBe(500)
+  })
+})
+
+describe('diff de cantidades BOM (Fase 2)', () => {
+  it('detecta solo líneas del BOM con cantidad cambiada', () => {
+    const diff = diffCantidadesBOM([
+      { cantidad: 5, bomLineaId: 1, cantidadOriginal: 2, nombre: 'Tela' },
+      { cantidad: 2, bomLineaId: 2, cantidadOriginal: 2, nombre: 'Forro' },
+      { cantidad: 9, nombre: 'Extra manual' },
+    ])
+    expect(diff).toEqual([{ bomLineaId: 1, nombre: 'Tela', antes: 2, ahora: 5 }])
+  })
+
+  it('ignora líneas sin rastreo o sin cambios', () => {
+    expect(diffCantidadesBOM([])).toEqual([])
+    expect(diffCantidadesBOM([{ cantidad: 1 }])).toEqual([])
   })
 })

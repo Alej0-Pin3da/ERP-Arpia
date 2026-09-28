@@ -13,7 +13,8 @@ import { updateProducto, type ProductoRead } from '@/services/api/productos'
 import { getParametros } from '@/services/api/maestros'
 import { listInsumos, getInsumo, type InsumoRead } from '@/services/api/insumos'
 import type { CostoLineaRead } from '@/services/api/bom'
-import { esLineaSospechosa, estimarHilos, fueAutoajustada, metrosHiloDeLinea, metrosTelaDeLineas, normalizarAMetros, subtotalLineaMaterial, subtotalMateriales as sumaMaterialesCentavos } from '@/utils/unidades'
+import { esLineaSospechosa, estimarHilos, fueAutoajustada, metrosHiloDeLinea, metrosTelaDeLineas, normalizarAMetros, diffCantidadesBOM, type CambioCantidadBOM, subtotalLineaMaterial, subtotalMateriales as sumaMaterialesCentavos } from '@/utils/unidades'
+import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
 
 const router = useRouter()
 const productosApi = useProductos()
@@ -180,7 +181,7 @@ async function aplicarBaseBom() {
   const productoId = recetaSeleccionada.value
   if (!productoId) return
   baseParcial.value = null
-  let bom: { insumo_id: number; cantidad_requerida: number | string; porcentaje_desperdicio: number | string }[]
+  let bom: { id: number; insumo_id: number; cantidad_requerida: number | string; porcentaje_desperdicio: number | string }[]
   try {
     bom = await bomApi.listInsumos(productoId)
   } catch {
@@ -250,6 +251,9 @@ async function aplicarBaseBom() {
       // Solo tela/forro alimentan la heurística de hilos: la mercería
       // (elásticos, cintas, sesgos en cm) se cose pero no a tasa de tela.
       esTela: destino === 'Telas' || destino === 'Forro',
+      // Rastreo Fase 2: si editás la cantidad, se ofrece llevarla a la receta.
+      bomLineaId: l.id,
+      cantidadOriginal: cant,
     })
   }
   // Tela/forro sin precio en el maestro (>0) no dan un ponderado honesto:
@@ -457,9 +461,43 @@ async function actualizarFichaTecnica() {
       markup_pct: Math.round(Number(margenMetaGlobal.value ?? 35)),
     })
     showToast('success', 'Ficha técnica actualizada', `Precio, Tiempos y CIF guardados en el producto ${nombrePrenda.value}.`)
+    // Fase 2: si editaste cantidades del BOM, se ofrece llevarlas a la receta.
+    const diffs = diffCantidadesBOM(insumos.value)
+    if (diffs.length && recetaSeleccionada.value) {
+      diffsBomPendientes.value = diffs
+      showBomSyncDialog.value = true
+    }
   } catch (e) {
     console.error('Error actualizando ficha técnica:', e)
     showToast('error', 'No se pudo actualizar', 'Revisá la conexión con el backend e intentá de nuevo.')
+  }
+}
+
+const showBomSyncDialog = ref(false)
+const syncBomLoading = ref(false)
+const diffsBomPendientes = ref<CambioCantidadBOM[]>([])
+
+async function confirmarSyncBom() {
+  const pid = recetaSeleccionada.value
+  if (pid == null) {
+    showBomSyncDialog.value = false
+    return
+  }
+  syncBomLoading.value = true
+  try {
+    for (const d of diffsBomPendientes.value) {
+      await bomApi.updateInsumo(pid, d.bomLineaId, { cantidad_requerida: d.ahora })
+      const linea = insumos.value.find((l) => l.bomLineaId === d.bomLineaId)
+      if (linea) linea.cantidadOriginal = d.ahora
+    }
+    showToast('success', 'Receta actualizada', `${diffsBomPendientes.value.length} cantidad(es) llevadas al BOM.`)
+  } catch (e) {
+    console.error('Error sincronizando BOM:', e)
+    showToast('error', 'No se pudo actualizar', 'Alguna línea no se guardó; revisá la receta.')
+  } finally {
+    syncBomLoading.value = false
+    diffsBomPendientes.value = []
+    showBomSyncDialog.value = false
   }
 }
 </script>
@@ -779,5 +817,16 @@ async function actualizarFichaTecnica() {
         </div>
       </div>
     </div>
+
+    <ConfirmActionDialog
+      :visible="showBomSyncDialog"
+      titulo="¿Actualizar cantidades en la receta?"
+      mensaje="Editaste cantidades del BOM en esta pantalla. ¿Deseás actualizar también las cantidades de los materiales en la receta?"
+      :detalle="diffsBomPendientes.map((d) => `${d.nombre}: ${d.antes} → ${d.ahora}`).join(' · ')"
+      confirmar-label="Actualizar receta"
+      :loading="syncBomLoading"
+      @update:visible="showBomSyncDialog = $event"
+      @confirmar="confirmarSyncBom"
+    />
   </div>
 </template>
