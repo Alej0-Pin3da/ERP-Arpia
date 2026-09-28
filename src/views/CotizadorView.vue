@@ -439,16 +439,26 @@ async function guardarCotizacion() {
   }
 }
 
-async function llevarPrecioAProducto() {
+async function actualizarFichaTecnica() {
   if (!recetaSeleccionada.value) {
-    showToast('warn', 'Sin receta', 'Cargá la cotización desde una receta BOM para llevarle el precio.')
+    showToast('warn', 'Sin receta', 'Cargá la cotización desde una receta BOM para actualizar su ficha.')
     return
   }
   try {
-    await updateProducto(recetaSeleccionada.value, { precio_venta_sugerido: Math.round(precioVentaSugerido.value) })
-    showToast('success', 'Precio actualizado', `Precio sugerido llevado al producto (${formatCOP(precioVentaSugerido.value)}).`)
+    // El precio validado es el de tienda (el que auditaste); si está vacío,
+    // cae al sugerido a meta. Tiempos y CIF van tal cual los validaste.
+    const precioValidado = precioMercado.value != null
+      ? Math.round(precioMercado.value)
+      : Math.round(precioVentaSugerido.value)
+    await updateProducto(recetaSeleccionada.value, {
+      precio_venta_sugerido: precioValidado,
+      tiempo_confeccion_min: Math.round(tiempoConfeccionMin.value),
+      cif_energia: costoCif.value,
+      markup_pct: Math.round(Number(margenMetaGlobal.value ?? 35)),
+    })
+    showToast('success', 'Ficha técnica actualizada', `Precio, Tiempos y CIF guardados en el producto ${nombrePrenda.value}.`)
   } catch (e) {
-    console.error('Error llevando precio al producto:', e)
+    console.error('Error actualizando ficha técnica:', e)
     showToast('error', 'No se pudo actualizar', 'Revisá la conexión con el backend e intentá de nuevo.')
   }
 }
@@ -722,14 +732,14 @@ async function llevarPrecioAProducto() {
             />
 
             <Button
-              label="Llevar precio al producto"
+              label="Actualizar Ficha Técnica (BOM)"
               icon="pi pi-tag"
               severity="secondary"
               outlined
               class="w-full text-xs font-semibold"
               :disabled="!recetaSeleccionada"
-              title="Requiere receta BOM cargada"
-              @click="llevarPrecioAProducto"
+              title="Guarda los tiempos, CIF y precio real en el maestro del producto"
+              @click="actualizarFichaTecnica"
             />
 
             <Button

@@ -3,6 +3,14 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Auditor escribe a la Ficha: botón Actualizar Ficha Técnica (BOM)
+
+- **Botón renombrado** con tooltip ("Guarda los tiempos, CIF y precio real en el maestro del producto"); función `llevarPrecioAProducto` → `actualizarFichaTecnica`.
+- **Payload completo:** precio validado de tienda (cae al sugerido si está vacío), `tiempo_confeccion_min`, `cif_energia` y `markup_pct` (meta). Backend y tipos ya lo aceptaban: cero cambios allá.
+- **Toast** literal de espec con el nombre del producto.
+- **Fase 2 deliberadamente afuera:** sincronizar cantidades del BOM editado a mano queda pendiente (requiere refactorizar endpoints de BOM).
+- **Verificación:** lint 0, vitest 65/65, build limpio.
+
 ### [2026-09-27] - Cotizador como evaluador interno (adiós presupuestos externos)
 
 - **Eliminado:** campos Cliente y Observaciones, botón WhatsApp (+ función), sección de margen con slider y badge de heredado. Cero referencias restantes.
