@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-27] - Cotizador como evaluador interno (adiós presupuestos externos)
+
+- **Eliminado:** campos Cliente y Observaciones, botón WhatsApp (+ función), sección de margen con slider y badge de heredado. Cero referencias restantes.
+- **Margen bloqueado a meta global:** `precioVentaSugerido`/`gananciaNeta` usan siempre `margenMetaGlobal` (receta ya no pisa); `guardarCotizacion` persiste esa meta; se fue `precioAMeta` (duplicado exacto del sugerido).
+- **Auditor:** `GANANCIA: $X (Y%)` prominente + pastillas literales de espec (`¡RENTABLE! (Supera la meta del N%)` / `ALERTA (Por debajo de la meta del N%)`). Autocompletado con sugerido hasta toque manual intacto.
+- **Verificación:** lint 0, vitest 65/65, build limpio. Backend sin cambios (guarda la meta como `margen_pct`).
+
 ### [2026-09-27] - Cotizador auditor gerencial (espec: margen base + precio tienda)
 
 - **Tope hilos 500 m:** `TOPE_HILO_METROS` 1000→500 (el costo ya estaba en $2.000). A $2/m el techo efectivo son $1.000; el cap de $2.000 muerde si subís el $/m.

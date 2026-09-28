@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useProductos } from '@/composables/useProductos'
-import type { ClienteRead } from '@/services/api/clientes'
 import { useBom } from '@/composables/useBom'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
-import Slider from 'primevue/slider'
 import { showToast } from '@/utils/toast'
 import { createCotizacion, listCotizaciones, updateCotizacionEstado, type CotizacionRead, type InsumoCotizacionLinea } from '@/services/api/cotizaciones'
-import { useClientes } from '@/composables/useClientes'
 import { updateProducto, type ProductoRead } from '@/services/api/productos'
 import { getParametros } from '@/services/api/maestros'
 import { listInsumos, getInsumo, type InsumoRead } from '@/services/api/insumos'
@@ -46,20 +43,15 @@ async function cargarProductos() {
     productos.value = r.items ?? []
   } catch { productos.value = [] }
 }
-onMounted(() => { void cargarProductos(); void cargarClientes(); void cargarHistorial(); void cargarMeta() })
+onMounted(() => { void cargarProductos(); void cargarHistorial(); void cargarMeta() })
 
-// Meta global de margen (Maestros → parametros-costeo; fallback 35).
-// La prenda nueva sin receta usa la meta como default, no un 60 fijo.
+// Meta global de margen (Maestros → parametros-costeo; fallback 35%).
+// Auditor interno: el precio sugerido SIEMPRE usa esta meta, sin margen manual.
 const margenMetaGlobal = ref<number>(35)
-// Margen heredado de la receta BOM cargada (null = prenda nueva/manual).
-const margenHeredado = ref<number | null>(null)
 async function cargarMeta() {
   try {
     const p = await getParametros()
     margenMetaGlobal.value = Number(p.margen_meta_global_pct ?? 35)
-    if (margenHeredado.value == null && !recetaSeleccionada.value) {
-      margenPct.value = Math.round(Number(margenMetaGlobal.value))
-    }
   } catch { /* sin backend: se queda en 35 */ }
 }
 
@@ -76,21 +68,6 @@ function agregarInsumo() {
 }
 function eliminarInsumo(index: number) {
   insumos.value.splice(index, 1)
-}
-
-// Cliente + notas (el modelo los soporta; antes quedaban huérfanos)
-const clientesApi = useClientes()
-const clienteSeleccionado = ref<number | null>(null)
-const observaciones = ref('')
-const clientesOptions = ref<{ label: string; value: number | null }[]>([{ label: '-- Sin cliente --', value: null }])
-async function cargarClientes() {
-  try {
-    const r = await clientesApi.list({ limit: 100 })
-    clientesOptions.value = [
-      { label: '-- Sin cliente --', value: null },
-      ...(r.items ?? []).map((c: ClienteRead & { apellido?: string | null }) => ({ label: `${c.nombre} ${c.apellido ?? ''}`.trim(), value: c.id })),
-    ]
-  } catch { /* sin clientes: se cotiza igual */ }
 }
 
 // Historial (el backend lista con filtros; la vista lo ignoraba)
@@ -128,7 +105,7 @@ const costoHiloMetro = ref<number>(2)
 // sobre metros reales normalizados (cm→/100, mm→/1000, yardas→×0.9144) y
 // solo de líneas de tela/forro — la mercería del BOM no cuenta.
 const metrosTotalesTela = computed(() => metrosTelaDeLineas(insumos.value))
-// Estimación con topes de seguridad: jamás más de 1000 m ni $2.000,
+// Estimación con topes de seguridad: jamás más de 500 m ni $2.000,
 // aunque una unidad venga mal cargada en el BOM.
 const estimacionHilos = computed(() => estimarHilos(metrosTotalesTela.value, Number(costoHiloMetro.value ?? 0)))
 const metrosHiloEstimado = computed(() => estimacionHilos.value.metros)
@@ -150,10 +127,6 @@ function aplicarEstimacionHilos() {
 const tiempoConfeccionMin = ref<number>(120)
 const tarifaHora = ref<number>(8000)
 const costoCif = ref<number>(2000)
-
-// Margin Slider: default = meta global (la carga real llega con cargarMeta()).
-// Si hay receta cargada, el margen se hereda de ella (badge informativo).
-const margenPct = ref<number>(35)
 
 const recetasOptions = computed(() => {
   return [
@@ -301,9 +274,7 @@ async function onRecetaChange() {
   // Nueva prenda/receta: el auditor vuelve a autocompletarse con el sugerido.
   mercadoTocado.value = false
   if (!recetaSeleccionada.value) {
-    // Prenda nueva/manual: se limpia lo heredado y el margen vuelve a la meta.
-    margenHeredado.value = null
-    margenPct.value = Math.round(Number(margenMetaGlobal.value ?? 35))
+    // Prenda nueva/manual: se limpia la base y el auditor se re-autocompleta.
     costoReal.value = null
     lineasBase.value = []
     detalleBase.value = []
@@ -314,8 +285,9 @@ async function onRecetaChange() {
   const r = (productos.value).find((x) => x.id === recetaSeleccionada.value)
   if (r) {
     nombrePrenda.value = r.nombre
-    // Solo receta: nombre, tiempos, CIF y margen. Tarifa $/hora no existe en la
+    // Solo receta: nombre, tiempos y CIF. Tarifa $/hora no existe en la
     // receta (mano_obra es un total, no una tasa): queda manual como siempre.
+    // El margen de la receta NO manda: el auditor usa siempre la meta global.
     // P0-5: la API manda Numeric como string ("83000.0000") y nulls; normalizar
     // con Number() para que InputNumber/slider no queden vacíos.
     // Ceros de receta NO pisan: se conserva el valor actual con aviso.
@@ -343,14 +315,6 @@ async function onRecetaChange() {
     } else {
       costoCif.value = Number(cif)
     }
-    const m = r.markup_pct
-    if (m == null || Number(m) <= 0) {
-      showToast('warn', 'Margen en 0 en la receta', 'La receta trae 0 en margen, conservo tu valor.')
-      margenHeredado.value = null
-    } else {
-      margenHeredado.value = Math.round(Number(m))
-      margenPct.value = Math.round(Number(m))
-    }
   }
   await cargarBaseBom()
 }
@@ -372,11 +336,11 @@ const costoTotalConfeccion = computed(() => {
 })
 
 const precioVentaSugerido = computed(() => {
-  // Regla de margen sincera (misma que el servidor en _calcular):
-  // margen normal → costo / (1 - margen); margen ≥100% → ×2.2 fijo;
-  // margen que deje menos de 5% de factor → ×2 (tope anti-margen-cero).
-  if (margenPct.value >= 100) return costoTotalConfeccion.value * 2.2
-  const factor = 1 - (margenPct.value / 100)
+  // Auditor interno: SIEMPRE a meta global de Maestros (misma que el servidor).
+  // Sin margen manual: la meta es la línea base inamovible.
+  const meta = Number(margenMetaGlobal.value ?? 35)
+  if (meta >= 100) return costoTotalConfeccion.value * 2.2
+  const factor = 1 - (meta / 100)
   if (factor <= 0.05) return costoTotalConfeccion.value * 2
   return costoTotalConfeccion.value / factor
 })
@@ -402,18 +366,13 @@ const veredictoMercado = computed(() => {
   if (margenRealMercado.value == null) return null
   const meta = Number(margenMetaGlobal.value ?? 35)
   const m = margenRealMercado.value
-  if (m >= meta) return { tono: 'ok', texto: `¡RENTABLE! (margen real ${m.toFixed(1)}% vs meta ${meta}%)` }
-  return { tono: 'alerta', texto: `ALERTA: margen ${m.toFixed(1)}% por debajo de la meta ${meta}%` }
+  if (m >= meta) return { tono: 'ok', texto: `¡RENTABLE! (Supera la meta del ${meta}%)` }
+  return { tono: 'alerta', texto: `ALERTA (Por debajo de la meta del ${meta}%)` }
 })
-
-// Piso a meta global (referencia): mismo costo, margen de Maestros (default 35%).
-// Solo informativo — el precio lista lo manda el margen del slider/heredado.
-const precioAMeta = computed(() => {
-  const meta = Number(margenMetaGlobal.value ?? 35)
-  if (meta >= 100) return costoTotalConfeccion.value * 2.2
-  const factor = 1 - (meta / 100)
-  if (factor <= 0.05) return costoTotalConfeccion.value * 2
-  return costoTotalConfeccion.value / factor
+const gananciaRealMercado = computed(() => {
+  const p = Number(precioMercado.value ?? 0)
+  if (!(p > 0)) return null
+  return p - costoTotalConfeccion.value
 })
 
 function formatCOP(val: number) {
@@ -434,27 +393,6 @@ function fmtPrecioU(val: number, unidad: string) {
 
 function onBaseToggle(e: Event) {
   baseExpandida.value = (e.target as HTMLDetailsElement).open
-}
-
-function copiarPresupuestoWhatsApp() {
-  const nombreCliente = clientesOptions.value.find((c) => c.value === clienteSeleccionado.value)?.label
-  const lineas = [
-    `✨ *PRESUPUESTO DE CONFECCIÓN • ARPÍA* ✨`,
-    ``,
-    `👗 *Prenda:* ${nombrePrenda.value}`,
-    ...(nombreCliente && clienteSeleccionado.value ? [`👤 *Cliente:* ${nombreCliente}`] : []),
-    `🧵 *Tiempo estimado:* ${tiempoConfeccionMin.value} min`,
-    `🧷 *Materiales (${insumos.value.length} líneas):* ${formatCOP(subtotalMateriales.value)}`,
-    `🧵 *Hilos estimados:* ${metrosHiloEstimado.value} m ≈ ${formatCOP(costoHilosEstimado.value)}`,
-    `📦 *Avíos y empaque:* ${formatCOP(subtotalAvios.value)}`,
-    `💪 *Mano de obra:* ${formatCOP(subtotalManoObra.value)} · *CIF:* ${formatCOP(costoCif.value)}`,
-    `💎 *Valor total:* ${formatCOP(precioVentaSugerido.value)} COP (margen ${margenPct.value}%)`,
-    ...(observaciones.value.trim() ? [`📝 ${observaciones.value.trim()}`] : []),
-    ``,
-    `_Para apartar cupo en el taller requerimos un abono del 50%._ 🖤`,
-  ]
-  navigator.clipboard.writeText(lineas.join('\n'))
-  showToast('success', 'Copiado al Portapapeles', 'El presupuesto con desglose se ha copiado con éxito.')
 }
 
 const guardando = ref(false)
@@ -480,7 +418,6 @@ async function guardarCotizacion() {
     }
     const saved = await createCotizacion({
       producto_id: recetaSeleccionada.value,
-      cliente_id: clienteSeleccionado.value,
       nombre_prenda: nombrePrenda.value.trim(),
       insumos: lineasValidas,
       costo_avios: costoAvios.value,
@@ -488,10 +425,9 @@ async function guardarCotizacion() {
       tiempo_confeccion_min: Math.round(tiempoConfeccionMin.value),
       tarifa_hora: tarifaHora.value,
       costo_cif: costoCif.value,
-      margen_pct: margenPct.value,
+      margen_pct: Math.round(Number(margenMetaGlobal.value ?? 35)),
       costo_hilo_m: Number(costoHiloMetro.value ?? 0),
       metros_hilo: metrosHiloEstimado.value,
-      observaciones: observaciones.value.trim() || null,
     })
     showToast('success', 'Cotización guardada', `${saved.codigo ?? 'COT'} · ${formatCOP(Number(saved.precio_sugerido))}`)
     await cargarHistorial()
@@ -557,20 +493,6 @@ async function llevarPrecioAProducto() {
             <div>
               <label class="block text-xs text-stone-400 mb-1">Nombre de la Prenda</label>
               <InputText v-model="nombrePrenda" class="w-full text-xs" />
-            </div>
-            <div>
-              <label class="block text-xs text-stone-400 mb-1">Cliente (opcional)</label>
-              <Dropdown
-                v-model="clienteSeleccionado"
-                :options="clientesOptions"
-                option-label="label"
-                option-value="value"
-                class="w-full text-xs"
-              />
-            </div>
-            <div>
-              <label class="block text-xs text-stone-400 mb-1">Observaciones (opcional)</label>
-              <InputText v-model="observaciones" placeholder="Ej: tela del cliente, entrega urgente..." class="w-full text-xs" />
             </div>
           </div>
         </div>
@@ -682,33 +604,6 @@ async function llevarPrecioAProducto() {
           </div>
         </div>
 
-        <!-- Margen base del taller (la meta manda; el slider es ajuste fino) -->
-        <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 shadow-lg space-y-4">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
-              <i class="pi pi-percentage" /> Margen base del taller
-            </div>
-            <span class="flex items-center gap-2">
-              <span v-if="margenHeredado !== null" class="px-2 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[10px] font-bold">meta heredada {{ margenHeredado }}% de la receta</span>
-              <span v-else class="px-2 py-0.5 rounded-full border border-stone-700 bg-stone-900 text-stone-300 text-[10px] font-bold">meta global {{ margenMetaGlobal }}% de Maestros</span>
-              <span class="font-mono text-sm font-extrabold text-amber-300">{{ margenPct }}%</span>
-            </span>
-          </div>
-
-          <p class="text-[11px] text-stone-400 m-0">A meta {{ margenMetaGlobal }}% daría {{ formatCOP(precioAMeta) }} (piso de referencia; el precio lista manda).</p>
-          <details class="rounded-xl border border-stone-800 bg-stone-950/60 px-3 py-2">
-            <summary class="cursor-pointer text-[11px] text-stone-400 font-bold">Ajuste fino de margen (avanzado)</summary>
-            <div class="pt-3 space-y-3">
-              <Slider v-model="margenPct" :min="20" :max="90" class="w-full" />
-              <div class="flex justify-between text-[11px] text-stone-500 font-medium">
-                <span>20% (Mayorista)</span>
-                <span class="text-amber-400 font-bold">55% - 65% (Taller Estándar)</span>
-                <span>80%+ (Alta Costura)</span>
-              </div>
-              <p class="text-[10px] text-stone-500 m-0">Regla visible: margen ≥100% usa ×2.2 fijo; margen que deje menos de 5% de factor usa ×2 (tope anti-margen-cero). Igual en servidor.</p>
-            </div>
-          </details>
-        </div>
       </div>
 
       <!-- Right (1 Col): Resumen de Cotización Card -->
@@ -783,16 +678,16 @@ async function llevarPrecioAProducto() {
               </details>
           </div>
 
-          <!-- Suggested Sale Price Box -->
+          <!-- Precio sugerido a meta del taller -->
           <div class="bg-stone-950/90 border border-amber-500/40 rounded-xl p-4 text-center space-y-1 shadow-inner">
             <div class="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
-              PRECIO DE VENTA SUGERIDO AL CLIENTE
+              PRECIO DE VENTA SUGERIDO (META {{ margenMetaGlobal }}%)
             </div>
             <div class="text-2xl sm:text-3xl font-extrabold font-mono text-amber-300">
               {{ formatCOP(precioVentaSugerido) }}
             </div>
             <div class="text-xs text-emerald-400 font-semibold pt-1">
-              Ganancia Neta: {{ formatCOP(gananciaNeta) }} ({{ margenPct }}%)
+              Ganancia Neta: {{ formatCOP(gananciaNeta) }} ({{ margenMetaGlobal }}%)
             </div>
           </div>
 
@@ -803,6 +698,9 @@ async function llevarPrecioAProducto() {
             </div>
             <label class="block text-[11px] text-stone-400">Precio de Venta Real / Tienda ($)</label>
             <InputNumber v-model="precioMercado" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" placeholder="Precio de venta actual ($)" class="w-full font-mono text-xs" @input="mercadoTocado = true" />
+            <div v-if="gananciaRealMercado !== null && margenRealMercado !== null" class="text-sm font-extrabold font-mono text-stone-100">
+              GANANCIA: {{ formatCOP(gananciaRealMercado) }} ({{ margenRealMercado.toFixed(1) }}%)
+            </div>
             <div v-if="veredictoMercado" class="text-sm font-extrabold font-mono px-2 py-1.5 rounded-lg border"
               :class="veredictoMercado.tono === 'ok'
                 ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
@@ -814,15 +712,6 @@ async function llevarPrecioAProducto() {
 
           <!-- Action Buttons -->
           <div class="space-y-2 pt-2">
-            <button
-              type="button"
-              class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition"
-              @click="copiarPresupuestoWhatsApp"
-            >
-              <i class="pi pi-whatsapp text-sm" />
-              <span>Copiar Presupuesto para WhatsApp</span>
-            </button>
-
             <Button
               label="Guardar Cotización"
               icon="pi pi-save"
