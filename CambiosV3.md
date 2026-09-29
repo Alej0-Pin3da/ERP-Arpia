@@ -3,6 +3,32 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-28] - Avíos se llaman Herrajes en el cotizador
+
+- **Motivo:** en el maestro del taller los avíos viven en la categoría Herrajes; "Avíos" confundía.
+- **Cambio (solo textos de pantalla):** Sección 2, resumen, botones ("Sumar a Herrajes", "Llevar herrajes al BOM"), toasts, columna "Va a" de la tabla base y diálogo de mapeo. Identificadores de código y API (`costo_avios`) intactos.
+- **Verificación:** eslint 0, vitest 67/67, build limpio.
+
+### [2026-09-28] - Avíos al BOM con insumo real (híbrido paso 2, mapeo a reales)
+
+- **Botón "Llevar avíos al BOM"** en la Sección 2 del cotizador (solo con receta cargada): diálogo `MapeoAviosDialog.vue` donde elegís el insumo real del maestro por fila (grupo Avíos/Empaque, cantidad, merma), con estimado a precio del maestro y referencia a los montos auditados.
+- **Cada fila crea una línea** en el BOM de la receta (`POST bom/insumos`, detalle "Avíos/Empaque auditoría cotizador"); al confirmar se recarga la base y el costo real ya las incluye. Honesto por diseño: no tiene que calzar al centavo con el monto auditado, el BOM valoriza a precio del maestro.
+- **Verificación:** eslint 0, vitest 67/67, build limpio. Backend intacto.
+
+### [2026-09-28] - Auditor guarda mano y materiales en la ficha (híbido paso 1)
+
+- **Bug:** `actualizarFichaTecnica` solo mandaba precio, tiempo, CIF y markup — los $16.000 de mano (120 min × tarifa) y los $12.000 de avíos/empaque se perdían al guardar.
+- **Fix (solo frontend, backend intacto):** el payload ahora incluye `mano_obra` (redondeo de `(min/60) × tarifa`) y `costo_insumos` (materiales auditados + avíos). El PUT de productos ya aceptaba ambos campos (`exclude_unset` + `setattr`).
+- **Lo que NO va a la ficha:** avíos/empaque/hilos/costo_total no tienen columna en Productos; las fases (Corte/Costura/Acabados/Calidad) son minutos medidos, no pesos — no se tocan. Paso 2 pendiente: llevar avíos al BOM como líneas.
+- **Verificación:** eslint 0, vitest 67/67, build limpio.
+
+### [2026-09-28] - Kits y Saldos con entrada propia en el menú lateral
+
+- **Antes:** Kits vivía como tab en Maestros (`MaestroKitsTab`) y Saldos como tab en Finanzas (`FinanzasSaldosTab`); llegar obligaba a abrir la vista madre y buscar el tab.
+- **Ahora:** rutas propias `/kits` (`KitsView.vue`) y `/saldos` (`SaldosView.vue`) con entradas en el sidebar (Kits & Cajas en TALLER & CATÁLOGO, Saldos en Vivo en GESTIÓN COMERCIAL). Reutilizan los mismos componentes sin duplicar lógica; los tabs viejos quedan intactos.
+- **Prueba real (1):** suite Emily en verde — `unidades.test.ts` + `costeo.test.ts` 20/20 (tope hilos, doble escala cm, badge >50m, paridad centavo).
+- **Verificación:** eslint 0 en 5 archivos, vitest 67/67, build limpio.
+
 ### [2026-09-27] - Fix: `tiempo_confeccion_min` ignorado por el motor de costos
 
 - **Causa:** `costo_mano_energia_estandar` solo miraba tiempos por fase o el legacy `mano_obra`; el total (ej. 120 del auditor) no lo consultaba nadie — el "Costo real BOM (DB)" no se movía tras actualizar la ficha.

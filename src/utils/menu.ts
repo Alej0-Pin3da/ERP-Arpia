@@ -36,6 +36,8 @@ export const MENU_ITEMS: MenuItem[] = [
   { name: 'devoluciones', path: '/devoluciones', label: 'Devoluciones', icon: 'pi-undo', roles: ['admin', 'operador', 'consulta'] },
   { name: 'finanzas', path: '/finanzas', label: 'Reparto de Socias', icon: 'pi-wallet', roles: ['admin', 'operador', 'consulta'] },
   { name: 'maestros', path: '/maestros', label: 'Maestros', icon: 'pi-book', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'kits', path: '/kits', label: 'Kits & Cajas', icon: 'pi-box', roles: ['admin', 'operador', 'consulta'] },
+  { name: 'saldos', path: '/saldos', label: 'Saldos en Vivo', icon: 'pi-wallet', roles: ['admin', 'operador', 'consulta'] },
   { name: 'omisiones', path: '/omisiones', label: 'Omisiones', icon: 'pi-list-check', roles: ['admin', 'operador', 'consulta'] },
   { name: 'auditoria', path: '/auditoria', label: 'Auditoría', icon: 'pi-file-check', roles: ['admin', 'operador', 'consulta'] },
   { name: 'usuarios', path: '/usuarios', label: 'Usuarios', icon: 'pi-shield', roles: ['admin'] },

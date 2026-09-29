@@ -75,6 +75,8 @@ const routes: RouteRecordRaw[] = [
       { path: 'finanzas', name: 'finanzas', component: getView('Finanzas'), meta: { roles: ALL_ROLES } },
       { path: 'socias', name: 'socias', component: getView('Finanzas'), meta: { roles: ALL_ROLES } },
       { path: 'maestros', name: 'maestros', component: getView('Maestros'), meta: { roles: ALL_ROLES } },
+      { path: 'kits', name: 'kits', component: getView('Kits'), meta: { roles: ALL_ROLES } },
+      { path: 'saldos', name: 'saldos', component: getView('Saldos'), meta: { roles: ALL_ROLES } },
       { path: 'omisiones', name: 'omisiones', component: getView('Omisiones'), meta: { roles: ALL_ROLES } },
       { path: 'auditoria', name: 'auditoria', component: getView('Auditoria'), meta: { roles: ALL_ROLES } },
       { path: 'usuarios', name: 'usuarios', component: getView('Usuarios'), meta: { roles: ['admin'] } },

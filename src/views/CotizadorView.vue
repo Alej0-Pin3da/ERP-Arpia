@@ -15,6 +15,7 @@ import { listInsumos, getInsumo, type InsumoRead } from '@/services/api/insumos'
 import type { CostoLineaRead } from '@/services/api/bom'
 import { esLineaSospechosa, estimarHilos, fueAutoajustada, metrosHiloDeLinea, metrosTelaDeLineas, normalizarAMetros, diffCantidadesBOM, type CambioCantidadBOM, subtotalLineaMaterial, subtotalMateriales as sumaMaterialesCentavos } from '@/utils/unidades'
 import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue'
+import MapeoAviosDialog from '@/components/cotizador/MapeoAviosDialog.vue'
 
 const router = useRouter()
 const productosApi = useProductos()
@@ -28,7 +29,7 @@ const loadingCostoReal = ref(false)
 const lineasBase = ref<CostoLineaRead[]>([])
 // Detalle trazable por línea del BOM para la tabla visible (Material | Cant
 // BOM | Conversión a m | Precio unit. | Subtotal | Va a).
-type DetalleBase = { nombre: string; cant: number; unidad: string; aMetros: number | null; precio: number; subtotal: number; destino: 'Telas' | 'Forro' | 'Avíos' | 'Empaque' }
+type DetalleBase = { nombre: string; cant: number; unidad: string; aMetros: number | null; precio: number; subtotal: number; destino: 'Telas' | 'Forro' | 'Herrajes' | 'Empaque' }
 const detalleBase = ref<DetalleBase[]>([])
 // El bloque Base BOM se muestra EXPANDIDO al cargar receta (el usuario no
 // registraba el colapsable cerrado).
@@ -36,7 +37,7 @@ const baseExpandida = ref(true)
 // true = el tiempo NO vino de la receta (default o receta en 0): supuesto.
 const tiempoSupuesto = ref(true)
 // Motivo cuando la base quedó parcial (maestro sin precio/categoría mapeable):
-// telas y avíos NO se pisan; solo tiempo/CIF/margen + bloque de referencia.
+// telas y herrajes NO se pisan; solo tiempo/CIF/margen + bloque de referencia.
 const baseParcial = ref<string | null>(null)
 async function cargarProductos() {
   try {
@@ -92,7 +93,7 @@ async function marcarEstado(c: CotizacionRead, estado: 'enviada' | 'aprobada' | 
   }
 }
 
-// Section 2: Avíos, Cierres & Empaque
+// Section 2: Herrajes, Cierres & Empaque
 const costoAvios = ref<number>(6500)
 const costoEmpaque = ref<number>(4500)
 
@@ -100,7 +101,7 @@ const costoEmpaque = ref<number>(4500)
 // Heurística de taller: ~120 m de hilo por metro lineal de tela+forro
 // (overlock + recta + remates). El costo por metro es editable porque
 // depende del cono que compre el taller. No se suma sola al total:
-// se muestra y se aplica a Avíos con un botón para no duplicar.
+// se muestra y se aplica a Herrajes con un botón para no duplicar.
 const costoHiloMetro = ref<number>(2)
 // Metros lineales de TELA para la heurística de hilos: suma estrictamente
 // sobre metros reales normalizados (cm→/100, mm→/1000, yardas→×0.9144) y
@@ -111,17 +112,17 @@ const metrosTotalesTela = computed(() => metrosTelaDeLineas(insumos.value))
 const estimacionHilos = computed(() => estimarHilos(metrosTotalesTela.value, Number(costoHiloMetro.value ?? 0)))
 const metrosHiloEstimado = computed(() => estimacionHilos.value.metros)
 const costoHilosEstimado = computed(() => estimacionHilos.value.costo)
-// Monto de hilo ya incluido en Avíos: el botón reemplaza, nunca acumula.
+// Monto de hilo ya incluido en Herrajes: el botón reemplaza, nunca acumula.
 const hilosAplicados = ref<number | null>(null)
 const hilosYaSumados = computed(() => hilosAplicados.value !== null && hilosAplicados.value === costoHilosEstimado.value)
 function aplicarEstimacionHilos() {
   if (hilosYaSumados.value) {
-    showToast('info', 'Ya sumado', 'Esa estimación ya está incluida en Avíos.')
+    showToast('info', 'Ya sumado', 'Esa estimación ya está incluida en Herrajes.')
     return
   }
   costoAvios.value = Number(costoAvios.value ?? 0) - (hilosAplicados.value ?? 0) + costoHilosEstimado.value
   hilosAplicados.value = costoHilosEstimado.value
-  showToast('success', 'Estimación aplicada', `${metrosHiloEstimado.value} m de hilo ≈ ${formatCOP(costoHilosEstimado.value)} en Avíos (reemplaza lo anterior, no acumula).`)
+  showToast('success', 'Estimación aplicada', `${metrosHiloEstimado.value} m de hilo ≈ ${formatCOP(costoHilosEstimado.value)} en Herrajes (reemplaza lo anterior, no acumula).`)
 }
 
 // Section 3: Mano de Obra & Costos Fijos
@@ -146,7 +147,7 @@ const recetasOptions = computed(() => {
 // (misma regla que el backend en migrate/sales.py); los keywords por nombre
 // son fallback documentado, no verdad del maestro.
 // Mercería ANTES que tela: elásticos/resortes/cintas se venden por metro pero
-// son avíos; la vieja regla "unidad m → tela" los sumaba a los metros de tela.
+// son herrajes; la vieja regla "unidad m → tela" los sumaba a los metros de tela.
 const MERCERIA_RE = /\b(resortes?|el[aá]sticos?|cauchos?|cintas?|sesgos?|ribetes?|vivos?|cord[oó]n(es)?|cremalleras?|cierres?|bot[oó]n(es)?|broches?|ojales?|hebillas?|hilos?)\b/
 type ClaseLinea = 'tela' | 'forro' | 'empaque' | 'avio'
 function clasificarLineaBom(m: InsumoRead, nombreFallback: string): ClaseLinea {
@@ -209,7 +210,7 @@ async function aplicarBaseBom() {
   if (sinMaestro.length) {
     // Prohibido fakear: sin precio/categoría del maestro no se inventan
     // metros ni precios. Solo tiempo/CIF/margen (ya aplicados) + referencia.
-    baseParcial.value = `Base parcial: ${sinMaestro.length} insumo(s) del BOM sin datos en el maestro; telas y avíos quedan manuales.`
+    baseParcial.value = `Base parcial: ${sinMaestro.length} insumo(s) del BOM sin datos en el maestro; telas y herrajes quedan manuales.`
     showToast('warn', 'Base BOM parcial', baseParcial.value)
     return
   }
@@ -231,10 +232,10 @@ async function aplicarBaseBom() {
     const conv = normalizarAMetros(cant, m.unidad_medida ?? '')
     if ((clase === 'tela' || clase === 'forro') && conv == null) {
       // Unidad no-longitud jamás va a metros: se valoriza como avío para no
-      // perder la plata (la tabla lo muestra con Va a = Avíos).
+      // perder la plata (la tabla lo muestra con Va a = Herrajes).
       clase = 'avio'
     }
-    let destino: DetalleBase['destino'] = 'Avíos'
+    let destino: DetalleBase['destino'] = 'Herrajes'
     if (clase === 'tela') destino = 'Telas'
     else if (clase === 'forro') destino = 'Forro'
     else if (clase === 'empaque') destino = 'Empaque'
@@ -267,7 +268,7 @@ async function aplicarBaseBom() {
     showToast('warn', 'Base BOM parcial', baseParcial.value)
     return
   }
-  // Los agregados manuales (avíos/empaque) no se tocan: el BOM ya vive en
+  // Los agregados manuales (herrajes/empaque) no se tocan: el BOM ya vive en
   // las líneas; lo manual son extras de esta cotización.
   insumos.value = lineas
   baseExpandida.value = true
@@ -450,17 +451,20 @@ async function actualizarFichaTecnica() {
   }
   try {
     // El precio validado es el de tienda (el que auditaste); si está vacío,
-    // cae al sugerido a meta. Tiempos y CIF van tal cual los validaste.
+    // cae al sugerido a meta. Tiempos, CIF, mano y materiales van tal cual
+    // los validaste: mano = (min/60) × tarifa, insumos = materiales + herrajes.
     const precioValidado = precioMercado.value != null
       ? Math.round(precioMercado.value)
       : Math.round(precioVentaSugerido.value)
     await updateProducto(recetaSeleccionada.value, {
       precio_venta_sugerido: precioValidado,
       tiempo_confeccion_min: Math.round(tiempoConfeccionMin.value),
+      mano_obra: Math.round(subtotalManoObra.value),
+      costo_insumos: Math.round(subtotalMateriales.value + subtotalAvios.value),
       cif_energia: costoCif.value,
       markup_pct: Math.round(Number(margenMetaGlobal.value ?? 35)),
     })
-    showToast('success', 'Ficha técnica actualizada', `Precio, Tiempos y CIF guardados en el producto ${nombrePrenda.value}.`)
+    showToast('success', 'Ficha técnica actualizada', `Precio, Tiempos, Mano, Materiales y CIF guardados en el producto ${nombrePrenda.value}.`)
     // El costo real BOM que se muestra viene de la DB: recargarlo para que
     // refleje los tiempos recién guardados sin tener que recargar la receta.
     if (recetaSeleccionada.value) {
@@ -483,6 +487,13 @@ async function actualizarFichaTecnica() {
 
 const showBomSyncDialog = ref(false)
 const syncBomLoading = ref(false)
+const showMapeoAvios = ref(false)
+
+/** Tras mapear herrajes a líneas reales, la base se recarga para que el costo
+ *  real y las líneas reflejen el BOM recién ampliado. */
+async function trasMapeoAvios(): Promise<void> {
+  await cargarBaseBom()
+}
 const diffsBomPendientes = ref<CambioCantidadBOM[]>([])
 
 async function confirmarSyncBom() {
@@ -519,7 +530,7 @@ async function confirmarSyncBom() {
           Cotizador Rápido de Costura & Presupuestos
         </h1>
         <p class="text-xs sm:text-sm text-stone-400 m-0 max-w-3xl">
-          Calcula en segundos el precio exacto para tus clientes considerando metros de tela, forros, avíos y mano de obra.
+          Calcula en segundos el precio exacto para tus clientes considerando metros de tela, forros, herrajes y mano de obra.
         </p>
       </div>
     </div>
@@ -599,11 +610,11 @@ async function confirmarSyncBom() {
           </div>
         </div>
 
-        <!-- Section 2: Avíos, Cierres & Empaque -->
+        <!-- Section 2: Herrajes, Cierres & Empaque -->
         <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 shadow-lg space-y-4">
           <div class="flex items-center justify-between border-b border-stone-800 pb-2">
             <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
-              <i class="pi pi-box" /> 2. Avíos, Cierres & Empaque
+              <i class="pi pi-box" /> 2. Herrajes & Empaque
             </div>
             <span class="font-mono text-xs font-bold text-stone-300">{{ formatCOP(subtotalAvios) }}</span>
           </div>
@@ -628,9 +639,14 @@ async function confirmarSyncBom() {
             <div class="flex items-center gap-2">
               <label class="text-[11px] text-stone-400">Costo hilo $/m</label>
               <InputNumber v-model="costoHiloMetro" mode="currency" currency="COP" locale="es-CO" :min-fraction-digits="0" :max-fraction-digits="0" class="w-32 font-mono text-xs" />
-              <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-bold" :class="hilosYaSumados ? 'bg-stone-800 text-stone-500 border border-stone-700' : 'bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30'" :disabled="hilosYaSumados" @click="aplicarEstimacionHilos">{{ hilosYaSumados ? '✓ Ya sumado' : 'Sumar a Avíos' }}</button>
+              <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-bold" :class="hilosYaSumados ? 'bg-stone-800 text-stone-500 border border-stone-700' : 'bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30'" :disabled="hilosYaSumados" @click="aplicarEstimacionHilos">{{ hilosYaSumados ? '✓ Ya sumado' : 'Sumar a Herrajes' }}</button>
             </div>
             <p class="text-[10px] text-stone-500 m-0">Heurística: 120 m hilo por metro de tela+forro (overlock+recta+remates), con tope de 500 m / $2.000. Ajustá el $/m según tu cono.</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button type="button" class="px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/30 disabled:opacity-40" :disabled="!recetaSeleccionada" title="Sin receta no hay BOM al cual llevarlos" @click="showMapeoAvios = true">Llevar herrajes al BOM</button>
+            <span class="text-[10px] text-stone-500">Elegís el insumo real por grupo; crea líneas en la receta y el costo real las absorbe.</span>
           </div>
         </div>
 
@@ -676,7 +692,7 @@ async function confirmarSyncBom() {
               <span class="font-mono font-semibold">{{ formatCOP(subtotalMateriales) }}</span>
             </div>
             <div class="flex justify-between text-stone-300">
-              <span>Avíos, Hilos & Empaque:</span>
+              <span>Herrajes, Hilos & Empaque:</span>
               <span class="font-mono font-semibold">{{ formatCOP(subtotalAvios) }}</span>
             </div>
             <div class="flex justify-between text-stone-300">
@@ -835,6 +851,15 @@ async function confirmarSyncBom() {
       :loading="syncBomLoading"
       @update:visible="showBomSyncDialog = $event"
       @confirmar="confirmarSyncBom"
+    />
+
+    <MapeoAviosDialog
+      :visible="showMapeoAvios"
+      :producto-id="recetaSeleccionada"
+      :monto-avios="Number(costoAvios ?? 0)"
+      :monto-empaque="Number(costoEmpaque ?? 0)"
+      @update:visible="showMapeoAvios = $event"
+      @creado="trasMapeoAvios"
     />
   </div>
 </template>

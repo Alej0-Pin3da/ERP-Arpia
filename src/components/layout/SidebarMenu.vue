@@ -26,8 +26,8 @@ function isActive(path: string): boolean {
 // Section grouping helper
 function getItemCategory(name: string): string {
   if (['dashboard', 'analisis'].includes(name)) return 'PANEL & ANALÍTICA'
-  if (['ventas', 'devoluciones', 'finanzas'].includes(name)) return 'GESTIÓN COMERCIAL'
-  if (['inventario', 'productos'].includes(name)) return 'TALLER & CATÁLOGO'
+  if (['ventas', 'devoluciones', 'finanzas', 'saldos'].includes(name)) return 'GESTIÓN COMERCIAL'
+  if (['inventario', 'productos', 'kits'].includes(name)) return 'TALLER & CATÁLOGO'
   return 'SISTEMA & CONTROL'
 }
 
