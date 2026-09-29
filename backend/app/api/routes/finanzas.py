@@ -59,6 +59,8 @@ from app.schemas.finanzas import (
     SocioConfiguracionRead,
     SocioConfiguracionUpdate,
 )
+from app.schemas.punto_equilibrio import PuntoEquilibrioRead
+from app.services.punto_equilibrio import calcular_termometro
 from app.services.audit import audit_movimiento_create
 from app.services.finanzas import (
     actualizar_movimiento,
@@ -624,3 +626,15 @@ def delete_anticipo(
     _: Usuario = Depends(mutation_user),
 ):
     eliminar_anticipo(db, anticipo_id)
+
+
+@router.get("/punto-equilibrio", response_model=PuntoEquilibrioRead)
+@user_limiter.limit("300/minute")
+def punto_equilibrio(
+    request: Request,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(audited_user),
+):
+    """Termómetro Operativo del Mes: break-even from confirmed month sales
+    (America/Bogota bounds), devoluciones netted on both sides."""
+    return calcular_termometro(db)

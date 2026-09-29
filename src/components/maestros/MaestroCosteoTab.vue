@@ -24,6 +24,7 @@ const PARAMETROS_COSTEO_DEFAULT: ParametrosRead = {
   distribucion_reinversion_pct: 40,
   reparto_margara_pct: 30,
   reparto_valqui_pct: 30,
+  costos_fijos_mensuales: 0,
 } as ParametrosRead
 
 const parametrosForm = ref<ParametrosRead>({ ...(props.parametros ?? PARAMETROS_COSTEO_DEFAULT) })
@@ -209,6 +210,28 @@ function restaurarParametrosDefecto() {
             />
           </div>
           <p class="text-[11px] text-stone-400">Porcentaje de tela adicional estimado por mermas en tizado.</p>
+        </div>
+
+        <!-- Costos fijos mensuales (Termómetro Operativo) -->
+        <div class="space-y-2">
+          <label for="param-fijos-mensuales" class="block text-xs font-mono text-stone-300">
+            Costos Fijos Mensuales (COP):
+          </label>
+          <div class="relative">
+            <InputNumber
+              v-model="parametrosForm.costos_fijos_mensuales"
+              inputId="param-fijos-mensuales"
+              mode="currency"
+              currency="COP"
+              locale="es-CO"
+              :min="0"
+              :min-fraction-digits="0"
+              :max-fraction-digits="0"
+              class="w-full"
+              inputClass="w-full bg-stone-950 border border-stone-700 rounded-lg px-3 py-2 text-stone-100 font-mono text-sm focus:border-amber-400 focus:outline-none"
+            />
+          </div>
+          <p class="text-[11px] text-stone-400">Arriendo, servicios y fijos del mes: meta del Termómetro Operativo.</p>
         </div>
 
         <!-- Distribución 40/30/30 Editable -->

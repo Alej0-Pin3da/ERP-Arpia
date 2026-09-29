@@ -108,6 +108,7 @@ export interface ParametrosRead {
   distribucion_reinversion_pct: number
   reparto_margara_pct: number
   reparto_valqui_pct: number
+  costos_fijos_mensuales: number
   created_at: string
   updated_at: string
 }

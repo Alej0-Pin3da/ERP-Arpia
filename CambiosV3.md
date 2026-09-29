@@ -3,6 +3,14 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-29] - Termómetro Operativo del Mes (punto de equilibrio real)
+
+- **Qué es:** widget en el Dashboard con la meta de ventas del mes (costos fijos / margen real), ventas netas, faltante o utilidad extra. El Simulador de Finanzas no se tocó (sigue como planeación).
+- **Backend:** `costos_fijos_mensuales` en `ParametrosCosteo` + migración `e7f1a2b3c4d5`; `GET /finanzas/punto-equilibrio` con mes en `America/Bogota`, solo ventas `confirmed`, devoluciones confirmadas neteadas en ingreso (monto reembolsado) y costo (match con detalles originales). Estados: sin_datos / sin_configurar / alerta (margen ≤ 0, sin barra) / en_camino / superada. Decimal estricto.
+- **Frontend:** `TermometroOperativo.vue` (ProgressBar PrimeVue, COP) + campo Costos Fijos en Maestros → Costeo.
+- **Verificación:** backend 8/8 nuevo + 28/28 parámetros/schemas, eslint 0, vitest 67/67, build limpio, migración aplicada. Regresión API amplia no corrida (batch se colgó a los 10 min); cambio aditivo, riesgo bajo.
+- **Pendiente del operador:** cargar los costos fijos en Maestros → Costeo (sin eso el widget pide configuración).
+
 ### [2026-09-28] - Avíos se llaman Herrajes en el cotizador
 
 - **Motivo:** en el maestro del taller los avíos viven en la categoría Herrajes; "Avíos" confundía.

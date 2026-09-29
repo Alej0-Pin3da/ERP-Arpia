@@ -307,6 +307,7 @@ class ParametrosRead(BaseModel):
     distribucion_reinversion_pct: Decimal
     reparto_margara_pct: Decimal
     reparto_valqui_pct: Decimal
+    costos_fijos_mensuales: Decimal
     created_at: datetime
     updated_at: datetime
 
@@ -321,3 +322,4 @@ class ParametrosUpdate(BaseModel):
     distribucion_reinversion_pct: Decimal | None = Field(default=None, ge=0, le=100)
     reparto_margara_pct: Decimal | None = Field(default=None, ge=0, le=100)
     reparto_valqui_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    costos_fijos_mensuales: Decimal | None = Field(default=None, ge=0)

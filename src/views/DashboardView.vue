@@ -17,6 +17,7 @@ import type { LiquidacionRead, LiquidacionDistribucionRead } from '@/services/ap
 import type { AnaliticosResumen } from '@/services/api/analiticos'
 import NuevoPedidoModal from '@/components/atelier/NuevoPedidoModal.vue'
 import SugerirOrdenModal from '@/components/atelier/SugerirOrdenModal.vue'
+import TermometroOperativo from '@/components/dashboard/TermometroOperativo.vue'
 
 const router = useRouter()
 const insumosApi = useInsumos()
@@ -276,6 +277,9 @@ function getEstadoBadgeClass(estado: string) {
         </div>
       </div>
     </div>
+
+    <!-- Termómetro Operativo del Mes (ejecución real, America/Bogota) -->
+    <TermometroOperativo />
 
     <!-- Flujo de Producción Personalizada (Kanban Summary Bar) -->
     <div class="bg-stone-900/80 border border-stone-800 rounded-2xl p-5 shadow-lg space-y-3">

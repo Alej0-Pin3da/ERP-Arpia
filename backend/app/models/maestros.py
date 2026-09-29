@@ -241,6 +241,7 @@ class ParametrosCosteo(Base):
         CheckConstraint("costo_hora_patronaje >= 0", name="ck_param_patronaje"),
         CheckConstraint("margen_meta_global_pct >= 0 AND margen_meta_global_pct <= 100", name="ck_param_margen"),
         CheckConstraint("desperdicio_textil_default_pct >= 0 AND desperdicio_textil_default_pct <= 100", name="ck_param_desperdicio"),
+        CheckConstraint("costos_fijos_mensuales >= 0", name="ck_param_fijos"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -253,6 +254,7 @@ class ParametrosCosteo(Base):
     distribucion_reinversion_pct: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("40"), default=Decimal("40"))
     reparto_margara_pct: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("30"), default=Decimal("30"))
     reparto_valqui_pct: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("30"), default=Decimal("30"))
+    costos_fijos_mensuales: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False, server_default=text("0"), default=Decimal("0"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
