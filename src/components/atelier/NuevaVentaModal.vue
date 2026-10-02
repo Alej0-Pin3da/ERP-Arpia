@@ -13,6 +13,7 @@ import { client } from '@/api/client'
 import type { CanalVenta, MetodoPago, VentaCreatePayload, VentaRead } from '@/services/api/ventas'
 import { updateVenta } from '@/services/api/ventas'
 import { listCanales, listMetodosPago } from '@/services/api/maestros'
+import { listKits, getKit, type KitRead } from '@/services/api/kits'
 import { showToast } from '@/utils/toast'
 
 /** Minimal venta shape this modal edits (REAL display object from the caller). */
@@ -63,14 +64,16 @@ const metodos = ref<{ codigo: string; nombre: string }[]>([])
 
 async function cargarOpciones() {
   try {
-    const [cliRes, prodRes, canRes, metRes] = await Promise.all([
+    const [cliRes, prodRes, canRes, metRes, kitRes] = await Promise.all([
       clientesApi.list({ limit: 100, offset: 0 }),
       client.get<{ items: { id: number; nombre: string; precio_venta_sugerido?: number }[] }>('/productos', { params: { limit: 100 } }),
       listCanales({ limit: 100 }).catch(() => ({ items: [], total: 0 })),
       listMetodosPago({ limit: 100 }).catch(() => ({ items: [], total: 0 })),
+      listKits({ limit: 100 }).catch(() => ({ items: [], total: 0 })),
     ])
     clientes.value = (cliRes.items as unknown as typeof clientes.value) ?? []
     productos.value = (prodRes.data.items as unknown as typeof productos.value) ?? []
+    kits.value = ((kitRes as unknown as { items: KitRead[] }).items as unknown as KitRead[]) ?? []
     if (canRes.items?.length) {
       canales.value = canRes.items
         .filter((c) => c.activo !== false)
@@ -146,6 +149,11 @@ interface LocalItem {
 
 const items = ref<LocalItem[]>([])
 const guardando = ref(false)
+
+// Cajas promo (Kits): elegir una la expande en renglones por producto.
+const kits = ref<KitRead[]>([])
+const kitSel = ref<number | null>(null)
+const kitCantidad = ref<number>(1)
 
 const canalesOptionsLegacy = [
   { label: 'Showroom Pereira', value: 'Showroom Pereira' },
@@ -246,6 +254,15 @@ const catalogoPrendasOptions = computed(() => {
     }
   })
 })
+
+const kitsOptions = computed(() =>
+  kits.value
+    .filter((k) => k.activo !== false)
+    .map((k) => ({
+      label: `${k.nombre} (promo ${formatCOP(Number(k.precio_promocional ?? 0))} · ${(k.lineas ?? []).length} productos)`,
+      value: k.id,
+    })),
+)
 
 // Financial calculations
 const subtotalItems = computed(() => {
@@ -404,8 +421,92 @@ async function seleccionarPrendaCatalogo(it: LocalItem, prendaId: number | null)
   }
 }
 
-function eliminarItem(index: number) {
-  items.value.splice(index, 1)
+/** Vender caja promo: la expande en un renglón por producto con sus
+ *  cantidades, la promo prorrateada por precio sugerido (último renglón
+ *  absorbe el redondeo) y variante/talla por defecto. El backend calcula
+ *  el costo desde el BOM como en cualquier renglón. */
+async function agregarCaja() {
+  if (kitSel.value == null) {
+    showToast('warn', 'Sin caja', 'Elegí una caja promo del dropdown.')
+    return
+  }
+  const cajas = Math.max(1, Math.round(Number(kitCantidad.value ?? 1)))
+  let kit: KitRead
+  try {
+    kit = await getKit(kitSel.value)
+  } catch {
+    showToast('error', 'No se pudo cargar', 'Revisá la conexión e intentá de nuevo.')
+    return
+  }
+  const lineas = kit.lineas ?? []
+  if (!lineas.length) {
+    showToast('warn', 'Caja vacía', `"${kit.nombre}" no tiene productos.`)
+    return
+  }
+  const promo = Number(kit.precio_promocional ?? 0)
+  if (!(promo > 0)) {
+    showToast('warn', 'Promo en $0', 'La caja tiene precio promocional en 0; poné precio antes de venderla.')
+    return
+  }
+  const src = productos.value as unknown as Array<{ id: number; nombre: string; precio_venta?: number | string; precio_venta_sugerido?: number | string; costo_unitario?: number | string; costos_operativos_fijos?: number | string; costo_insumos?: number | string }>
+  const sugDe = (pid: number): number => {
+    const p = src.find((x) => x.id === pid)
+    const n = Number(p?.precio_venta ?? p?.precio_venta_sugerido ?? NaN)
+    return Number.isFinite(n) && n > 0 ? n : 0
+  }
+  const totalSug = lineas.reduce((a, l) => a + sugDe(Number(l.producto_id)) * Number(l.cantidad ?? 0), 0)
+  const totales: number[] = lineas.map((l, i) => {
+    if (i < lineas.length - 1) {
+      const base = totalSug > 0
+        ? (sugDe(Number(l.producto_id)) * Number(l.cantidad ?? 0)) / totalSug
+        : 1 / lineas.length
+      return Math.round(promo * base)
+    }
+    return 0
+  })
+  totales[lineas.length - 1] = Math.max(0, Math.round(promo) - totales.reduce((a, t) => a + t, 0))
+  let creados = 0
+  for (let i = 0; i < lineas.length; i++) {
+    const l = lineas[i]
+    const pid = Number(l.producto_id)
+    const cant = Number(l.cantidad ?? 0) * cajas
+    if (!(cant > 0)) continue
+    const p = src.find((x) => x.id === pid)
+    const numCosto = Number(p?.costo_unitario ?? p?.costos_operativos_fijos ?? p?.costo_insumos ?? NaN)
+    const it: LocalItem = {
+      id: Date.now() + Math.random(),
+      producto_id: pid,
+      variante_id: null,
+      nombre_prenda: l.producto_nombre ?? p?.nombre ?? `Producto ${pid}`,
+      talla: '',
+      cantidad: cant,
+      precio_unitario: totales[i] > 0 ? Math.max(1, Math.round(totales[i] / cant)) : 0,
+      costo_unitario: Number.isFinite(numCosto) && numCosto > 0 ? numCosto : 0,
+      variantes: [],
+      stockTexto: '',
+      stockDisponible: 0,
+    }
+    items.value.push(it)
+    await cargarVariantesYStock(it, pid)
+    if (it.variantes?.length) {
+      it.variante_id = it.variantes[0].id
+      it.talla = tallaDeVariante(it.variantes[0].nombre_variante)
+    } else {
+      it.variante_id = null
+      it.talla = 'Única'
+    }
+    creados += 1
+  }
+  // Saca la fila vacía inicial del modal para no bloquear el guardado.
+  items.value = items.value.filter((it) => it.producto_id != null || it.nombre_prenda.trim() !== '' || it.precio_unitario > 0)
+  if (!creados) {
+    showToast('warn', 'Sin renglones', 'Ninguna línea de la caja tenía cantidad mayor a 0.')
+    return
+  }
+  showToast('success', 'Caja agregada', `"${kit.nombre}" × ${cajas}: ${creados} renglones con la promo prorrateada.`)
+}
+
+function eliminarItem(index: number) {  items.value.splice(index, 1)
   if (items.value.length === 0) {
     agregarItemVacio()
   }
@@ -725,6 +826,30 @@ async function guardar() {
             @click="agregarItemVacio"
           />
         </div>
+        <div class="flex flex-wrap items-center gap-2 rounded-lg border border-stone-800 bg-stone-950/60 p-2.5">
+          <Dropdown
+            :model-value="kitSel"
+            :options="kitsOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="O elegí una caja promo..."
+            class="flex-1 min-w-[200px] text-xs"
+            show-clear
+            filter
+            @update:model-value="(val) => (kitSel = val)"
+          />
+          <div class="w-20">
+            <InputNumber v-model="kitCantidad" :min="1" class="w-full text-xs" placeholder="Cant." />
+          </div>
+          <Button
+            label="Agregar caja"
+            icon="pi pi-box"
+            size="small"
+            class="p-button-outlined text-[11px] py-1 px-2.5"
+            @click="agregarCaja"
+          />
+        </div>
+        <p class="text-[10px] text-stone-500 m-0">La caja se expande en renglones por producto con la promo prorrateada.</p>
 
         <!-- Items List -->
         <div class="space-y-3">

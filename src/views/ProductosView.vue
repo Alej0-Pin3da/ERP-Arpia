@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useProductos } from '@/composables/useProductos'
+import { useMaestros } from '@/composables/useMaestros'
 import { usePrendas } from '@/composables/usePrendas'
 import { useBom } from '@/composables/useBom'
 import Button from 'primevue/button'
@@ -14,6 +15,7 @@ import { getApiErrorDetail } from '@/utils/api-error'
 import type { ProductoRead } from '@/services/api/productos'
 
 const productosApi = useProductos()
+const maestrosApi = useMaestros()
 const bomApi = useBom()
 
 const search = ref('')
@@ -62,16 +64,30 @@ const recetaSeleccionada = ref<RecetaDisplay | null>(null)
 const recetaEditar = ref<RecetaDisplay | null>(null)
 const fichaStartEditing = ref(false)
 
-const categorias = [
-  'Todos los Modelos',
-  'Corsetería',
-  'Blusas y Tops',
-  'Conjuntos y Sets',
-  'Vestidos',
-  'Pantalones',
-  'Accesorios',
-  'Alta Costura',
-]
+const TODOS_LOS_MODELOS = 'Todos los Modelos'
+
+/** Opciones del filtro desde el maestro (Maestros → Categorías) + lo que
+ *  traen los productos. Nada hardcodeado: si creás "Lencería" en Maestros,
+ *  aparece sola; "General" aparece porque el mapeo la asigna por defecto. */
+const categoriasMaestro = ref<string[]>([])
+
+/** Comparación insensible a mayúsculas y tildes: "corseteria" matchea
+ *  "Corsetería" en vez de esconder la prenda sin aviso. */
+function normCat(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+async function cargarCategorias() {
+  try {
+    const r = await maestrosApi.listCategoriasProducto({ limit: 100 })
+    categoriasMaestro.value = (r.items ?? [])
+      .filter((c) => c.activo !== false && String(c.tipo ?? '').toUpperCase() === 'CATEGORIA')
+      .map((c) => c.nombre)
+  } catch { categoriasMaestro.value = [] }
+}
 
 const productos = ref<ProductoRead[]>([])
 const bomCounts = ref<Record<number, number>>({})
@@ -118,7 +134,7 @@ async function cargarProductos() {
     } catch { /* ignore BOM counts */ }
   } catch { productos.value = [] }
 }
-onMounted(() => { void cargarProductos(); void cargarMargenMeta(); void cargarUdsPorTalla() })
+onMounted(() => { void cargarProductos(); void cargarMargenMeta(); void cargarUdsPorTalla(); void cargarCategorias() })
 function mapProductoRow(p: ProductoRead): RecetaDisplay {
   return {
   id: p.id,
@@ -164,6 +180,27 @@ function mapProductoRow(p: ProductoRead): RecetaDisplay {
   }
 }
 const recetasDisplay = computed(() => productos.value.map((p) => mapProductoRow(p)))
+
+/** Opciones del filtro desde el maestro + lo que traen los productos. Nada
+ *  hardcodeado: si creás "Lencería" en Maestros, aparece sola; "General"
+ *  aparece porque el mapeo la asigna por defecto. */
+const categorias = computed(() => {
+  const deProductos = recetasDisplay.value
+    .map((r) => r.categoria)
+    .filter((c) => c.trim() !== '')
+  const union: string[] = []
+  for (const c of [...categoriasMaestro.value, ...deProductos]) {
+    if (!union.includes(c)) union.push(c)
+  }
+  return [TODOS_LOS_MODELOS, ...union]
+})
+
+// Si la categoría elegida deja de existir (maestro o datos), volver a Todos.
+watch(categorias, (cats) => {
+  if (selectedCategory.value !== TODOS_LOS_MODELOS && !cats.includes(selectedCategory.value)) {
+    selectedCategory.value = TODOS_LOS_MODELOS
+  }
+})
 const recetasFiltradas = computed(() => {
   let list = recetasDisplay.value.filter((r) => {
     const q = search.value.trim().toLowerCase()
@@ -174,8 +211,8 @@ const recetasFiltradas = computed(() => {
       r.descripcion.toLowerCase().includes(q)
 
     const matchesCat =
-      selectedCategory.value === 'Todos los Modelos' ||
-      r.categoria === selectedCategory.value
+      selectedCategory.value === TODOS_LOS_MODELOS ||
+      normCat(r.categoria) === normCat(selectedCategory.value)
 
     const m = Number(r.markup_pct ?? 0)
     const meta = Number(margenMetaGlobal.value ?? 35)

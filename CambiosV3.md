@@ -3,6 +3,19 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-09-29] - Vender cajas promo explotadas en la venta
+
+- **Causa:** los Kits viven en tabla propia y el "Prenda / Modelo" solo leía `/productos`; ninguna caja podía venderse.
+- **Fix (solo frontend, backend intacto):** selector de caja promo en Nueva Venta que la expande en un renglón por producto (cantidades del kit × cajas, promo prorrateada por precio sugerido con redondeo absorbido en el último renglón, variante/talla por defecto). El costo lo calcula el servidor desde el BOM como siempre; stock, ganancia y reparto fluyen solos.
+- **Verificación:** eslint 0, vitest 67/67, build limpio. Prueba real pendiente: vender una caja de prueba.
+
+### [2026-09-29] - Filtro de categorías de Productos dinámico desde el maestro
+
+- **Bug:** lista hardcodeada y duplicada en 3 lugares; sin "General" (que el mapeo asigna por defecto) y match exacto sensible a tildes que escondía prendas.
+- **Fix (solo frontend):** opciones desde Maestros → Categorías (tipo CATEGORIA activas) + categorías reales de los productos; comparación insensible a mayúsculas/tildes; si la elegida deja de existir vuelve a Todos.
+- **Fix del fix:** el computed quedó declarado antes que `recetasDisplay` y rompía el setup (`Cannot access before initialization`); movido debajo, orden verificado por líneas.
+- **Verificación:** eslint 0, vitest 67/67, build limpio.
+
 ### [2026-09-29] - Termómetro Operativo del Mes (punto de equilibrio real)
 
 - **Qué es:** widget en el Dashboard con la meta de ventas del mes (costos fijos / margen real), ventas netas, faltante o utilidad extra. El Simulador de Finanzas no se tocó (sigue como planeación).
