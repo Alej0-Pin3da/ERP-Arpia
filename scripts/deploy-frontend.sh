@@ -24,7 +24,8 @@ set -euo pipefail
 REPO_URL="https://github.com/Alej0-Pin3da/ERP-Arpia.git"
 # Server checkout — env-overridable (see deploy.sh). Fails fast if missing.
 CLONE="${CLONE:-/home/arpiacom/repositories/ERP-Arpia}"
-FRONTEND_SRC="$CLONE/frontend"
+# Frontend vive en la RAIZ del repo (package.json / src/ / dist/), no en frontend/.
+FRONTEND_SRC="$CLONE"
 # app.arpia.com.co document root — ADJUST to the cPanel subdomain docroot.
 FRONTEND_DOCROOT="${FRONTEND_DOCROOT:-/home/arpiacom/app.arpia.com.co}"
 # Live URL used for the post-deploy verification curl.
@@ -64,8 +65,8 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 if [ ! -f "$FRONTEND_SRC/package.json" ]; then
-  echo "ERROR: frontend/ not found at $FRONTEND_SRC" >&2
-  echo "       This branch may predate Phase 6 — checkout a branch that has frontend/." >&2
+  echo "ERROR: package.json not found at $FRONTEND_SRC" >&2
+  echo "       Expected frontend at repo root — checkout a branch that has package.json at root." >&2
   exit 1
 fi
 cd "$FRONTEND_SRC"

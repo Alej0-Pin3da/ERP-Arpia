@@ -3,6 +3,13 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-10-14] - Deploy a servidor: frontend en raíz, env ejemplo y CRLF
+
+- **Causa:** `deploy-frontend.sh` apuntaba a `$CLONE/frontend` pero el front vive en la raíz del repo (`package.json`/`src/`/`dist/`); además tenía CRLF (105 líneas) que rompía `bash` en el servidor (`syntax error near unexpected token do`). `.env.example` estaba ignorado por `.gitignore` (`.env.*`) así que nunca viajaría al servidor, y le faltaban 6 vars que `config.py` ya lee. `docker-compose.yml` tampoco pasaba esas vars al servicio `api`.
+- **Fix:** `FRONTEND_SRC="$CLONE"` + mensaje de error corregido; normalizados `deploy.sh` y `deploy-frontend.sh` a LF; `.gitignore` con excepción `!.env.example`; `.env.example` con `REFRESH_TOKEN_EXPIRE_DAYS`, `REDIS_URL`, `WOO_WEBHOOK_SECRET`, `OLLAMA_URL`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT_S` (defaults iguales a `config.py`); `docker-compose.yml` pasa las 6 al contenedor `api`.
+- **Verificación:** `bash -n` OK en ambos scripts (antes `deploy-frontend.sh` fallaba). Sin cambios de código de app.
+- **Pendiente:** decisión Ollama en shared hosting (V6 M5 apunta a `localhost:11434` — en cPanel no hay Ollama; definir si se deshabilita, se usa endpoint externo o se saca del deploy). Commitear y pushear.
+
 ### [2026-09-29] - Vender cajas promo explotadas en la venta
 
 - **Causa:** los Kits viven en tabla propia y el "Prenda / Modelo" solo leía `/productos`; ninguna caja podía venderse.
