@@ -10,10 +10,11 @@
 #   1) Clone the repo if the clone dir does not exist (bootstrap)
 #   2) Pull latest code in the clone
 #   3) Sync backend to the app dir
-#   4) Validate production configuration and run alembic migrations
-#   5) Restart the Passenger app
-#   6) Verify readiness
-#   7) (Optional) Deploy the frontend — enabled with DEPLOY_FRONTEND=1
+#   4) Install backend dependencies from requirements.txt into the venv
+#   5) Validate production configuration and run alembic migrations
+#   6) Restart the Passenger app
+#   7) Verify readiness
+#   8) (Optional) Deploy the frontend — enabled with DEPLOY_FRONTEND=1
 #
 # Adjust CLONE / APP / VENV / REPO_URL if the server layout changes.
 # Frontend docroot / URL live in scripts/deploy-frontend.sh.
@@ -53,6 +54,20 @@ rsync -av --delete \
   --exclude='tmp/' \
   --exclude='public/' \
   "$CLONE/backend/" "$APP/"
+
+echo "==> [3b/6] Installing backend dependencies"
+if [ ! -x "$VENV/python" ]; then
+  echo "ERROR: no venv python at $VENV — create the Python app in cPanel first." >&2
+  exit 1
+fi
+# A fresh venv, or a package added to requirements.txt, used to reach runtime as an
+# ImportError: that is how a missing slowapi put a 500 on every endpoint. Install
+# here — after the code sync, before migrations and before Passenger restarts — so
+# the restart picks up the new code with its dependencies already in place. Without
+# --upgrade, pip only installs what is missing or does not satisfy the pins, so an
+# unchanged requirements.txt is a no-op.
+"$VENV/python" -m pip install --no-input --disable-pip-version-check \
+  -r "$APP/requirements.txt"
 
 echo "==> [4/6] Running migrations"
 cd "$APP"
