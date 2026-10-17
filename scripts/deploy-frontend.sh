@@ -75,44 +75,46 @@ npm ci
 # Platform-native binaries. package-lock.json is generated on Windows, so it
 # only pins the win32 builds of rollup / esbuild / tailwind-oxide /
 # lightningcss; `npm ci` installs exactly what the lock lists, so on Linux
-# those packages cannot load their native module at build time
-# ("Cannot find module @rollup/rollup-linux-x64-gnu"). Install the Linux x64
-# binaries at the very versions `npm ci` just installed, then restore the
-# lockfile so the clone stays clean for the next `git pull --ff-only`.
-restore_lockfile() {
-  if ! git -C "$FRONTEND_SRC" diff --quiet -- package-lock.json; then
-    git -C "$FRONTEND_SRC" checkout -- package-lock.json
-    echo "    package-lock.json restaurado - el clon queda limpio"
-  fi
-}
-trap restore_lockfile EXIT
-
-native_missing=""
-require_native() {
+# those packages cannot load their native module at build time ("Cannot find
+# module @rollup/rollup-linux-x64-gnu").
+#
+# They are taken straight from the registry into their package directory
+# instead of via `npm install`: an install reifies the whole tree, drags in
+# tsx's nested esbuild 0.28.2 and kills the deploy inside esbuild's postinstall
+# ('Expected "0.25.12" but got "0.28.2"'). Extracting the tarball touches only
+# that one package, never runs lifecycle scripts and never writes the lockfile.
+fetch_native_binary() {
   # $1 = package, $2 = parent package whose installed version we mirror
-  local pkg="$1" parent="$2" version
-  if [ -d "node_modules/$pkg" ]; then
+  local pkg="$1" parent="$2" version url dest
+  dest="node_modules/$pkg"
+  if [ -d "$dest" ]; then
     return 0
   fi
   version="$(node -p "require('./node_modules/$parent/package.json').version" 2>/dev/null || true)"
-  if [ -z "$version" ]; then
-    echo "ERROR: cannot read $parent version from node_modules" >&2
+  if [ -z "$version" ] || [ "$version" = "undefined" ]; then
+    echo "ERROR: cannot read the $parent version from node_modules" >&2
     exit 1
   fi
-  native_missing="$native_missing $pkg@$version"
+  url="$(npm view "$pkg@$version" dist.tarball 2>/dev/null || true)"
+  if [ -z "$url" ]; then
+    echo "ERROR: cannot resolve the tarball URL for $pkg@$version" >&2
+    exit 1
+  fi
+  echo "    fetching $pkg@$version (native Linux binary missing from the lock)"
+  mkdir -p "$dest"
+  curl -fsSL "$url" | tar -xz --strip-components=1 -C "$dest"
+  # esbuild keeps its native binary under bin/ and needs the exec bit; do not
+  # depend on the umask or on how tar preserved the mode.
+  if [ -f "$dest/bin/esbuild" ]; then
+    chmod +x "$dest/bin/esbuild"
+  fi
 }
 
 if [ "$(uname -s)" = "Linux" ]; then
-  require_native "@rollup/rollup-linux-x64-gnu" "rollup"
-  require_native "@esbuild/linux-x64" "esbuild"
-  require_native "@tailwindcss/oxide-linux-x64-gnu" "@tailwindcss/oxide"
-  require_native "lightningcss-linux-x64-gnu" "lightningcss"
-
-  if [ -n "$native_missing" ]; then
-    echo "    native Linux binaries missing from the lock:$native_missing"
-    # shellcheck disable=SC2086  # the space-separated list is intentional
-    npm install --no-save --no-audit --no-fund $native_missing
-  fi
+  fetch_native_binary "@rollup/rollup-linux-x64-gnu" "rollup"
+  fetch_native_binary "@esbuild/linux-x64" "esbuild"
+  fetch_native_binary "@tailwindcss/oxide-linux-x64-gnu" "@tailwindcss/oxide"
+  fetch_native_binary "lightningcss-linux-x64-gnu" "lightningcss"
 fi
 
 npm run build
