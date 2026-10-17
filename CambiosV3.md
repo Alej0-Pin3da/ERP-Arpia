@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-10-17] - SPA fallback perdido: restaurado `public/.htaccess`
+
+- **Síntoma:** `https://app.arpia.com.co` responde 200, pero las rutas del SPA en modo history (`/ventas`, `/dashboard`) dan 404 al entrar directo o recargar: sin rewrite, Apache busca el archivo inexistente.
+- **Causa:** el `.htaccess` con el fallback existía versionado en `frontend/public/.htaccess` y lo borró el commit masivo `4e9b966` ("Cambios desde Google IA Studio") cuando el front se mudó de `frontend/` a la raíz; nunca se recreó en `public/`. En el primer deploy exitoso del SPA, el `rsync --delete` del docroot borró la copia que quedaba en el servidor (`deleting .htaccess` en la salida del deploy) y `dist/` no tenía nada para reemplazarla, así que el servidor quedó sin reglas.
+- **Fix:** restaurado el archivo original (contenido idéntico al de `4e9b966^`; solo se actualizó el comentario que apuntaba a `frontend/public/`) en `public/.htaccess`, que es el `publicDir` de Vite. Reglas: `RewriteEngine On`, `RewriteCond %{REQUEST_FILENAME} !-f`, `RewriteCond %{REQUEST_FILENAME} !-d`, `RewriteRule ^ index.html [L]`.
+- **Verificación:** en el clon aislado, `npm run build` con el archivo en `public/` → `dist/.htaccess` presente, 569 bytes, byte a byte idéntico al del repo y solo LF (sin CR, que rompería el flag `[L]`). Al viajar dentro de `dist/`, el rsync lo despliega en cada deploy y el `--delete` ya no puede dejarlo sin reemplazo.
+- **Archivos:** `public/.htaccess` (nuevo), `scripts/deploy-frontend.sh` (comentario del rsync), `MANUAL_DESPLIEGUE.md`, `CambiosV3.md`.
+- **Pendiente:** confirmar en el servidor que `/ventas` devuelve 200 con el HTML del SPA después del redeploy.
+
 ### [2026-10-17] - Deploy frontend en Linux: binarios nativos ausentes en el lockfile
 
 - **Causa:** `package-lock.json` se genera en Windows, así que solo materializa las variantes `win32` de los paquetes con binario nativo (`@rollup/rollup-win32-*`, `@esbuild/win32-x64`, `@tailwindcss/oxide-win32-x64-msvc`, `lightningcss-win32-x64-msvc`). `npm ci` instala exactamente lo que lista el lock, entonces en el servidor Linux el build muere con `Cannot find module @rollup/rollup-linux-x64-gnu` (y fallarían también esbuild, tailwind-oxide y lightningcss).

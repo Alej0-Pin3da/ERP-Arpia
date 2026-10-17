@@ -147,7 +147,9 @@ fi
 echo "==> [5/6] Syncing dist/ to docroot ($FRONTEND_DOCROOT)"
 mkdir -p "$FRONTEND_DOCROOT"
 # Clean mirror of dist/: --delete removes stale hashed assets from old builds.
-# Keep server-side tweaks in frontend/public/ (e.g. .htaccess) so they survive.
+# Keep server-side tweaks in public/ (the SPA fallback .htaccess lives there and
+# Vite copies it into dist/) so they survive; anything in the docroot that dist/
+# does not replace is deleted.
 # .well-known/ is excluded so Let's Encrypt HTTP-01 challenges survive redeploys.
 rsync -av --delete \
   --exclude='.well-known/' \
