@@ -70,6 +70,14 @@ if [ ! -f "$FRONTEND_SRC/package.json" ]; then
   exit 1
 fi
 cd "$FRONTEND_SRC"
+
+# Wipe node_modules first: `npm ci` does not remove a package that a previous
+# (possibly failed) install hoisted and the lockfile does not list. A leftover
+# node_modules/@esbuild/linux-x64@0.28.2 -- hoisted from tsx's nested esbuild --
+# is kept because on Linux it does belong to the tree, and then esbuild's own
+# postinstall validates against it and dies with
+# 'Expected "0.25.12" but got "0.28.2"'.
+rm -rf node_modules
 npm ci
 
 # Platform-native binaries. package-lock.json is generated on Windows, so it
