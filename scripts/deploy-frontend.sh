@@ -71,14 +71,19 @@ if [ ! -f "$FRONTEND_SRC/package.json" ]; then
 fi
 cd "$FRONTEND_SRC"
 
-# Wipe node_modules first: `npm ci` does not remove a package that a previous
-# (possibly failed) install hoisted and the lockfile does not list. A leftover
-# node_modules/@esbuild/linux-x64@0.28.2 -- hoisted from tsx's nested esbuild --
-# is kept because on Linux it does belong to the tree, and then esbuild's own
-# postinstall validates against it and dies with
-# 'Expected "0.25.12" but got "0.28.2"'.
+# Clean install with lifecycle scripts disabled.
+#
+# package-lock.json is generated on Windows, so on Linux npm ci resolves the
+# platform packages the lock is missing by itself -- and it puts the one that
+# belongs to tsx's NESTED esbuild (0.28.2) in the root
+# node_modules/@esbuild/linux-x64, the very slot the root esbuild (0.25.12)
+# would use. esbuild's own postinstall then resolves that binary from
+# node_modules/esbuild/install.js and aborts the deploy with
+# 'Expected "0.25.12" but got "0.28.2"'. With --ignore-scripts that check never
+# runs; the native binaries are supplied explicitly right below (verified: the
+# build does not need any install script in this tree).
 rm -rf node_modules
-npm ci
+npm ci --ignore-scripts
 
 # Platform-native binaries. package-lock.json is generated on Windows, so it
 # only pins the win32 builds of rollup / esbuild / tailwind-oxide /
@@ -93,15 +98,21 @@ npm ci
 # that one package, never runs lifecycle scripts and never writes the lockfile.
 fetch_native_binary() {
   # $1 = package, $2 = parent package whose installed version we mirror
-  local pkg="$1" parent="$2" version url dest
+  local pkg="$1" parent="$2" version have url dest
   dest="node_modules/$pkg"
-  if [ -d "$dest" ]; then
-    return 0
-  fi
   version="$(node -p "require('./node_modules/$parent/package.json').version" 2>/dev/null || true)"
   if [ -z "$version" ] || [ "$version" = "undefined" ]; then
     echo "ERROR: cannot read the $parent version from node_modules" >&2
     exit 1
+  fi
+  if [ -f "$dest/package.json" ]; then
+    have="$(node -p "require('./$dest/package.json').version" 2>/dev/null || true)"
+    if [ "$have" = "$version" ]; then
+      return 0
+    fi
+    # npm ci may have put a different version here (see the note above).
+    echo "    replacing $pkg@$have with @$version"
+    rm -rf "$dest"
   fi
   url="$(npm view "$pkg@$version" dist.tarball 2>/dev/null || true)"
   if [ -z "$url" ]; then
