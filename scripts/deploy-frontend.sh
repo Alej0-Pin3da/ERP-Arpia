@@ -71,6 +71,50 @@ if [ ! -f "$FRONTEND_SRC/package.json" ]; then
 fi
 cd "$FRONTEND_SRC"
 npm ci
+
+# Platform-native binaries. package-lock.json is generated on Windows, so it
+# only pins the win32 builds of rollup / esbuild / tailwind-oxide /
+# lightningcss; `npm ci` installs exactly what the lock lists, so on Linux
+# those packages cannot load their native module at build time
+# ("Cannot find module @rollup/rollup-linux-x64-gnu"). Install the Linux x64
+# binaries at the very versions `npm ci` just installed, then restore the
+# lockfile so the clone stays clean for the next `git pull --ff-only`.
+restore_lockfile() {
+  if ! git -C "$FRONTEND_SRC" diff --quiet -- package-lock.json; then
+    git -C "$FRONTEND_SRC" checkout -- package-lock.json
+    echo "    package-lock.json restaurado - el clon queda limpio"
+  fi
+}
+trap restore_lockfile EXIT
+
+native_missing=""
+require_native() {
+  # $1 = package, $2 = parent package whose installed version we mirror
+  local pkg="$1" parent="$2" version
+  if [ -d "node_modules/$pkg" ]; then
+    return 0
+  fi
+  version="$(node -p "require('./node_modules/$parent/package.json').version" 2>/dev/null || true)"
+  if [ -z "$version" ]; then
+    echo "ERROR: cannot read $parent version from node_modules" >&2
+    exit 1
+  fi
+  native_missing="$native_missing $pkg@$version"
+}
+
+if [ "$(uname -s)" = "Linux" ]; then
+  require_native "@rollup/rollup-linux-x64-gnu" "rollup"
+  require_native "@esbuild/linux-x64" "esbuild"
+  require_native "@tailwindcss/oxide-linux-x64-gnu" "@tailwindcss/oxide"
+  require_native "lightningcss-linux-x64-gnu" "lightningcss"
+
+  if [ -n "$native_missing" ]; then
+    echo "    native Linux binaries missing from the lock:$native_missing"
+    # shellcheck disable=SC2086  # the space-separated list is intentional
+    npm install --no-save --no-audit --no-fund $native_missing
+  fi
+fi
+
 npm run build
 
 echo "==> [4/6] Verifying build output"

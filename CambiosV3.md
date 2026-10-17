@@ -3,6 +3,15 @@
 
 Este documento registra cronológica y detalladamente todas las modificaciones, nuevas funcionalidades, módulos maestros, correcciones y expansiones integradas a partir de la versión 3 (V3).
 
+### [2026-10-17] - Deploy frontend en Linux: binarios nativos ausentes en el lockfile
+
+- **Causa:** `package-lock.json` se genera en Windows, así que solo materializa las variantes `win32` de los paquetes con binario nativo (`@rollup/rollup-win32-*`, `@esbuild/win32-x64`, `@tailwindcss/oxide-win32-x64-msvc`, `lightningcss-win32-x64-msvc`). `npm ci` instala exactamente lo que lista el lock, entonces en el servidor Linux el build muere con `Cannot find module @rollup/rollup-linux-x64-gnu` (y fallarían también esbuild, tailwind-oxide y lightningcss).
+- **Descartado:** parchear el lock a mano con las entradas `linux-x64` — verificado que rompe `npm ci` (`EUSAGE`: *can only install packages when your package.json and package-lock.json are in sync*) porque cualquier entrada extra fuerza a npm a re-resolver el árbol. Tampoco se regeneró el lock: un `npm install --package-lock-only` desde Windows refresca 68 versiones del toolchain, cambio que no se quiere mezclar con un deploy.
+- **Fix (solo script de deploy):** en `scripts/deploy-frontend.sh`, tras `npm ci`, si el sistema es Linux y faltan esos 4 binarios en `node_modules`, se instalan con `npm install --no-save` a la MISMA versión que `npm ci` acaba de dejar (leída de `node_modules/<padre>/package.json`), con `trap` en `EXIT` que restaura `package-lock.json` para que el clon quede limpio y el próximo `git pull --ff-only` no se caiga.
+- **Verificación:** `bash -n` OK, archivo en LF (0 pares CRLF). La prueba real es el deploy en el servidor.
+- **Archivos:** `scripts/deploy-frontend.sh`.
+- **Pendiente:** CI (`ubuntu-latest` + `npm ci`, `.github/workflows/ci.yml`) falla por la misma causa; y el lockfile ideal es uno generado en Linux (o regenerado y validado) — ambos fuera del alcance de este deploy.
+
 ### [2026-10-14] - Deploy a servidor: frontend en raíz, env ejemplo y CRLF
 
 - **Causa:** `deploy-frontend.sh` apuntaba a `$CLONE/frontend` pero el front vive en la raíz del repo (`package.json`/`src/`/`dist/`); además tenía CRLF (105 líneas) que rompía `bash` en el servidor (`syntax error near unexpected token do`). `.env.example` estaba ignorado por `.gitignore` (`.env.*`) así que nunca viajaría al servidor, y le faltaban 6 vars que `config.py` ya lee. `docker-compose.yml` tampoco pasaba esas vars al servicio `api`.
